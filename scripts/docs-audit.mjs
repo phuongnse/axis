@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readList } from './check-issue-links.mjs'
@@ -342,8 +342,18 @@ async function read(runNumber) {
   )
 }
 
+/**
+ * Reads the findings that the audit job wrote. The read command always prints a list, at least `[]`, so a
+ * missing or empty file means the findings were lost on the way, and filing nothing would hide them.
+ */
+export function readFindings(file) {
+  const text = existsSync(file) ? readFileSync(file, 'utf8').trim() : ''
+  if (!text) throw new Error(`${file} holds no findings: the audit job passed none, so nothing is filed`)
+  return JSON.parse(text)
+}
+
 function file(findingsFile, runId) {
-  const findings = JSON.parse(readFileSync(findingsFile, 'utf8'))
+  const findings = readFindings(findingsFile)
   const gh = process.env.GH ?? 'gh'
   const open = JSON.parse(run(gh, ['issue', 'list', '--state', 'open', '--limit', '1000', '--json', 'body']))
   const { issues, leftOut } = issuesFrom(findings, open.map((i) => i.body ?? ''), runId)

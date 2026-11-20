@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, test } from 'node:test'
 import {
   chooseHomes,
@@ -11,6 +14,7 @@ import {
   parseAnswer,
   parseHomes,
   readers,
+  readFindings,
   readGroups,
   shares,
 } from './docs-audit.mjs'
@@ -295,5 +299,32 @@ describe('issuesFrom', () => {
     )
     assert.equal(issues.length, maxIssues)
     assert.deepEqual(leftOut, found.slice(-9))
+  })
+})
+
+describe('readFindings', () => {
+  const withFile = (text, check) => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'docs-audit-'))
+    try {
+      const file = path.join(dir, 'findings.json')
+      if (text !== undefined) writeFileSync(file, text)
+      check(file)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  test('an empty file is refused with its name, since the read command always prints a list', () => {
+    withFile('\n', (file) => assert.throws(() => readFindings(file), (e) => e.message.includes(file) && e.message.includes('no findings')))
+  })
+
+  test('a missing file is refused the same way', () => {
+    withFile(undefined, (file) => assert.throws(() => readFindings(file), (e) => e.message.includes(file) && e.message.includes('no findings')))
+  })
+
+  test('a file with a list is read as that list', () => {
+    withFile('[]', (file) => assert.deepEqual(readFindings(file), []))
+    const one = [finding('docs/a.md', 3, 'wrong')]
+    withFile(JSON.stringify(one), (file) => assert.deepEqual(readFindings(file), one))
   })
 })
