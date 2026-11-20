@@ -652,7 +652,6 @@
   "shell.value.items": "{count} mục",
   "shell.value.table": "Bảng",
   "shell.value.json": "JSON",
-  "shell.value.showAs": "Hiển thị dạng",
   "shell.empty.noData": "Chưa có dữ liệu.",
   "shell.kpi.empty": "Không có giá trị",
   "shell.kpi.loading": "Đang tải…",

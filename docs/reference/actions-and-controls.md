@@ -215,7 +215,8 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   a count of fields or items, or Hidden ("Đã ẩn") for a secret or a value the reader may not read, takes the
   [empty value's](frontend.md#shown-values) style, as Not set does. The server's `[secret]` stays its placeholder in
   logs, JSON and the API, and reads Hidden in the table. A value in the table has no copy button. A JSON body is a table
-  by default, with a Table and JSON switch. Other text shows as it is in the code font.
+  by default, with Table and JSON as line tabs right above it, see [tab bars](#tab-bars). Other text shows as it is in
+  the code font.
 - **A person by name** _(planned)_. A person is always named, so a page read by someone else, or seen in a screenshot,
   still says who. The signed-in person's own name is followed by "(you)" ("(bạn)") in `textMuted`, and is never
   replaced by You or Me. "Me" stays for the reader's own voice, such as a filter Assigned to me. A name is a link only

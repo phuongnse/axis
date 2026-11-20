@@ -1,4 +1,4 @@
-import { Flex, Segmented } from 'antd'
+import { Tabs } from 'antd'
 import { useMemo, useState } from 'react'
 import { CodeBlock } from './CodeBlock'
 import { useText } from './texts'
@@ -30,9 +30,10 @@ function parsedBody(body: string): { value: object; pretty: string } | null {
 type Shown = 'table' | 'json'
 
 /**
- * A body that may be JSON. One that is an object or a list shows as a {@link ValueTable} by default, with a Table and
- * JSON switch. Other text shows as it is in a {@link CodeBlock}, see docs/reference/actions-and-controls.md#text. Shared
- * widgets are in docs/reference/shared-widgets.md#which-widget.
+ * A body that may be JSON. One that is an object or a list shows as a {@link ValueTable} by default, with Table and
+ * JSON as line tabs right above the body, see docs/reference/shell.md#layout. Other text shows as it is in a
+ * {@link CodeBlock}, see docs/reference/actions-and-controls.md#text. Shared widgets are in
+ * docs/reference/shared-widgets.md#which-widget.
  */
 export function BodyView({ body, testId }: { body: string; testId?: string }) {
   const t = useText()
@@ -42,17 +43,15 @@ export function BodyView({ body, testId }: { body: string; testId?: string }) {
     return <CodeBlock testId={testId} text={body} />
   }
   return (
-    <Flex vertical gap="small" data-testid={testId}>
-      <Segmented<Shown>
-        aria-label={t('shell.value.showAs')}
-        value={shown}
-        onChange={setShown}
-        options={[
-          { value: 'table', label: t('shell.value.table') },
-          { value: 'json', label: t('shell.value.json') },
-        ]}
-      />
-      {shown === 'table' ? <ValueTable value={parsed.value} /> : <CodeBlock text={parsed.pretty} />}
-    </Flex>
+    <Tabs
+      data-testid={testId}
+      activeKey={shown}
+      onChange={(key) => setShown(key as Shown)}
+      destroyOnHidden
+      items={[
+        { key: 'table', label: t('shell.value.table'), children: <ValueTable value={parsed.value} /> },
+        { key: 'json', label: t('shell.value.json'), children: <CodeBlock text={parsed.pretty} /> },
+      ]}
+    />
   )
 }
