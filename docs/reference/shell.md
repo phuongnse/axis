@@ -98,6 +98,13 @@ their own controls where they expect them.
   border, box or rounded corner goes round a region. A rule runs the whole length of the region it parts, from one
   rule to the next or to the edge, as the rule under the header and the one beside the sidebar do. What fills a
   region, such as a log, a code editor or a table, reaches the region's rules with no box of its own.
+- **A region lines up, scrolls once and follows the work** _(planned)_. A region's title row, its content and its
+  action bar start and end at one inset, `spacing-md` in a pane of a workspace and `spacing-lg` on a page, and an
+  `ActionBar` at the foot of a pane takes the pane's inset. A region scrolls as one, and no region scrolls inside
+  another. Its title row and its action bar stay in place while its content scrolls. A region's parts come in the
+  order a person works: what to act on, the input, the action, then the result. An action sits after what it acts
+  on, at the foot of its region when the input can be long, and the result comes after the action, below it or on
+  its right.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer.
 - **The bar slot** _(planned)_. The save bar draws in the shell's bar slot, `ShellBarSlot`, in the content column
   right above the footer, and it sticks to the window's foot while the page scrolls. See the
