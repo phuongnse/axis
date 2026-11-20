@@ -1,4 +1,3 @@
-import { DownOutlined } from '@ant-design/icons'
 import { Button, Dropdown, type MenuProps } from 'antd'
 import { useContext, useState } from 'react'
 import { useShellSidebar } from '../platform/shellSidebarContext'
@@ -9,6 +8,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { StudioNewApplication } from './StudioNewApplication'
+import { Chevron } from '../platform/Chevron'
 
 /** The height of the application row, the `bar` size of the shell's header. */
 const rowHeight = 48
@@ -101,7 +101,7 @@ export function StudioSidebar({
                 >
                   {title}
                 </span>
-                <DownOutlined aria-hidden style={{ flex: 'none', fontSize: 12 }} />
+                <Chevron />
               </>
             )}
           </Button>

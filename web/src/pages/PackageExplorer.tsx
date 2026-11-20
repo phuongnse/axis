@@ -1,15 +1,9 @@
-import {
-  FileOutlined,
-  FolderOpenOutlined,
-  FolderOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  RightOutlined,
-} from '@ant-design/icons'
+import { FileOutlined, FolderOpenOutlined, FolderOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Dropdown, Flex, Tree, type MenuProps, type TreeDataNode } from 'antd'
 import { useContext, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { navigationItemLook } from '../platform/antTheme'
 import { AxisButton } from '../platform/AxisButton'
+import { Chevron } from '../platform/Chevron'
 import { useText } from '../platform/texts'
 import { ThemeModeContext, useDesignTokens } from '../platform/themeMode'
 import { fileTree } from './packageTree'
@@ -274,9 +268,7 @@ export function PackageExplorer({
           className={flat ? 'axis-file-tree axis-file-tree-flat' : 'axis-file-tree'}
           treeData={tree}
           blockNode
-          switcherIcon={({ expanded: open }: { expanded?: boolean }) => (
-            <RightOutlined aria-hidden style={{ fontSize: 10, transform: open ? 'rotate(90deg)' : undefined }} />
-          )}
+          switcherIcon={({ expanded: open }: { expanded?: boolean }) => <Chevron direction={open ? 'down' : 'right'} />}
           expandedKeys={expanded}
           onExpand={(keys) => {
             const open = new Set(keys.map(String))

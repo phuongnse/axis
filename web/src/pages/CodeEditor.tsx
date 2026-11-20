@@ -16,6 +16,7 @@ import { Annotation, Compartment, EditorState, Prec, Transaction, type Extension
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref, type RefObject } from 'react'
 import { selectedItemTint } from '../platform/antTheme'
+import { Chevron } from '../platform/Chevron'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { findPanel, type FindTexts } from './jsonFindPanel'
@@ -94,6 +95,8 @@ export default function CodeEditor({
   const { mode } = useThemeMode()
   const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
+  /** The platform's chevron, drawn hidden, that the fold gutter copies for each fold mark. */
+  const foldMark = useRef<HTMLSpanElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [themeCompartment] = useState(() => new Compartment())
   const [languageCompartment] = useState(() => new Compartment())
@@ -144,7 +147,15 @@ export default function CodeEditor({
           // closing brackets, indenting as one types and completion of the words in the text.
           highlightActiveLineGutter(),
           highlightActiveLine(),
-          foldGutter(),
+          // The fold marks are the platform's one chevron, in the gutter's textMuted.
+          foldGutter({
+            markerDOM: (open) => {
+              const mark = foldMark.current!.firstElementChild!.cloneNode(true) as HTMLElement
+              mark.style.color = 'inherit'
+              mark.style.transform = open ? '' : 'rotate(-90deg)'
+              return mark
+            },
+          }),
           bracketMatching(),
           closeBrackets(),
           indentOnInput(),
@@ -313,7 +324,14 @@ export default function CodeEditor({
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  return <div ref={hostRef} style={{ height: fill ? '100%' : height }} />
+  return (
+    <>
+      <span ref={foldMark} hidden>
+        <Chevron />
+      </span>
+      <div ref={hostRef} style={{ height: fill ? '100%' : height }} />
+    </>
+  )
 }
 
 const codeViewTheme = sharedTheme((tokens, mode) => {

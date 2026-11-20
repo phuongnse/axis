@@ -1,4 +1,4 @@
-import { DownOutlined, EllipsisOutlined } from '@ant-design/icons'
+import { EllipsisOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Flex, Space, Tooltip, type ButtonProps, type FlexProps } from 'antd'
 import {
   createContext,
@@ -12,6 +12,7 @@ import {
   type Ref,
 } from 'react'
 import type { ButtonRole } from './buttonRoles'
+import { Chevron } from './Chevron'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { focusFollowsTab } from './tabFocus'
@@ -275,9 +276,7 @@ export function AxisButton(props: AxisButtonProps) {
   const { role, style, disabled, caret, children, ...rest } = props
   const body = {
     ...rest,
-    children: caret
-      ? [children, <DownOutlined key="caret" aria-hidden style={{ flex: 'none', fontSize: 12 }} />]
-      : children,
+    children: caret ? [children, <Chevron key="caret" />] : children,
   }
   const outline = (text: string): CSSProperties => (disabled ? {} : { color: text, borderColor: text })
   const tinted = (text: string): CSSProperties => (disabled ? {} : { color: text })
@@ -343,9 +342,15 @@ export function AxisSplitButton({
   onClick,
   menuNameKey,
   items,
+  titleRow = false,
   'data-testid': testId,
 }: {
   role?: 'secondary' | 'main'
+  /**
+   * Proposed, see #3978: the button sits in a region's title row, so it is a borderless text button with a borderless
+   * caret beside it, as light as the row's icon actions.
+   */
+  titleRow?: boolean
   children: ReactNode
   disabled?: boolean
   onClick: () => void
@@ -353,9 +358,10 @@ export function AxisSplitButton({
   items: readonly SplitButtonItem[]
   'data-testid'?: string
 }) {
+  const Group = titleRow ? Flex : Space.Compact
   return (
-    <Space.Compact data-testid={testId}>
-      <AxisButton role={role} disabled={disabled} onClick={onClick}>
+    <Group data-testid={testId} align="center">
+      <AxisButton role={titleRow ? 'plain' : role} disabled={disabled} onClick={onClick}>
         {children}
       </AxisButton>
       <Dropdown
@@ -370,8 +376,8 @@ export function AxisSplitButton({
           onClick: ({ key }) => items.find((item) => item.key === key)?.onClick(),
         }}
       >
-        <AxisButton role="icon" joined nameKey={menuNameKey} icon={<DownOutlined />} />
+        <AxisButton role="icon" joined={!titleRow} nameKey={menuNameKey} icon={<Chevron />} />
       </Dropdown>
-    </Space.Compact>
+    </Group>
   )
 }

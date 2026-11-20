@@ -1,4 +1,3 @@
-import { DownOutlined, UpOutlined } from '@ant-design/icons'
 import { linter, type Diagnostic as EditorDiagnostic } from '@codemirror/lint'
 import type { Extension } from '@codemirror/state'
 import { Flex, Modal, Select, Tabs, Typography } from 'antd'
@@ -46,6 +45,7 @@ import { PackageExplorer, type ExplorerTarget } from './PackageExplorer'
 import { PackageRun, type PackageOperation } from './PackageRun'
 import { SaveBar } from './SaveBar'
 import { FileAtLine, StudioProblemList } from './StudioProblems'
+import { Chevron } from '../platform/Chevron'
 
 /** What the workspace reads from a package's manifest. */
 interface PackageManifest {
@@ -858,7 +858,7 @@ export default function StudioPackage({
                     role="icon"
                     size="small"
                     nameKey={panelOpen ? 'shell.studio.package.panel.hide' : 'shell.studio.package.panel.show'}
-                    icon={panelOpen ? <DownOutlined /> : <UpOutlined />}
+                    icon={<Chevron direction={panelOpen ? 'down' : 'up'} />}
                     aria-expanded={panelOpen}
                     onClick={() => setPanelOpen((value) => !value)}
                   />

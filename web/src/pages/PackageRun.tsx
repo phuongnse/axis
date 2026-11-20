@@ -268,6 +268,7 @@ export function PackageRun({
               developer && (
                 <AxisSplitButton
                   data-testid="package-run-save"
+                  titleRow
                   disabled={input === null}
                   onClick={() =>
                     chosen === null
