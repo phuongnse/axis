@@ -55,7 +55,7 @@ function main(args) {
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the planned markers and where they sit, the homes of the capability map, the ASVS table, the threat model tables, the development users, the Studio spec folders table, the repository layout tree, the decisions, sections and milestones the code cites and the doc sizes, the skill word limit, the AGENTS.md word limits and the scripts it names are in order.')
+  console.log('The docs map, the decisions index, the planned markers and where they sit, the homes of the capability map, the ASVS tables, the threat model tables, the development users, the Studio spec folders table, the repository layout tree, the decisions, sections and milestones the code cites and the doc sizes, the skill word limit, the AGENTS.md word limits and the scripts it names are in order.')
   return 0
 }
 

@@ -2,7 +2,7 @@
 
 This page lists every log Axis writes: what it records, its format, where it goes, who reads it and how long it is
 kept. The design of telemetry is in [telemetry](../architecture.md#telemetry), and the rows of the
-[ASVS](asvs.md#requirements) chapter on logging point here. OTLP is the OpenTelemetry export protocol.
+[ASVS](asvs-data-and-operations.md#v16-security-logging-and-error-handling) chapter on logging point here. OTLP is the OpenTelemetry export protocol.
 
 ## Logs
 
@@ -22,7 +22,7 @@ Axis writes six logs: three streams of log entries for the operator, and three k
   admin events are the operator's, see [Axis's identity provider](identity-provider.md).
 - **Access.** Console and OTLP logs are the operator's to protect. Axis writes no log file, so no
   file permission is needed. The database rejects changes to the audit tables, see the
-  [ASVS](asvs.md#requirements) row for protected logs.
+  [ASVS](asvs-data-and-operations.md#v16-security-logging-and-error-handling) row for protected logs.
 - **Storage and retention.** The operator owns the storage and the retention of console and OTLP
   logs. Axis sets neither, and ships no collector.
 - **Nothing else.** The hosts store or send logs nowhere else than the rows above.
