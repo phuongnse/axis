@@ -941,8 +941,6 @@
   "shell.studio.package.readOnly": "Bạn xem được các tệp của gói mở rộng này. Muốn sửa, bạn cần vai trò nhà phát triển.",
   "shell.studio.package.loadFailed": "Không tải được tệp.",
   "shell.studio.package.saveFailed": "Không lưu được tệp.",
-  "shell.studio.package.status.changed": "Đã thay đổi từ phiên bản {release}",
-  "shell.studio.package.status.unchanged": "Không đổi từ phiên bản {release}",
   "shell.studio.package.newFile": "Tệp mới…",
   "shell.studio.package.newFile.title": "Tệp mới",
   "shell.studio.package.newFile.label": "Đường dẫn",

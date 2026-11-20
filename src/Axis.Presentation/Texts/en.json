@@ -941,8 +941,6 @@
   "shell.studio.package.readOnly": "You can read this package's files. Changing them needs the developer role.",
   "shell.studio.package.loadFailed": "The file could not be loaded.",
   "shell.studio.package.saveFailed": "The file could not be saved.",
-  "shell.studio.package.status.changed": "Changed since release {release}",
-  "shell.studio.package.status.unchanged": "Unchanged since release {release}",
   "shell.studio.package.newFile": "New file…",
   "shell.studio.package.newFile.title": "New file",
   "shell.studio.package.newFile.label": "Path",

@@ -18,7 +18,6 @@ import {
   buildStudioPackage,
   createStudioPackageFile,
   deleteStudioPackageFile,
-  fetchStudioLiveDiff,
   fetchStudioPackageFile,
   fetchStudioRequest,
   moveStudioPackageFiles,
@@ -73,9 +72,6 @@ interface OpenFile {
   /** Counts the times the file was put back, so its editor starts again with no steps. */
   generation: number
 }
-
-/** Whether the package differs from the live release, read from the live diff. */
-type PackageStatus = { release: number; changed: boolean } | 'unpublished' | undefined
 
 /** A tool of the workspace that runs on the server, and the request that runs it. */
 type Job = 'build' | 'test' | 'run'
@@ -152,7 +148,6 @@ export default function StudioPackage({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [writeError, setWriteError] = useState<string | null>(null)
-  const [status, setStatus] = useState<PackageStatus>()
   const [emptyFolders, setEmptyFolders] = useState<string[]>([])
   const [dialog, setDialog] = useState<Dialog>(null)
   const [panelOpen, setPanelOpen] = useState(true)
@@ -254,24 +249,6 @@ export default function StudioPackage({
     }
     return () => controller.abort()
   }, [application, packageId, missing])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchStudioLiveDiff(application, controller.signal).then(
-      (diff) =>
-        setStatus(
-          diff === null
-            ? 'unpublished'
-            : { release: diff.release, changed: diff.resources.some((entry) => entry.file.startsWith(packagePrefix)) },
-        ),
-      () => {
-        if (!controller.signal.aborted) {
-          setStatus(undefined)
-        }
-      },
-    )
-    return () => controller.abort()
-  }, [application, packagePrefix, files])
 
   // The frame fills the window down to the footer, as the code editor of a resource does.
   const fit = useCallback(() => {
@@ -543,15 +520,6 @@ export default function StudioPackage({
       : t('shell.studio.package.line')
           .replace('{language}', t(`shell.studio.package.language.${languageName}`))
           .replace('{version}', manifest.version)
-  const statusText =
-    status === undefined
-      ? null
-      : status === 'unpublished'
-        ? t('shell.studio.band.notPublished')
-        : t(status.changed ? 'shell.studio.package.status.changed' : 'shell.studio.package.status.unchanged').replace(
-            '{release}',
-            String(status.release),
-          )
 
   const activeSteps = steps[file] ?? { undo: 0, redo: 0 }
   const panelMax = Math.max(panelLeast, frameHeight - 160)
@@ -613,11 +581,7 @@ export default function StudioPackage({
 
   return (
     <div data-testid="studio-package" onKeyDown={onKeyDown}>
-      <PageLayout
-        title={manifest.label ?? packageId}
-        line={line}
-        tags={statusText === null ? undefined : <StatusTag tone="neutral">{statusText}</StatusTag>}
-      >
+      <PageLayout title={manifest.label ?? packageId} line={line}>
         <PageActions>
           {/* Proposed, see #3978: Build, Run tests and Run… are of equal weight, so they are one joined group. */}
           <AxisButtonGroup nameKey="shell.studio.package.actions">
