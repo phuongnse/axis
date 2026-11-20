@@ -32,12 +32,10 @@ widget has no heading, so it is not a part, and no rule sits above it.
 - **Positions.** The position comes from the metadata the user is served. A policy can remove a tab, so a shared link
   can open another tab.
 - **A page parameter named `tab`** clashes with the tab state.
-- **One mechanism** _(planned)_. The widget keeps its tab through `useAddressTab`, which a process instance's page
-  takes too, see [which widget](shared-widgets.md#which-widget).
+- **One mechanism.** The widget keeps its tab through `useAddressTab`, see [which widget](shared-widgets.md#which-widget).
+  A process instance's page keeps its tab the same way, see [process inspector widget](process-inspector-widget.md).
 
 ## Sections
-
-_(planned)_
 
 A `section` is a part of the page, as [shell layout](shell.md#layout) sets out. Its title is a heading drawn at the
 `heading5` size, straight on `surface`, with its widgets under it, and no panel, border or Ant Design `Collapse`. The

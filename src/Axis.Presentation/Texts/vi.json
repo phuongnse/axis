@@ -547,6 +547,8 @@
   "shell.notFound.home": "Về trang chủ",
   "shell.record.notFound": "Bản ghi này không tồn tại hoặc bạn không có quyền mở.",
   "shell.record.goToList": "Đi tới {page}",
+  "shell.section.show": "Hiện phần {title}",
+  "shell.section.hide": "Ẩn phần {title}",
   "shell.actionRow.more": "Thao tác khác",
   "shell.table.yes": "Có",
   "shell.table.no": "Không",
