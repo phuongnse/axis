@@ -222,16 +222,15 @@ function SitePage({
       return <NotFoundPage />
     }
     return (
-      <PageLayout title={t(page.titleKey)}>
-        <TaskPage
-          sitePath={sitePath}
-          pageName={page.name}
-          widget={taskInbox}
-          taskId={recordId}
-          locale={locale}
-          fallbackLocale={fallbackLocale}
-        />
-      </PageLayout>
+      <TaskPage
+        sitePath={sitePath}
+        pageName={page.name}
+        titleKey={page.titleKey}
+        widget={taskInbox}
+        taskId={recordId}
+        locale={locale}
+        fallbackLocale={fallbackLocale}
+      />
     )
   }
   // An instance's address is under its inspector page. `new` and an id in the wrong form are no instance.

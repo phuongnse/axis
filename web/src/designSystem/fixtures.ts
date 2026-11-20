@@ -21,7 +21,7 @@ import type {
   SiteMetadata,
   WidgetMetadata,
 } from '../platform/site'
-import type { TaskPage } from '../platform/tasks'
+import type { TaskItem, TaskPage } from '../platform/tasks'
 import type {
   AddAuthenticatorContext,
   AddAuthenticatorTexts,
@@ -79,6 +79,10 @@ export const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 export const shellRequestId = '9d4f5a6b-7c81-4d93-a4b5-c6d7e8f90a1b'
 /** A well-formed request id that no record has, which the fixtures answer `404` for. */
 export const missingRequestId = 'c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f'
+/** The first task of the inbox, which the `shell` preview opens. */
+export const taskId = '9c4f5d6e-7081-4c93-9da4-c5e6f708192a'
+/** A well-formed task id that no task has, which the fixtures answer `404` for. */
+export const missingTaskId = 'e4f5a6b7-c8d9-4e0f-8a1b-2c3d4e5f6a7b'
 const releaseId = '3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b0a'
 
 function field(name: string, type: FieldType, labelKey: string): FieldMetadata {
@@ -642,7 +646,7 @@ const history: HistoryPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
 const taskPage: TaskPage = {
   items: [
     {
-      id: '9c4f5d6e-7081-4c93-9da4-c5e6f708192a',
+      id: taskId,
       releaseId,
       process: 'Approve',
       step: 'Review',
@@ -826,6 +830,13 @@ const dashboardPage: PageMetadata = {
   ],
 }
 
+const tasksPage: PageMetadata = {
+  name: 'Tasks',
+  titleKey: 'page.tasks',
+  parameters: [],
+  widgets: [taskInboxWidget],
+}
+
 const requestPage: PageMetadata = {
   name: 'Request',
   titleKey: 'request.label',
@@ -876,6 +887,26 @@ const currentUser: CurrentUser = {
   tenantStatus: 'active',
   billingUrl: null,
   tenantExports: false,
+}
+
+/** The first task of the inbox as the task page reads it: open, claimed by the signed-in person and overdue. */
+const openTask: TaskItem = {
+  ...taskPage.items[0],
+  instanceId: '5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d',
+  state: 'open',
+  assignee: { user: null, role: 'Operator' },
+  claimedBy: currentUser.id,
+  overdue: true,
+  commands: ['release', 'reassign'],
+  reassignRoles: [],
+  outcomes: [
+    { name: 'approve', labelKey: 'request.outcome.approve' },
+    { name: 'reject', labelKey: 'request.outcome.reject' },
+  ],
+  form: { ...formWidget.form!, entity: formWidget.entity! },
+  completedAt: null,
+  completedBy: null,
+  outcome: null,
 }
 
 const ownAuthenticators: OwnAuthenticators = {
@@ -1342,6 +1373,9 @@ export const siteTexts: Record<string, string> = {
   'nav.dashboard': 'Dashboard',
   'page.requests': 'Requests',
   'page.dashboard': 'Dashboard',
+  'page.tasks': 'Tasks',
+  'request.outcome.approve': 'Approve',
+  'request.outcome.reject': 'Reject',
 }
 
 export const signUpApplications = {
@@ -1404,6 +1438,9 @@ export const routes: Record<string, FixtureRoute> = {
   [`${categoriesPath}/${categoryId}`]: () => categoryRecord,
   [`${categoriesPath}/${categoryId}/history`]: () => history,
   [tasksPath]: () => taskPage,
+  [`${tasksPath}/${taskId}`]: () => openTask,
+  [`${tasksPath}/${taskId}/form-state`]: noStateAnswer,
+  [`${tasksPath}/${missingTaskId}`]: () => new Response(null, { status: 404 }),
   [instancesPath]: () => instancePage,
   [deadLettersPath]: () => deadLetterPage,
   [requestsByStatusPath]: () => requestsByStatusPage,
@@ -1419,6 +1456,7 @@ export const routes: Record<string, FixtureRoute> = {
   [`/api/sites/${sitePath}`]: () => applicationSite,
   [`/api/sites/${sitePath}/pages/requests`]: () => requestsPage,
   [`/api/sites/${sitePath}/pages/request`]: () => requestPage,
+  [`/api/sites/${sitePath}/pages/tasks`]: () => tasksPage,
   [`/api/sites/${sitePath}/pages/dashboard`]: () => dashboardPage,
   [`/api/sites/${sitePath}/records/category`]: () => categoryRecordPage,
   [formStatePath('RequestForm')]: noStateAnswer,

@@ -187,7 +187,7 @@ below it. It says where the person is and what the page is.
   the header while the page scrolls, see [band](studio-workspace.md#band).
 - **Actions stay with their widget.** A widget's actions stay in its own toolbar, because a page can
   hold several widgets and an action belongs to its widget, not to the page.
-- **A record's actions** _(planned)_. A form's actions on its record are the page's own and sit on the right of the
+- **A record's actions.** A form's actions on its record are the page's own and sit on the right of the
   page's heading, on its row, see [start process actions](form-widget.md#start-process-actions). A task page's
   Release, Claim and Reassign… and its outcomes sit there too, see [task page](task-inbox-widget.md#task-page). Other
   widgets' actions stay with them.
@@ -433,7 +433,7 @@ to the frame shows in every state. How previews work is in
 
   | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Saved record, Saved record with a change, Record not found, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                                       |
+  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Saved record, Saved record with a change, Record not found, Task, Task not found, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                 |
   | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
   | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 

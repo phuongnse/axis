@@ -1,5 +1,5 @@
 import { EllipsisOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
+import { Button, Dropdown, Flex, Space, Tooltip, type ButtonProps, type FlexProps } from 'antd'
 import {
   createContext,
   useContext,
@@ -316,4 +316,50 @@ export function AxisButton(props: AxisButtonProps) {
         />
       )
   }
+}
+
+/**
+ * Actions of equal weight as one joined group, see docs/reference/actions-and-controls.md#buttons: buttons of one
+ * `role` in Ant Design's `Space.Compact`, each as wide as the widest, named by the text of `nameKey` for assistive
+ * technology. A group of one is a plain button of that role, with no group.
+ */
+export function AxisButtonGroup({
+  role,
+  nameKey,
+  actions,
+}: {
+  role: 'main' | 'secondary' | 'destructive'
+  nameKey: string
+  actions: readonly {
+    key: string
+    label: string
+    loading?: boolean
+    disabled?: boolean
+    onClick: () => void
+  }[]
+}) {
+  const t = useText()
+  const buttons = actions.map((action) => (
+    <AxisButton
+      key={action.key}
+      role={role}
+      loading={action.loading}
+      disabled={action.disabled}
+      onClick={action.onClick}
+    >
+      {action.label}
+    </AxisButton>
+  ))
+  if (actions.length === 1) {
+    return buttons[0]
+  }
+  return (
+    <Space.Compact
+      role="group"
+      aria-label={t(nameKey)}
+      style={{ display: 'inline-grid', gridAutoFlow: 'column', gridAutoColumns: '1fr' }}
+    >
+      {buttons}
+    </Space.Compact>
+  )
 }

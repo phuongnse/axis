@@ -3,10 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { designTokensFor } from './designTokens'
 import { formatValue } from './formatValue'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
+import { RecordPagesContext } from './recordPages'
 import type { FieldMetadata, FieldType, WidgetMetadata } from './site'
 import { TaskPage } from './TaskPage'
 import { TextProvider } from './TextProvider'
@@ -154,6 +154,7 @@ const subject = JSON.stringify({
 
 const texts = {
   ...platformEnglish,
+  'page.tasks': 'Tasks',
   'purchaseRequest.managerApproval': 'Manager approval',
   'purchaseRequest.sections.decision': 'Decision',
   'purchaseRequest.title': 'Title',
@@ -265,18 +266,21 @@ function CurrentPath() {
   return <output data-testid="location">{useLocation().pathname}</output>
 }
 
-function renderPage(outerCatalogs: TextCatalog[] = catalogs) {
+function renderPage(outerCatalogs: TextCatalog[] = catalogs, recordPages: Record<string, string> | null = null) {
   return render(
     <MemoryRouter initialEntries={[`/e2e/tasks/${taskId}`]}>
       <TextProvider catalogs={outerCatalogs} development={false}>
-        <TaskPage
-          sitePath="e2e"
-          pageName="Tasks"
-          widget={inboxWidget}
-          taskId={taskId}
-          locale="en"
-          fallbackLocale="en"
-        />
+        <RecordPagesContext value={recordPages ? { sitePath: 'e2e', recordPages } : null}>
+          <TaskPage
+            sitePath="e2e"
+            pageName="Tasks"
+            titleKey="page.tasks"
+            widget={inboxWidget}
+            taskId={taskId}
+            locale="en"
+            fallbackLocale="en"
+          />
+        </RecordPagesContext>
       </TextProvider>
       <CurrentPath />
     </MemoryRouter>,
@@ -300,16 +304,84 @@ describe('TaskPage', () => {
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Approve', 'Return', 'Reject'])
   })
 
-  it('spaces the form and its buttons 24px apart, from the layout', async () => {
+  it('is headed by the step label, with Task as its line, and has no title of the inbox', async () => {
     stubTaskApi()
 
-    const { container } = renderPage()
+    renderPage()
 
     await screen.findByTestId('field-value-title')
-    const form = container.querySelector('form')
-    const buttons = screen.getByRole('button', { name: 'Approve' }).parentElement
-    expect(form?.parentElement).toBe(buttons?.parentElement)
-    expect(form?.parentElement).toHaveStyle({ gap: `${designTokensFor('light').spacing.lg}px` })
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Manager approval')
+    expect(within(screen.getByTestId('page-heading')).getByText('Task')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Tasks' })).not.toBeInTheDocument()
+  })
+
+  it('lists Record and Due as the first part, and Record is a link where the entity has a record page', async () => {
+    stubTaskApi()
+    const { unmount } = renderPage(catalogs, { PurchaseRequest: '/e2e/requests' })
+
+    const facts = await screen.findByTestId('task-facts')
+    expect(
+      within(facts)
+        .getAllByRole('term')
+        .map((term) => term.textContent),
+    ).toEqual(['Record', 'Due'])
+    expect(within(facts).getByRole('link', { name: 'PR-2026-00042' })).toHaveAttribute(
+      'href',
+      `/e2e/requests/${subjectId}`,
+    )
+    unmount()
+
+    stubTaskApi()
+    renderPage()
+    const plain = await screen.findByTestId('task-facts')
+    expect(within(plain).getByText('PR-2026-00042')).toBeInTheDocument()
+    expect(within(plain).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('shows no Due fact for a task with no due date', async () => {
+    stubTaskApi({ reads: [{ status: 200, body: { ...openTask, dueAt: null } }] })
+
+    renderPage()
+
+    const facts = await screen.findByTestId('task-facts')
+    expect(
+      within(facts)
+        .getAllByRole('term')
+        .map((term) => term.textContent),
+    ).toEqual(['Record'])
+  })
+
+  it('puts the outcomes on the heading as one group named Decision, after the commands', async () => {
+    stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands: ['claim', 'release', 'reassign'] } }] })
+
+    renderPage()
+
+    await screen.findByTestId('field-value-title')
+    const actions = screen.getByTestId('page-actions')
+    expect(
+      within(actions)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Release', 'Claim', 'Reassign…', 'Approve', 'Return', 'Reject'])
+    const group = within(actions).getByRole('group', { name: 'Decision' })
+    expect(
+      within(group)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Approve', 'Return', 'Reject'])
+    expect(within(screen.getByTestId('task-form')).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('shows one outcome as a plain button', async () => {
+    stubTaskApi({
+      reads: [{ status: 200, body: { ...openTask, outcomes: [{ name: 'approve', labelKey: 'task.approve' }] } }],
+    })
+
+    renderPage()
+
+    await screen.findByTestId('field-value-title')
+    expect(within(screen.getByTestId('page-actions')).getByRole('button', { name: 'Approve' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Decision' })).not.toBeInTheDocument()
   })
 
   it("renders a label from the texts of the task's release when the site texts lack the key", async () => {
@@ -454,6 +526,8 @@ describe('TaskPage', () => {
     renderPage()
 
     expect(await screen.findByText('This task is assigned to someone else.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tasks')
+    expect(screen.queryByTestId('record-not-found')).not.toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
@@ -518,12 +592,13 @@ describe('TaskPage', () => {
     expect(api.completions()).toHaveLength(0)
   })
 
-  it('shows the overdue tag beside the due date of an overdue task only', async () => {
+  it("shows the overdue tag beside the step's label of an overdue task only", async () => {
     stubTaskApi({ reads: [{ status: 200, body: { ...openTask, overdue: true } }] })
     const { unmount } = renderPage()
 
-    expect(await screen.findByText('Overdue')).toBeInTheDocument()
-    expect(screen.getByText('Overdue').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
+    const tag = await within(await screen.findByTestId('page-heading')).findByText('Overdue')
+    expect(tag.closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
+    expect(within(screen.getByTestId('task-facts')).queryByText('Overdue')).not.toBeInTheDocument()
     unmount()
 
     stubTaskApi()
@@ -854,12 +929,16 @@ describe('TaskPage', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
-  it('shows the not-found page when the task API has no task with the id', async () => {
+  it('shows the not-found line under the inbox heading, with a link to the inbox, when the task API answers 404', async () => {
     stubTaskApi({ reads: [{ status: 404, body: { title: 'No task exists with this id.', status: 404 } }] })
 
     renderPage()
 
-    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    const line = await screen.findByTestId('record-not-found')
+    expect(line).toHaveTextContent('This task does not exist, or you cannot open it.')
+    expect(within(line).getByRole('link', { name: 'Go to Tasks' })).toHaveAttribute('href', '/e2e/tasks')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tasks')
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('asks to sign in when nobody is signed in', async () => {
@@ -921,15 +1000,33 @@ describe('TaskPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Next' }))
       expect(await screen.findByTestId('field-value-title')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
-      expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
-        'Back',
-        'Approve',
-        'Return',
-        'Reject',
-      ])
+      // The outcomes are on the heading, so Back is the only button under the fields.
+      expect(
+        within(screen.getByTestId('page-actions'))
+          .getAllByRole('button')
+          .map((button) => button.textContent),
+      ).toEqual(['Approve', 'Return', 'Reject'])
+      expect(
+        within(screen.getByTestId('task-form'))
+          .getAllByRole('button')
+          .map((button) => button.textContent),
+      ).toEqual(['Back'])
 
       await userEvent.click(screen.getByRole('button', { name: 'Back' }))
       expect(await screen.findByLabelText('Comments')).toHaveValue('Fine')
+    })
+
+    it('keeps Back and Next under the fields and the outcomes off the heading before the last step', async () => {
+      stubTaskApi({ reads: [{ status: 200, body: stepsTask }] })
+      const { container } = renderPage()
+
+      const comments = await screen.findByLabelText('Comments')
+      const form = container.querySelector('form')!
+      const next = within(screen.getByTestId('task-form')).getByRole('button', { name: 'Next' })
+      expect(form).toContainElement(comments)
+      expect(form.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(within(screen.getByTestId('page-actions')).queryByRole('button')).not.toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: 'Decision' })).not.toBeInTheDocument()
     })
 
     it('completes with the changes from every step', async () => {
