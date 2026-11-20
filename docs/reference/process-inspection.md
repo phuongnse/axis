@@ -454,7 +454,7 @@ same for every user who may inspect the instance. `subjectLabel`, `studio`, a ca
 **Values by user.** A call's `request`, `response` and `returned` differ between users too, as the masking
 rule hides them.
 
-**Run values by user.** The values that the masking rule hides in a run differ between users as well, each over its own field.
+**Run values by user.** The values that the masking rule hides in a run differ between users as well. A run's `read` and `made.changes` are hidden each over its own field, and the fields of `made.event` and the addresses of `made.notified` over the fields their expression reads.
 
 **Paths and variables.** _(planned for M38)_ The `variables`, and the `commands` of each path and task,
 differ between users too. The rest of `paths` and `tasks` is the same for every user.
@@ -463,9 +463,9 @@ differ between users too. The rest of `paths` and `tasks` is the same for every 
 
 Inspection shows a stored field value only where this section says it does. The history's
 `input` and `output` hold only ids, versions, step names and outcomes, and a
-task row holds none, so they need no masking. The history's `read`, `changes` and `notified` do hold field values, and
-the Kept run values bullet below masks them. A raised event's payload and the address of a notification hold field values too, and
-the Event fields and addresses bullet masks them. A call's `input` is the
+task row holds none, so they need no masking. The history's `read`, `changes` and `notified` do hold field values. The Kept run values bullet below masks
+`read` and `made.changes`, and the Event fields and addresses bullet masks `notified`. A raised event's payload holds field values too, and
+the Event fields and addresses bullet masks it. A call's `input` is the
 evaluated input that the call sent, so it holds field values.
 
 - **The hiding rule.** A call's `input` is shown only when the user may read
