@@ -33,7 +33,6 @@ function sourceFiles(directory) {
 }
 
 const splitLines = (text) => text.replace(/\n$/, '').split('\n')
-const countLines = (text) => splitLines(text).length
 export const lines = (file) => splitLines(readFileSync(file, 'utf8'))
 export const countWords = (text) => (text.match(/\S+/g) ?? []).filter((word) => /[\p{L}\p{N}]/u.test(word)).length
 
@@ -73,8 +72,8 @@ function git(root, args) {
   }
 }
 
-/** Returns a counter of a doc's lines at the base commit, or undefined when no base commit can be read. */
-export function gitBaseLineCount(root, env = process.env) {
+/** Returns a counter of a doc's words at the base commit, or undefined when no base commit can be read. */
+export function gitBaseWordCount(root, env = process.env) {
   const mergeBase = git(root, ['merge-base', 'HEAD', 'origin/main'])?.trim()
   const sha = [env.NEXKIT_BASE_SHA, mergeBase].find(
     (ref) => ref && git(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]),
@@ -82,6 +81,6 @@ export function gitBaseLineCount(root, env = process.env) {
   if (!sha) return undefined
   return (rel) => {
     const text = git(root, ['show', `${sha}:./${rel}`])
-    return text === undefined ? 0 : countLines(text)
+    return text === undefined ? 0 : countWords(text)
   }
 }

@@ -14,7 +14,7 @@ import { checkDecisions } from './lib/docs/decisions.mjs'
 import { checkCodeReferences } from './lib/docs/code-references.mjs'
 import { checkDevelopmentUsers } from './lib/docs/development-users.mjs'
 import { checkDocsMap } from './lib/docs/docs-map.mjs'
-import { gitBaseLineCount, relativePath } from './lib/docs/helpers.mjs'
+import { gitBaseWordCount, relativePath } from './lib/docs/helpers.mjs'
 import { checkPlannedMarkers } from './lib/docs/planned-markers.mjs'
 import { checkRepositoryLayout } from './lib/docs/repository-layout.mjs'
 import { checkSizes } from './lib/docs/sizes.mjs'
@@ -49,8 +49,8 @@ export function checkDocs(root, options = {}) {
 function main(args) {
   const rootIndex = args.indexOf('--root')
   const root = rootIndex >= 0 ? path.resolve(args[rootIndex + 1]) : scriptRoot
-  const baseLineCount = gitBaseLineCount(root)
-  const problems = checkDocs(root, { baseLineCount }).sort((a, b) =>
+  const baseWordCount = gitBaseWordCount(root)
+  const problems = checkDocs(root, { baseWordCount }).sort((a, b) =>
     a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1,
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)

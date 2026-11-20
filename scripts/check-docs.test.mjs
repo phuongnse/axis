@@ -20,7 +20,7 @@ function write(file, text) {
 
 const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' })
 
-const doc = (n) => '# Guide\n' + 'line\n'.repeat(n - 1)
+const doc = (n) => '# Guide\n' + 'word\n'.repeat(n - 1)
 
 const index = (...rows) =>
   ['# Decisions', '', '| Decision | Title | Status |', '| --- | --- | --- |', ...rows].join('\n') + '\n'
@@ -72,13 +72,13 @@ describe('CLI', () => {
     assert.equal(result.stderr, 'docs/README.md:1: does not list docs/reference/orphan.md\n')
   })
 
-  test('fails a committed doc that a change grows past 900 lines', () => {
-    write('docs/reference/guide.md', doc(880))
+  test('fails a committed doc that a change grows past 10,000 words', () => {
+    write('docs/reference/guide.md', doc(9800))
     git('init', '-q')
     git('add', '-A')
     git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base')
     const base = git('rev-parse', 'HEAD').stdout.trim()
-    write('docs/reference/guide.md', doc(910))
+    write('docs/reference/guide.md', doc(10100))
 
     const result = spawnSync(process.execPath, [script, '--root', root], {
       encoding: 'utf8',
@@ -86,7 +86,7 @@ describe('CLI', () => {
     })
 
     assert.equal(result.status, 1)
-    assert.match(result.stderr, /^docs\/reference\/guide\.md:901: 910 lines, up from 880/)
+    assert.match(result.stderr, /^docs\/reference\/guide\.md:1: 10100 words, up from 9800/)
   })
 
   test('passes on the repository', () => {
