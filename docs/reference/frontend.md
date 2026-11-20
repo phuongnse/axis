@@ -50,6 +50,11 @@ component holds a number of its own.
   modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. [Each preview](widget-previews.md#the-spec) is checked.
 - **Rules on a flush page** _(planned)_. `borderSubtle` stands apart from `surface` about as much in light mode as in
   dark, because on a flush page a rule is all that parts two areas. `border` stays for controls.
+- **One meaning, one sign** _(planned)_. A sign means one thing and looks one way. The same icon for the same meaning
+  has one shape, size and colour on every screen, whichever widget draws it.
+- **One chevron** _(planned)_. Every chevron is Ant Design's `DownOutlined` at 12 px in `textMuted`, turned to point
+  down for open or a menu below, right for closed and up for a panel that opens upwards: a select's arrow, a caret, a
+  fold and a panel's collapse. `Chevron` draws it.
 - **A surface for a graph**. `fillSubtle` is a shade off `surface` in both modes, with a light and a dark
   value, under a process graph and a step's icon tile, see [process graph](process-inspector-widget.md#process-graph).
 - **A site's brand** _(planned for M42)_. A site's `brand.primary` is its main colour, see [sites](configuration.md#sites)

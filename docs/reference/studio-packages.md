@@ -36,20 +36,70 @@ package's page as `&view=packages&package=<id>`.
 
 ## A package's files
 
-An open package lists its files. Reading and editing the text of a file, so that a package can be written in the
-browser, is planned, see the marked bullets below.
+An open package lists its files. The workspace that reads, edits, builds, tests and runs them, so that a
+package can be written in the browser, is planned, see the marked bullets below.
 
 - **The file list.** An open package lists its files by path, the manifest, the adapter, the lock file and
   the tests among them. The page is headed with the package's label, and its table has a filter and a sort on
   Path, and no search or pager. It shows the working folder.
-- **The code editor** _(planned for M37)_. Opening a file shows its text in a code editor. It builds on the CodeMirror editor of
-  the [JSON view](studio-resource-form.md#json-view), in `JsonView.tsx` and `codeEditorTheme.ts`, with the
-  highlighting of the file's language and the same colours, so no editor draws in CodeMirror's own.
-- **Saving** _(planned for M37)_. A save uses the version check of [versions](authoring.md#versions), and a save over a stale
-  version answers `409`, as it does for a resource.
-- **Without the developer role** _(planned for M37)_. The editor is read-only, and the file shows no save action.
-- **Problems** _(planned for M37)_. A build failure of a package shows in the [Problems panel](studio-workspace.md#problems-panel)
-  like any other diagnostic.
+- **The workspace** _(planned for M37)_. An open package is one workspace in place of the file list. It fills the
+  window down to the footer: the explorer on the left, the open files as tabs with the code editor under them, the
+  status line at the editor's foot, and the output panel under it, with Problems, Output, Tests and Run. A handle on
+  the explorer's end rule sets its width, from a least width to half the workspace, and a handle on the output
+  panel's top rule sets its height, both drawn as the one [handle on a rule](shell.md#layout). The workspace follows
+  [rules, not boxes](shell.md#layout): a rule under the heading from the sidebar across, rules between its regions
+  and no box.
+- **The heading** _(planned for M37)_. The package's label, with its kind and version under it. Build, Run tests and
+  Run… are on the right as one [group of equal weight](actions-and-controls.md#buttons), each button as wide as the
+  widest. The heading has no tag of a change, because the band's Changes not live tells of every change, so the
+  workspace reads no diff against the live release.
+- **The explorer** _(planned for M37)_. A tree of the package's folders and files, drawn by Ant Design's `Tree`.
+  Folders come first, with a chevron on a folder's left and a folder icon, and a file has a file icon. A file keeps
+  the chevron's place only in a tree that has a folder, so without one the files start at the explorer's edge. A
+  file with unsaved changes has a dot. A chosen or hovered row is marked across its whole width, a chosen one in the
+  tint of the [navigation's](shell.md#layout) current entry, and each level steps in by 12 px. Files is its title row,
+  with New, which offers New file and New folder, and Refresh. A node's actions are on a right click, Shift+F10 or the
+  menu key: New file, New folder, Rename (F2), Delete and Copy path. A file or folder dragged onto a folder moves into
+  it, and onto the explorer's free space moves to the package's root. The folder holds only files, so a new folder
+  lives in the explorer until a file is in it, as git keeps folders.
+- **The files and the editor** _(planned for M37)_. An open file is a tab with a dot while it is unsaved, and closing
+  it asks before it discards. The tabs are line tabs in the one tab look, and their rule is level with the rule under the explorer's title
+  row.
+  The editor is one CodeMirror 6 editor, the one the [JSON view](studio-resource-form.md#json-view) is, in
+  `codeEditorTheme.ts`'s colours and with the highlighting of the file's language, so no editor draws in
+  CodeMirror's own. It folds, matches and closes brackets, indents on input, completes the words of the text and
+  marks the current line. A build problem is marked at its line. Its fold column sits `spacing-sm` from the line
+  numbers and from the gutter's rule, and shows an open fold's chevron while the pointer is over the gutter and a
+  folded one always, as VS Code does. Ctrl+S saves every changed file, Ctrl+P opens a file by its name and
+  Ctrl+Shift+B builds.
+- **Saving** _(planned for M37)_. A save uses the version check of [versions](authoring.md#versions), and a save over a
+  stale version answers `409`, as it does for a resource. One save bar saves every changed file.
+- **The status line** _(planned for M37)_. At the editor's foot, right above the output panel, it tells of the open
+  file: the cursor's line and column, the file's language and what is unsaved.
+- **Save before a run** _(planned for M37)_. Build, Run tests and Run… save every changed file first, as a code
+  editor saves before it runs a task, so each takes the files the editor shows. A file that cannot be saved, such as
+  one changed elsewhere, stops it with that file's notice.
+- **Build** _(planned for M37)_. A build runs only when asked, from Build or Ctrl+Shift+B. Each save still answers the folder's diagnostics. The build's output shows in Output
+  under a title row with its state, and its problems in Problems, see [the authoring API](#the-authoring-api).
+- **Problems** _(planned for M37)_. The diagnostics of the folder and of a build show in the
+  [Problems panel](studio-workspace.md#problems-panel) like any other diagnostic. A problem's file at its line
+  follows its message on the row when the row has room, and opens the file at that line.
+- **Tests** _(planned for M37)_. Run tests shows one row a test in Tests, with its result, name, duration and message.
+  A failed test's place, its file at its line, follows its message and opens there, as a problem's file does.
+- **Run** _(planned for M37)_. Run… shows two panes parted by a rule that runs the panel's height. The Input pane is
+  one block under its title row, in the order a person works: Operation, then Saved input, then the Form and JSON
+  tabs and the values, with no rule between them. Run sits in the pane's action bar at its foot, outlined as the
+  pane's main action and lined up with the fields. The JSON shows each field the input lacks as `null`. The Output
+  pane has the Output title row, with the outcome as a status tag beside the title and Duration on the row's right,
+  then the output as read-only JSON, then a rule and the Log, wrapped. Each pane scrolls once from top to bottom, see
+  [scroll areas](actions-and-controls.md#scroll-areas). A run's CPU time is not shown, because one run's CPU time
+  tells the author nothing they act on, and it counts in the tenant's
+  [package run time](tenant-quotas.md#package-run-time-a-day).
+- **Saved inputs** _(planned for M37)_. A run's named inputs are kept with the application and shared by its
+  developers, as AWS Lambda's shareable test events are, so a team runs the same cases. Saved input's list ends with
+  Manage saved inputs…, which opens the [dialog that keeps saved items](actions-and-controls.md#fields).
+- **Without the developer role** _(planned for M37)_. The editor is read-only, with an info alert, and the file shows
+  no save action. The explorer offers only the files, Copy path and Refresh.
 
 ## Diffs
 
@@ -77,6 +127,18 @@ path names one as `packages/<package>/<path>`.
 | `GET /api/studio/apps/{application}/packages/{package}/files/{**path}` | `200` with `{ package, path, version, content }` and the version as an `ETag`, `content` being the file's text                                                                                                                                         |
 | `PUT /api/studio/apps/{application}/packages/{package}/files/{**path}` | `200` with `{ version, diagnostics }` and an `ETag`, both for a create and for a replace. The body is `{ content }` as `application/json`, with `If-None-Match: *` to create or `If-Match` of the file's version to replace                           |
 | `DELETE /api/studio/apps/{application}/packages/{package}/files/{**path}` | `200` with `{ diagnostics }`. It needs `If-Match` of the file's version                                                                                                                                                                            |
+
+Studio's package workspace needs these routes besides, see [a package's files](#a-packages-files). Each has the
+developer role and the switch as a write has, and answers `403` otherwise.
+
+| Route                                                                                  | Response                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/studio/apps/{application}/build` _(planned for M37)_                        | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below                                              |
+| `POST /api/studio/apps/{application}/test` _(planned for M37)_                         | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below                                      |
+| `POST /api/studio/apps/{application}/run` _(planned for M37)_                          | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run`, see A run of one operation below                                                                                                            |
+| `GET /api/studio/apps/{application}/packages/{package}/run-inputs` _(planned for M37)_ | `200` with `{ items: [{ name, operation, input }] }` and the version as an `ETag`, see Saved run inputs below                                                                                                                                    |
+| `PUT /api/studio/apps/{application}/packages/{package}/run-inputs` _(planned for M37)_ | `200` with `{ version }` and an `ETag`. The body is `{ items }`, with `If-None-Match: *` for the first save or `If-Match` of the version, and a stale version answers `409`                                                                                       |
+| `POST /api/studio/apps/{application}/packages/{package}/move` _(planned for M37)_      | `200` with `{ diagnostics }`. The body is `{ moves: [{ from, to, version }] }`, see Moves below                                                                                                                                                              |
 
 - **The checks.** A write to a package's files is under the [versions](authoring.md#versions) and the write
   lock, the storage quota, see [refusals](tenant-quotas.md#refusals), and the
@@ -121,3 +183,27 @@ path names one as `packages/<package>/<path>`.
 - **Testing a package.** The MCP server's `test_package` tests a package's files in a draft, see
   [tools](mcp-server.md#tools) and [a package's tests](authoring.md#test). It needs the developer role and the switch,
   as a write does.
+- **A build without a publish** _(planned for M37)_. `POST .../build` queues a `build` request that the publisher
+  sends to `application-package-host`, as a publish's build is sent, and it releases nothing. A Node.js package
+  compiles its TypeScript with its `tsconfig.json` before the checks, so an author never compiles on their own
+  machine. Studio polls `GET .../requests/{id}` as for any request. The request ends with each problem as a
+  [diagnostic](authoring.md#diagnostics) at its file, with `line` and `column`, which only a package file's
+  diagnostic has, and with `output`, the lines the host wrote.
+- **A package's tests from Studio** _(planned for M37)_. `POST .../test` with `{ package }` queues a `test` request
+  for that package's files, as `test_package` does. Its answer has `package`, `packageTests` and `output`. Each of
+  `packageTests` has `name`, `outcome`, `message` and `durationMs`, and a failed test has `file`, `line` and `column`,
+  where it failed in the package. Without `package` the request is the application's scenario test, see
+  [test](authoring.md#test).
+- **A run of one operation** _(planned for M37)_. `POST .../run` with `{ package, operation, input }` queues a `run`
+  request. The host builds the package's working files and calls the operation with the folder's bindings for its
+  capabilities. The request ends with `run`, which has `operation`, `outcome`, `output`, `error` (`code` and
+  `message`) and `durationMs`. The run's CPU seconds count in the tenant's
+  [package run time](tenant-quotas.md#package-run-time-a-day), and the answer carries no CPU time.
+- **Saved run inputs** _(planned for M37)_. `GET` and `PUT .../packages/{package}/run-inputs` read and replace the
+  application's named inputs for the package, `{ items: [{ name, operation, input }] }`, under the
+  [versions](authoring.md#versions) as a file is. They are kept outside the package's folder so no build holds
+  them, and each save is a revision.
+- **Moves** _(planned for M37)_. `POST .../packages/{package}/move` with `{ moves: [{ from, to, version }] }` moves
+  files as one revision, so one [undo](revisions-and-drafts.md#undo) puts them all back. Renaming a folder moves each
+  of its files. A changed file or a taken path answers `409`, and a refused path `400`, by the rules of
+  the path above.

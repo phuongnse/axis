@@ -244,6 +244,8 @@ In a cell the worker counts the CPU seconds that the runners of a tenant's
 - **Customer-hosted packages** _(planned for M37)_. The calls to a
   [customer-hosted](extension-packages.md#customer-hosted-runners) package are neither counted nor held,
   because they use no CPU of Axis.
+- **A run from Studio** _(planned for M37)_. A [run](studio-packages.md#the-authoring-api) of one operation from
+  Studio's package workspace counts its CPU seconds against `packageCpuSecondsPerDay`, as a call does.
 - **Refused.** While the quota is 0, turning the tenant's
   [switch](user-administration.md#application-packages) on and a publish of an application that holds an
   application's package answer the quota's `403`, see [refusals](#refusals).
