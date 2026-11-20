@@ -94,6 +94,10 @@ their own controls where they expect them.
   `borderSubtle` border and `radius-base` corners.
 - **Parts a rule apart** _(planned)_. A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
   drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
+- **Rules, not boxes** _(planned)_. A region is parted from the one beside it by one `borderSubtle` rule, and no
+  border, box or rounded corner goes round a region. A rule runs the whole length of the region it parts, from one
+  rule to the next or to the edge, as the rule under the header and the one beside the sidebar do. What fills a
+  region, such as a log, a code editor or a table, reaches the region's rules with no box of its own.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer.
 - **The bar slot** _(planned)_. The save bar draws in the shell's bar slot, `ShellBarSlot`, in the content column
   right above the footer, and it sticks to the window's foot while the page scrolls. See the

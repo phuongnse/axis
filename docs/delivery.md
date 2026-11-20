@@ -428,10 +428,10 @@ change, a design review and a sync are in the
   changes against the API's reference page and the server code that answers it, such as
   `ProcessInspectionEndpoints` for an instance. A value no API gives today is a field marked _Proposed_ in
   the code, named in the design issue's build notes. It never looks like a real value. The session also
-  checks the step against the rules for every screen, which
+  checks the step on the whole page it draws, against the rules for every screen, which
   [checking a card](../.claude/skills/axis-design/checking-a-card.md#the-rules-for-every-screen) lists with
-  their reference sections: text, showing what is empty, list order, opening things, and the contrast of
-  design tokens and previews in both modes.
+  their reference sections: text, showing what is empty, list order, opening things, rules, not boxes, and
+  the contrast of design tokens and previews in both modes.
 - **A step stays one step.** When a step reaches anything outside the subject, not only a new screen or a
   new concept of the platform, the session proposes it to the owner as its own design issue. The issue
   has the `design` and `on-hold` labels and no milestone. It is *blocked by* the review's design issue
