@@ -4,7 +4,7 @@ This page describes how Studio is laid out around the work: the list of applicat
 that an open application takes, and the band, headings, Overview, Releases and History that every
 application shares. The form that edits one resource is in
 [Studio resource form](studio-resource-form.md), and what each editor and designer does is in
-[Studio](studio.md). Shared controls, such as buttons and tables, follow
+[Studio](studio.md) and [Studio editors by kind](studio-editors-by-kind.md). Shared controls, such as buttons and tables, follow
 [actions and controls](actions-and-controls.md).
 
 ## Applications
@@ -170,7 +170,7 @@ and the application's description it shows, in one column:
    and order. A tile opens the running site in a new tab, so Studio stays open, and its accessible name
    says so, as in "Purchasing, opens in a new tab". A live release with no site says so.
 3. **Changes since the live release**: the files that differ from it, from the `changes` of
-   [`GET .../releases`](authoring.md#release-history), in the [change list](#change-list). The modules
+   [`GET .../releases`](authoring-publishing.md#release-history), in the [change list](#change-list). The modules
    and packages that differ follow the files, from its `partChanges`, modules first. Each module and
    package is a plain-text row, as on a [release page](#release-page). With no file and no module or
    package that differs, one line says that everything is live; with no live release, one line says
@@ -208,10 +208,10 @@ The Overview's changes and a release's changes share one list.
 ## Releases
 
 The Releases entry lists the application's releases from
-[`GET .../release-list`](authoring.md#release-list) on the
+[`GET .../release-list`](authoring-publishing.md#release-list) on the
 [shared table](actions-and-controls.md#tables), one row per release, the highest number first unless the
 view sorts them: a publish gives a release its label and note, and activating goes to whichever release is
-wanted. The table is paged on the server, [20 releases at a time](authoring.md#release-list), with Search,
+wanted. The table is paged on the server, [20 releases at a time](authoring-publishing.md#release-list), with Search,
 Filter, Columns, Refresh, a sort on Release, Label, Published and Published by, and a pager with a page size.
 Note does not sort, because it is long text. All of them live in the address, as
 [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md)
@@ -293,7 +293,7 @@ user without the author role is refused, and a number that the history lacks ans
   with `previousIsLive` true, else the one just below it, or `null` for the first. `live` is true when
   this release is the live one.
 - `changes` lists the files that differ from `previous`, as in the
-  [release history](authoring.md#release-history). It is `null` without `previous`.
+  [release history](authoring-publishing.md#release-history). It is `null` without `previous`.
 - `partChanges` lists the modules and packages that differ, each
   `{ type, id, label, change, version, previousVersion }`, where `change` is `added`, `removed`,
   `upgraded` or `downgraded`. It is `null` without `previous`.

@@ -465,7 +465,7 @@ release history see which promises of a module the business turned off, and why.
 - **What the release keeps.** The release keeps the list of relaxed points with their reasons, and the
   [release history](publish-request-storage.md#release-history) shows it. The Studio release history route answers
   `offStandard` and `relaxed` for each release, read from the `application.json` stored with it, see
-  [release history](authoring.md#release-history).
+  [release history](authoring-publishing.md#release-history).
 - **Where it shows.** Studio's [releases](studio-workspace.md#releases) show the Off-standard tag beside
   the number of an off-standard release, and the operator console's publishing view shows the tag with
   the module, point and reason of each relaxed entry.
@@ -488,7 +488,7 @@ marks some of them as contract scenarios, which test the contract's points on ev
   really tests its points is not checked.
 - **On publish.** Every publish and every validate request of an application runs the contract
   scenarios of every module it pins, before activation, through the
-  [publisher](authoring.md#publishing), as the `contracts` step of the request, see
+  [publisher](authoring-publishing.md#publishing), as the `contracts` step of the request, see
   [the publisher](administration.md#publisher). A failing one fails the request, which names the
   module, the scenario and its failing step, with `AXC0342`, once for each failing scenario, and
   nothing is stored or activated. Without scenarios to run, nothing changes.
@@ -496,8 +496,8 @@ marks some of them as contract scenarios, which test the contract's points on ev
   other scenarios run. Its result in the request's scenario results is
   `{ name, file, outcome: "skipped", point }`, with the first relaxed point in its `covers`, and the
   publisher writes a `<tenant> scenario <name> skipped: …` line. The
-  [request](authoring.md#the-request) returns the skipped item in its `scenarios`, and Studio's results
-  list shows it with its point. A [`test` request](authoring.md#test) skips them the same way, so a
+  [request](authoring-publishing.md#the-request) returns the skipped item in its `scenarios`, and Studio's results
+  list shows it with its point. A [`test` request](authoring-publishing.md#test) skips them the same way, so a
   draft that relaxes the point passes the agent's checking step and an author's test run.
 
 ## In Studio

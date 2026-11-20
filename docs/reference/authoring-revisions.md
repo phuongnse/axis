@@ -20,7 +20,7 @@ records the folder as the start of history first and answers.
 
 `200` with `{ items: [{ id, summary, author, userId, client, request, time }], page, pageSize, totalCount,
 start }`: one page of the revisions, newest first unless `sort` says otherwise. `userId` and `client` are
-`null` for a revision the server made. `request` is the `accept` [publish request](authoring.md#the-request)
+`null` for a revision the server made. `request` is the `accept` [publish request](authoring-publishing.md#the-request)
 that a revision from an accept names, and `null` for any other.
 
 The route takes the record API's `page`, `pageSize`, `sort`, `search` and `filter`, as
@@ -69,7 +69,7 @@ A draft that does not exist, or that is another person's, answers `404`, titled 
 draft with this id." The write lock is taken to read, so a lock that cannot be taken answers `503`.
 
 - **Titles** _(planned for M35)_. Each entry of `resources` also carries `titles`: the resource's label by locale, as
-  `GET .../resources` gives it, see [release history](authoring.md#release-history) for `changes`. It is null
+  `GET .../resources` gives it, see [release history](authoring-publishing.md#release-history) for `changes`. It is null
   without a label text key.
 
 ## Live diff

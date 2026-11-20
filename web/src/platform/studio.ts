@@ -1367,7 +1367,7 @@ export interface StudioReleasePage {
 
 /**
  * Loads one page of the releases of an application, the highest number first unless `query` sorts them. `query` is the
- * record API's `page`, `pageSize`, `sort`, `search` and `filter` as a query string, see docs/reference/authoring.md#release-list.
+ * record API's `page`, `pageSize`, `sort`, `search` and `filter` as a query string, see docs/reference/authoring-publishing.md#release-list.
  * A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function fetchStudioReleaseList(

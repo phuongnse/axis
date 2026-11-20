@@ -789,7 +789,7 @@ trusted code, so the platform gives it more limits than an installation's packag
   closes it without an answer or does not answer within 5 minutes fails it with one `AXC0152` diagnostic at
   `packages/<id>/axis-package.json`, which does not name the host's address. Either way no release is stored,
   and a `publish` to a `tenant` writes `release.publishFailed`. A `built` answer lets the compile go on, and a new release
-  stores the built files, see [a built package in the release](#versions-and-pinning). A `test` that names a package sends that package as a `test`, see [test](authoring.md#test).
+  stores the built files, see [a built package in the release](#versions-and-pinning). A `test` that names a package sends that package as a `test`, see [test](authoring-publishing.md#test).
   A `validate`, `accept`, any other `test`, `activate` and the activation at server start do not build
   packages yet. A publish needs the publisher role only.
 - **In the release.** The release holds every file of the package as written, and the content hash covers
