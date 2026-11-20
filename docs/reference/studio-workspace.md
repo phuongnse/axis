@@ -107,6 +107,8 @@ that names no resource shows its file in muted text. Opening the link opens its 
 problem names and leaves the panel open, so an author can fix one problem after another. The panel scrolls on its own and stops at its
 end, as [scroll areas](actions-and-controls.md#scroll-areas) say.
 
+- **A problem's row** _(planned)_. Its severity is a status tag set apart from its code, and its resource or file
+  follows its message on the row when the row fits it.
 - **The shared frame.** The panel is drawn in `SidePanel`, the one side panel frame of every page, at the
   width the person last chose, see [layout](shell.md#layout).
 

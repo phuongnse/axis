@@ -42,8 +42,23 @@ widget names a role, never an Ant Design button type.
   scrolls draws in the shell's [bar slot](shell.md#layout), above the footer, instead of at the foot of its page.
 - **Actions of equal weight are one group** _(planned)_. A screen keeps one main action. Actions of equal weight that
   together are a region's main action, such as a task's outcomes, are one joined group in the `main` role, in the order
-  the process gives them. Each button of the group is as wide as the widest, stays a button of its own with no selected
-  state, and the group has a name for assistive technology. A group of one is a plain `main` button.
+  the process gives them. Actions of equal weight in any other role, such as a package's Build, Run tests and Run…,
+  are one joined group in their role. Each button of the group is as wide as the widest, stays a button of its own
+  with no selected state, and the group has a name for assistive technology. A group of one is a plain button of its
+  role.
+- **Which actions go together** _(planned)_. Do the actions change or remove the same thing? Then they manage that
+  thing. If not, they are tools, which stay side by side.
+- **Actions that manage one thing fold into a split button** _(planned)_. From three on, the one used most stays the
+  button and the others are the entries of a menu on its joined caret, in their order, a destructive one in
+  `dangerText`. It is one button in one shape, as Ant Design joins one with Space.Compact: its text does the action
+  and its caret opens the menu. `AxisSplitButton` draws it.
+- **Tools stay side by side** _(planned)_. Find, Format, Copy, Zoom in, Zoom out, Move up, Move down, Undo and Redo
+  stay as buttons, because a menu would cost a click each time. They fold into "…" only when their row runs out of
+  room.
+- **All text or all icons** _(planned)_. A group of actions is all text or all icons. The "…" or the caret that opens
+  a menu is no action of its own, so it stays an icon beside text or icons alike.
+- **A page's actions and a tree's rows keep their own rules** _(planned)_. A page's actions keep the page's rules, and
+  a file tree's node keeps its actions on a right click, Shift+F10 or the menu key.
 - **Text or an icon, never both.** An action shows its text or its icon. An icon goes with text only
   where it does what text cannot: navigation that collapses to icons, a status or a severity, and the
   mark that identifies an application or a site.
@@ -80,6 +95,9 @@ choices.
   icon-only trigger has none.
 - **Actions come after the choices.** In a menu that holds both, such as the
   application menu, the choices come first and an action, such as New application…, follows them.
+- **A select's own actions end its list** _(planned)_. Creating or managing a select's choices, such as New
+  application… or Manage saved inputs…, comes after the choices and a divider, in the look of the list's own items,
+  as actions come after the choices in a menu. `ChoiceActions` draws them.
 - **One look for a list's items** _(planned for M35)_. Every list of things to pick or open draws its
   items one way, whether Ant Design draws the list or the page does, such as the sidebar's menu, a select
   or the notification bell. An item sits inset from its list's edge, with rounded corners. Groups are set
@@ -121,6 +139,14 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   `AxisCheckboxField` and `AxisChoiceField` take the same two modes: with a `name` inside a form, or with the
   value and `onChange` the screen holds. A choice the screen holds gives its radio group a name of its own, so
   two choices on one panel never join.
+- **An action on an input's value** _(planned)_. It is an icon inside the input, at its end, such as Clear, Copy, Show
+  password or a label's Translations.
+- **An action on a select's value** _(planned)_. It is an icon joined after the select, such as a reference's Open, the
+  two as wide as the field.
+- **One dialog keeps saved items** _(planned)_. Saved items that a person names, a table's views and a package's saved
+  run inputs, are kept in one dialog, `SavedItemsDialog`. Each name opens its item, its line holds one split button,
+  Overwrite with Rename and Delete in its menu, and Name with Save saves what is shown now as a new item. A table
+  opens it from Views, and a select of saved items from the end of its list.
 - **A field's status.** A field inside a form takes a `status`, what the screen found about the
   field beyond its rules: a check run while the person types, such as whether a subdomain is free, or
   choices that could not load. Running shows the input busy. A status that passed leaves the field as it
@@ -164,6 +190,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 A tab bar sits `spacing-md` under what precedes it. The theme starts a tab's label at the top of its
 bar, with the underline right under the label, for every tab bar, because Ant Design's padding above
 the label reads as a gap too wide.
+
+- **One tab row look** _(planned)_. Every tab row of a workspace has the same padding and a rule the region's width,
+  whether it holds a file's tabs or a view switch.
 
 ## Text
 
@@ -314,6 +343,9 @@ be kept right.
   view keeps its name and its place in the list. The columns, the page size and the data source values stay out, as
   they do on Save view. After the overwrite the line shows the view again and the dialog stays open. A write the
   server refuses leaves the dialog open with "The view could not be overwritten.", and the list stays as it was.
+- **Views in the saved items dialog** _(planned for M37)_. A table's Views opens the one
+  [dialog that keeps saved items](#fields), in place of the icons a view's line has. Each line is one split button,
+  Overwrite with Rename and Delete in the menu of its joined caret.
 - **Which tables keep a choice.** A table whose view `useTableView` keeps in the address, and that
   has a key, keeps its columns and views on the server. A table in a dialog keeps its view in the dialog and keeps
   nothing. The cell console's tables pass no key, because its host has no tenant database. Studio's page canvas
@@ -446,6 +478,9 @@ wheel with the page under two rules.
 - **One scroll area in each direction.** A scroll area never sits inside another that scrolls the same
   way, because two areas would share one wheel. So a list in a dialog grows, and the dialog's body scrolls
   it. A wide table may still scroll sideways inside a page or dialog that scrolls down.
+- **One scroll per pane** _(planned)_. A pane scrolls as one from top to bottom, however many blocks it holds. A code
+  editor in it is as tall as its text with no scroll of its own. One a person types in keeps a least height and reaches
+  the pane's foot when its text is shorter. An action bar at the pane's foot stays in place.
 
 ## Showing what is empty
 

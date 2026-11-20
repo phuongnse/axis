@@ -94,6 +94,35 @@ their own controls where they expect them.
   `borderSubtle` border and `radius-base` corners.
 - **Parts a rule apart.** A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
   drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
+- **Rules, not boxes** _(planned)_. One `borderSubtle` rule parts a block from the one beside it, and no border, box
+  or rounded corner goes round a region. It follows dividers over containers, as Material's containment has it, and a
+  code editor's split panes, and keeps clear of boxes inside boxes.
+- **Where a rule goes** _(planned)_. A rule goes under a block's title row, as under Files, Input, Output and Log, and
+  where one block ends and the next begins, such as between a run's Output and its Log. Inside a block's content no
+  rule is drawn at will: the parts of one task sit together under one title, set apart by spacing. Where a rule is
+  needed is judged on the whole page, not by applying a rule everywhere.
+- **A rule runs the whole way** _(planned)_. It runs the length of what it parts, from one rule to the next or to the
+  edge, as the rules under the header and beside the sidebar do.
+- **What fills a region fills it to its rules** _(planned)_. A log, a code editor or a table reaches the region's
+  rules, with no box of its own.
+- **One inset per region** _(planned)_. A region's title row, its content and its action bar start and end at the same
+  inset, `spacing-md` in a pane of a workspace and `spacing-lg` on a page. An action bar at the foot of a pane takes the
+  pane's inset and keeps its actions' outlines, as it holds the pane's main action, and its look never depends on
+  which buttons a person's rights show.
+- **Fields as wide as each other** _(planned)_. Every field of a region is as wide as the others, and no button stands
+  loose beside an input. An action of the whole region, such as Reset or Import, sits in its title row, and an action
+  of one control goes with the control.
+- **A title row's actions are light** _(planned)_. They are borderless text buttons or icon buttons with their names as
+  tooltips, at the usual button size, such as the explorer's New and Refresh.
+- **A view switch sits above what it switches** _(planned)_. A switch between two views of one content, such as Form
+  and JSON, is a row of line tabs right above that content, in the one look every tab row of the workspace has, see
+  [tab bars](actions-and-controls.md#tab-bars).
+- **The layout follows the work** _(planned)_. A region puts what to act on first, then the input, the action and the
+  result. An action sits after what it acts on, at the foot of its region when the input can be long, and the result
+  comes after it.
+- **A handle on a rule** _(planned)_. Every size handle, the side panel's included, is one handle: a grip of two bars
+  in `border` at the middle of its rule, lying over the rule, and the rule and the grip turn `primary` under the
+  pointer or a drag. `ResizeHandle` draws it.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer.
 - **The bar slot.** The save bar and a Studio request's guide draw in the shell's bar slot, `ShellBarSlot`, in the
   content column right above the footer. The slot sticks to the window's foot while the page scrolls and rests above
