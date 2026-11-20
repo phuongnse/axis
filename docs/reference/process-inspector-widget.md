@@ -90,11 +90,11 @@ wrong form show the not-found page, and the instance is not requested.
   only when the instance has a parent or a child. A relative whose process no navigation page inspects shows
   without a link.
 
-- **Tabs** _(planned)_. Three tabs, Diagram, History and Data, Diagram first, with no counts. The open tab is kept
+- **Tabs**. Three tabs, Diagram, History and Data, Diagram first, with no counts. The open tab is kept
   in the address as `tab`, through `useAddressTab`. Its value is `history` or `data`, and Diagram, the first tab,
   is left out. Diagram shows the process's graph with the steps the instance ran, see [process graph](#process-graph).
 
-- **Data** _(planned)_. A `TermList` of two facts, each name above its value. Input is the parameters the instance
+- **Data**. A `TermList` of two facts, each name above its value. Input is the parameters the instance
   started with, as a `ValueTable`, or "It started with no input.". Output is the step that ended the instance and
   the values it ended with, as `result` gives them, or "The instance has not ended yet." while it runs or waits.
   Output reads Not set for an instance that failed or was cancelled. A hidden value follows
@@ -170,7 +170,7 @@ wrong form show the not-found page, and the instance is not requested.
   repeat's steps show no branch.
 - **Paths.** _(planned for M38)_ After the calls, a Paths part is a table of the instance's `paths`. Its columns are
   Branch or pass, Step, State, Revision, Started and Ended. A branch shows its name, and a pass shows "Pass 3". Step
-  shows the step's label, as the Steps list does. Each column has Filter under the `paths.` prefix.
+  shows the step's label, as History does. Each column has Filter under the `paths.` prefix.
 - **Variables.** _(planned for M38)_ After the Paths part, a Variables part lists each variable with its Name, Type and
   Value. A list shows its values as a list, a `null` value shows the muted dash, and a hidden value shows "hidden", as
   a call input does.
@@ -196,11 +196,12 @@ A process is drawn as one graph, with the same layout, cards and controls wherev
 - **Surface and zoom.** The graph lies on `fillSubtle`, with no pattern. It never zooms in past its own size.
 - **What an instance took.** The steps an instance ran and the transitions it took are drawn in `successText`. The
   rest are muted, and their transitions are dashed and thinner.
-- **A step's card** _(planned)_. A step is a card on `surface`, and every card is one width. Its type's icon sits in a tile on
+- **A step's card**. A step is a card on `surface`, and every card is one width. Its type's icon sits in a tile on
   `fillSubtle`, and the type is the icon's tooltip. Its label is bold, at most two lines, then an ellipsis. The whole
   label is in a tooltip and in the card's accessible name. On an instance, the card shows the duration of the step's
   last run. A step run more than once shows its run count with that duration, such as "2 runs, last 1 day 17 hr".
-  A duration under a second reads "< 1 sec".
+  A duration under a second reads "< 1 sec". A run that has not ended has no duration, so its card shows only the run
+  count, or nothing.
 - **State icon.** On an instance, a step's state is an icon on the card's top-right corner, on a disc of `surface`
   that cuts into the border. Its words are in its tooltip, and colour is never the only sign:
   - done, a check in `successText`;
@@ -209,14 +210,14 @@ A process is drawn as one graph, with the same layout, cards and controls wherev
   - failed, a cross in `dangerText`;
   - cancelled, a minus in `textMuted`;
   - not reached, no icon.
-- **Border** _(planned)_. Every card has a `borderSubtle` border, whatever its state. The step the instance is at has a thicker
+- **Border**. Every card has a `borderSubtle` border, whatever its state. The step the instance is at has a thicker
   `primary` border, drawn inside the card so the card keeps its size. That step is chosen when the page opens, and
   the view opens on it. Choosing another step moves the `primary` border to it. In the designer, a step with a
   diagnostic keeps a `danger` border, see [diagnostics](process-designer.md#diagnostics). A viewer's steps show no
   handle dots.
-- **Transition labels** _(planned)_. A transition's label sits beside its line, on `fillSubtle`, which cuts the line. The label is
+- **Transition labels**. A transition's label sits beside its line, on `fillSubtle`, which cuts the line. The label is
   the author's `label` of the outcome or branch. Without one, a decision branch shows its name, and the fallback shows
-  Otherwise. A wait for an event shows the event's label. A timeout shows "After {duration}" ("Sau {duration}"). A
+  Otherwise. A wait for an event shows the event's label, or its name where it has none. A timeout shows "After {duration}" ("Sau {duration}"). A
   condition is not written in words, since a generated sentence explains a branch less well than the author's own
   words. The labels come from the [instance detail](process-inspection.md#instance-detail).
 - **Controls** _(planned)_. `ProcessGraphControls` gives each control a tooltip in the reader's language:

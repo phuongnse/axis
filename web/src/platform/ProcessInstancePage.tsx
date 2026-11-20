@@ -1,7 +1,7 @@
-import { Button, Descriptions, Flex, Typography } from 'antd'
+import { Button, Descriptions, Flex, Tabs, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLinkClickHandler } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { CopyableId } from './CopyableId'
@@ -51,8 +51,12 @@ import { localDay } from './tableFilter'
 import { recordPageSize } from './tableQuery'
 import { useText, useTextCatalogs } from './texts'
 import { useDesignTokens } from './themeMode'
+import { useAddressTab } from './useAddressTab'
+import { useEmptyStyle } from './useEmptyStyle'
 import { useReleaseTexts } from './useReleaseTexts'
 import { useTableView } from './useTableView'
+import { namedValues } from './valueRows'
+import { ValueTable } from './ValueTable'
 
 interface ProcessInstancePageProps {
   sitePath: string
@@ -112,16 +116,26 @@ const subProcessFields = [
 // The tables have no parameters of their own. A stable empty array keeps useTableView from recomputing on each render.
 const noParameters: readonly string[] = []
 
+// React Flow draws the graph, so its code loads only when a page opens the Diagram tab.
+const LazyInstanceDiagram = lazy(() => import('./InstanceDiagram'))
+
+/** The height of the Diagram's frame, in px, as the process designer's graph has. */
+const diagramHeight = 480
+
+/** The tabs of an instance's page, Diagram first, which the address leaves out. */
+const instanceTabs = ['diagram', 'history', 'data'] as const
+
 /** The options of an enum column that shows the API's word as it is. */
 const wordOptions = (words: readonly string[]) => words.map((word) => ({ value: word, label: word }))
 
 /**
  * Shows one instance under the page of its process inspector: its heading with the process's title and state, its
- * facts, the steps of the release it is pinned to with the path marked, the history, the tasks, the calls with their
- * attempts and the sub-processes. A failed instance has a banner that names the step it stopped at. The parent
- * and each sub-process link to their instance on the first navigation page whose process inspector
- * names their process, and show without a link when there is none. A step the path holds is marked as taken, and the step the instance is at is marked as
- * current. A call whose input is hidden shows the fixed "hidden" text and no value.
+ * facts, and three tabs, Diagram, History and Data, see docs/reference/process-inspector-widget.md#instance-page. The
+ * open tab is kept in the address as `tab`. Diagram draws the process graph with the steps the instance ran, History holds
+ * the history, tasks, calls with their attempts and sub-processes, and Data holds the instance's input and output. A failed instance has a
+ * banner that names the step it stopped at. The parent and each sub-process link to their instance on the first
+ * navigation page whose process inspector names their process, and show without a link when there is none. A call whose
+ * input is hidden shows the fixed "hidden" text and no value.
  *
  * The History, Tasks and Sub-processes tables and each call's Attempts table hold all their rows, show them with no
  * pager and have Filter on every column but the Open link. Each keeps its filter in the address under a prefix of its
@@ -269,7 +283,7 @@ interface InstanceDetailViewProps {
   stepNames?: boolean
 }
 
-/** The sections of an instance. It reads the release texts, unless `stepNames` is set. */
+/** The facts and the tabs of an instance. It reads the release texts, unless `stepNames` is set. */
 export function InstanceDetailView({
   instance,
   instancesPath,
@@ -280,7 +294,7 @@ export function InstanceDetailView({
   stepNames = false,
 }: InstanceDetailViewProps) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const [tab, selectTab] = useAddressTab('tab', instanceTabs)
   const historyView = useTableView(historyFields, recordPageSize, noParameters, false, true, false, 'history.')
   const taskView = useTableView(taskFields, recordPageSize, noParameters, false, true, false, 'tasks.')
   const subProcessView = useTableView(
@@ -292,15 +306,17 @@ export function InstanceDetailView({
     false,
     'subProcesses.',
   )
-  const rowStyle = { paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }
   const stepsByName = useMemo(
     () => new Map(instance.graph.steps.map((step) => [step.name, step])),
     [instance.graph.steps],
   )
-  const stepLabel = (name: string) => {
-    const labelKey = stepNames ? undefined : stepsByName.get(name)?.labelKey
-    return labelKey ? t(labelKey) : name
-  }
+  const stepLabel = useCallback(
+    (name: string) => {
+      const labelKey = stepNames ? undefined : stepsByName.get(name)?.labelKey
+      return labelKey ? t(labelKey) : name
+    },
+    [stepNames, stepsByName, t],
+  )
   const time = (name: string, value: string | null) =>
     value === null ? null : formatValue(dateTime(name), value, {}, { locale, text: t })
 
@@ -590,7 +606,68 @@ export function InstanceDetailView({
     { key: 'instanceId', term: t('shell.inspector.instanceId'), value: <CopyableId id={instance.id} /> },
   ]
 
-  const taken = new Set(instance.path.map((entry) => entry.step))
+  const history = (
+    <SectionParts>
+      <SectionPart testName="inspector-history" heading={{ title: t('shell.inspector.history') }}>
+        <AxisTable<PathEntry>
+          rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
+          columns={historyColumns}
+          dataSource={instance.path}
+          view={{ query: historyView.view, onChange: historyView.setView, paging: false }}
+          emptyText={t('shell.inspector.noHistory')}
+        />
+      </SectionPart>
+      <SectionPart testName="inspector-tasks" heading={{ title: t('shell.inspector.tasks') }}>
+        <AxisTable<InstanceTask>
+          rowKey={(row) => row.id}
+          columns={taskColumns}
+          dataSource={instance.tasks}
+          view={{ query: taskView.view, onChange: taskView.setView, paging: false }}
+          emptyText={t('shell.inspector.noTasks')}
+        />
+      </SectionPart>
+      <SectionPart testName="inspector-calls" heading={{ title: t('shell.inspector.calls') }}>
+        {instance.calls.length === 0 ? (
+          <EmptyState text={t('shell.inspector.noCalls')} />
+        ) : (
+          <Flex vertical>
+            {instance.calls.map((call) => (
+              <CallItem
+                key={call.id}
+                call={call}
+                instanceId={instance.id}
+                instancesPath={instancesPath}
+                onChanged={onChanged}
+                stepLabel={stepLabel}
+                attemptColumns={attemptColumns}
+              />
+            ))}
+          </Flex>
+        )}
+      </SectionPart>
+      <SectionPart testName="inspector-sub-processes" heading={{ title: t('shell.inspector.subProcesses') }}>
+        <AxisTable<SubProcess>
+          rowKey={(row) => row.id}
+          columns={subProcessColumns}
+          dataSource={instance.subProcesses}
+          view={{ query: subProcessView.view, onChange: subProcessView.setView, paging: false }}
+          emptyText={t('shell.inspector.noSubProcesses')}
+        />
+      </SectionPart>
+    </SectionParts>
+  )
+  // Only the open tab is drawn, so the graph is not laid out while History or Data is open.
+  const panes: Record<(typeof instanceTabs)[number], ReactNode> = {
+    diagram: (
+      <div data-testid="inspector-diagram" style={{ height: diagramHeight, position: 'relative' }}>
+        <Suspense fallback={null}>
+          <LazyInstanceDiagram instance={instance} stepLabel={stepLabel} stepNames={stepNames} locale={locale} />
+        </Suspense>
+      </div>
+    ),
+    history,
+    data: <InstanceData instance={instance} stepLabel={stepLabel} />,
+  }
   return (
     <div data-testid="inspector-instance">
       <PageActions>
@@ -606,72 +683,69 @@ export function InstanceDetailView({
         <SectionPart testName="inspector-facts">
           <TermList row terms={facts} />
         </SectionPart>
-        <SectionPart testName="inspector-steps" heading={{ title: t('shell.inspector.steps') }}>
-          <Flex vertical>
-            {instance.graph.steps.map((step) => (
-              <Flex key={step.name} vertical gap="small" data-testid={`inspector-step-${step.name}`} style={rowStyle}>
-                <Flex gap="small" align="center">
-                  <Typography.Text strong>{stepLabel(step.name)}</Typography.Text>
-                  <Typography.Text type="secondary">{step.type}</Typography.Text>
-                  {taken.has(step.name) && <StatusTag tone="muted">{t('shell.inspector.taken')}</StatusTag>}
-                  {step.name === instance.step && <StatusTag tone="neutral">{t('shell.inspector.current')}</StatusTag>}
-                </Flex>
-                {step.transitions.map((transition) => (
-                  <Typography.Text key={`${transition.next}|${transition.on ?? ''}`} type="secondary">
-                    {`→ ${stepLabel(transition.next)}${transition.on === null ? '' : ` (${transition.on})`}`}
-                  </Typography.Text>
-                ))}
-              </Flex>
-            ))}
-          </Flex>
-        </SectionPart>
-        <SectionPart testName="inspector-history" heading={{ title: t('shell.inspector.history') }}>
-          <AxisTable<PathEntry>
-            rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
-            columns={historyColumns}
-            dataSource={instance.path}
-            view={{ query: historyView.view, onChange: historyView.setView, paging: false }}
-            emptyText={t('shell.inspector.noHistory')}
-          />
-        </SectionPart>
-        <SectionPart testName="inspector-tasks" heading={{ title: t('shell.inspector.tasks') }}>
-          <AxisTable<InstanceTask>
-            rowKey={(row) => row.id}
-            columns={taskColumns}
-            dataSource={instance.tasks}
-            view={{ query: taskView.view, onChange: taskView.setView, paging: false }}
-            emptyText={t('shell.inspector.noTasks')}
-          />
-        </SectionPart>
-        <SectionPart testName="inspector-calls" heading={{ title: t('shell.inspector.calls') }}>
-          {instance.calls.length === 0 ? (
-            <EmptyState text={t('shell.inspector.noCalls')} />
-          ) : (
-            <Flex vertical>
-              {instance.calls.map((call) => (
-                <CallItem
-                  key={call.id}
-                  call={call}
-                  instanceId={instance.id}
-                  instancesPath={instancesPath}
-                  onChanged={onChanged}
-                  stepLabel={stepLabel}
-                  attemptColumns={attemptColumns}
-                />
-              ))}
-            </Flex>
-          )}
-        </SectionPart>
-        <SectionPart testName="inspector-sub-processes" heading={{ title: t('shell.inspector.subProcesses') }}>
-          <AxisTable<SubProcess>
-            rowKey={(row) => row.id}
-            columns={subProcessColumns}
-            dataSource={instance.subProcesses}
-            view={{ query: subProcessView.view, onChange: subProcessView.setView, paging: false }}
-            emptyText={t('shell.inspector.noSubProcesses')}
+        <SectionPart testName="inspector-tabs">
+          <Tabs
+            activeKey={tab}
+            onChange={selectTab}
+            items={instanceTabs.map((key) => ({
+              key,
+              label: t(`shell.inspector.tabs.${key}`),
+              children: key === tab ? panes[key] : null,
+            }))}
           />
         </SectionPart>
       </SectionParts>
+    </div>
+  )
+}
+
+interface InstanceDataProps {
+  instance: InstanceDetail
+  stepLabel: (name: string) => string
+}
+
+/**
+ * The Data tab: a `TermList` of Input and Output, each name above its value, see
+ * docs/reference/process-inspector-widget.md#instance-page. Input is the parameters the instance started with in a
+ * `ValueTable`, where a hidden value reads Hidden, or "It started with no input.". Output is the end step and the values
+ * the instance ended with, "The instance has not ended yet." while it runs or waits, and Not set for an instance that
+ * failed or was cancelled, or that completed before the engine kept its values.
+ */
+function InstanceData({ instance, stepLabel }: InstanceDataProps) {
+  const t = useText()
+  const empty = useEmptyStyle()
+  const { input, result } = instance
+  let output: ReactNode = <NotSet />
+  if (instance.state === 'running' || instance.state === 'waiting') {
+    output = <span style={empty}>{t('shell.inspector.data.notEnded')}</span>
+  } else if (result !== null) {
+    output = (
+      <Flex vertical gap="small">
+        <span>{fillText(t('shell.inspector.data.endedAt'), { step: stepLabel(result.step) })}</span>
+        {result.values === null ? (
+          <NotSet />
+        ) : (
+          result.values.length > 0 && <ValueTable value={namedValues(result.values)} testId="inspector-output" />
+        )}
+      </Flex>
+    )
+  }
+  const terms: Term[] = [
+    {
+      key: 'input',
+      term: t('shell.inspector.input'),
+      value:
+        input === null || input.length === 0 ? (
+          <span style={empty}>{t('shell.inspector.data.noInput')}</span>
+        ) : (
+          <ValueTable value={namedValues(input)} testId="inspector-input" />
+        ),
+    },
+    { key: 'output', term: t('shell.inspector.output'), value: output },
+  ]
+  return (
+    <div data-testid="inspector-data">
+      <TermList terms={terms} />
     </div>
   )
 }

@@ -241,14 +241,14 @@ export function formatTimeAgo(time: string, now: number, options: FormatOptions)
 }
 
 /**
- * A length of time in the locale's units, such as "1.2 sec" or "2 min 5 sec", and "< 1 sec" under a second, see
+ * A length of time in the locale's units, such as "1.2 sec" or "1 day 17 hr", and "< 1 sec" under a second, see
  * docs/reference/frontend.md#shown-values. Over a minute it keeps the two largest units, and a unit of zero is left out.
  */
 export function formatDuration(ms: number, locale: string, text: (key: string) => string): string {
   if (ms < 1000) {
     return text('shell.value.underSecond')
   }
-  const unit = (value: number, name: 'second' | 'minute' | 'hour', digits = 0) =>
+  const unit = (value: number, name: 'second' | 'minute' | 'hour' | 'day', digits = 0) =>
     plain(
       new Intl.NumberFormat(locale, {
         style: 'unit',
@@ -262,8 +262,27 @@ export function formatDuration(ms: number, locale: string, text: (key: string) =
     return unit(Math.floor(ms / 100) / 10, 'second', 1)
   }
   const [large, small, largeSize, smallSize] =
-    ms < hour ? (['minute', 'second', minute, 1000] as const) : (['hour', 'minute', hour, minute] as const)
+    ms < hour
+      ? (['minute', 'second', minute, 1000] as const)
+      : ms < day
+        ? (['hour', 'minute', hour, minute] as const)
+        : (['day', 'hour', day, hour] as const)
   const first = Math.floor(ms / largeSize)
   const second = Math.floor((ms % largeSize) / smallSize)
   return [unit(first, large), second > 0 ? unit(second, small) : null].filter((part) => part !== null).join(' ')
+}
+
+/**
+ * The length of an ISO 8601 duration such as `PT1H` or `P1DT2H30M`, in milliseconds, as a process file writes a timeout.
+ * Returns `null` for text that is not a duration of days, hours, minutes and seconds, which a caller shows as written.
+ */
+export function isoDurationMs(text: string): number | null {
+  const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(text)
+  if (!match || text === 'P' || text.endsWith('T')) {
+    return null
+  }
+  const [, days, hours, minutes, seconds] = match
+  return (
+    Number(days ?? 0) * day + Number(hours ?? 0) * hour + Number(minutes ?? 0) * minute + Number(seconds ?? 0) * 1000
+  )
 }

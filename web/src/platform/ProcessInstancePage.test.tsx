@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formItem, optionTexts } from '../test/antd'
@@ -11,6 +11,7 @@ import { assignLocation } from './navigation'
 import { ProcessInstancePage } from './ProcessInstancePage'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
+import { ThemeModeProvider } from './theme'
 
 vi.mock('./navigation')
 
@@ -54,6 +55,8 @@ const detailText = `{
   "createdAt": "2026-10-10T02:05:00.123456Z",
   "endedAt": null,
   "startedBy": { "kind": "person", "name": "Ada Lovelace", "id": "ada", "via": "purchaseRequest.submit" },
+  "input": null,
+  "result": null,
   "studio": null,
   "graph": {
     "start": "managerApproval",
@@ -62,18 +65,22 @@ const detailText = `{
         "name": "managerApproval",
         "type": "task",
         "labelKey": "purchaseRequest.managerApproval",
+        "event": null,
+        "eventLabelKey": null,
         "transitions": [
-          { "next": "registerPurchase", "on": "approve" },
-          { "next": "done", "on": "reject" }
+          { "next": "registerPurchase", "on": "approve", "branch": null, "labelKey": "task.approve", "after": null },
+          { "next": "done", "on": "reject", "branch": null, "labelKey": null, "after": null }
         ]
       },
       {
         "name": "registerPurchase",
         "type": "operation",
         "labelKey": null,
-        "transitions": [{ "next": "done", "on": null }]
+        "event": null,
+        "eventLabelKey": null,
+        "transitions": [{ "next": "done", "on": null, "branch": null, "labelKey": null, "after": null }]
       },
-      { "name": "done", "type": "end", "labelKey": null, "transitions": [] }
+      { "name": "done", "type": "end", "labelKey": null, "event": null, "eventLabelKey": null, "transitions": [] }
     ]
   },
   "path": [
@@ -150,6 +157,8 @@ const texts = {
   ...platformEnglish,
   'purchaseRequest.managerApproval': 'Manager approval',
   'purchaseRequest.submit': 'Submit for approval',
+  'task.approve': 'Approve',
+  'order.again': 'Go again',
 }
 
 /** The texts of the instance's release, which give the process its title. */
@@ -225,8 +234,15 @@ function detailWithRelatives() {
     graph: {
       start: 'wait',
       steps: [
-        { name: 'wait', type: 'timer', labelKey: null, transitions: [{ next: 'done', on: null }] },
-        { name: 'done', type: 'end', labelKey: null, transitions: [] },
+        {
+          name: 'wait',
+          type: 'timer',
+          labelKey: null,
+          event: null,
+          eventLabelKey: null,
+          transitions: [{ next: 'done', on: null, branch: null, labelKey: null, after: null }],
+        },
+        { name: 'done', type: 'end', labelKey: null, event: null, eventLabelKey: null, transitions: [] },
       ],
     },
     path: [
@@ -262,6 +278,74 @@ function detailWithRelatives() {
     ],
   })
 }
+
+/**
+ * A completed instance without a subject that went again once: again, check, again, check, done, each run 2 seconds,
+ * with a wait whose timeout reads After 1 hr. The fallback of `check` leads to `done`.
+ */
+function detailLooping() {
+  const detail = JSON.parse(detailWithRelatives()) as Record<string, unknown>
+  const run = (step: string, decision: string | null, second: number) => ({
+    step,
+    startedAt: `2026-10-10T02:05:${String(second).padStart(2, '0')}Z`,
+    finishedAt: `2026-10-10T02:05:${String(second + 2).padStart(2, '0')}Z`,
+    decision,
+    output: null,
+    error: null,
+    problem: null,
+    traceId: null,
+  })
+  const step = (name: string, type: string, transitions: Record<string, unknown>[], extra = {}) => ({
+    name,
+    type,
+    labelKey: null,
+    event: null,
+    eventLabelKey: null,
+    transitions,
+    ...extra,
+  })
+  const move = (next: string, extra = {}) => ({ next, on: null, branch: null, labelKey: null, after: null, ...extra })
+  return JSON.stringify({
+    ...detail,
+    state: 'completed',
+    step: 'done',
+    endedAt: '2026-10-10T02:05:09Z',
+    parent: null,
+    subProcesses: [],
+    graph: {
+      start: 'again',
+      steps: [
+        step('again', 'operation', [move('check')]),
+        step('check', 'decision', [
+          move('again', { on: '0', branch: 'repeat', labelKey: 'order.again' }),
+          move('wait', { on: '1', branch: 'pause' }),
+          move('done', { on: 'otherwise' }),
+        ]),
+        step('wait', 'waitEvent', [move('done'), move('done', { on: 'timeout', after: 'PT1H' })], {
+          event: 'order.shipped',
+        }),
+        step('done', 'end', []),
+      ],
+    },
+    path: [
+      run('again', null, 0),
+      run('check', '0', 2),
+      run('again', null, 4),
+      run('check', 'otherwise', 6),
+      { ...run('done', null, 8), finishedAt: '2026-10-10T02:05:08.100Z' },
+    ],
+  })
+}
+
+/** The instance of `detailWithRelatives`, which has no subject, with `patch` laid over it. */
+function detailWithData(patch: Record<string, unknown>) {
+  return JSON.stringify({ ...(JSON.parse(detailWithRelatives()) as Record<string, unknown>), ...patch })
+}
+
+const startedWith = [
+  { name: 'title', value: 'Laptops', hidden: false },
+  { name: 'budget', value: null, hidden: true },
+]
 
 /** The metadata of a page that holds one process inspector of `process`. */
 function inspectorPage(name: string, process: string) {
@@ -336,22 +420,35 @@ function stubApi({
   return fetchMock
 }
 
+/** The address's query, for a test that reads what the page keeps there. */
+function Address() {
+  return <span data-testid="address">{useLocation().search}</span>
+}
+
 function renderPage(search = '') {
   return render(
     <MemoryRouter initialEntries={[`/e2e/inspector/${instanceId}${search}`]}>
-      <TextProvider catalogs={catalogs} development={false}>
-        <ProcessInstancePage
-          sitePath="e2e"
-          pages={['Inspector', 'Children']}
-          widget={inspectorWidget}
-          instanceId={instanceId}
-          title="Approvals"
-          locale="en"
-          fallbackLocale="en"
-        />
-      </TextProvider>
+      <Address />
+      <ThemeModeProvider>
+        <TextProvider catalogs={catalogs} development={false}>
+          <ProcessInstancePage
+            sitePath="e2e"
+            pages={['Inspector', 'Children']}
+            widget={inspectorWidget}
+            instanceId={instanceId}
+            title="Approvals"
+            locale="en"
+            fallbackLocale="en"
+          />
+        </TextProvider>
+      </ThemeModeProvider>
     </MemoryRouter>,
   )
+}
+
+/** The page opened on its History tab, with `search` joined to the address's own, such as a table's filter. */
+function renderHistory(search = '') {
+  return renderPage(`?tab=history${search === '' ? '' : `&${search.slice(1)}`}`)
 }
 
 /** The address part that filters a table's `field` to `value`, under the table's `prefix`. */
@@ -371,7 +468,7 @@ describe('ProcessInstancePage', () => {
   it('shows no record fact, the parent in Started by, and the sub-processes by their process title', async () => {
     stubApi({ detail: { status: 200, body: detailWithRelatives() } })
 
-    renderPage()
+    renderHistory()
 
     const facts = await screen.findByTestId('studio-section-inspector-facts')
     expect(within(facts).queryByText('Record')).not.toBeInTheDocument()
@@ -386,48 +483,133 @@ describe('ProcessInstancePage', () => {
   it('shows the empty text and no parent for an instance without relatives', async () => {
     stubApi()
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     expect(screen.getByText('No sub-processes.')).toBeInTheDocument()
     expect(screen.queryByTestId('inspector-parent-link')).not.toBeInTheDocument()
   })
 
-  it('lists the steps in graph order with the taken and current marks, and shows the open task', async () => {
+  it('shows the open task under History', async () => {
     stubApi()
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
-    const steps = screen.getAllByTestId(/^inspector-step-/)
-    expect(steps.map((step) => step.getAttribute('data-testid'))).toEqual([
-      'inspector-step-managerApproval',
-      'inspector-step-registerPurchase',
-      'inspector-step-done',
-    ])
-    const [approval, register, done] = steps
-    expect(within(approval).getByText('Manager approval')).toBeInTheDocument()
-    expect(within(approval).getByText('Taken')).toBeInTheDocument()
-    expect(within(approval).getByText('Taken').closest('[data-tone]')).toHaveAttribute('data-tone', 'muted')
-    expect(within(approval).queryByText('Current')).not.toBeInTheDocument()
-    expect(within(approval).getByText('→ registerPurchase (approve)')).toBeInTheDocument()
-    expect(within(approval).getByText('→ done (reject)')).toBeInTheDocument()
-    expect(within(register).getByText('Current')).toBeInTheDocument()
-    expect(within(register).getByText('Current').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
-    expect(within(register).queryByText('Taken')).not.toBeInTheDocument()
-    expect(within(register).getByText('→ done')).toBeInTheDocument()
-    expect(within(done).queryByText('Taken')).not.toBeInTheDocument()
-    expect(within(done).queryByText('Current')).not.toBeInTheDocument()
-
     const taskRow = screen.getByRole('row', { name: /role: manager/ })
     expect(within(taskRow).getByText('Manager approval')).toBeInTheDocument()
     expect(within(taskRow).getByText('open')).toBeInTheDocument()
   })
 
-  it('shows the em dash in the completed cell of a task that is not completed', async () => {
+  it('has the tabs Diagram, History and Data, Diagram first and open, with no count', async () => {
     stubApi()
 
     renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Diagram', 'History', 'Data'])
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('address')).toHaveTextContent('')
+    expect(screen.queryByRole('region', { name: 'Tasks' })).not.toBeInTheDocument()
+  })
+
+  it('keeps tab=history in the address when History is chosen, and leaves it out for Diagram', async () => {
+    stubApi()
+    renderPage()
+    await screen.findByTestId('inspector-instance')
+
+    await userEvent.click(screen.getByRole('tab', { name: 'History' }))
+
+    expect(screen.getByTestId('address')).toHaveTextContent('?tab=history')
+    expect(screen.getByRole('region', { name: 'Tasks' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Data' }))
+    expect(screen.getByTestId('address')).toHaveTextContent('?tab=data')
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Diagram' }))
+    expect(screen.getByTestId('address')).toHaveTextContent('')
+  })
+
+  it('shows History selected, with its history table, when the address has tab=history', async () => {
+    stubApi()
+
+    renderPage('?tab=history')
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Diagram' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('region', { name: 'History' })).toBeInTheDocument()
+    expect(screen.queryByTestId('inspector-diagram')).not.toBeInTheDocument()
+  })
+
+  it('shows the Diagram when the tab in the address is not one of the tabs', async () => {
+    stubApi()
+
+    renderPage('?tab=nothing')
+
+    expect(await screen.findByTestId('inspector-diagram')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Diagram' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('draws a state badge in its tone on each step reached and none on a step not reached, with the current step chosen', async () => {
+    stubApi()
+
+    renderPage()
+
+    const approval = await screen.findByTestId('rf__node-managerApproval', undefined, { timeout: 5000 })
+    expect(within(approval).getByRole('img', { name: 'Done' })).toHaveAttribute('data-tone', 'success')
+    expect(within(approval).getByText('Manager approval')).toBeInTheDocument()
+    const register = screen.getByTestId('rf__node-registerPurchase')
+    expect(within(register).getByRole('img', { name: 'Waiting for an event' })).toHaveAttribute('data-tone', 'neutral')
+    expect(screen.getByTestId('rf__node-done').querySelector('[data-tone]')).toBeNull()
+    expect(within(register).getByRole('button', { name: 'registerPurchase' })).toHaveAttribute('aria-current', 'true')
+    expect(within(approval).getByRole('button', { name: 'Manager approval' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('moves the chosen border to the step that is clicked', async () => {
+    stubApi()
+    renderPage()
+    const approval = await screen.findByTestId('rf__node-managerApproval', undefined, { timeout: 5000 })
+
+    fireEvent.click(within(approval).getByRole('button', { name: 'Manager approval' }))
+
+    expect(within(approval).getByRole('button', { name: 'Manager approval' })).toHaveAttribute('aria-current', 'true')
+    expect(
+      within(screen.getByTestId('rf__node-registerPurchase')).getByRole('button', { name: 'registerPurchase' }),
+    ).not.toHaveAttribute('aria-current')
+  })
+
+  it('shows the duration of the last run on a step, and the run count on a step that ran twice', async () => {
+    stubApi({ detail: { status: 200, body: detailLooping() } })
+
+    renderPage()
+
+    const again = await screen.findByTestId('rf__node-again', undefined, { timeout: 5000 })
+    expect(within(again).getByText('2 runs, last 2 sec')).toBeInTheDocument()
+    expect(within(again).getByRole('img', { name: 'Done' })).toHaveAttribute('data-tone', 'success')
+    expect(within(screen.getByTestId('rf__node-check')).getByText('2 runs, last 2 sec')).toBeInTheDocument()
+    expect(within(screen.getByTestId('rf__node-done')).queryByText(/runs/)).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('rf__node-done')).getByText('< 1 sec')).toBeInTheDocument()
+  })
+
+  it('writes the author label, the branch name, Otherwise and the timeout on the transitions', async () => {
+    stubApi({ detail: { status: 200, body: detailLooping() } })
+
+    renderPage()
+
+    await screen.findByTestId('rf__node-again', undefined, { timeout: 5000 })
+    expect(await screen.findByText('Go again')).toBeInTheDocument()
+    expect(screen.getByText('Otherwise')).toBeInTheDocument()
+    expect(screen.getByText('After 1 hr')).toBeInTheDocument()
+    expect(screen.getByText('order.shipped')).toBeInTheDocument()
+    expect(screen.getByLabelText('check to done')).toBeInTheDocument()
+  })
+
+  it('shows the em dash in the completed cell of a task that is not completed', async () => {
+    stubApi()
+
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     const taskRow = screen.getByRole('row', { name: /role: manager/ })
@@ -439,7 +621,7 @@ describe('ProcessInstancePage', () => {
   it('shows the history rows and the attempts of a call', async () => {
     stubApi()
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     expect(screen.queryByText('No history yet.')).not.toBeInTheDocument()
@@ -474,7 +656,7 @@ describe('ProcessInstancePage', () => {
     detail.calls[0].attempts[0].problem = { code: 'serverError', values: {} }
     stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     const timedOut = screen.getByRole('row', { name: /^registerPurchase / })
@@ -493,7 +675,7 @@ describe('ProcessInstancePage', () => {
     detail.path[0].problem = { code: 'somethingNew', values: {} }
     stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     expect(screen.getByText('A fixed text.')).toBeInTheDocument()
@@ -503,7 +685,7 @@ describe('ProcessInstancePage', () => {
     stubApi()
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-    renderPage()
+    renderHistory()
     await screen.findByTestId('inspector-instance')
     const attemptRow = screen.getByRole('row', { name: /retryable/ })
 
@@ -517,7 +699,7 @@ describe('ProcessInstancePage', () => {
     detail.calls[0].attempts[0].httpStatus = null
     stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     const attemptRow = screen.getByRole('row', { name: /retryable/ })
@@ -529,7 +711,7 @@ describe('ProcessInstancePage', () => {
   it('shows the hidden text and no input value for a call whose input is hidden', async () => {
     stubApi()
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     const hidden = screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c')
@@ -542,7 +724,7 @@ describe('ProcessInstancePage', () => {
   it('shows a call kind as plain text, and its state as a tag in words with the tone of its meaning', async () => {
     stubApi()
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     const hidden = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c'))
@@ -559,7 +741,7 @@ describe('ProcessInstancePage', () => {
     detail.calls[1].state = 'archived'
     stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     const first = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c'))
@@ -571,7 +753,7 @@ describe('ProcessInstancePage', () => {
   it('shows the top-level input properties of a visible input, with numbers as their source digits', async () => {
     stubApi()
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     const visible = screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8d')
@@ -594,10 +776,9 @@ describe('ProcessInstancePage', () => {
 
     renderPage()
 
-    await screen.findByTestId('inspector-instance')
-    const approval = screen.getByTestId('inspector-step-managerApproval')
+    const approval = await screen.findByTestId('rf__node-managerApproval', undefined, { timeout: 5000 })
     expect(within(approval).getByText('Approval by the manager')).toBeInTheDocument()
-    expect(within(screen.getByTestId('inspector-step-done')).getByText('done')).toBeInTheDocument()
+    expect(within(screen.getByTestId('rf__node-done')).getByText('done')).toBeInTheDocument()
   })
 
   it('keeps the heading and shows the not-found line with no command on a 404', async () => {
@@ -646,14 +827,14 @@ describe('ProcessInstancePage', () => {
     expect(assignLocation).not.toHaveBeenCalled()
   })
 
-  it('shows each section as a part, with the commands on the heading', async () => {
+  it('shows each History section as a part, with the commands on the heading', async () => {
     stubApi({ detail: { status: 200, body: detailWith(['cancel']) } })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     expect(within(screen.getByTestId('page-actions')).getByTestId('inspector-command-cancel')).toBeInTheDocument()
-    for (const title of ['Steps', 'History', 'Tasks', 'Calls', 'Sub-processes']) {
+    for (const title of ['History', 'Tasks', 'Calls', 'Sub-processes']) {
       expect(screen.getByRole('region', { name: title })).toBeInTheDocument()
     }
     expect(screen.queryByRole('region', { name: 'Details' })).not.toBeInTheDocument()
@@ -879,7 +1060,7 @@ describe('ProcessInstancePage', () => {
   it('gives each resolve field its help and names the outputs as a group', async () => {
     stubApi({ detail: { status: 200, body: detailWithResolvable() } })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
@@ -905,7 +1086,7 @@ describe('ProcessInstancePage', () => {
   it('posts a resolve as succeeded with the reason and the typed outputs', async () => {
     const fetchMock = stubApi({ detail: { status: 200, body: detailWithResolvable() } })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
@@ -935,7 +1116,7 @@ describe('ProcessInstancePage', () => {
   it('sends a failed resolve without outputs, and blocks a missing outcome or required output', async () => {
     const fetchMock = stubApi({ detail: { status: 200, body: detailWithResolvable() } })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
@@ -971,7 +1152,7 @@ describe('ProcessInstancePage', () => {
       },
     })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
@@ -999,7 +1180,7 @@ describe('ProcessInstancePage', () => {
       },
     })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
@@ -1018,7 +1199,7 @@ describe('ProcessInstancePage', () => {
   it('shows the Resolve button only on a call the server marks resolvable', async () => {
     stubApi({ detail: { status: 200, body: detailWithResolvable() } })
 
-    renderPage()
+    renderHistory()
 
     await screen.findByTestId('inspector-instance')
     expect(screen.getAllByTestId(/^inspector-resolve-/).map((button) => button.getAttribute('data-testid'))).toEqual([
@@ -1037,7 +1218,7 @@ describe('ProcessInstancePage', () => {
   })
   it('offers every column of the tasks in Filter', async () => {
     stubApi()
-    renderPage()
+    renderHistory()
     await screen.findByTestId('inspector-instance')
     await userEvent.click(
       within(screen.getByTestId('studio-section-inspector-tasks')).getByRole('button', { name: 'Filter' }),
@@ -1053,7 +1234,7 @@ describe('ProcessInstancePage', () => {
         body: detailWithTasks({ assignee: 'clerk', state: 'completed', outcome: 'approve', completedBy: 'ann' }),
       },
     })
-    renderPage(filterSearch('tasks.', 'state', 'completed'))
+    renderHistory(filterSearch('tasks.', 'state', 'completed'))
 
     const tasks = within((await screen.findAllByTestId('studio-section-inspector-tasks')).at(-1)!)
     expect(await tasks.findByRole('row', { name: /role: clerk/ })).toBeInTheDocument()
@@ -1069,7 +1250,7 @@ describe('ProcessInstancePage', () => {
       },
     })
 
-    renderPage(filterSearch('history.', 'step', 'nothing'))
+    renderHistory(filterSearch('history.', 'step', 'nothing'))
 
     await screen.findByTestId('inspector-instance')
     expect(
@@ -1090,7 +1271,7 @@ describe('ProcessInstancePage', () => {
     detail.calls[1].attempts = [{ ...detail.calls[0].attempts[0], outcome: 'succeeded', httpStatus: 200 }]
     stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
 
-    renderPage(filterSearch(`attempts.${detail.calls[0].id}.`, 'outcome', 'succeeded'))
+    renderHistory(filterSearch(`attempts.${detail.calls[0].id}.`, 'outcome', 'succeeded'))
 
     await screen.findByTestId('inspector-instance')
     const first = within(screen.getByTestId(`inspector-call-${detail.calls[0].id}`))
@@ -1103,10 +1284,86 @@ describe('ProcessInstancePage', () => {
     const createdAt = '2026-10-12T01:00:00Z'
     stubApi({ detail: { status: 200, body: detailWithTasks({ assignee: 'clerk', createdAt }) } })
 
-    renderPage(filterSearch('tasks.', 'createdAt', dayjs(createdAt).format('YYYY-MM-DD')))
+    renderHistory(filterSearch('tasks.', 'createdAt', dayjs(createdAt).format('YYYY-MM-DD')))
 
     const tasks = within(await screen.findByTestId('studio-section-inspector-tasks'))
     expect(await tasks.findByRole('row', { name: /role: clerk/ })).toBeInTheDocument()
     expect(tasks.queryByRole('row', { name: /role: manager/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the input as a table of names and values, with a hidden value as Hidden', async () => {
+    stubApi({ detail: { status: 200, body: detailWithData({ input: startedWith }) } })
+
+    renderPage('?tab=data')
+
+    const data = await screen.findByTestId('inspector-data')
+    expect(screen.getByRole('tab', { name: 'Data' })).toHaveAttribute('aria-selected', 'true')
+    const input = within(data).getByTestId('inspector-input')
+    expect(within(input).getByRole('cell', { name: 'Laptops' })).toBeInTheDocument()
+    const budget = within(input).getByRole('cell', { name: 'budget' }).closest('tr')!
+    expect(within(budget).getByText('Hidden')).toBeInTheDocument()
+    expect(within(data).queryByText('It started with no input.')).not.toBeInTheDocument()
+  })
+
+  it('says the instance has not ended yet in Output while it waits or runs', async () => {
+    stubApi({ detail: { status: 200, body: detailWithData({ input: startedWith }) } })
+
+    renderPage('?tab=data')
+
+    const data = await screen.findByTestId('inspector-data')
+    expect(within(data).getByText('Output')).toBeInTheDocument()
+    expect(within(data).getByText('The instance has not ended yet.')).toBeInTheDocument()
+  })
+
+  it('says it started with no input when the instance has none, or its process has a subject', async () => {
+    stubApi({ detail: { status: 200, body: detailWithData({ input: [] }) } })
+    const { unmount } = renderPage('?tab=data')
+    expect(await screen.findByText('It started with no input.')).toBeInTheDocument()
+    unmount()
+
+    stubApi()
+    renderPage('?tab=data')
+    expect(await screen.findByText('It started with no input.')).toBeInTheDocument()
+  })
+
+  it('shows the end step and the values a completed instance ended with', async () => {
+    stubApi({
+      detail: {
+        status: 200,
+        body: detailWithData({
+          state: 'completed',
+          step: 'done',
+          endedAt: '2026-10-10T02:06:00Z',
+          input: [],
+          result: { step: 'done', values: [{ name: 'status', value: 'approved', hidden: false }] },
+        }),
+      },
+    })
+
+    renderPage('?tab=data')
+
+    const data = await screen.findByTestId('inspector-data')
+    expect(within(data).getByText('Ended at done.')).toBeInTheDocument()
+    expect(
+      within(within(data).getByTestId('inspector-output')).getByRole('cell', { name: 'approved' }),
+    ).toBeInTheDocument()
+    expect(within(data).queryByText('The instance has not ended yet.')).not.toBeInTheDocument()
+  })
+
+  it('reads Not set in Output for a completed instance whose values were not kept, and for a failed or cancelled one', async () => {
+    for (const patch of [
+      { state: 'completed', step: 'done', result: { step: 'done', values: null } },
+      { state: 'failed', result: null },
+      { state: 'cancelled', result: null },
+    ]) {
+      stubApi({ detail: { status: 200, body: detailWithData({ input: startedWith, ...patch }) } })
+      const { unmount } = renderPage('?tab=data')
+
+      const data = await screen.findByTestId('inspector-data')
+      const output = within(data).getByText('Output').closest('div')!
+      expect(within(output).getByText('Not set')).toBeInTheDocument()
+      expect(within(data).queryByText('The instance has not ended yet.')).not.toBeInTheDocument()
+      unmount()
+    }
   })
 })

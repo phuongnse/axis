@@ -166,7 +166,7 @@ describe('ProcessGraphControls', () => {
     expect(screen.queryByRole('button', { name: 'Go to the current step' })).not.toBeInTheDocument()
   })
 
-  it('goes to the current step at zoom 1', async () => {
+  it('opens an instance on the current step at zoom 1, and Show the whole process and Go to the current step move between the views', async () => {
     stubReducedMotion()
     const { container } = render(
       <Providers>
@@ -182,11 +182,26 @@ describe('ProcessGraphControls', () => {
 
     const goTo = await screen.findByRole('button', { name: 'Go to the current step' }, slow)
     await screen.findByTestId('rf__node-a', undefined, slow)
-    expect(scale(container)).toBeLessThan(1)
+    expect(scale(container)).toBe(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show the whole process' }))
+    await waitFor(() => expect(scale(container)).toBeLessThan(1))
 
     fireEvent.click(goTo)
 
-    expect(scale(container)).toBe(1)
+    await waitFor(() => expect(scale(container)).toBe(1))
+  })
+
+  it('opens a graph with no current step on the whole process', async () => {
+    const { container } = render(
+      <Providers>
+        <ProcessGraphCanvas steps={steps} transitions={transitions} label="Process" />
+      </Providers>,
+    )
+
+    await screen.findByTestId('rf__node-a', undefined, slow)
+
+    expect(scale(container)).toBeLessThan(1)
   })
 
   it('lists the steps in the order given, and choosing one calls onChoose', async () => {

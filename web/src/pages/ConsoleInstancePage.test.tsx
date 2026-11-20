@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
+import { ThemeModeProvider } from '../platform/theme'
 import { PlatformContext, type Platform } from './context'
 import { ConsoleInstancePage } from './ConsoleInstancePage'
 
@@ -37,6 +38,8 @@ const detail = {
   createdAt: '2026-10-10T02:05:00.123456Z',
   endedAt: '2026-10-10T02:06:00.000000Z',
   startedBy: { kind: 'person', name: 'Ada Lovelace', id: 'ada', via: 'purchaseRequest.submit' },
+  input: null,
+  result: null,
   studio: null,
   timerDueAt: null,
   parent: null,
@@ -48,9 +51,11 @@ const detail = {
         name: 'managerApproval',
         type: 'task',
         labelKey: 'purchaseRequest.managerApproval',
-        transitions: [{ next: 'done', on: 'approve' }],
+        event: null,
+        eventLabelKey: null,
+        transitions: [{ next: 'done', on: 'approve', branch: null, labelKey: 'task.approve', after: null }],
       },
-      { name: 'done', type: 'end', labelKey: null, transitions: [] },
+      { name: 'done', type: 'end', labelKey: null, event: null, eventLabelKey: null, transitions: [] },
     ],
   },
   path: [
@@ -89,16 +94,18 @@ function stubServer(answer: () => Response) {
   return fetchMock
 }
 
-function renderPage() {
+function renderPage(search = '') {
   render(
     <PlatformContext.Provider value={platform}>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <MemoryRouter initialEntries={[`/console/instances/${instanceId}`]}>
-          <Routes>
-            <Route path="console/instances/:id" element={<ConsoleInstancePage />} />
-          </Routes>
-        </MemoryRouter>
-      </TextProvider>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <MemoryRouter initialEntries={[`/console/instances/${instanceId}${search}`]}>
+            <Routes>
+              <Route path="console/instances/:id" element={<ConsoleInstancePage />} />
+            </Routes>
+          </MemoryRouter>
+        </TextProvider>
+      </ThemeModeProvider>
     </PlatformContext.Provider>,
   )
 }
@@ -109,18 +116,22 @@ afterEach(() => {
 })
 
 describe('ConsoleInstancePage', () => {
-  it('shows the steps by name with the failed step current, the history error and the hidden call input', async () => {
+  it('draws the steps by name with the failed step current, and the history error and the hidden call input under History', async () => {
     const fetchMock = stubServer(
       () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
     )
     renderPage()
 
-    const step = await screen.findByTestId('inspector-step-managerApproval')
+    const step = await screen.findByTestId('rf__node-managerApproval', undefined, { timeout: 5000 })
     expect(fetchMock.mock.calls[0]).toEqual([`/api/console/instances/${instanceId}`, expect.anything()])
     expect(within(step).getByText('managerApproval')).toBeVisible()
-    expect(within(step).getByText('Current')).toBeVisible()
-    expect(within(step).getByText('Taken')).toBeVisible()
+    expect(within(step).getByRole('img', { name: 'Failed' })).toHaveAttribute('data-tone', 'danger')
+    expect(within(step).getByRole('button', { name: 'managerApproval' })).toHaveAttribute('aria-current', 'true')
     expect(screen.queryByText('purchaseRequest.managerApproval')).toBeNull()
+    expect(screen.queryByText('Approve')).toBeNull()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'History' }))
+
     expect(screen.getByText('System.InvalidOperationException')).toBeVisible()
     expect(within(screen.getByTestId('inspector-call-c-1')).getByText('Input: Hidden')).toBeVisible()
     expect(screen.queryByTestId('inspector-command-retry')).toBeNull()
@@ -139,24 +150,27 @@ describe('ConsoleInstancePage', () => {
     expect(heading.getByText('Failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
   })
 
-  it('shows the instance in parts: its facts, then each section, with a rule before every part but the first', async () => {
+  it('shows the instance in parts: its facts, then the tabs, with a rule before every part but the first', async () => {
     stubServer(
       () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
     )
-    renderPage()
+    renderPage('?tab=history')
 
     const page = await screen.findByTestId('inspector-instance')
     const sections = within(page).getAllByRole('region')
     expect(sections.map((part) => within(part).getByRole('heading', { level: 2 }).textContent)).toEqual([
-      'Steps',
       'History',
       'Tasks',
       'Calls',
       'Sub-processes',
     ])
     expect(within(page).getByTestId('studio-section-inspector-facts')).toBeVisible()
-    expect(within(page).getAllByRole('separator')).toHaveLength(5)
-    for (const part of sections) {
+    expect(within(page).getByTestId('studio-section-inspector-tabs').previousElementSibling).toHaveAttribute(
+      'role',
+      'separator',
+    )
+    expect(within(page).getAllByRole('separator')).toHaveLength(4)
+    for (const part of sections.slice(1)) {
       expect(part.previousElementSibling).toHaveAttribute('role', 'separator')
     }
   })

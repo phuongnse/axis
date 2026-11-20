@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
 import { ValueTable } from './ValueTable'
-import { JsonNumber, valueRows } from './valueRows'
+import { JsonNumber, namedValues, valueRows } from './valueRows'
 
 const texts = {
   'shell.value.empty': 'Empty',
@@ -92,5 +92,21 @@ describe('ValueTable', () => {
     for (const text of ['false', '3', 'Paper']) {
       expect(screen.getByText(text)).not.toHaveStyle({ fontStyle: 'italic' })
     }
+  })
+})
+
+describe('namedValues', () => {
+  it("reads a value the API marks hidden as the word Hidden, whatever came in the value's place", () => {
+    renderTable(
+      namedValues([
+        { name: 'title', value: 'Laptops', hidden: false },
+        { name: 'budget', value: 'secret figure', hidden: true },
+      ]),
+    )
+
+    expect(screen.getByRole('cell', { name: 'Laptops' })).toBeInTheDocument()
+    const row = screen.getByRole('cell', { name: 'budget' }).closest('tr')!
+    expect(within(row).getByText('Hidden')).toHaveStyle(emptyStyle)
+    expect(screen.queryByText('secret figure')).not.toBeInTheDocument()
   })
 })
