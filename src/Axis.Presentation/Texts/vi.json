@@ -822,6 +822,7 @@
   "shell.form.saveFailed": "Không lưu được bản ghi.",
   "shell.form.loadFailed": "Không tải được bản ghi.",
   "shell.form.choose": "Chọn…",
+  "shell.form.openRecord": "Mở",
   "shell.form.clear": "Xóa",
   "shell.form.addRow": "Thêm dòng",
   "shell.form.removeRow": "Xóa dòng",

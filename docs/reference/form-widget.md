@@ -152,11 +152,11 @@ A required field's label is marked, but the mark blocks nothing: the server stil
 - **Creator fields.** Page metadata marks a field that declares
   [`creator`](roles-and-policies.md#record-creator), so the form shows it read-only. It is empty on a
   new record, shows the creating user's id once saved, and the form never sends it.
-- **Open a reference** _(planned)_. A `reference` field whose chosen record the person can open has an Open icon button
+- **Open a reference**. A `reference` field whose chosen record the person can open has an Open icon button
   with `ExportOutlined`, joined after Choose and before Clear. It is named "Open {label}" ("Mở {label}"), where Open is
   the text `shell.form.openRecord`, and it is a real link to the record's page. A read-only reference is a link too,
-  see [opening things](actions-and-controls.md#opening-things). The unsaved changes guard asks before a link leaves a
-  form with a change. A record the person cannot open is plain text, with no Open button.
+  see [opening things](actions-and-controls.md#opening-things). A record the person cannot open is plain text, with no
+  Open button.
 
 ## Field look
 
@@ -236,7 +236,7 @@ returns no label when the user may not read the target's display field.
   check the limit of 1,000 ids, and the server's message shows on the field.
 - **Read-only.** A set that the form makes read-only shows its labels joined by a comma,
   or "Not set" when it is empty, with no add or remove button.
-- **Links** _(planned)_. Each entry's label is a link to its record page, and so is each label of a read-only set.
+- **Links**. Each entry's label is a link to its record page, and so is each label of a read-only set.
 
 ## Child collections
 
@@ -257,7 +257,7 @@ A child collection field shows its rows as a table under the field's label.
   the row's value, not an input, formatted as a table cell shows it. It keeps an input's
   height, so it lines up with the inputs beside it. An empty read-only or computed cell shows a muted
   italic "—". A read-only file cell shows its download link, or a dash when it has no file.
-- **References in cells** _(planned)_. A reference cell has the same Open button as a reference field, and a read-only
+- **References in cells**. A reference cell has the same Open button as a reference field, and a read-only
   reference cell is a link to its record page.
 - **Table.** The table is the shared table, see [tables](actions-and-controls.md#tables). A reference
   cell's input keeps at least 240px and the other inputs at least 160px.
@@ -318,8 +318,8 @@ The form sends only what changed, and shows the server's answer where it belongs
 - **The save bar** _(planned)_. A site's form has no Save or Cancel row of its own. While the form has a change to
   save, the [save bar](studio-resource-form.md#save-bar) shows Discard and Save. With no change it is not drawn, so a
   new record's form shows it once the person types. Discard asks first, then puts every value back as the form
-  started. A form without the grant to save shows no bar. A person who leaves by the sidebar or the browser is asked
-  first, by [Leave without saving?](studio.md#editor), while there is a change. A wizard's Back and Next stay under
+  started. A form without the grant to save shows no bar. A person who leaves by the sidebar, a reference's link or the
+  browser is asked first, by [Leave without saving?](studio.md#editor), while there is a change. A wizard's Back and Next stay under
   the step's fields, and the bar shows on its last step.
 
 ### Form drafts
