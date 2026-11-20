@@ -263,6 +263,9 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         folder.With(
             "application.json",
             $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "application", "name": "{{name}}", "formatVersion": 1 }""");
+        folder.With(
+            Path.Combine("texts", "en.json"),
+            $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": { "processes.nightlyJob.title": "Run the nightly job" } }""");
         var job = await File.ReadAllTextAsync(Path.Combine(_appFolder, "processes", "nightly-job.json"));
         folder.With(
             Path.Combine("processes", "nightly-job.json"),

@@ -1,0 +1,8 @@
+{
+  "id": "aecac8da-e276-4ac3-8433-0f8120d65377",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": { "nav.orders": "Orders" }
+}

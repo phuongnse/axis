@@ -7,7 +7,7 @@ import { ChildCollectionTable } from './ChildCollectionTable'
 import { useCanvasActions } from './canvasActions'
 import { NotSet } from './EmptyValue'
 import { FileLink } from './FileInput'
-import { formatValue, referencesLabels } from './formatValue'
+import { formatValue } from './formatValue'
 import { navigateTarget, type NavigateOpen } from './navigateAction'
 import { newIdempotencyKey, startProcess } from './processes'
 import {
@@ -19,6 +19,7 @@ import {
   type RecordValue,
   type RowLabels,
 } from './records'
+import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
 import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
 import { TermList } from './TermList'
@@ -43,12 +44,17 @@ const noLabels: RowLabels[] = []
 /** The labels of a child collection's rows, which are an array only for a collection with references. */
 const rowLabelsOf = (label: FieldLabel | undefined) => (Array.isArray(label) ? (label as RowLabels[]) : noLabels)
 
+/** The labels of a set of references, by position, with `null` where a record has no label for the reader. */
+const referenceLabels = (label: FieldLabel | undefined): (string | null)[] =>
+  Array.isArray(label) ? label.map((item) => (typeof item === 'string' ? item : null)) : []
+
 /**
  * Shows one record of the widget's entity, read-only. A widget that names a form shows the form's
  * sections under their titles, with only the fields they list. Otherwise it shows every field in one
  * section without a title. Each section's fields form a description list in the sections' column widths.
  * A value looks as it does in a table cell, and a child collection shows its
- * rows in a read-only table. The server leaves out the fields the user may not read. A record that is
+ * rows in a read-only table. A reference, and each entry of a set of references, is a link to its record page, see
+ * `RecordLink`. The server leaves out the fields the user may not read. A record that is
  * missing or unreadable shows the missing-record line, see `RecordNotFound`.
  *
  * A button for each `startProcess` action starts its process for the record straight away, with
@@ -211,11 +217,23 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       />
     ) : field.type === 'references' ? (
       <Flex wrap gap="small" data-testid={`detail-references-${field.name}`}>
-        {referencesLabels(record.values[field.name], record.labels[field.name]).map((label, index) => (
-          <Tag key={index}>{label}</Tag>
+        {(Array.isArray(value) ? (value as string[]) : []).map((target, index) => (
+          <Tag key={target}>
+            <RecordLink
+              entity={field.target?.entity ?? ''}
+              id={target}
+              label={referenceLabels(record.labels[field.name])[index] ?? null}
+            />
+          </Tag>
         ))}
         {!Array.isArray(value) || value.length === 0 ? <NotSet /> : null}
       </Flex>
+    ) : field.type === 'reference' && typeof value === 'string' ? (
+      <RecordLink
+        entity={field.target?.entity ?? ''}
+        id={value}
+        label={typeof record.labels[field.name] === 'string' ? (record.labels[field.name] as string) : null}
+      />
     ) : field.type === 'file' && isFileValue(value) ? (
       <FileLink field={field} value={value} />
     ) : value === null ? (

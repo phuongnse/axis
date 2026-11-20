@@ -421,6 +421,7 @@ function stubServer({
   failingLocale = '',
   e2eSiteStatus = 200,
   recordsStatus = 200,
+  recordPages = undefined as Record<string, string> | undefined,
   hostSite = null as string | null,
   // `null` answers 401, as when nobody is signed in.
   me = signedInUser as CurrentUser | null,
@@ -447,7 +448,7 @@ function stubServer({
       return json({ title: 'Sign in to read or write this data.', status: e2eSiteStatus }, e2eSiteStatus)
     }
     if (input.startsWith('/api/sites/')) {
-      return siteRoute(input.replace('/api/sites/', ''), failingLocale)
+      return siteRoute(input.replace('/api/sites/', ''), failingLocale, recordPages)
     }
     if (input.startsWith('/api/apps/')) {
       if (recordsStatus !== 200) {
@@ -474,7 +475,7 @@ function stubServer({
 }
 
 /** Answers the application site endpoints for the site `e2e`, and 404 for anything else. */
-function siteRoute(path: string, failingLocale: string) {
+function siteRoute(path: string, failingLocale: string, recordPages?: Record<string, string>) {
   const notFound = json({ title: 'Not found', status: 404 }, 404)
   const [sitePath, kind, ...segments] = path.split('/')
   const name = segments.length > 0 ? segments.join('/') : undefined
@@ -482,7 +483,7 @@ function siteRoute(path: string, failingLocale: string) {
     return notFound
   }
   if (kind === undefined) {
-    return json(e2eSite)
+    return json(recordPages ? { ...e2eSite, recordPages } : e2eSite)
   }
   if (kind === 'texts' && name !== undefined && name in siteTexts) {
     return name === failingLocale ? json({}, 500) : json({ locale: name, texts: siteTexts[name] })
@@ -1463,6 +1464,42 @@ describe('App', () => {
       '/e2e/notedetail?note=42',
       '/e2e/notedetail/new?note=6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7',
     ]) {
+      const { unmount } = renderApp(path)
+
+      expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+      unmount()
+    }
+    const requested = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
+    expect(requested.filter((url) => url.startsWith(`${noteEntity.recordsPath}/`))).toEqual([])
+  })
+
+  it('opens the record of a detail page that the site names as its entity record page, at /{site}/{page}/{id}', async () => {
+    stubServer({ recordPages: { Note: '/e2e/notedetail' } })
+
+    renderApp(`/e2e/notedetail/${knownNoteId}`)
+
+    expect(await screen.findByText('First note')).toBeInTheDocument()
+    expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(`${noteEntity.recordsPath}/${knownNoteId}`, expect.anything())
+  })
+
+  it('shows the not-found page for an id on a detail page that the site does not name as a record page, and requests no record', async () => {
+    stubServer({ recordPages: { Note: '/e2e/noteform' } })
+
+    renderApp(`/e2e/notedetail/${knownNoteId}`)
+
+    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    const requested = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
+    expect(requested.filter((url) => url.startsWith(`${noteEntity.recordsPath}/`))).toEqual([])
+  })
+
+  it('shows the not-found page for no site record pages at all, and for new or a malformed id on a detail record page', async () => {
+    for (const [recordPages, path] of [
+      [undefined, `/e2e/notedetail/${knownNoteId}`],
+      [{ Note: '/e2e/notedetail' }, '/e2e/notedetail/new'],
+      [{ Note: '/e2e/notedetail' }, '/e2e/notedetail/42'],
+    ] as const) {
+      stubServer({ recordPages })
       const { unmount } = renderApp(path)
 
       expect(await screen.findByTestId('not-found')).toBeInTheDocument()

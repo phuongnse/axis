@@ -32,3 +32,20 @@ export function useRecordOpener(): (entity: string, id: string) => string | null
     return siteAddress(context.sitePath, `${rest}/${encodeURIComponent(id)}`)
   }
 }
+
+/**
+ * Whether the site names the page `pageName` as the record page of `entity`, ignoring letter case. A detail page that
+ * the site names so opens a record at `/{site}/{page}/{id}`. See docs/reference/frontend.md#routing.
+ */
+export function isRecordPage(
+  sitePath: string,
+  recordPages: Readonly<Record<string, string>> | null | undefined,
+  entity: string,
+  pageName: string,
+): boolean {
+  return (
+    !!recordPages &&
+    Object.hasOwn(recordPages, entity) &&
+    recordPages[entity].toLowerCase() === `/${sitePath}/${pageName}`.toLowerCase()
+  )
+}

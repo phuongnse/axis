@@ -5,6 +5,7 @@ import { PageLeaf, type PageLeafProps } from '../platform/PageLeaf'
 import { detailRecordId, readPageParameters } from '../platform/pageParameters'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
 import { RecordList, type RecordListValue } from '../platform/recordList'
+import { isRecordPage } from '../platform/recordPages'
 import { fetchPage, fetchRecordPage, type ApplicationSite, type PageMetadata } from '../platform/site'
 import { siteAddress } from '../platform/siteLinks'
 import { TaskPage } from '../platform/TaskPage'
@@ -202,17 +203,34 @@ function SitePage({
     return <ShellError />
   }
 
+  // A route check finds its widget anywhere in the tree, not only as the first widget.
+  const leaves = leafWidgets(page.widgets)
+  // A detail that the site names as its entity's record page takes its record from the id segment, so that segment
+  // fills the detail's `record` parameter. A page with a form keeps its id for the form.
+  const isForm = leaves.some((widget) => widget.type === 'form')
+  const recordPageDetail =
+    form === 'edit' && !isForm
+      ? leaves.find(
+          (widget) =>
+            widget.type === 'detail' &&
+            widget.entity !== null &&
+            isRecordPage(sitePath, trail.site.recordPages, widget.entity.name, page.name),
+        )
+      : undefined
+  const params = new URLSearchParams(searchParams)
+  if (recordPageDetail?.detail && recordId !== null) {
+    params.set(recordPageDetail.detail.record, recordId)
+  }
+
   // A page whose required parameter is missing or malformed in the address names no page. This runs
   // before any widget renders, so no rows are requested.
-  const pageValues = readPageParameters(searchParams, page.parameters)
+  const pageValues = readPageParameters(params, page.parameters)
   if (pageValues === null) {
     return <NotFoundPage />
   }
 
   const breadcrumb = breadcrumbFor(trail, page.name, page.titleKey, t)
 
-  // A route check finds its widget anywhere in the tree, not only as the first widget.
-  const leaves = leafWidgets(page.widgets)
   const taskInbox = leaves.find((widget) => widget.type === 'taskInbox')
   const processInspector = leaves.find((widget) => widget.type === 'processInspector')
   const details = leaves.filter((widget) => widget.type === 'detail')
@@ -256,9 +274,13 @@ function SitePage({
   if (details.some((widget) => !recordIdPattern.test(detailRecordId(widget, pageValues) ?? ''))) {
     return <NotFoundPage />
   }
-  // A table page has no record segment, and a form page always has one.
-  const isForm = leaves.some((widget) => widget.type === 'form')
-  if (isForm !== (form !== undefined) || (recordId !== null && !recordIdPattern.test(recordId))) {
+  // A table page has no record segment. A form page and a detail record page always have one, and `new` only a form.
+  const takesId = isForm || recordPageDetail !== undefined
+  if (
+    takesId !== (form !== undefined) ||
+    (form === 'new' && !isForm) ||
+    (recordId !== null && !recordIdPattern.test(recordId))
+  ) {
     return <NotFoundPage />
   }
 
