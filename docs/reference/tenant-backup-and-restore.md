@@ -391,7 +391,7 @@ archive and the steps are those above.
   own realm holds the tenant's `realm.json`, so a restore gives the tenant back with its people. The
   chart gives the cell backup CronJob `IdentityProvider__DatabaseConnectionString`, the connection of a
   read-only role of the identity provider's database, from the Secret in `secrets.identityCredentialsConnection`,
-  see [which pod gets which secret](installation.md#which-pod-gets-which-secret). The chart requires the Secret with
+  see [which pod gets which secret](installation-in-the-cloud.md#which-pod-gets-which-secret). The chart requires the Secret with
   `backup.bucket`. The [weekly restore check](#weekly-restore-check) fails an archive of such a tenant
   that holds no `realm.json`.
 - **Crypto-shredding.** [Deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) destroys its backup
@@ -434,7 +434,7 @@ hours 15 minutes, see [the Helm chart](installation.md#settings-and-secrets).
   hours after its last point, but only while the run reports another tenant. The rule is in
   `deploy/helm/axis/alerts/axis-alerts.yaml`, a Prometheus rule file that an install without the chart loads
   in Prometheus's `rule_files`. In the chart, `alerts.enabled` renders it as a PrometheusRule, see
-  [values](installation.md#values). It is off by default, see
+  [values](installation-in-the-cloud.md#values). It is off by default, see
   [D110](../decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md). The chart passes the
   backup job no OTLP endpoint, so the operator must bring the gauge into Prometheus. `tests/alerts/axis-alerts.test.yaml`
   tests the rule with `promtool`.

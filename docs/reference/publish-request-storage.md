@@ -5,7 +5,7 @@ the audit records of publishing. The other system tables are in [storage](storag
 
 ## Publish requests and release history
 
-Studio publishes by storing a request that the [publisher](administration.md#publisher) runs, and
+Studio publishes by storing a request that the [publisher](publisher.md#publisher) runs, and
 every activation adds a row to the release history, from which a release can be activated again.
 `Axis.Configuration` owns both tables, in the `axis` schema of each tenant database. The server
 inserts `validate`, `publish`, `activate` and `test` requests through the

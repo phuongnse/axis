@@ -30,7 +30,7 @@ problems can still fail activation.
 - **Publishing and activating a release are audited,** whether they succeed or fail.
 
 The detail is in [publishing](../reference/authoring.md#publishing), the
-[publisher](../reference/administration.md#publisher),
+[publisher](../reference/publisher.md#publisher),
 [publish requests and release history](../reference/publish-request-storage.md#publish-requests-and-release-history)
 and the [Studio settings](../reference/host-settings.md#studio-settings).
 

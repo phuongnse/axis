@@ -1,5 +1,5 @@
 // Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the seven
-// production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
+// production images exactly as docs/reference/installation-on-premises.md says. It runs against a test PostgreSQL
 // and the example's own identity provider, creates two tenants and their realms there, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
 // publisher runs in each tenant. It then starts a second server replica, signs requester in
@@ -207,13 +207,13 @@ describe('the example holds no secret', () => {
     for (const secret of Object.values(config.secrets)) assert.ok(secret.file, 'a secret has no file')
   })
 
-  test("the installation doc's 'Mounted in' table lists the secret files of each service as the rendered config mounts them", () => {
+  test("the on-premises install doc's 'Mounted in' table lists the secret files of each service as the rendered config mounts them", () => {
     const { services } = render([scenariosFile])
     const mounted = {}
     for (const [name, service] of Object.entries(services)) {
       for (const secret of service.secrets ?? []) (mounted[secret.source] ??= []).push(name)
     }
-    const doc = readFileSync(join(root, 'docs/reference/installation.md'), 'utf8')
+    const doc = readFileSync(join(root, 'docs/reference/installation-on-premises.md'), 'utf8')
     const start = doc.indexOf('| File | Mounted in |')
     assert.notEqual(start, -1, 'no Mounted in table')
     const listed = {}
@@ -859,7 +859,7 @@ describe('the on-premises installation', () => {
         `Host=postgres;Port=5432;Database=axis_identity;Username=axis_identity_reader;Password=${passwords.reader}${trust}`,
       )
 
-      // Step 3, the database roles. This is the SQL of the installation guide.
+      // Step 3, the database roles. This is the SQL of docs/reference/installation-on-premises.md#database-roles.
       const initSql = join(folder, 'init-roles.sql')
       writeFile(
         initSql,
@@ -1228,7 +1228,7 @@ describe('the on-premises installation', () => {
       assert.equal((await request(agentPort, 'localhost', '/health/ready')).status, 200)
 
       // The package hosts: a read-only root with a writable /tmp, the limits of the example, and the environment of their image
-      // and no more. See docs/reference/installation.md#on-premises.
+      // and no more. See docs/reference/installation-on-premises.md#on-premises.
       const inspect = (target) => {
         const result = docker(['inspect', target])
         assert.equal(result.status, 0, result.stderr)

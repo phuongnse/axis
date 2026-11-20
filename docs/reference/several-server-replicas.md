@@ -42,5 +42,5 @@ the server reads the real scheme and host from forwarded headers, and only from 
   reads none. Loopback is not trusted by default. The rules are in
   [forwarded headers](host-settings.md#forwarded-headers).
 - **On premises.** The Compose example runs two server replicas behind a TLS proxy, see
-  [TLS proxy and a second replica](installation.md#tls-proxy-and-a-second-replica) and
+  [TLS proxy and a second replica](installation-on-premises.md#tls-proxy-and-a-second-replica) and
   [TLS](installation.md#tls).

@@ -65,7 +65,7 @@ has one implementation.
 
 A route that changes a tenant answers `202` with a job, `{ "id", "kind", "tenantId", "state",
 "createdAt" }`, and a `Location` header of `/api/cell/jobs/{id}`. The
-[publisher](administration.md#publisher) runs the job with the same code as the `Axis.Admin` command,
+[publisher](publisher.md#publisher) runs the job with the same code as the `Axis.Admin` command,
 over the schema role.
 
 - **Queuing.** The server only queues the job, over the platform reader role, which may insert into
@@ -95,11 +95,11 @@ over the schema role.
 | Kind | Queued by | Steps |
 | --- | --- | --- |
 | `suspend`, `resume`, `read-only` | Its route | One `status` step |
-| `create` | `POST /api/cell/tenants` | The five steps of [creating a tenant](#creating-a-tenant), see the [create job](administration.md#create-job) |
+| `create` | `POST /api/cell/tenants` | The five steps of [creating a tenant](#creating-a-tenant), see the [create job](publisher.md#create-job) |
 | `export` | `POST /api/cell/tenants/{id}/exports` or `POST /api/tenant/exports` | One `export` step, see [exporting a tenant](#exporting-a-tenant) |
 | `delete` | `DELETE /api/cell/tenants/{id}` | One `schedule` step |
 | `cancel-deletion` | `POST /api/cell/tenants/{id}/deletion/cancel` | One `cancel` step |
-| `purge` | The publisher, never a route. An operator does not run a failed one again | The eight steps of [deleting a tenant](#deleting-a-tenant), see the [purge job](administration.md#purge-job) |
+| `purge` | The publisher, never a route. An operator does not run a failed one again | The eight steps of [deleting a tenant](#deleting-a-tenant), see the [purge job](publisher.md#purge-job) |
 
 ### Routes
 
@@ -178,7 +178,7 @@ read never returns.
 - **One at a time.** A cell-wide advisory lock covers the id check and the cap check, so two parallel
   creates cannot both pass. `Axis.Admin tenant create` does not take that lock.
 
-The publisher runs the job's steps in order, see the [create job](administration.md#create-job):
+The publisher runs the job's steps in order, see the [create job](publisher.md#create-job):
 
 1. `tenant`: create the tenant as `tenant create` does, with the host `<id>.<Cell:TenantDomain>`, its
    realm, its keys and its backup key, see
@@ -219,7 +219,7 @@ served before it is verified are in [hosts and certificates](cells.md#hosts-and-
   request over the platform reader role, which may insert into that table and nothing else there. The
   row's `actor` is the id of the operator, or of the tenant administrator who asked. The route queues no job and takes no `Idempotency-Key`.
 
-The [publisher](administration.md#publisher) checks the customer's DNS records, under
+The [publisher](publisher.md#publisher) checks the customer's DNS records, under
 `Tenancy:Source=directory`, every `Cell:HostCheckInterval` (10 minutes by default):
 
 - **Expired.** A pending request past `expires_at` becomes `expired` without a DNS lookup, and its
@@ -265,7 +265,7 @@ restore takes an [archive](tenant-backup-and-restore.md), never an export.
   S3 server-side encryption (`AES256`), so the owner can open the downloaded ZIP without a key of the
   cell. The export id is the job id. A publisher without these settings still runs every other job,
   and the `export` job fails with a message that names the missing setting.
-- **Kept 7 days.** The [publisher](administration.md#publisher) sweeps the export bucket every hour
+- **Kept 7 days.** The [publisher](publisher.md#publisher) sweeps the export bucket every hour
   and deletes each ZIP under `exports/` that was stored more than 7 days ago. So a ZIP can outlive its
   `expiresAt` by up to an hour, and the route answers `410` from `expiresAt` in that time.
 - **Downloaded.** The download is the [exports route](#routes) with `Accept: application/zip`, or
@@ -323,7 +323,7 @@ A tenant administrator asks for a host of the tenant's own, with the same reques
 - **When.** While the tenant is `active`, the `POST` and the `GET` work. While it is `readOnly`, the
   `POST` is refused with the read-only `403` and the `GET` still answers.
 - **Audit.** Asking for a host writes no platform audit record, as the operator route writes none. The
-  row's `actor` keeps who asked. When the [publisher](administration.md#publisher) verifies the host,
+  row's `actor` keeps who asked. When the [publisher](publisher.md#publisher) verifies the host,
   the `tenant host verify` record names the administrator as its actor.
 - **Storage quota.** A request writes one platform row and no tenant data, so it is never refused
   over the `storage` quota, see [tenant quotas](tenant-quotas.md#refusals).
@@ -371,9 +371,9 @@ A deletion can be undone during its grace window, and not after.
    tenant stays `suspended` until it is resumed. A cancel after `delete_after` has passed fails its job
    and keeps the date. A cancel of a tenant with no scheduled deletion succeeds and changes nothing.
    An export can still run in the window.
-3. **Purge.** After `delete_after`, the [publisher](administration.md#publisher) in a cell queues a
+3. **Purge.** After `delete_after`, the [publisher](publisher.md#publisher) in a cell queues a
    `purge` job for each main tenant, never for a preview tenant, and runs it, see the
-   [purge job](administration.md#purge-job). The job's actor is the actor of the tenant's latest
+   [purge job](publisher.md#purge-job). The job's actor is the actor of the tenant's latest
    succeeded `delete` job, and the tombstone names them. A tenant whose deletion was cancelled has no
    `delete_after` and is never purged. A purge that failed is queued again no sooner than an hour
    after it ended, and a tenant has one `purge` job at a time. The job's eight steps run in the order

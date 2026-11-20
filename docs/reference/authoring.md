@@ -3,7 +3,7 @@
 The authoring API is how Studio, and any other client, reads and edits an application. It edits the
 resource files of an application folder on the server's disk, the same files that are kept in git,
 and it never activates a release: going live is a [publish request](#publishing), which the server
-stores and a separate [publisher](administration.md#publisher) runs, so the server never activates
+stores and a separate [publisher](publisher.md#publisher) runs, so the server never activates
 in its own process. This page gives the API's settings, routes, versions, order of checks, writes and diagnostics,
 [answers](authoring-responses.md), and the publishing routes. The page and form metadata routes are in
 [draft page metadata](draft-page-metadata.md), and the routes that save a module resource are in
@@ -481,7 +481,7 @@ and module resource saves.
 - **Who wrote it.** A write also records its writer, see [resource activity](studio-resource-form.md#resource-activity).
 - **Never an activation.** A write never compiles against a database, never stores a release and never
   activates one. Only a [publish request](#publishing) leads to an activation, which the
-  [publisher](administration.md#publisher) runs.
+  [publisher](publisher.md#publisher) runs.
 
 ### New files
 
@@ -603,7 +603,7 @@ references is saved, and the diagnostics list the broken references.
 An author validates, publishes, previews and tests an application from Studio, and activates any
 release of its history. The server holds no tenant schema connection and never activates in its own
 process: it stores a **publish request** in the tenant database, and a separate
-[publisher](administration.md#publisher) runs it with the tenant's schema role. The tables are in
+[publisher](publisher.md#publisher) runs it with the tenant's schema role. The tables are in
 [publish requests and release history](publish-request-storage.md#publish-requests-and-release-history).
 
 A request runs for the tenant of the author's session, so Studio on a tenant's host publishes to that
@@ -704,7 +704,7 @@ What each kind does:
   real users.
 - **Where it is stored and where it runs.** The request is stored in the session tenant's database,
   so Studio polls `GET .../requests/{id}` on the main host as for any request. The publisher runs it
-  against the preview tenant's database, see [the publisher](administration.md#publisher).
+  against the preview tenant's database, see [the publisher](publisher.md#publisher).
 - **History.** The activation goes in the preview tenant's own release history, with the request id,
   and the preview's release number is its own. `GET .../releases` on the main host shows only the main
   tenant's history.
@@ -735,7 +735,7 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
 - **Where it runs.** The server stores the request with a snapshot, taken as for `validate`, or of
   the person's [draft](revisions-and-drafts.md#drafts) for the MCP server's `run_scenarios` and `test_package`. The
   publisher runs it with `Scenarios:ServerConnectionString`, in a new database for each scenario, see
-  [the publisher](administration.md#publisher), and touches the tenant database only for the
+  [the publisher](publisher.md#publisher), and touches the tenant database only for the
   request's status and outcomes. Without the setting, the request ends `failed` with `AXC0217`, which
   names it, and a snapshot that does not compile ends it `failed` with the compile diagnostics. In
   these cases, and for an unknown name, no scenario runs.

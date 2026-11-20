@@ -42,7 +42,7 @@ The compile reports every problem it finds, not only the first, as the
 [diagnostics](#diagnostics) say.
 
 Studio does not run this pipeline itself. It stores a [publish request](authoring.md#publishing) in the
-tenant database, and the [publisher](administration.md#publisher) claims it. The publisher compiles the
+tenant database, and the [publisher](publisher.md#publisher) claims it. The publisher compiles the
 stored snapshot, stores the release or finds it by content hash, and activates it in one transaction.
 It then updates the tenant's realm, sets the request's final status and writes the audit record. The
 server reads the new active release from the next request. The diagram leaves out the contract

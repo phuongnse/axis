@@ -41,7 +41,7 @@ seconds without a connection or 5 minutes. A service that does not answer fails 
 next. See [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md).
 
 On Linux with a reachable Docker, setup also registers gVisor's `runsc` runtime with Docker, which the `application-packages` profile of the
-[Compose example](reference/installation.md#on-premises) and the `onprem` test need. `scripts/lib/tools.sh` pins the release, downloads `runsc` for the machine's
+[Compose example](reference/installation-on-premises.md#on-premises) and the `onprem` test need. `scripts/lib/tools.sh` pins the release, downloads `runsc` for the machine's
 architecture into `~/.cache/axis-tools/gvisor-<release>`, which NexKit's `tools` cache entry restores, and checks it against the SHA-512 that the release publishes. A
 download that does not match stops setup and installs nothing. Setup then copies the binary to `/usr/local/bin` with `sudo` unless it runs as root, runs `runsc install`
 and reloads Docker. It skips all of this when Docker already lists `runsc`, so a second run downloads nothing and changes nothing. On macOS, and when Docker is not reachable, it prints a note and skips gVisor.
@@ -584,7 +584,7 @@ All six ports are published on `127.0.0.1` only. The Keycloak admin console logi
   that the purchase request sample calls when a request is approved, see
   [purchasing system stub](testing.md#purchasing-system-stub).
 - **The publisher,** `axis-admin publisher`, runs Studio's publish requests, see
-  [publisher](reference/administration.md#publisher). It serves the tenants `default` and
+  [publisher](reference/publisher.md#publisher). It serves the tenants `default` and
   `default-preview`, so it runs preview requests too. It has no port and no health check, and writes
   `default ready` and `default-preview ready` once the server has migrated each tenant database.
 - **The Node.js package host,** `package-host-node`, runs host mode of `Axis.PackageHost` from the `package-host-node-dev`

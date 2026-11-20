@@ -390,7 +390,7 @@ export async function startStack({ binding, answersFile } = {}) {
     const secretKey = randomBytes(32).toString('base64')
     const suffix = `${process.pid}-${randomBytes(3).toString('hex')}`
 
-    // 1. PostgreSQL. The init SQL makes the roles of the installation guide and the platform database.
+    // 1. PostgreSQL. The init SQL makes the roles of docs/reference/installation-on-premises.md#database-roles and the platform database.
     const initSql = join(folder, 'init-roles.sql')
     writeFileSync(
       initSql,

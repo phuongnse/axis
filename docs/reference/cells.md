@@ -39,7 +39,7 @@ The diagram shows one cell and the connections that the Helm chart configures. T
 ingress, cert-manager and the object storage come from the cluster and the cloud provider, not from
 the chart. The chart renders the workloads, the wildcard certificate when `cell.certificate.enabled`
 is set, and the backup CronJob only when `backup.bucket` is set, see
-[installation](installation.md#in-the-cloud).
+[installation](installation-in-the-cloud.md#in-the-cloud).
 
 ```mermaid
 flowchart LR
@@ -97,7 +97,7 @@ that it controls the host.
   1. The cell answers with a verification token. The customer adds the DNS record
      `_axis-verify.<host>` of type `TXT` with that token, and a `CNAME` of the host to the tenant's
      subdomain.
-  2. The [publisher](administration.md#publisher) looks the record up every
+  2. The [publisher](publisher.md#publisher) looks the record up every
      `Cell:HostCheckInterval`, 10 minutes by default, for 7 days. When it matches, the host is
      `verified`. After 7 days without a match the request expires.
   3. Before it marks the request `verified`, the publisher creates a cert-manager `Certificate` for
@@ -174,7 +174,7 @@ cell puts PgBouncer in front of it.
   [cell settings](host-settings.md#cell-settings). The tenant directory row and the platform
   connection strings keep PostgreSQL's address for everything else. TLS with a full certificate check
   holds on both legs, as [TLS](installation.md#tls) asks. The Helm chart's `cell.pgbouncer` deploys
-  PgBouncer and sets both settings, see [installation](installation.md#in-the-cloud).
+  PgBouncer and sets both settings, see [installation](installation-in-the-cloud.md#in-the-cloud).
 
 ## Cell size
 

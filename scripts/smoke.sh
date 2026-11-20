@@ -9,7 +9,7 @@
 #   cell from the settings and file paths that its Helm chart renders, and builds the test package of each
 #   language in its package host image.
 # - onprem: scripts/onprem.test.mjs installs deploy/compose/compose.yaml from the production images as
-#   docs/reference/installation.md says, against a test PostgreSQL over TLS and the example's own identity
+#   docs/reference/installation-on-premises.md says, against a test PostgreSQL over TLS and the example's own identity
 #   provider, which the TLS proxy serves on a host of its own. Every
 #   connection string sets SSL Mode=VerifyFull, and the test checks that every Axis connection uses TLS. It
 #   creates two tenants, activates the leave request sample, checks each tenant's site and sign-in, suspend
