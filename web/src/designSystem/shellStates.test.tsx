@@ -80,4 +80,31 @@ describe('the design-system shell states', () => {
     expect(await screen.findByRole('heading', { name: 'Category' }, { timeout: 15000 })).toBeVisible()
     expect(screen.queryByTestId('not-found')).toBeNull()
   }, 30000)
+
+  const state = (caption: string) => previews.shell.find((candidate) => candidate.caption === caption)!
+
+  it('shows a saved record with Submit for approval on the page heading and its history', async () => {
+    render(<Preview states={[state('Saved record')]} />)
+
+    const heading = await screen.findByTestId('page-actions', {}, { timeout: 15000 })
+    expect(
+      await within(heading).findByRole('button', { name: 'Submit for approval' }, { timeout: 15000 }),
+    ).toBeVisible()
+    expect(screen.queryByTestId('form-save-bar')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+  }, 30000)
+
+  it('shows the save bar for a saved record with a change typed into Title', async () => {
+    render(<Preview states={[state('Saved record with a change')]} />)
+
+    expect(await screen.findByTestId('form-save-bar', {}, { timeout: 15000 })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Standing desks for the new office (revised)')
+  }, 30000)
+
+  it('shows the missing-record line with a link to Requests for an id the fixtures answer 404 for', async () => {
+    render(<Preview states={[state('Record not found')]} />)
+
+    expect(await screen.findByTestId('record-not-found', {}, { timeout: 15000 })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Go to Requests' })).toBeVisible()
+  }, 30000)
 })

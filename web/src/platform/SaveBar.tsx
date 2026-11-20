@@ -40,7 +40,7 @@ export function SaveBar({
   saveTestId?: string
 }): ReactNode {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, colour } = useDesignTokens()
   const [discardOpen, setDiscardOpen] = useState(false)
   const shown = unsaved || (history?.redoable ?? false)
   useUnsavedChanges(unsaved)
@@ -56,7 +56,9 @@ export function SaveBar({
           data-testid={testId}
           start={
             <>
-              <span>{unsaved ? t('shell.studio.saveBar.unsaved') : t('shell.studio.saveBar.noUnsaved')}</span>
+              <span style={{ color: colour.text }}>
+                {unsaved ? t('shell.studio.saveBar.unsaved') : t('shell.studio.saveBar.noUnsaved')}
+              </span>
               {history && (
                 <>
                   <AxisButton

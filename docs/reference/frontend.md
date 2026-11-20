@@ -509,8 +509,8 @@ and which fields each write action covers. A `taskInbox`, a `processInspector`, 
 - **`createFields` and `updateFields`** list the fields the user's `create` and `update` grants cover, in declaration
   order. Each is `[]` when the action is not in `actions`.
 - **On a form.** A form shows a field it may not write as read-only, as it shows a computed field, and never sends it.
-  On a new record it writes the `createFields`, and on a saved record the `updateFields`. A form has no save button
-  without the action it needs, `create` on a new record and `update` on a saved one. Cancel and the start process
+  On a new record it writes the `createFields`, and on a saved record the `updateFields`. A form shows no save bar
+  without the action it needs, `create` on a new record and `update` on a saved one. The start process
   buttons stay.
 - **On a table.** A toolbar action to a form without `record` shows only with `create`.
 - **Bulk actions and inline edit** _(planned for M42)_. A table's metadata lists only the

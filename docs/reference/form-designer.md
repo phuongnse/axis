@@ -19,7 +19,7 @@ width switch.
 - **Drawn from the server.** The canvas asks [the draft page metadata route](draft-page-metadata.md)
   300 ms after the last edit and after each save. For a form it answers the metadata of a form widget, with a `path` on
   each section, field and step. A form the route cannot draw shows a short notice.
-- **Nothing runs.** Save, Next, Back and Cancel do nothing, because the canvas cancels every click and
+- **Nothing runs.** Next and Back do nothing, because the canvas cancels every click and
   form submit. A click only selects.
 - **Loaded when needed.** The canvas is mounted only while the Design tab is active. The tab's code is
   the lazy chunk `StudioFormDesign`, which loads when the tab first opens.

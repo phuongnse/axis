@@ -65,11 +65,11 @@ the changes of every step.
 - **Focus.** After Next or Back, focus moves to the first input of the new step, so a keyboard user
   types on at once. Nothing is focused when the form first opens. Enter on a step before the last acts
   as Next.
-- **Last step.** Save and the `startProcess` actions are on the last step. Cancel and the `navigate`
+- **Last step.** The save bar and the `startProcess` actions are on the last step. The `navigate`
   actions are on every step, because a navigate action uses the record as loaded and not the draft.
   After a failed save, the form opens the first step that has an error. The current step stays out of
   the URL, because a draft does not survive a reload.
-- **The last step's bar** _(planned)_. The save bar and the `startProcess` actions on the page heading show on the
+- **The last step's bar.** The save bar and the `startProcess` actions on the page heading show on the
   last step, and the `navigate` actions on every step, as the [saving](form-widget.md#saving) and
   [start process actions](form-widget.md#start-process-actions) rules say. Back and Next stay under the step's fields.
 - **Task page.** The task page shows the steps of the task's form the same way. The outcome buttons

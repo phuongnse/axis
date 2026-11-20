@@ -281,7 +281,8 @@ test("a finance reviewer sees a submitted request read-only, and an update throu
   await page.goto(`/purchasing/purchaserequestform/${id}`);
   await expectShown(fieldValue(page, "title"), title);
   await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel", exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("form-save-bar")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Save/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Submit/ })).toHaveCount(0);
 

@@ -1308,7 +1308,8 @@ describe('App', () => {
 
     renderApp('/e2e/nestedform/new')
 
-    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: 'title' })).toBeInTheDocument()
+    expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Nested note' })).toBeInTheDocument()
     expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
   })
@@ -1318,8 +1319,10 @@ describe('App', () => {
 
     renderApp('/e2e/noteform/new')
 
-    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'title' })).toBeInTheDocument()
+    const title = await screen.findByRole('textbox', { name: 'title' })
+    expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
+    await userEvent.type(title, 'x')
+    expect(await screen.findByTestId('form-save')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Note' })).toBeInTheDocument()
   })
 
