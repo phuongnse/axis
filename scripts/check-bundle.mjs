@@ -8,11 +8,13 @@
 // design chunk is the same for the designChunk prefix, the lazy module of the page designer's canvas and palette.
 // The process design chunk is the same for the processDesignChunk prefix, the lazy module of the process designer's Design tab.
 // The drag and drop chunk is the same for the dragChunk prefix, the lazy @dnd-kit library the designers share.
-// Sizes are gzipped. Prints the five sizes, and exits 1 when
+// The process layout chunk is the same for the layoutChunk prefix, the lazy elkjs library that lays out a process graph.
+// Sizes are gzipped. Prints the six sizes, and exits 1 when
 // - the main bundle is larger than mainBaselineBytes + allowedGrowthBytes,
-// - there is no separate chart chunk, page design chunk, process design chunk or drag and drop chunk, or
-// - the chart code, a designer or the drag and drop library is among the main bundle files, so every
-//   page would load it.
+// - there is no separate chart chunk, page design chunk, process design chunk, drag and drop chunk or process layout
+//   chunk, or
+// - the chart code, a designer, the drag and drop library or the graph layout library is among the main bundle files,
+//   so every page would load it.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,8 +49,8 @@ function chunkFiles(spaDirectory, prefix) {
 
 /**
  * Measures the SPA in spaDirectory and checks it against the budget. Returns the gzipped size of the
- * main bundle, of the chart chunk, of the page design chunk, of the process design chunk and of the drag and drop
- * chunk in bytes, and the problems found.
+ * main bundle, of the chart chunk, of the page design chunk, of the process design chunk, of the drag and drop
+ * chunk and of the process layout chunk in bytes, and the problems found.
  */
 export function checkBundle(spaDirectory, budget) {
   const mainFiles = mainBundleFiles(spaDirectory)
@@ -56,11 +58,13 @@ export function checkBundle(spaDirectory, budget) {
   const designFiles = chunkFiles(spaDirectory, budget.designChunk)
   const processDesignFiles = chunkFiles(spaDirectory, budget.processDesignChunk)
   const dragFiles = chunkFiles(spaDirectory, budget.dragChunk)
+  const layoutFiles = chunkFiles(spaDirectory, budget.layoutChunk)
   const mainBytes = mainFiles.reduce((sum, file) => sum + gzippedSize(path.join(spaDirectory, file)), 0)
   const chartBytes = chartFiles.reduce((sum, file) => sum + gzippedSize(path.join(spaDirectory, file)), 0)
   const designBytes = designFiles.reduce((sum, file) => sum + gzippedSize(path.join(spaDirectory, file)), 0)
   const processDesignBytes = processDesignFiles.reduce((sum, file) => sum + gzippedSize(path.join(spaDirectory, file)), 0)
   const dragBytes = dragFiles.reduce((sum, file) => sum + gzippedSize(path.join(spaDirectory, file)), 0)
+  const layoutBytes = layoutFiles.reduce((sum, file) => sum + gzippedSize(path.join(spaDirectory, file)), 0)
   const limit = budget.mainBaselineBytes + budget.allowedGrowthBytes
 
   const problems = []
@@ -96,7 +100,13 @@ export function checkBundle(spaDirectory, budget) {
   for (const file of mainFiles.filter((candidate) => dragFiles.includes(candidate))) {
     problems.push(`The drag and drop chunk ${file} is part of the main bundle, so every page loads the drag and drop library.`)
   }
-  return { mainBytes, chartBytes, designBytes, processDesignBytes, dragBytes, problems }
+  if (layoutFiles.length === 0) {
+    problems.push(`There is no process layout chunk: no file in assets/ starts with '${budget.layoutChunk}'.`)
+  }
+  for (const file of mainFiles.filter((candidate) => layoutFiles.includes(candidate))) {
+    problems.push(`The process layout chunk ${file} is part of the main bundle, so every page loads the graph layout library.`)
+  }
+  return { mainBytes, chartBytes, designBytes, processDesignBytes, dragBytes, layoutBytes, problems }
 }
 
 function main(args) {
@@ -107,7 +117,7 @@ function main(args) {
   const spaDirectory = path.resolve(rest[0] ?? path.join(scriptRoot, 'src', 'Axis.Server', 'wwwroot'))
   const budget = JSON.parse(readFileSync(budgetFile, 'utf8'))
 
-  const { mainBytes, chartBytes, designBytes, processDesignBytes, dragBytes, problems } = checkBundle(spaDirectory, budget)
+  const { mainBytes, chartBytes, designBytes, processDesignBytes, dragBytes, layoutBytes, problems } = checkBundle(spaDirectory, budget)
   console.log(
     `Main bundle: ${kilobytes(mainBytes)} gzipped, budget ${kilobytes(budget.mainBaselineBytes + budget.allowedGrowthBytes)}.`,
   )
@@ -115,6 +125,7 @@ function main(args) {
   console.log(`Page design chunk: ${kilobytes(designBytes)} gzipped.`)
   console.log(`Process design chunk: ${kilobytes(processDesignBytes)} gzipped.`)
   console.log(`Drag and drop chunk: ${kilobytes(dragBytes)} gzipped.`)
+  console.log(`Process layout chunk: ${kilobytes(layoutBytes)} gzipped.`)
   for (const problem of problems) process.stderr.write(`${problem}\n`)
   return problems.length > 0 ? 1 : 0
 }

@@ -55,7 +55,7 @@ shows a panel edit within 2 s, and
 [`studio-process-redraw.spec.ts`](../../tests/e2e/specs/studio-process-redraw.spec.ts) fails at 2 s or
 more.
 
-- **Layout chunk** _(planned)_. `elkjs` loads in a chunk of its own, only on a page that draws a process, see
+- **Layout chunk**. `elkjs` loads in a chunk of its own, only on a page that draws a process, see
   [design tokens and previews](frontend.md#design-tokens-and-previews).
 
 ## Palette
