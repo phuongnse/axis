@@ -472,7 +472,7 @@ and module resource saves.
 - **Format.** The file is written as JSON with 2-space indents, LF line ends and a final newline. The
   order of keys is kept, so a patch of one value changes one line in git.
 - **The manifest.** `application.json` at the folder root can be patched. It cannot be created or
-  deleted, because `AXC0009` (see the [diagnostic codes](diagnostic-codes.md)) requires it there.
+  deleted, because `AXC0009` (see the [resource diagnostic codes](diagnostic-codes-resources.md)) requires it there.
 - **Paths.** A path is resolved and must stay under the application folder, so `..` and links cannot
   leave it. A resource write touches only `*.json` files. A [package file write](studio-packages.md#the-authoring-api) writes one
   file under `packages/`, byte for byte, and the Format rule above applies to resource files only. An undo and an accept also write `packages/` files.

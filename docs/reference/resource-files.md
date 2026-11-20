@@ -574,7 +574,7 @@ rather than when the table is created, and a value outside the range is `AXC0013
   and `money`, and defaults to `false`. `true` on a `reference`, `references` or `file` field is
   `AXC0308` at `/fields/{i}/sensitive`, and on the `displayField` at `/displayField`, and on a
   `child-collection` it is `AXC0013`. `exactLookup` needs `sensitive` and a name of at most 54
-  characters, else [`AXC0309`](diagnostic-codes.md). See
+  characters, else [`AXC0309`](diagnostic-codes-resources.md). See
   [sensitive fields](roles-and-policies.md#sensitive-fields) and
   [exact lookup](data-encryption.md#exact-lookup).
 

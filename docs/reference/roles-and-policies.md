@@ -366,7 +366,7 @@ looked up and re-encrypted is in [data encryption](data-encryption.md).
 - **Uses it cannot serve.** A filter, sort, aggregate, group field, index,
   `unique`, `searchable`, stored computed field, migration `fill` or `convert`
   target or value, or other expression that runs as SQL on the field is
-  [`AXC0308`](diagnostic-codes.md), except the exact lookup below, and a
+  [`AXC0308`](diagnostic-codes-resources.md), except the exact lookup below, and a
   caller's `sort` on it in the record API or a data source is a `400`. See
   [what a sensitive field cannot do](data-encryption.md#what-a-sensitive-field-cannot-do).
 - **Exact lookup.** A field that declares an exact lookup may be tested with

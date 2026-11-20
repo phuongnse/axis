@@ -5,7 +5,7 @@ resource of the module and holds only what the application changes in it, so the
 stay as the module wrote them. Compilation applies the layers to the pinned module version, then
 checks the result, the [module contract](module-contracts.md) included. Why a module is open to change
 this way is in [D102](../decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md),
-and what each diagnostic code means is in [diagnostic codes](diagnostic-codes.md).
+and what each diagnostic code means is on the [diagnostic codes](diagnostic-codes.md) pages, by topic.
 
 ## The layer resource
 

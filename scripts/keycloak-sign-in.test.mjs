@@ -133,10 +133,12 @@ describe('signIn', () => {
   const authorize = 'http://kc/realms/r/protocol/openid-connect/auth?client_id=axis&redirect_uri=http%3A%2F%2Ft.localhost%3A1%2Fapi%2Fauth%2Fcallback'
   const callbackUrl = 'http://t.localhost:1/api/auth/callback?code=abc&state=xyz'
 
-  const fakes = ({ passwordPage = page({ page: 'twoStep', loginAction: 'http://kc/code' }) } = {}) => {
+  // refusals: how many codes the two-step page refuses before it accepts one.
+  const fakes = ({ passwordPage = page({ page: 'twoStep', loginAction: 'http://kc/code' }), refusals = 0 } = {}) => {
     const appCalls = []
     const identityCalls = []
     let starts = 0
+    let refused = 0
     const app = async (path, jar, headers) => {
       appCalls.push({ path, cookie: [...jar], headers })
       if (path.startsWith('/api/auth/sign-in')) {
@@ -149,6 +151,10 @@ describe('signIn', () => {
       identityCalls.push({ url, cookie: [...jar], ...options })
       if (url === authorize) return reply(200, { body: page({ loginAction: 'http://kc/login' }), setCookie: ['KC=k1; Path=/'] })
       if (url === 'http://kc/login') return reply(200, { body: passwordPage })
+      if (refused < refusals) {
+        refused++
+        return reply(200, { body: page({ page: 'twoStep', error: 'Invalid authenticator code.', loginAction: 'http://kc/code' }) })
+      }
       return reply(302, { headers: { location: callbackUrl } })
     }
     return { app, identity, appCalls, identityCalls }
@@ -208,5 +214,22 @@ describe('signIn', () => {
   test('fails when the password step is not the two-step page', async () => {
     const transports = fakes({ passwordPage: page({ page: 'login', loginAction: 'http://kc/login' }) })
     await assert.rejects(signIn(options(transports)), /not the two-step page/)
+  })
+
+  test('retries a refused code once with a code of the next window', async () => {
+    const transports = fakes({ refusals: 1 })
+    const result = await signIn(options(transports))
+
+    const codes = transports.identityCalls.filter((call) => call.url === 'http://kc/code')
+    assert.equal(codes.length, 2)
+    assert.match(codes[1].form.otp, /^\d{6}$/)
+    assert.notEqual(codes[1].form.otp, codes[0].form.otp)
+    assert.equal(result.done.status, 302)
+  })
+
+  test('fails when the retried code is refused too', async () => {
+    const transports = fakes({ refusals: 2 })
+    await assert.rejects(signIn(options(transports)), /the Keycloak login: .*Invalid authenticator code/)
+    assert.equal(transports.identityCalls.filter((call) => call.url === 'http://kc/code').length, 2)
   })
 })

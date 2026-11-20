@@ -54,7 +54,7 @@ them in Word and a release holds them with the rest of the application.
   file or a file that is not in `files`, when a place names a field that the entity does not have, when a
   repeat names something that is not a child collection, when an image place names a field that is not a
   `file` field, and when a repeat or a condition is not closed. Each is reported at the template, as the
-  [diagnostic codes](diagnostic-codes.md) page lists once the checks exist.
+  [resource diagnostic codes](diagnostic-codes-resources.md) page lists once the checks exist.
 - **Who may edit.** Whoever may publish the application. The file is part of the release, so a document made
   from a release is always the one that release holds.
 
