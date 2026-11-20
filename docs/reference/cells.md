@@ -17,10 +17,10 @@ is set, see [cell settings](host-settings.md#cell-settings). A cell adds the per
 A region is where customer data is kept, and a cell is one installation in a region. Every tenant
 lives in exactly one cell.
 
-- **Region.** A region is named by a short code such as `vn`, and the first region is `vn`. Every
+- **Region.** A region is named by a short code such as `vn` or `sg`. Every
   part of a cell, its backups and its object storage included, runs in the cell's region, so a
-  tenant's data never leaves its region. The operator opens another region, such as `sg`, when its first
-  customer needs it, with no change to the platform.
+  tenant's data never leaves its region. The operator opens a region, such as `sg`, when the first
+  customer of that region needs it, with no change to the platform.
 - **What a region needs.** Its cloud provider offers managed Kubernetes, managed PostgreSQL,
   S3-compatible object storage, and backups kept in a second data centre in the same country.
 - **Cell.** A cell is one full installation in one region: the server replicas, the worker, the
