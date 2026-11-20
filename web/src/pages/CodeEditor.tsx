@@ -50,7 +50,8 @@ export interface CodeEditorProps {
   fill?: boolean
   /**
    * Proposed, see #3978: the editor is as tall as its text, with no scroll of its own, so the pane that holds it scrolls
-   * once from top to bottom, as a run's input and output do. One a person types in is at least `minHeight` tall.
+   * once from top to bottom, as a run's input and output do. One a person types in is at least `minHeight` tall, and
+   * reaches the foot of a flex column that holds it when its text is shorter, so its gutter's rule does not stop short.
    */
   grow?: boolean
   /** Called with the number of problems that the checks mark, each time it changes. */
@@ -339,12 +340,12 @@ export default function CodeEditor({
       </span>
       {/* A growing editor drops the theme's fixed height and inner scroll, so its pane scrolls it with the rest. */}
       {grow && (
-        <style>{`.axis-code-grow .cm-editor { height: auto !important; } .axis-code-grow:not(.axis-code-read) .cm-editor { min-height: ${minHeight}px; } .axis-code-grow .cm-scroller { overflow: visible !important; }`}</style>
+        <style>{`.axis-code-grow .cm-editor { height: auto !important; flex: 1; } .axis-code-grow:not(.axis-code-read) .cm-editor { min-height: ${minHeight}px; } .axis-code-grow .cm-scroller { overflow: visible !important; }`}</style>
       )}
       <div
         ref={hostRef}
         className={grow ? (readOnly ? 'axis-code-grow axis-code-read' : 'axis-code-grow') : undefined}
-        style={{ height: fill ? '100%' : grow ? undefined : height }}
+        style={grow ? { flex: 1, display: 'flex', flexDirection: 'column' } : { height: fill ? '100%' : height }}
       />
     </>
   )

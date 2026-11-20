@@ -358,7 +358,7 @@ export function PackageRun({
             </div>
           )}
           {shown === 'json' && (
-            <div style={{ flex: 'none' }}>
+            <div style={{ flex: '1 0 auto', display: 'flex', flexDirection: 'column' }}>
               <CodeEditor
                 label={t('shell.studio.package.run.inputJson')}
                 value={jsonText}
