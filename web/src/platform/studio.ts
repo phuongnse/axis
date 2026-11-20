@@ -2368,8 +2368,6 @@ export interface StudioPackageRun {
   /** Why a failed run failed, `null` for a run that succeeded. */
   error: { code: string; message: string } | null
   durationMs: number
-  /** The CPU seconds the run counted against the tenant's package run time a day. */
-  cpuSeconds: number
 }
 
 /** Proposed, see #3978: a named input for an operation of a package, kept with the application and shared by its developers. */

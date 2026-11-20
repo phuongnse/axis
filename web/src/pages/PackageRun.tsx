@@ -1,8 +1,7 @@
-import { DeleteOutlined, FileAddOutlined, SaveOutlined } from '@ant-design/icons'
 import { Flex, Segmented, Select, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisButton } from '../platform/AxisButton'
+import { AxisButton, AxisSplitButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { CodeBlock } from '../platform/CodeBlock'
 import { EmptyState } from '../platform/EmptyState'
@@ -207,7 +206,7 @@ export function PackageRun({
 
   const runButton = (
     <AxisButton
-      role="finish"
+      role="main"
       data-testid="package-run-send"
       disabled={!runnable || !developer}
       loading={running}
@@ -233,9 +232,12 @@ export function PackageRun({
           display: 'flex',
           flexDirection: 'column',
           minHeight: 0,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
           borderInlineEnd: rule,
         }}
       >
+        {/* One scroll for the whole input pane, as for the result pane, so no region scrolls inside another. */}
         <div style={{ flex: 'none', padding: pad, borderBottom: rule }}>
           <Flex vertical gap={spacing.sm}>
             <Flex gap="small" align="end">
@@ -269,40 +271,41 @@ export function PackageRun({
                 </AxisField>
               </div>
               {developer && (
-                <Flex gap={spacing.xs}>
-                  <AxisButton
-                    role="icon"
-                    nameKey="shell.studio.package.run.saveInput"
-                    icon={<SaveOutlined />}
-                    disabled={chosen === null || input === null}
-                    onClick={() =>
-                      void store(
-                        saved.items.map((item) =>
-                          item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
+                // Proposed, see #3978: three actions of the saved input are one split button, Save with the others in its menu.
+                <AxisSplitButton
+                  data-testid="package-run-save"
+                  disabled={input === null}
+                  onClick={() =>
+                    chosen === null
+                      ? setSaveAsOpen(true)
+                      : void store(
+                          saved.items.map((item) =>
+                            item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
+                          ),
+                        )
+                  }
+                  menuNameKey="shell.studio.package.run.inputActions"
+                  items={[
+                    {
+                      key: 'saveAs',
+                      label: t('shell.studio.package.run.saveInputAs'),
+                      disabled: input === null,
+                      onClick: () => setSaveAsOpen(true),
+                    },
+                    {
+                      key: 'delete',
+                      label: t('shell.studio.package.run.deleteInput'),
+                      destructive: true,
+                      disabled: chosen === null,
+                      onClick: () =>
+                        void store(saved.items.filter((item) => item.name !== chosen)).then(
+                          (done) => done && choose(null),
                         ),
-                      )
-                    }
-                  />
-                  <AxisButton
-                    role="icon"
-                    nameKey="shell.studio.package.run.saveInputAs"
-                    icon={<FileAddOutlined />}
-                    disabled={input === null}
-                    onClick={() => setSaveAsOpen(true)}
-                  />
-                  <AxisButton
-                    role="icon"
-                    nameKey="shell.studio.package.run.deleteInput"
-                    destructive
-                    icon={<DeleteOutlined />}
-                    disabled={chosen === null}
-                    onClick={() =>
-                      void store(saved.items.filter((item) => item.name !== chosen)).then(
-                        (done) => done && choose(null),
-                      )
-                    }
-                  />
-                </Flex>
+                    },
+                  ]}
+                >
+                  {t('shell.studio.package.run.saveInput')}
+                </AxisSplitButton>
               )}
             </Flex>
             {saveError !== null && <AxisAlert kind="error" message={saveError} />}
@@ -326,7 +329,7 @@ export function PackageRun({
         />
         {jsonError && <AxisAlert kind="error" message={t('shell.studio.package.run.jsonInvalid')} />}
         {shown === 'form' ? (
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: pad }}>
+          <div style={{ flex: 'none', padding: pad }}>
             {fields.length === 0 ? (
               <Typography.Text type="secondary">{t('shell.studio.package.run.noInput')}</Typography.Text>
             ) : (
@@ -350,7 +353,7 @@ export function PackageRun({
             )}
           </div>
         ) : (
-          <div style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ flex: 1, minHeight: 160 }}>
             <CodeEditor
               label={t('shell.studio.package.run.inputJson')}
               value={jsonText}
@@ -380,48 +383,35 @@ export function PackageRun({
               height={rowHeight}
               title={
                 <Flex gap="small" align="center" wrap>
-                  <Typography.Text strong>{t('shell.studio.package.run.outcome')}</Typography.Text>
+                  <Typography.Text strong>{t('shell.studio.package.run.output')}</Typography.Text>
                   <StatusTag tone={run.outcome === 'succeeded' ? 'success' : 'danger'}>
                     {t(`shell.studio.package.run.outcome.${run.outcome}`)}
                   </StatusTag>
-                  <Typography.Text type="secondary" style={{ fontWeight: 'normal', fontSize: 'inherit' }}>
-                    {t('shell.studio.package.run.summary')
-                      .replace(
-                        '{duration}',
-                        t('shell.studio.package.run.milliseconds').replace('{count}', String(run.durationMs)),
-                      )
-                      .replace(
-                        '{cpu}',
-                        t('shell.studio.package.run.seconds').replace('{count}', String(run.cpuSeconds)),
-                      )}
+                  <Typography.Text type="secondary">
+                    {t('shell.studio.package.run.milliseconds').replace('{count}', String(run.durationMs))}
                   </Typography.Text>
                 </Flex>
               }
             />
-            {/* The output's rows run the pane's width, and its last row's rule parts it from the log. */}
-            <div
-              style={{
-                flex: 'none',
-                maxHeight: '50%',
-                overflowY: 'auto',
-                padding: run.error !== null ? pad : 0,
-                borderBottom: run.error !== null ? rule : undefined,
-              }}
-            >
+            {/* One scroll for the output and the log, so no region scrolls inside another. The output's rows run the
+                pane's width, and its last row's rule parts it from the log. */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
               {run.error !== null ? (
-                <AxisAlert kind="error" message={`${run.error.code}: ${run.error.message}`} />
+                <div style={{ padding: pad, borderBottom: rule }}>
+                  <AxisAlert kind="error" message={`${run.error.code}: ${run.error.message}`} />
+                </div>
               ) : (
                 run.output !== null && <ValueTable value={run.output} testId="package-run-output" />
               )}
+              {output.length > 0 && (
+                <>
+                  <PaneHeader title={t('shell.studio.package.run.log')} height={rowHeight} />
+                  <div style={{ padding: pad }}>
+                    <CodeBlock text={output.join('\n')} plain wrap />
+                  </div>
+                </>
+              )}
             </div>
-            {output.length > 0 && (
-              <>
-                <PaneHeader title={t('shell.studio.package.run.log')} height={rowHeight} />
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: pad }}>
-                  <CodeBlock text={output.join('\n')} plain wrap />
-                </div>
-              </>
-            )}
           </>
         )}
       </div>

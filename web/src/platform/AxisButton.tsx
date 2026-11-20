@@ -1,5 +1,5 @@
 import { DownOutlined, EllipsisOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
+import { Button, Dropdown, Flex, Space, Tooltip, type ButtonProps, type FlexProps } from 'antd'
 import {
   createContext,
   useContext,
@@ -313,4 +313,59 @@ export function AxisButton(props: AxisButtonProps) {
         />
       )
   }
+}
+
+/** One entry of a split button's menu. */
+export interface SplitButtonItem {
+  key: string
+  label: string
+  /** Draws the entry in `dangerText`, as a menu draws a destructive entry. */
+  destructive?: boolean
+  disabled?: boolean
+  onClick: () => void
+}
+
+/**
+ * Proposed, see #3978: the main of three or more small actions of one thing as a button, with the others in a menu on a
+ * joined caret button, such as a saved input's Save with Save as… and Delete, see
+ * docs/reference/actions-and-controls.md#buttons. `menuNameKey` names the caret button.
+ */
+export function AxisSplitButton({
+  role = 'secondary',
+  children,
+  disabled,
+  onClick,
+  menuNameKey,
+  items,
+  'data-testid': testId,
+}: {
+  role?: 'secondary' | 'main'
+  children: ReactNode
+  disabled?: boolean
+  onClick: () => void
+  menuNameKey: string
+  items: readonly SplitButtonItem[]
+  'data-testid'?: string
+}) {
+  return (
+    <Space.Compact data-testid={testId}>
+      <AxisButton role={role} disabled={disabled} onClick={onClick}>
+        {children}
+      </AxisButton>
+      <Dropdown
+        trigger={['click']}
+        menu={{
+          items: items.map((item) => ({
+            key: item.key,
+            label: item.label,
+            danger: item.destructive,
+            disabled: item.disabled,
+          })),
+          onClick: ({ key }) => items.find((item) => item.key === key)?.onClick(),
+        }}
+      >
+        <AxisButton role="icon" joined nameKey={menuNameKey} icon={<DownOutlined />} />
+      </Dropdown>
+    </Space.Compact>
+  )
 }

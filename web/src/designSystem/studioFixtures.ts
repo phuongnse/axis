@@ -1106,7 +1106,6 @@ function packageJobRoutes(files: readonly StudioPackageFile[]): Record<string, F
           output: { dueDate: '2026-04-30' },
           error: null,
           durationMs: 38,
-          cpuSeconds: 0.04,
         },
         output: [
           'Building payment-terms 1.0.0 (Node.js) in the tenant sandbox',
