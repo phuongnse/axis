@@ -53,7 +53,7 @@ These rules keep every destination in the hands of the operator:
   form, a release or a record. A connector or a package operation can reach only the host of the
   binding it names.
 - **No redirects.** A connector call never follows one. A `3xx` fails the call, see
-  [call outcomes](process-execution.md#call-outcomes).
+  [call outcomes](connector-and-package-calls.md#call-outcomes).
 - **No network rule in the examples.** The Compose example and the Helm chart set no egress rule. An
   operator may add one that allows only the destinations of this page.
 - **An installation's packages are trusted code.** Installing one means trusting its code. The `url`

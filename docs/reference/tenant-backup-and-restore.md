@@ -356,7 +356,7 @@ Work goes back to backup time, see [execution](../domain/knowledge.md#execution)
 - A call that was staged after the backup is not in the archive. Its step runs again and stages a new
   call, with a new operation identity and so a new idempotency key. The system may already have acted
   on the first call, so even a system that honours the key can act twice. See
-  [staging and the call](process-execution.md#staging-and-the-call).
+  [staging and the call](connector-and-package-calls.md#staging-and-the-call).
 - A connector without `idempotency` sends no key, so the system may act twice in either case.
 - Sequence counters, inbound endpoint receipts and schedule state go back too. A number issued after the
   backup can be issued again, and an inbound request accepted after it is lost.

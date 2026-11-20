@@ -11,7 +11,7 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// What a customer-hosted runner gets when it takes a call: the lease, the package, the version, the operation, the operation identity,
 /// the input and the end of the lease. The input is encoded as in a <c>run</c> message and holds no binding value, see
-/// docs/reference/process-execution.md#staging-a-package-call.
+/// docs/reference/connector-and-package-calls.md#staging-a-package-call.
 /// </summary>
 public sealed record PackageCallTake(
     Guid LeaseId,
@@ -24,9 +24,9 @@ public sealed record PackageCallTake(
 
 /// <summary>
 /// Lets a customer-hosted runner take the oldest <c>pending</c> call to a package it registered and holds, in the caller's transaction, see
-/// docs/reference/process-execution.md#staging-a-package-call. The call becomes <c>sending</c> with one more attempt, and stores the runner, a
+/// docs/reference/connector-and-package-calls.md#staging-a-package-call. The call becomes <c>sending</c> with one more attempt, and stores the runner, a
 /// new lease and the end of the lease, which is the step's timeout from now. The take also queues a <c>package.call</c> work item that is due when the
-/// lease ends, which a posted result deletes, see docs/reference/process-execution.md#package-call-outcomes. The caller commits. A call whose step is not customer-hosted, whose
+/// lease ends, which a posted result deletes, see docs/reference/connector-and-package-calls.md#package-call-outcomes. The caller commits. A call whose step is not customer-hosted, whose
 /// manifest cannot be found or whose stored input no longer fits the manifest is passed over and stays <c>pending</c>.
 /// </summary>
 public static class PackageCallTakes

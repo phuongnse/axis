@@ -15,7 +15,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Compiles and activates releases of one application whose own package <c>tools</c> is customer-hosted, in a tenant database, for the tests of
 /// the registration check and the take in <c>docs/reference/extension-packages.md#customer-hosted-runners</c>. A release can also hold a process whose
-/// step calls the package, and a call that staging would leave for it, see <c>docs/reference/process-execution.md#staging-a-package-call</c>.
+/// step calls the package, and a call that staging would leave for it, see <c>docs/reference/connector-and-package-calls.md#staging-a-package-call</c>.
 /// A release can also hold the entity <c>Order</c> and the process <c>OrderSum</c>, whose subject is an order that the step writes its output to.
 /// A release can also pin an installed package with a <c>probe</c> operation, such as <c>test-package</c>, as customer-hosted, with the entity <c>Probe</c> and the process <c>ProbeCall</c>.
 /// </summary>

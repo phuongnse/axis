@@ -133,7 +133,7 @@ internal sealed partial class PackageCallHandler(
             if (call is { State: PackageCalls.Pending, RunnerId: not null })
             {
                 // A customer-hosted runner took the call and its result set it back to pending, see
-                // docs/reference/process-execution.md#package-call-outcomes. The item only held the call back until its backoff
+                // docs/reference/connector-and-package-calls.md#package-call-outcomes. The item only held the call back until its backoff
                 // passed, so it is deleted and the next take of a runner makes the next attempt.
                 if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
                 {
@@ -171,7 +171,7 @@ internal sealed partial class PackageCallHandler(
                 // A worker crashed after it marked the call, so the operation may have acted. The
                 // attempt the crashed worker made is already counted.
                 // A call that a customer-hosted runner took is found sending when its lease ended with no result, see
-                // docs/reference/process-execution.md#package-call-outcomes.
+                // docs/reference/connector-and-package-calls.md#package-call-outcomes.
                 errorClass = ErrorClass.Unknown;
                 error = call.RunnerId is null ? UnknownOutcome : TimedOut;
                 await transaction.RollbackAsync(cancellationToken);

@@ -9,7 +9,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// A customer-hosted runner's take queues a <c>package.call</c> item that is due when the lease ends, a posted result deletes it, and a lease that ends
-/// with no result is an unknown outcome, see <c>docs/reference/process-execution.md#package-call-outcomes</c>, with real PostgreSQL and Keycloak. The
+/// with no result is an unknown outcome, see <c>docs/reference/connector-and-package-calls.md#package-call-outcomes</c>, with real PostgreSQL and Keycloak. The
 /// lease end is forced by making the item due, and the item runs on the worker's handler. Each test makes the realm of its tenant with a unique name and
 /// deletes it at the end.
 /// </summary>

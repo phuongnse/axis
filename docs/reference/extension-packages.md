@@ -6,7 +6,7 @@ covers what a package is, its manifest, the contracts it builds on, how it is in
 pinned and loaded, and what its operations may reach. What those limits do not protect against is in
 [extension package limits](extension-package-limits.md). An
 application's own packages are in [An application's packages](#an-applications-packages). How a
-process calls a package operation is in [package operations](process-execution.md#package-operations),
+process calls a package operation is in [package operations](connector-and-package-calls.md#package-operations),
 and how an application declares its packages is in
 [declaring packages](declaring-packages.md#declaring-packages-in-an-application). The reason for keeping custom code out of
 configuration is in [knowledge](../domain/knowledge.md#logic-in-configuration).
@@ -112,7 +112,7 @@ identity, its operations and, for a C# package, its main assembly. This example 
   - `idempotent` says whether running the operation twice with the same
     operation identity has the same effect as running it once. It decides
     whether an unknown outcome is retried, see
-    [Call outcomes](process-execution.md#package-call-outcomes).
+    [Call outcomes](connector-and-package-calls.md#package-call-outcomes).
   - `timeout` is an ISO 8601 duration. It defaults to `PT30S` and is at most
     `PT2M`, as for a [connector](integration-resources.md#connector-resource).
     Operation names are unique in the package, and field names are unique in
@@ -156,7 +156,7 @@ public class RetryableException : Exception { }
   pass it on as an idempotency key.
 - **`RetryableException`.** Thrown by an operation to say that the attempt
   may succeed later. Any other exception fails the call, see
-  [Call outcomes](process-execution.md#package-call-outcomes).
+  [Call outcomes](connector-and-package-calls.md#package-call-outcomes).
 - **The Node.js SDK.** `sdk/node/` holds the Node.js runner and a small SDK that implements the operation
   context over [the runner protocol](#the-runner-protocol), which no language owns. An adapter written as
   CommonJS or as an ES module exports one function for each operation `type`, and the runner calls it with
@@ -197,7 +197,7 @@ public class RetryableException : Exception { }
   | `boolean` | `bool` | `bool` |
   | `date` | `DateOnly` | `datetime.date` |
   | `date-time` | `DateTimeOffset` | `datetime` with a time zone |
-  | [`file`](process-execution.md#files-in-calls) _(planned for M40)_ | `AxisFile` | `AxisFile` |
+  | [`file`](connector-and-package-calls.md#files-in-calls) _(planned for M40)_ | `AxisFile` | `AxisFile` |
 
   A missing value is `null` in C# and `None` in Python.
 
@@ -331,7 +331,7 @@ that its release was compiled against.
   `AXC0141`. Its message lists the installed versions.
 - **Steps.** A package operation step is checked against the pinned
   version's manifest, or the manifest of an application's own package, see
-  [Package step shape](process-execution.md#package-step-shape), and the compiled
+  [Package step shape](connector-and-package-calls.md#package-step-shape), and the compiled
   step holds that version. A running instance keeps the version its release
   pins, even after a newer version is installed. A host rebuilds a stored
   release against the manifests of its installed packages, so a release with
@@ -456,7 +456,7 @@ see [Contracts](#contracts).
   package's operations declare, so a tenant without them activates the release.
 - **A customer-hosted package and the binding resolution.** The worker resolves no binding for its calls,
   because it runs no attempt of them, see
-  [staging a package call](process-execution.md#staging-a-package-call). The [runner](#customer-hosted-runners)
+  [staging a package call](connector-and-package-calls.md#staging-a-package-call). The [runner](#customer-hosted-runners)
   keeps its own bindings.
 - **Secret values stay hidden.** A secret value never appears in history,
   audit records or logs. History and audit records hold only the type of an
@@ -506,7 +506,7 @@ package reaches nothing of the host and no binding of another call.
   `url` and `secret` bindings that the operation declares, with the values of the call's tenant. Package
   code and manifests do not change with the language.
 - **The answer.** A `result`, a `retryable` and a `failure` give the same outcomes as an operation
-  that runs in the worker, see [package call outcomes](process-execution.md#package-call-outcomes).
+  that runs in the worker, see [package call outcomes](connector-and-package-calls.md#package-call-outcomes).
   A `failure` that names a binding fails the call at once, and its error names the operation, the
   package and the binding.
 - **Environment, for a runner that Axis hosts.** The environment is empty
@@ -537,7 +537,7 @@ package reaches nothing of the host and no binding of another call.
   reaches nothing.
 - **Timeout.** The operation's `timeout` starts when the worker sends the `run`. At the `timeout` the
   worker closes the connection, which makes the host kill the runner process. The attempt's outcome is
-  unknown, see [package call outcomes](process-execution.md#package-call-outcomes).
+  unknown, see [package call outcomes](connector-and-package-calls.md#package-call-outcomes).
 - **Crash.** A runner that closes its connection during an attempt gives an unknown outcome
   too. It is retried only when the operation declares `idempotent: true`.
 - **No host.** A host that cannot be reached, that starts no runner, or that is not set makes the
@@ -685,7 +685,7 @@ never leave the customer, see [D148](../decisions/d148-packages-in-c-typescript-
   minute before it expires. A `401` gets one fresh token and one retry, and a second `401` exits with code 1. It sends no
   DPoP proof, so a tenant under `fapi2` answers its requests `401`.
 - **Taking a call and posting its result.** The runner takes a call under a lease and posts the result, see
-  [staging a package call](process-execution.md#staging-a-package-call) for the lease and the outcomes. It takes only
+  [staging a package call](connector-and-package-calls.md#staging-a-package-call) for the lease and the outcomes. It takes only
   calls of its tenant to a package it registered and to the exact version whose manifest the release pins, and waits
   2 seconds after a take that gives no call. It runs the call in the runner of the manifest's language, one for each
   version, with no proxy variables, and posts `result` as `succeeded`, `retryable` as `retryable` and `failure` as
@@ -774,7 +774,7 @@ trusted code, so the platform gives it more limits than an installation's packag
   manifest as it checks an installation's, see [the manifest](#manifest), at `packages/<id>/axis-package.json`.
   An id that an installation's package also uses is `AXC0147`. The application's `packages` list does not
   name it. Steps call it as `<id>/<operation>`, see
-  [Package step shape](process-execution.md#package-step-shape).
+  [Package step shape](connector-and-package-calls.md#package-step-shape).
 - **A customer-hosted package's folder.** An application's own package is customer-hosted when its folder is
   `packages/<id>/axis-package.json` alone, with `"runner": "customer"`. Another file in it is `AXC0132` at that
   file. Compilation types the steps against the manifest and marks them customer-hosted. Publishing builds

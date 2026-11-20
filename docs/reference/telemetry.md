@@ -51,7 +51,7 @@ Axis adds its own spans for the work that the standard instrumentation does not 
 | `axis.package.call`      | worker            | `axis.tenant`, `axis.application`, `axis.package`, `axis.operation`, `axis.outcome`           |
 
 - **Outcomes.** A call span's `axis.outcome` is a call outcome class: `succeeded`, `retryable`,
-  `failed` or `unknown`, see [call outcomes](process-execution.md#call-outcomes). A work item run's
+  `failed` or `unknown`, see [call outcomes](connector-and-package-calls.md#call-outcomes). A work item run's
   outcome is `completed`, `failed` or `fenced`.
 - **Links, not children.** A work item stores the trace id and span id of the transaction that queued
   it, and its run starts a new trace with a link to that span. Instances wait for days, so a child span

@@ -13,7 +13,7 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// The writes that record the outcome of a package call, which the worker's <see cref="PackageCallHandler"/> and a customer-hosted
-/// runner's result share, see docs/reference/process-execution.md#staging-a-package-call. A fitting output is written to the subject record
+/// runner's result share, see docs/reference/connector-and-package-calls.md#staging-a-package-call. A fitting output is written to the subject record
 /// with the record update rules, the call is settled <c>succeeded</c>, the instance runs on to <c>next</c>, and the history row, the attempt row,
 /// the audit records, the data change triggers and the next step's work item follow. A call that cannot succeed is settled <c>failed</c> and
 /// its instance fails, with the audit records <c>operation.called</c> and <c>process.failed</c>. A call that is retried is set back to <c>pending</c>

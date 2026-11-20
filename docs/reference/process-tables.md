@@ -167,8 +167,8 @@ or `process.timer` item. Items of other kinds name their path through their task
 | `process.step` | `process_instance_id` | Runs the instance's next step, see [Running a step](process-execution.md#running-a-step) |
 | `process.timer` | `process_instance_id` and the `revision` its step left | Resumes one instance that waits on a `timer` step, or on a `waitEvent` step's timeout, only while the instance waits at that revision. Its `due_at` is the time of the timer. See [Timer step](process-flow.md#timer-step) |
 | `process.resume` | `process_instance_id` of the child | Resumes the parent of a completed child, which the handler finds from the child's `parent_instance_id`. See [Sub-process step](process-flow.md#sub-process-step) |
-| `connector.call` | `process_instance_id` and `connector_call_id` | Sends or reconciles one connector call. Its `due_at` gives the backoff. See [Connector calls](process-execution.md#connector-calls) |
-| `package.call` | `process_instance_id` and `package_call_id` | Runs one package call. See [Package operations](process-execution.md#package-operations) |
+| `connector.call` | `process_instance_id` and `connector_call_id` | Sends or reconciles one connector call. Its `due_at` gives the backoff. See [Connector calls](connector-and-package-calls.md#connector-calls) |
+| `package.call` | `process_instance_id` and `package_call_id` | Runs one package call. See [Package operations](connector-and-package-calls.md#package-operations) |
 | `event.deliver` | `event_id`, and `trigger_id` when an operator [redelivered](process-events.md#routes) a dead letter | Delivers one event occurrence to the `async` event triggers, or to the one trigger it names. See [Event delivery](process-events.md#event-delivery) |
 | `trigger.schedule` | `trigger_id` | Runs the occurrences of one schedule trigger. Its `due_at` is the next occurrence, and a partial unique index allows one such item for each trigger. See [Schedules](process-events.md#schedules) |
 | `trigger.fanOut` | `trigger_id`, `release_id` and `occurrence_at` | Starts the process for the records of one occurrence. `release_id` is the release that was active at the occurrence. Its `cursor` is the last record id it handled, and is null before its first batch |
@@ -224,7 +224,7 @@ assignee finds the open tasks of a user id or a role name.
 ### Connector calls
 
 `axis.connector_calls` holds one row per staged connector call, see
-[Connector calls](process-execution.md#connector-calls). A unique index on (`process_instance_id`,
+[Connector calls](connector-and-package-calls.md#connector-calls). A unique index on (`process_instance_id`,
 `step`, `staged_revision`) lets a step stage one call per pass of a [loop](process-flow.md#loops).
 Each call attempt row stores the `trace_id` of its attempt, see [Telemetry](../architecture.md#telemetry).
 
@@ -289,7 +289,7 @@ keeps each number once. The call is in one of two tables, so `call_id` has no fo
 ### Package calls
 
 `axis.package_calls` holds one row per staged package call, see
-[Package operations](process-execution.md#package-operations). A unique index on
+[Package operations](connector-and-package-calls.md#package-operations). A unique index on
 (`process_instance_id`, `step`, `staged_revision`) lets a step stage one call per pass of a
 [loop](process-flow.md#loops). Each call attempt row stores the `trace_id` of its attempt, see
 [Telemetry](../architecture.md#telemetry).

@@ -43,7 +43,7 @@ declares the real sample package the same way, with
   package id. A wrong value is `AXC0004`. An application's own package says it in its manifest instead.
 - **A customer-hosted package's calls.** Staging queues no work item for them, so the worker runs no
   attempt, resolves no binding and starts no Axis runner, see
-  [staging a package call](process-execution.md#staging-a-package-call).
+  [staging a package call](connector-and-package-calls.md#staging-a-package-call).
 - **Where a customer-hosted package's calls run** _(planned for M37)_. They go to a
   [customer-hosted runner](extension-packages.md#customer-hosted-runners).
 - **Pinning.** Compilation picks the highest installed version in each range and pins it in the
@@ -65,4 +65,4 @@ declares the real sample package the same way, with
   tenant sees the same installed packages. Installation is in
   [Installation](extension-packages.md#installation).
 - How a process calls a package operation is in
-  [Package operations](process-execution.md#package-operations).
+  [Package operations](connector-and-package-calls.md#package-operations).
