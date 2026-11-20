@@ -104,8 +104,74 @@ public sealed class ProcessInstanceSensitiveFieldTests(TaskApiFixture fixture) :
         Assert.Equal(["field"], salary.EnumerateObject().Select(property => property.Name));
     }
 
+    [Fact]
+    public async Task An_email_address_read_from_a_sensitive_field_is_hidden_and_its_stored_entry_holds_no_address()
+    {
+        var (release, model) = await fixture.ActivateEditedWithModelAsync(TenantA, (path, content) => AddContact(path, AddSalary(mapped: false)(path, content)!), added: new Dictionary<string, string> { ["processes/mail-contact.json"] = MailContact });
+        var subject = await fixture.InsertRequestAsync(TenantA, null);
+        var instance = await fixture.StartAsync(TenantA, "MailContact", subject, release, model);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var body = await GetOkAsync(TenantA, instance, "MailContact");
+
+        var tell = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "tell");
+        var email = Assert.Single(tell.GetProperty("made").GetProperty("notified").GetProperty("to").EnumerateArray());
+        Assert.Equal("email", email.GetProperty("kind").GetString());
+        Assert.Equal(JsonValueKind.Null, email.GetProperty("name").ValueKind);
+        Assert.True(email.GetProperty("hidden").GetBoolean());
+
+        // No plaintext copy exists: the stored entry holds its kind and its position and no value.
+        var stored = (string?)await fixture.ScalarAsync(
+            TenantA, "SELECT notified::text FROM axis.process_step_history WHERE process_instance_id = @id AND step = 'tell'", ("id", instance));
+        Assert.DoesNotContain("nora@example.com", stored, StringComparison.Ordinal);
+        using var storedNotified = JsonDocument.Parse(stored!);
+        Assert.Equal(["kind", "recipient"], Assert.Single(storedNotified.RootElement.EnumerateArray()).EnumerateObject().Select(property => property.Name));
+    }
+
+    // The process sets "contact" and then notifies it by email only. A recipient expression may read a sensitive field, and only a value may not.
+    private const string MailContact =
+        """
+        {
+          "id": "9d2c4e6a-7b18-4f35-a0e1-3c5d7f9b1a28",
+          "kind": "process",
+          "name": "MailContact",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "setContact",
+          "steps": [
+            { "name": "setContact", "type": "operation", "operation": "updateRecord", "set": { "contact": "'nora@example.com'" }, "next": "tell" },
+            {
+              "name": "tell",
+              "type": "operation",
+              "operation": "notify",
+              "to": [{ "email": "contact" }],
+              "channels": ["email"],
+              "message": {
+                "subject": { "textKey": "request.notice.subject" },
+                "body": { "textKey": "request.notice.body" },
+                "values": { "title": "title", "amount": "amount" }
+              },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
+    // Lets the auditor read "contact", which AddSalary adds, and inspect MailContact.
+    private static string? AddContact(string path, string content) =>
+        path == Path.Combine("policies", "auditor-access.json")
+            ? content
+                .Replace("\"fields\": [\"title\", \"amount\"", "\"fields\": [\"title\", \"amount\", \"contact\"", StringComparison.Ordinal)
+                .Replace(
+                    "{ \"name\": \"departmentOrderInspect\"",
+                    "{ \"name\": \"mailContactInspect\", \"process\": \"MailContact\", \"actions\": [\"inspect\"] },\n    { \"name\": \"departmentOrderInspect\"",
+                    StringComparison.Ordinal)
+            : content;
+
     // Edits the Request entity to add the decimal field "salary", sensitive from the release that adds it, and lets the
-    // auditor read it. The DepartmentOrder call maps "salary" as its amount when mapped is true.
+    // auditor read it. The DepartmentOrder call maps "salary" as its amount when mapped is true. It also adds the sensitive text field
+    // "contact", which only the MailContact test uses: a column stays after the release that adds it, so each release of this tenant keeps both fields.
     private static Func<string, string, string?> AddSalary(bool mapped, bool submits = false) =>
         (path, content) =>
         {
@@ -119,7 +185,7 @@ public sealed class ProcessInstanceSensitiveFieldTests(TaskApiFixture fixture) :
             {
                 return content.Replace(
                     "\"fields\": [",
-                    "\"fields\": [\n    { \"name\": \"salary\", \"type\": \"decimal\", \"precision\": 20, \"scale\": 2, \"sensitive\": true },",
+                    "\"fields\": [\n    { \"name\": \"salary\", \"type\": \"decimal\", \"precision\": 20, \"scale\": 2, \"sensitive\": true },\n    { \"name\": \"contact\", \"type\": \"text\", \"sensitive\": true },",
                     StringComparison.Ordinal);
             }
 

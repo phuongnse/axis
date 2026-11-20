@@ -443,6 +443,34 @@ public static class InstanceQueries
             : (null, null);
     }
 
+    /// <summary>
+    /// Reads the event occurrences <paramref name="ids"/> name, each with its event name and its payload as JSON text, for the
+    /// <c>raiseEvent</c> runs of an instance's path. An id with no occurrence is missing from the result, and no query runs for no ids.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<Guid, (string Event, string Payload)>> EventsAsync(
+        NpgsqlConnection connection,
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var events = new Dictionary<Guid, (string Event, string Payload)>();
+        if (ids.Count == 0)
+        {
+            return events;
+        }
+
+        await using var command = new NpgsqlCommand("SELECT id, event, payload::text FROM axis.events WHERE id = ANY(@ids)", connection);
+        command.Parameters.AddWithValue("ids", ids.ToArray());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            events[reader.GetGuid(0)] = (reader.GetString(1), reader.GetString(2));
+        }
+
+        return events;
+    }
+
     /// <summary>Reads the step history rows of the instance <paramref name="instanceId"/>, oldest first.</summary>
     public static async Task<IReadOnlyList<ProcessStepHistoryRow>> HistoryAsync(
         NpgsqlConnection connection,
@@ -453,7 +481,7 @@ public static class InstanceQueries
 
         await using var command = new NpgsqlCommand(
             """
-            SELECT id, process_instance_id, step, revision, input::text, output::text, decision, error, started_at, finished_at, trace_id, problem::text, read::text, changes::text
+            SELECT id, process_instance_id, step, revision, input::text, output::text, decision, error, started_at, finished_at, trace_id, problem::text, read::text, changes::text, notified::text
             FROM axis.process_step_history WHERE process_instance_id = @id ORDER BY finished_at, id
             """,
             connection);
@@ -478,6 +506,7 @@ public static class InstanceQueries
                 Problem = reader.IsDBNull(11) ? null : reader.GetString(11),
                 Read = reader.IsDBNull(12) ? null : reader.GetString(12),
                 Changes = reader.IsDBNull(13) ? null : reader.GetString(13),
+                Notified = reader.IsDBNull(14) ? null : reader.GetString(14),
             });
         }
 

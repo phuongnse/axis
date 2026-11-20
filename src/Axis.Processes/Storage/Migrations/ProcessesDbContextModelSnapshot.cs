@@ -905,6 +905,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("input");
 
+                    b.Property<string>("Notified")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("notified");
+
                     b.Property<string>("Output")
                         .HasColumnType("jsonb")
                         .HasColumnName("output");

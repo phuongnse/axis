@@ -255,6 +255,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
         JsonArray? read = null;
         JsonArray? changes = null;
+        JsonArray? notified = null;
         NewTask? task = null;
         TaskDeadlineModel? taskDeadline = null;
         IReadOnlyList<TaskEscalationModel> taskEscalations = [];
@@ -429,6 +430,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
                     instance.ReleaseId,
                     (part, error) => ExpressionFailure(part, notifyStep, error, instance, input),
                     (value, name) => ToJson(value, name, notifyStep, instance, input));
+                notified = RunValues.Notified(model, entity, notifyStep, notification);
                 state = ProcessStarts.Running;
                 nextStep = afterNotify.Name;
                 decision = null;
@@ -742,7 +744,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
 
         await ProcessSteps.InsertHistoryAsync(
             context.Transaction,
-            new StepOccurrence(instance.Id, step.Name, instance.Revision, input, output, decision, null, instance.Now, Read: read, Changes: changes),
+            new StepOccurrence(instance.Id, step.Name, instance.Revision, input, output, decision, null, instance.Now, Read: read, Changes: changes, Notified: notified),
             cancellationToken);
         if (recordAudit is not null)
         {
