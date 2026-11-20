@@ -248,6 +248,18 @@ describe('RecordHistory', () => {
     ])
   })
 
+  it('is a part named History with a level-2 heading, and no card', async () => {
+    stubFetch({ status: 200, body: page([item('record.created')]) })
+
+    renderHistory()
+
+    const part = screen.getByRole('region', { name: 'History' })
+    expect(part).toBe(screen.getByTestId('record-history'))
+    expect(within(part).getByRole('heading', { level: 2 })).toHaveTextContent('History')
+    await screen.findByText('Created')
+    expect(document.querySelector('.ant-card')).toBeNull()
+  })
+
   it('is busy while a page loads, and marks the current page', async () => {
     const first = Array.from({ length: 20 }, () => item('record.updated'))
     stubFetch({ status: 200, body: page(first, 1, 21) }, { status: 200, body: page([item('record.created')], 2, 21) })

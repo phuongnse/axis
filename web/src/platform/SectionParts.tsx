@@ -51,6 +51,7 @@ export function SectionPart({
   heading,
   fold,
   action,
+  busy,
   children,
 }: SectionPartName & {
   /** The heading, and its line when it has one. None for the last section of unnamed properties. */
@@ -62,6 +63,8 @@ export function SectionPart({
   fold?: { open: boolean; onToggle: () => void; title: string }
   /** On the right of the heading, such as a list's Add. A function child draws the slot in its place. */
   action?: ReactNode
+  /** Sets `aria-busy` on the part while its body loads. */
+  busy?: boolean
   /** A function child gets a slot on the right of the heading, for a list that draws its own Add… into it. */
   children: ReactNode | ((actionSlot: HTMLElement | null) => ReactNode)
 }) {
@@ -90,14 +93,16 @@ export function SectionPart({
     return (
       <>
         {rule}
-        <div data-testid={dataTestId}>{body}</div>
+        <div data-testid={dataTestId} aria-busy={busy}>
+          {body}
+        </div>
       </>
     )
   }
   return (
     <>
       {rule}
-      <section aria-labelledby={headingId} data-testid={dataTestId}>
+      <section aria-labelledby={headingId} data-testid={dataTestId} aria-busy={busy}>
         <Flex justify="space-between" align="flex-start" gap="small" style={{ marginBottom: spacing.sm }}>
           {fold ? (
             <Flex align="center" gap="small">

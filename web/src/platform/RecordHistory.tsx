@@ -1,4 +1,4 @@
-import { Card, Flex, Pagination, Space, Spin, Typography } from 'antd'
+import { Flex, Pagination, Space, Spin, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
@@ -8,6 +8,7 @@ import { inspectTarget } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { markCurrentPage } from './pagination'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
+import { SectionPart } from './SectionParts'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -52,11 +53,11 @@ function actorOf({ actor, actorName }: HistoryItem, t: (key: string) => string):
 }
 
 /**
- * The history panel of a saved record: its audit records, newest first, 20 to a page. Each entry
+ * The history of a saved record, the form page's last part: its audit records, newest first, 20 to a page. Each entry
  * shows its action, who did it, when, and a short summary. An entry with an `inspectPath` also links
- * to the instance on the first navigation page whose process inspector names its process. The panel
+ * to the instance on the first navigation page whose process inspector names its process. The part
  * loads the pages' metadata only when an entry on screen has an `inspectPath`. The page is the panel's own and stays
- * out of the URL. A failed load shows an error inside the panel and leaves the form working.
+ * out of the URL. A failed load shows an error inside the part and leaves the form working.
  */
 export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, locale }: RecordHistoryProps) {
   const t = useText()
@@ -87,7 +88,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   const totalCount = state.result?.totalCount ?? 0
 
   return (
-    <Card data-testid="record-history" aria-busy={loading} title={t('shell.history.title')} size="small">
+    <SectionPart testId="record-history" heading={{ title: t('shell.history.title') }} busy={loading}>
       {failed ? (
         <AxisAlert data-testid="record-history-error" kind="error" message={t('shell.history.loadFailed')} />
       ) : (
@@ -149,6 +150,6 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
           )}
         </Spin>
       )}
-    </Card>
+    </SectionPart>
   )
 }

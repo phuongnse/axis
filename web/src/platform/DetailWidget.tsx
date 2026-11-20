@@ -1,6 +1,6 @@
-import { Flex, Tag, Typography } from 'antd'
+import { Flex, Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { AxisButton } from './AxisButton'
 import { ChildCollectionTable } from './ChildCollectionTable'
@@ -22,6 +22,7 @@ import {
 import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
 import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
+import { SectionPart, SectionParts, PartBoundary } from './SectionParts'
 import { TermList } from './TermList'
 import { useText } from './texts'
 import { sectionsOf } from './useRecordForm'
@@ -247,19 +248,26 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     <Flex vertical gap="middle" data-testid="detail" aria-busy="false">
       {started && <AxisAlert data-testid="detail-started" kind="success" message={t('shell.form.processStarted')} />}
       {errors.length > 0 && <AxisAlert data-testid="detail-error" kind="error" message={errors.join(' ')} />}
-      {sections.map((section, index) => (
-        <Fragment key={index}>
-          {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}
-          <TermList
-            terms={section.fields.map(({ field, width }) => ({
-              key: field.name,
-              term: field.labelKey ? t(field.labelKey) : field.name,
-              value: valueOf(field),
-              width,
-            }))}
-          />
-        </Fragment>
-      ))}
+      <PartBoundary>
+        <SectionParts>
+          {sections.map((section, index) => (
+            <SectionPart
+              key={index}
+              testId={`detail-section-${index}`}
+              heading={section.titleKey !== null ? { title: t(section.titleKey) } : undefined}
+            >
+              <TermList
+                terms={section.fields.map(({ field, width }) => ({
+                  key: field.name,
+                  term: field.labelKey ? t(field.labelKey) : field.name,
+                  value: valueOf(field),
+                  width,
+                }))}
+              />
+            </SectionPart>
+          ))}
+        </SectionParts>
+      </PartBoundary>
       {buttons.length > 0 && <Flex gap="small">{buttons}</Flex>}
     </Flex>
   )

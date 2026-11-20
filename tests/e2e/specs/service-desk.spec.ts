@@ -125,7 +125,7 @@ test("requester submits a ticket, lead triages it to agent, agent resolves it, a
 
   await useSession(page, "agent");
   await openTask(page, title, "Resolve ticket");
-  await page.getByLabel(fieldLabel("Resolution")).fill("Replaced the battery.");
+  await page.getByRole("textbox", { name: fieldLabel("Resolution") }).fill("Replaced the battery.");
   await page.getByRole("button", { name: "Resolve", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 

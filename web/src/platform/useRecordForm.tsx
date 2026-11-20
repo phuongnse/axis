@@ -1,5 +1,5 @@
 import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
-import { Flex, Form, Input, Space, Typography } from 'antd'
+import { Form, Input, Space } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
@@ -27,6 +27,7 @@ import { ReadOnlyValue } from './ReadOnlyValue'
 import { OpenRecordButton, RecordLink } from './RecordLink'
 import { ReferenceLookup } from './ReferenceLookup'
 import { ReferencesInput } from './ReferencesInput'
+import { PartBoundary, SectionPart, SectionParts } from './SectionParts'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -593,12 +594,15 @@ export function useRecordForm(
       if (!canvas && visible.length === 0) {
         return null
       }
+      const showTitle =
+        section.titleKey !== null &&
+        !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field)))
       const content = (
-        <div>
-          {section.titleKey !== null &&
-            !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
-              <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
-            )}
+        <SectionPart
+          key={index}
+          testId={`form-group-${index}`}
+          heading={showTitle && section.titleKey !== null ? { title: t(section.titleKey) } : undefined}
+        >
           <ColumnGrid rowGap={spacing.lg}>
             {visible.map((entry) => {
               const { field } = entry
@@ -647,16 +651,17 @@ export function useRecordForm(
               )
             })}
           </ColumnGrid>
-        </div>
+        </SectionPart>
       )
-      return <Fragment key={index}>{canvas ? canvas.section(index, content) : content}</Fragment>
+      return canvas ? <Fragment key={index}>{canvas.section(index, content)}</Fragment> : content
     })
     return (
       <>
         {nodes.some((node) => node !== null) && (
-          <Flex vertical gap={spacing.lg}>
-            {nodes}
-          </Flex>
+          // The boundary keeps a rule off the first group, whatever comes before the form, see docs/reference/form-widget.md#form-widget.
+          <PartBoundary>
+            <SectionParts>{nodes}</SectionParts>
+          </PartBoundary>
         )}
         {shown
           .filter(

@@ -260,8 +260,8 @@ export async function openRequestDetail(page: Page, sitePath: string, title: str
 export function detailValue(page: Page, label: string): Locator {
   return page
     .getByTestId('detail')
-    .locator('div', { has: page.locator('dt', { hasText: fieldLabel(label) }) })
-    .locator('dd')
+    .locator('dt', { hasText: fieldLabel(label) })
+    .locator('xpath=following-sibling::dd[1]')
 }
 
 /**

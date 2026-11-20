@@ -781,15 +781,38 @@ describe('FormWidget', () => {
       }
     })
 
-    it('gives the sections of a form a 24px gap from the layout, each section in its own block', async () => {
+    it("draws a form's titled groups as parts a borderSubtle rule apart, with none above the first", async () => {
       stubFetch({ status: 200, body: sectionsJson(1) })
       renderForm(noteId, sectionsWidget, 'light')
 
-      const main = (await screen.findByRole('heading', { name: 'Main' })).parentElement
-      const details = screen.getByRole('heading', { name: 'Details' }).parentElement
-      expect(main?.parentElement).toBe(details?.parentElement)
-      expect(main?.parentElement?.style.gap).toBe(`${designTokensFor('light').spacing.lg}px`)
+      const main = await screen.findByRole('region', { name: 'Main' })
+      const details = screen.getByRole('region', { name: 'Details' })
+      expect(within(main).getByRole('heading', { level: 2 })).toHaveTextContent('Main')
+      expect(within(details).getByRole('heading', { level: 2 })).toHaveTextContent('Details')
+      expect(main.previousElementSibling).toBeNull()
+      const rule = details.previousElementSibling
+      expect(rule).toHaveAttribute('role', 'separator')
+      expect(rule).toHaveStyle({ borderTop: `1px solid ${designTokensFor('light').colour.borderSubtle}` })
     })
+  })
+
+  it('draws no rule on a form with one untitled group', async () => {
+    renderForm()
+
+    expect(await screen.findByRole('textbox', { name: 'Title' })).toBeInTheDocument()
+    expect(screen.queryByRole('separator')).toBeNull()
+  })
+
+  it('draws the history of a saved record as the last part, headed History, with a rule above it and no card', async () => {
+    stubFetch({ status: 200, body: sectionsJson(1) })
+    renderForm(noteId, sectionsWidget)
+
+    const history = await screen.findByRole('region', { name: 'History' })
+    expect(history).toBe(screen.getByTestId('record-history'))
+    expect(within(history).getByRole('heading', { level: 2 })).toHaveTextContent('History')
+    expect(history.previousElementSibling).toHaveAttribute('role', 'separator')
+    expect(history.nextElementSibling).toBeNull()
+    expect(document.querySelector('.ant-card')).toBeNull()
   })
 
   it('shows field errors under their field and other errors above the form', async () => {
@@ -1661,7 +1684,7 @@ describe('FormWidget', () => {
     renderForm(noteId, sectionsWidget)
 
     expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Buy paper')
-    expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Main', 'Details'])
+    expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Main', 'Details', 'History'])
     expect(screen.getByTestId('field-value-code')).toHaveTextContent('N-1')
     expect(screen.getByLabelText('Priority')).toHaveValue('7')
     expect(screen.queryByLabelText('Done')).not.toBeInTheDocument()
@@ -1677,7 +1700,7 @@ describe('FormWidget', () => {
     })
 
     expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Buy paper')
-    expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Main', 'Details'])
+    expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Main', 'Details', 'History'])
   })
 
   it('puts each field in a column of its width, and a field without a width on the whole row', async () => {
