@@ -27,9 +27,13 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         // Both designers share the drag and drop library. It loads with the first Design tab, never with the main bundle.
+        // The graph layout library elkjs loads with the first process graph or contract lifecycle a page draws.
         codeSplitting: {
           includeDependenciesRecursively: false,
-          groups: [{ name: 'DragAndDrop', test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/ }],
+          groups: [
+            { name: 'DragAndDrop', test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/ },
+            { name: 'ProcessLayout', test: /[\\/]node_modules[\\/]elkjs[\\/]/ },
+          ],
         },
       },
     },

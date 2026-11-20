@@ -15,7 +15,8 @@ import {
 describe.each(['light', 'dark'] as const)('the Ant Design theme in %s mode', (mode) => {
   it('resolves the colours the components read through useDesignTokens', () => {
     const token = theme.getDesignToken(antThemeFor(mode))
-    const { colour } = designTokensFor(mode)
+    // fillSubtle has no Ant Design token: the process graph and its icon tiles read it through useDesignTokens only.
+    const { fillSubtle: _fillSubtle, ...colour } = designTokensFor(mode).colour
     expect({
       primary: token.colorPrimary,
       primaryText: token.colorPrimaryText,

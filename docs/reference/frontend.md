@@ -39,8 +39,8 @@ component holds a number of its own.
 - **The token file.** `web/src/platform/designTokens.ts` holds every colour, shadow, type, spacing, radius, size and
   breakpoint value of the theme.
 - **Colours.** The colours are `primary`, `success`, `warning`, `danger`, `info`, `primaryText`, `successText`,
-  `warningText`, `dangerText`, `infoText`, `canvas`, `surface`, `text`, `textMuted`, `border`, `borderSubtle`,
-  `divider`, `focusRing` and `onPrimary`, each with a light and a dark value. The first five are seeds, which colour
+  `warningText`, `dangerText`, `infoText`, `canvas`, `surface`, `fillSubtle`, `text`, `textMuted`, `border`,
+  `borderSubtle`, `divider`, `focusRing` and `onPrimary`, each with a light and a dark value. The first five are seeds, which colour
   fills, icons and tints, except a message's icon. The `*Text` tokens colour text and a message's icon in that state
   colour: state text, links, the selected tab, the active navigation entry, form validation messages, the current page
   of a pagination, destructive menu entries and the text of outlined and danger buttons, see
@@ -50,7 +50,7 @@ component holds a number of its own.
   modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. [Each preview](widget-previews.md#the-spec) is checked.
 - **Rules on a flush page** _(planned)_. `borderSubtle` stands apart from `surface` about as much in light mode as in
   dark, because on a flush page a rule is all that parts two areas. `border` stays for controls.
-- **A surface for a graph** _(planned)_. `fillSubtle` is a shade off `surface` in both modes, with a light and a dark
+- **A surface for a graph**. `fillSubtle` is a shade off `surface` in both modes, with a light and a dark
   value, under a process graph and a step's icon tile, see [process graph](process-inspector-widget.md#process-graph).
 - **A site's brand** _(planned for M42)_. A site's `brand.primary` is its main colour, see [sites](configuration.md#sites)
   and [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
@@ -82,8 +82,8 @@ component holds a number of its own.
   `web/src` outside the token file and `antTheme.ts`.
 - **Charts.** The shared chart component in `web/src/platform/Chart.tsx` maps the Axis tokens to chart colours, font
   and grid, and loads the chart library in its own chunk.
-- **Process graph** _(planned)_. `ProcessGraphCanvas` loads `elkjs` in its own chunk, only on a page that draws a
-  process, the process designer or an instance's page, never in the first load.
+- **Process graph**. `ProcessGraphCanvas` loads `elkjs` in its own chunk, only on a page that draws a
+  process, the process designer, an instance's page or a module contract's lifecycle, never in the first load.
 - **Widget previews.** The previews draw every widget, container and field input from fixture metadata, in light and
   dark mode. `scripts/design-system.sh` builds them into one classic script that sets `window.Axis` with a mount for
   each preview. A mounted widget follows `data-theme` on the page's root element. For the current mode it also reads
