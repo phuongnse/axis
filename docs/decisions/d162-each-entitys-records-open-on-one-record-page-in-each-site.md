@@ -11,7 +11,7 @@ page that is.
 
 ## Decision
 
-- **A site names the record page of each entity** _(planned)_. A site's `recordPages` maps an entity to a page of its
+- **A site names the record page of each entity**. A site's `recordPages` maps an entity to a page of its
   application that opens a record of that entity at `/{site}/{page}/{id}`, through a form or a detail. The compiler
   checks it, as [sites](../reference/configuration.md#sites) says. A detail named as a record page takes its record
   from that `id` segment, as [routing](../reference/frontend.md#routing) says.

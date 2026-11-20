@@ -401,7 +401,7 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   or Delete…, asking for a little, such as a reason, a name or an invitation, or choosing one thing. It
   never holds a record's detail or a long form, and never opens a dialog of its own. What needs much
   scrolling, or to be come back to, is a page.
-- **A reference opens what it names** _(planned)_. A record's label, shown read-only, is a real link to its record page,
+- **A reference opens what it names**. A record's label, shown read-only, is a real link to its record page,
   with an `href` so Ctrl+click opens a new tab. The link passes the page it leaves as `from`, see
   [shell layout](shell.md#layout). It never opens a dialog. A record the person cannot open is plain text.
 - **A link in a value opens in the same site** _(planned)_. A reference in a value is an inline link only when the

@@ -5,6 +5,7 @@ import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { formatValue } from './formatValue'
 import type { WidgetMetadata } from './site'
+import { RecordLink } from './RecordLink'
 import { StatusTag } from './StatusTag'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { fetchTasks, type TaskListItem, type TaskPage } from './tasks'
@@ -57,7 +58,8 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * rows back. With nobody signed in, the task API's 401 shows the sign-in prompt.
  *
  * An overdue task shows an "Overdue" tag beside its due date, and a task the user claimed shows a
- * "Claimed by you" tag beside its label.
+ * "Claimed by you" tag beside its label. The Record column is a link to the subject's record page, see `RecordLink`, and
+ * shows the muted dash when the subject has no label.
  *
  * A row's label comes from the texts of the release its task started on, then the site texts and
  * the platform texts. The table stays loading until the texts of every release on the page have
@@ -141,7 +143,10 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
         title: t('shell.tasks.subject'),
         filter: { kind: 'text' },
         sorter: true,
-        render: (_value: unknown, task: TaskListItem) => task.subject.label ?? null,
+        render: (_value: unknown, task: TaskListItem) =>
+          task.subject.label === null ? null : (
+            <RecordLink entity={task.subject.entity} id={task.subject.id} label={task.subject.label} />
+          ),
       },
       {
         key: 'dueAt',
