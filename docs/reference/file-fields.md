@@ -123,7 +123,7 @@ module has no upload route. A service account may upload, as it may write record
     The message is the same whether the id is unknown, belongs to another user, is attached
     elsewhere or was uploaded for another field. A malformed id is "Must be a UUID."
   - **Repeated id.** An id sent twice in one body is refused at every pointer after the first.
-  - **Other writers.** Inbound endpoints, task completion and process steps pass no uploader, so
+  - **Other writers.** Inbound endpoints, task completion and save, and process steps pass no uploader, so
     they attach nothing and refuse any id the record does not already hold.
   - **Replaced and removed files.** A file that a write replaced or cleared is `deleted`, as
     [storage and clean-up](#storage-and-clean-up) says. Its id is refused like any other unknown id,

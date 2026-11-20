@@ -184,8 +184,10 @@ The triggers run in the order of the release, after the record and its `record.c
 - For an `updateRecord` step, a connector output or a package operation output, they run after its
   `record.updated` audit record, and for a `createRecord` step after its `record.created` audit
   record.
-- For a task form save, they run after the `task.completed` audit record, once the task is closed and
+- For a task completion, they run after the `task.completed` audit record, once the task is closed and
   its instance resumes, so the instance of the task's own process is already running.
+- For a task save, they run after its `record.updated` audit record while the instance still waits, so a
+  trigger on the task's own process is skipped.
 
 A start that fails for any reason but a skip, such as a database error, fails the write, which rolls
 back with everything the triggers started. The record is locked by the write, so a data change start

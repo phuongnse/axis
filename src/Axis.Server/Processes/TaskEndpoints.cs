@@ -21,7 +21,7 @@ namespace Axis.Server.Processes;
 
 /// <summary>
 /// The task API endpoints that list the current user's open human tasks, read one task, complete
-/// one, claim or release one, and reassign one. The current user is the session user. A user may act on a task assigned to their
+/// one, save one's changes, claim or release one, and reassign one. The current user is the session user. A user may act on a task assigned to their
 /// id, or to a role they hold. A request is checked in order:
 /// signed-in user (401), application (404), then for a list the paging, <c>sort</c>, <c>search</c> and <c>filter</c> (400,
 /// each keyed by its name), and for a read or a completion the task id and the task's application (404) and who may act (403).
@@ -38,6 +38,10 @@ namespace Axis.Server.Processes;
 /// that fails writes nothing. A task shows its process, step, outcomes and form as the release
 /// its instance is pinned to declares them, and a completion uses that release too. Its subject
 /// label is the record's display field in the task's release.
+/// The save route runs the same wrapper as a completion: the same order of checks, the write limit, the shared
+/// start lock and the release retry. Its body has no <c>outcome</c> and needs <c>values</c> and <c>version</c> (400).
+/// <see cref="TaskCompletionCommand"/> writes the values with the completion's record write and appends the audit
+/// record <c>record.updated</c> for the user, and the task stays open. It answers 200 with the record's new <c>version</c>.
 /// The form state route answers what the task's form shows for a draft, without writing anything.
 /// Its checks run in the task order: signed-in user (401), application, task id and task (404),
 /// who may act (403), the task being open (409), then the content type (415) and the body (400).
@@ -88,6 +92,7 @@ internal static class TaskEndpoints
         tasks.MapGet("", ListAsync);
         tasks.MapGet("/{id}", GetAsync);
         tasks.MapPost("/{id}/complete", CompleteAsync).WithWriteTimeout();
+        tasks.MapPost("/{id}/save", SaveAsync).WithWriteTimeout();
         tasks.MapPost("/{id}/form-state", FormStateAsync);
         tasks.MapPost("/{id}/claim", ClaimAsync);
         tasks.MapPost("/{id}/release", ReleaseAsync);
@@ -246,7 +251,7 @@ internal static class TaskEndpoints
 
     // The body is read here rather than bound, so every body problem is reported by JSON Pointer,
     // and only after the task is locked and found open.
-    private static async Task<IResult> CompleteAsync(
+    private static Task<IResult> CompleteAsync(
         string app,
         string id,
         HttpRequest request,
@@ -255,6 +260,85 @@ internal static class TaskEndpoints
         ITenantContextAccessor tenants,
         SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken) =>
+        WriteTaskAsync(
+            app,
+            id,
+            request,
+            resolver,
+            database,
+            tenants,
+            (connection, transaction, active, task, actor, tenantId, ct) => TaskCompletionCommand.CompleteLockedAsync(
+                connection,
+                transaction,
+                tenantId,
+                active.Model,
+                active.ReleaseId,
+                task,
+                actor,
+                (completing, releaseCt) => resolver.GetReleaseModelAsync(completing.ReleaseId, releaseCt),
+                async bodyCt => JsonRequest.IsJson(request) ? await RecordEndpoints.ReadBodyAsync(request, bodyCt) : null,
+                new RecordCipher(sensitive, tenantId),
+                loggerFactory,
+                ct),
+            async (connection, active, user, roles, taskId, _) =>
+            {
+                var completed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
+                    ?? throw new InvalidOperationException($"The completed task '{taskId}' could not be read.");
+                return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user, roles, completed, cancellationToken));
+            },
+            cancellationToken);
+
+    // A save writes the form's values to the subject record and leaves the task open, so it answers the record's new version.
+    private static Task<IResult> SaveAsync(
+        string app,
+        string id,
+        HttpRequest request,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken) =>
+        WriteTaskAsync(
+            app,
+            id,
+            request,
+            resolver,
+            database,
+            tenants,
+            (connection, transaction, active, task, actor, tenantId, ct) => TaskCompletionCommand.SaveLockedAsync(
+                connection,
+                transaction,
+                tenantId,
+                active.Model,
+                active.ReleaseId,
+                task,
+                actor,
+                (saving, releaseCt) => resolver.GetReleaseModelAsync(saving.ReleaseId, releaseCt),
+                async bodyCt => JsonRequest.IsJson(request) ? await RecordEndpoints.ReadBodyAsync(request, bodyCt) : null,
+                new RecordCipher(sensitive, tenantId),
+                loggerFactory,
+                ct),
+            (_, _, _, _, _, result) => Task.FromResult<IResult>(Results.Ok(new TaskSaveResponse(result.Version!.Value))),
+            cancellationToken);
+
+    /// <summary>
+    /// The write of a task's completion or save, as one wrapper. A release change under the start lock sends
+    /// it back to resolution, so every check runs on the new release. The transaction takes the write limit
+    /// first, so it also bounds the wait for the start lock, then the start lock shared and the task lock.
+    /// <paramref name="write"/> runs the command on the locked task, and a failure rolls everything back.
+    /// <paramref name="answer"/> answers once the transaction has committed.
+    /// </summary>
+    private static async Task<IResult> WriteTaskAsync(
+        string app,
+        string id,
+        HttpRequest request,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ITenantContextAccessor tenants,
+        Func<NpgsqlConnection, NpgsqlTransaction, ActiveApplication, ProcessTaskRow?, RecordActor, string, CancellationToken, Task<TaskCompletionResult>> write,
+        Func<NpgsqlConnection, ActiveApplication, CurrentUserResponse, IReadOnlyList<string>, Guid, TaskCompletionResult, Task<IResult>> answer,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
@@ -262,7 +346,6 @@ internal static class TaskEndpoints
             return Grants.SignInRequired();
         }
 
-        // A release change under the start lock sends the completion back to resolution, so every check runs on the new release.
         for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
             if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -278,24 +361,25 @@ internal static class TaskEndpoints
             var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
             var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
             var connection = await database.GetConnectionAsync(cancellationToken);
+            TaskCompletionResult result;
             await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
             {
                 // The write limit comes first, so it also bounds the wait for the start lock.
                 await database.LimitWriteAsync(transaction, cancellationToken);
 
                 // The start lock comes first, before any table is touched, so a migrating activation
-                // cannot deadlock with this completion. The release is read again under it.
+                // cannot deadlock with this write. The release is read again under it.
                 if (await StartLock.TakeSharedAsync(transaction, active.Model.Manifest.Id, cancellationToken) != active.ReleaseId)
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     continue;
                 }
 
-                // The lock makes a concurrent completion of the task wait until this one commits or
+                // The lock makes a concurrent completion or save of the task wait until this one commits or
                 // rolls back, and then find the task as it was left.
                 var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
-                var failure = await CompleteLockedAsync(request, resolver, connection, transaction, active, task, user, roles, tenantId, sensitive, loggerFactory, cancellationToken);
-                if (failure is not null)
+                result = await write(connection, transaction, active, task, new RecordActor(user.Id, roles), tenantId, cancellationToken);
+                if (Failure(result) is { } failure)
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     return failure;
@@ -304,9 +388,7 @@ internal static class TaskEndpoints
                 await transaction.CommitAsync(cancellationToken);
             }
 
-            var completed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
-                ?? throw new InvalidOperationException($"The completed task '{taskId}' could not be read.");
-            return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user, roles, completed, cancellationToken));
+            return await answer(connection, active, user, roles, taskId, result);
         }
 
         return ReleaseRetry.Changed();
@@ -601,50 +683,18 @@ internal static class TaskEndpoints
         return reason is null ? null : new ReassignBody(hasUser ? ProcessTasks.UserAssignee : ProcessTasks.RoleAssignee, assignee, reason);
     }
 
-    /// <summary>
-    /// Completes the locked <paramref name="task"/> in <paramref name="transaction"/> with
-    /// <see cref="TaskCompletionCommand"/>, or returns the failure, after which the caller rolls
-    /// every write back.
-    /// </summary>
-    private static async Task<IResult?> CompleteLockedAsync(
-        HttpRequest request,
-        ActiveApplicationResolver resolver,
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
-        ActiveApplication current,
-        ProcessTaskRow? task,
-        CurrentUserResponse user,
-        IReadOnlyList<string> roles,
-        string tenantId,
-        SensitiveValues sensitive,
-        ILoggerFactory loggerFactory,
-        CancellationToken cancellationToken)
+    /// <summary>The problem a failed <paramref name="result"/> answers, or null for a completion or a save that went through.</summary>
+    private static IResult? Failure(TaskCompletionResult result) => result.Outcome switch
     {
-        var result = await TaskCompletionCommand.CompleteLockedAsync(
-            connection,
-            transaction,
-            tenantId,
-            current.Model,
-            current.ReleaseId,
-            task,
-            new RecordActor(user.Id, roles),
-            (completing, ct) => resolver.GetReleaseModelAsync(completing.ReleaseId, ct),
-            async ct => JsonRequest.IsJson(request) ? await RecordEndpoints.ReadBodyAsync(request, ct) : null,
-            new RecordCipher(sensitive, tenantId),
-            loggerFactory,
-            cancellationToken);
-        return result.Outcome switch
-        {
-            TaskCompletionOutcome.Completed => null,
-            TaskCompletionOutcome.NotFound => TaskNotFound(),
-            TaskCompletionOutcome.Denied => AssignedToSomeoneElse(),
-            TaskCompletionOutcome.AlreadyCompleted => AlreadyCompleted(),
-            TaskCompletionOutcome.UnsupportedContent => JsonRequest.UnsupportedMediaType(),
-            TaskCompletionOutcome.Invalid => Results.ValidationProblem(result.Errors!),
-            TaskCompletionOutcome.StaleVersion => StaleVersion(),
-            _ => RecordEndpoints.WriteFailure(result.Write!),
-        };
-    }
+        TaskCompletionOutcome.Completed or TaskCompletionOutcome.Saved => null,
+        TaskCompletionOutcome.NotFound => TaskNotFound(),
+        TaskCompletionOutcome.Denied => AssignedToSomeoneElse(),
+        TaskCompletionOutcome.AlreadyCompleted => AlreadyCompleted(),
+        TaskCompletionOutcome.UnsupportedContent => JsonRequest.UnsupportedMediaType(),
+        TaskCompletionOutcome.Invalid => Results.ValidationProblem(result.Errors!),
+        TaskCompletionOutcome.StaleVersion => StaleVersion(),
+        _ => RecordEndpoints.WriteFailure(result.Write!),
+    };
 
     /// <summary>
     /// The task as a single read returns it, with its form as its release declares it, less the
@@ -855,6 +905,8 @@ internal sealed record ReassignBody(string Kind, string Assignee, string Reason)
 internal sealed record TaskAssignee(string? User, string? Role);
 
 /// <summary>The form a task is completed on, in the shape of a form widget's metadata, with its entity's metadata.</summary>
+internal sealed record TaskSaveResponse(long Version);
+
 internal sealed record TaskForm(string Name, IReadOnlyList<FormSectionMetadata> Sections, IReadOnlyList<FormStepMetadata> Steps, EntityMetadata Entity);
 
 /// <summary>An outcome a task can be completed with.</summary>

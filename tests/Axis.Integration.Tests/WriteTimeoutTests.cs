@@ -113,6 +113,7 @@ public sealed class WriteTimeoutTests(RecordApiFixture fixture) : IClassFixture<
         "POST /api/apps/{app}/processes/{process}/instances",
         "POST /api/apps/{app}/processes/{module}/{process}/instances",
         "POST /api/apps/{app}/tasks/{id}/complete",
+        "POST /api/apps/{app}/tasks/{id}/save",
         "POST /api/apps/{app}/endpoints/{name}",
     ];
 

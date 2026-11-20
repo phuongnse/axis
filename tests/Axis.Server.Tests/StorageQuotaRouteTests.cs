@@ -130,6 +130,9 @@ public sealed class StorageQuotaRouteTests
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 
+        // A task save goes on like a completion, see docs/reference/tenant-quotas.md#refusals.
+        "POST /api/apps/{app}/tasks/{id}/save",
+
         // Notifications.
         "POST /api/apps/{app}/notifications/read-all",
         "POST /api/apps/{app}/notifications/{id}/read",

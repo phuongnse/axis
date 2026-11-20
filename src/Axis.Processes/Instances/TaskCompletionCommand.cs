@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Core.Telemetry;
+using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Records;
@@ -16,6 +17,9 @@ public enum TaskCompletionOutcome
 {
     /// <summary>The values are written, the task is closed and the instance resumes. The caller commits.</summary>
     Completed,
+
+    /// <summary>The values are written and the task stays open. The caller commits.</summary>
+    Saved,
 
     /// <summary>The task does not exist, or belongs to another application.</summary>
     NotFound,
@@ -39,11 +43,16 @@ public enum TaskCompletionOutcome
     WriteFailed,
 }
 
-/// <summary>The result of a task completion. <see cref="Errors"/> are keyed by JSON Pointer. <see cref="Write"/> is set for <see cref="TaskCompletionOutcome.WriteFailed"/>.</summary>
+/// <summary>
+/// The result of a task completion or save. <see cref="Errors"/> are keyed by JSON Pointer. <see cref="Write"/> is set for
+/// <see cref="TaskCompletionOutcome.WriteFailed"/>. <see cref="Version"/> is the subject record's new version after
+/// <see cref="TaskCompletionOutcome.Saved"/>.
+/// </summary>
 public sealed record TaskCompletionResult(
     TaskCompletionOutcome Outcome,
     IDictionary<string, string[]>? Errors = null,
-    RecordWriteResult? Write = null);
+    RecordWriteResult? Write = null,
+    long? Version = null);
 
 /// <summary>
 /// Completes a locked task in the caller's transaction, as the task API and the test scenario
@@ -66,8 +75,14 @@ public sealed record TaskCompletionResult(
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
 /// Only the claimer may complete a claimed role task.
 /// A role assignee counts only when the active release declares the role.
+/// <see cref="SaveLockedAsync"/> saves a task's changes with the same checks and the same record write, and
+/// leaves the task open. Its body has no <c>outcome</c> and needs <c>values</c> and <c>version</c>. The write
+/// names no deciding task, and its accountable user is the actor. It appends the audit record
+/// <c>record.updated</c> for the actor, as the record API does, with no process instance id, then starts the
+/// data change triggers and the effects' create triggers as a completion does. It never touches the task,
+/// its instance, its history or its work items.
 /// The command never commits or rolls back. A result other than <see cref="TaskCompletionOutcome.Completed"/>
-/// may have written partly, so the caller rolls back.
+/// or <see cref="TaskCompletionOutcome.Saved"/> may have written partly, so the caller rolls back.
 /// </summary>
 public static class TaskCompletionCommand
 {
@@ -144,67 +159,23 @@ public static class TaskCompletionCommand
         long? readVersion = null;
         long? writtenVersion = null;
         IReadOnlyList<string> fields = [];
-        Record? previous = null;
-        Record? updated = null;
+        SubjectWrite? subject = null;
         JsonArray? changes = null;
-        IReadOnlyList<EffectRecord> effects = [];
         var write = new RecordWriteContext(actor.Id, task.Id);
         if (body.Input is { } input)
         {
-            // The values are written as a record update on the task's release. The lock makes the
-            // read below see the latest version, which the computed fields and validations use.
-            await RecordCommands.LockAsync(connection, entity, task.SubjectId, cancellationToken);
-            if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cipher, cancellationToken) is not { } stored)
+            var (failure, written) = await WriteValuesAsync(
+                connection, transaction, tenantId, release, entity, form, task, input, write, cipher, loggerFactory, cancellationToken);
+            if (failure is not null)
             {
-                return new TaskCompletionResult(
-                    TaskCompletionOutcome.WriteFailed, Write: new RecordWriteResult(RecordWriteOutcome.NotFound));
+                return failure;
             }
 
-            var matched = await RecordMatcher.WithMatchesAsync(connection, release, entity, input.Values, stored, cancellationToken);
-            var computed = RecordComputer.ComputeUpdate(release, entity, stored, matched, input.Rows);
-            if (computed.Errors is { } computeErrors)
-            {
-                return new TaskCompletionResult(TaskCompletionOutcome.Invalid, computeErrors);
-            }
-
-            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var sent = RecordCommand.SetFields(entity, input).ToList();
-            var sets = entity.Validations.Count > 0 || form.HasRequiredWhen || (sent.Count > 0 && form.HasVisibleOrReadOnlyWhen)
-                ? await RecordSets.ReadAsync(connection, release, entity, stored, input.Links, cancellationToken)
-                : RecordSets.Empty;
-            var failures = RecordFormRequirements.Merge(
-                RecordFormRequirements.Check(release, entity, form, stored, computed.Values, computed.Rows, now, sent, sets),
-                RecordValidator.ValidateUpdate(release, entity, stored, computed.Values, computed.Rows, now, sets));
-            if (failures is not null)
-            {
-                return new TaskCompletionResult(TaskCompletionOutcome.Invalid, failures);
-            }
-
-            var result = await RecordCommands.UpdateAsync(
-                connection, release, entity, task.ReleaseId, write, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
-            if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
-            {
-                if (result.Outcome == RecordWriteOutcome.StaleVersion)
-                {
-                    return new TaskCompletionResult(TaskCompletionOutcome.StaleVersion);
-                }
-
-                if (result.Outcome is RecordWriteOutcome.LifecycleRefused or RecordWriteOutcome.EffectRefused)
-                {
-                    RecordLifecycleLog.Refused(loggerFactory, entity.Id, result.Point, task.SubjectId);
-                }
-
-                return new TaskCompletionResult(TaskCompletionOutcome.WriteFailed, Write: result);
-            }
-
-            await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, release, entity, task.ReleaseId, cancellationToken);
-            previous = stored;
-            updated = written;
-            changes = RunValues.Changes(release, entity, stored, written);
-            effects = result.Effects;
-            readVersion = stored.Version;
-            writtenVersion = written.Version;
-            fields = sent;
+            subject = written!;
+            changes = RunValues.Changes(release, entity, subject.Stored, subject.Written);
+            readVersion = subject.Stored.Version;
+            writtenVersion = subject.Written.Version;
+            fields = subject.Fields;
         }
         else if (form.HasRequiredWhen)
         {
@@ -240,37 +211,202 @@ public static class TaskCompletionCommand
 
         // The triggers run once the task is closed and its instance resumes, so a trigger on the
         // task's own process finds the instance running and is skipped.
-        if (previous is not null && updated is not null && body.Input is { } saved)
+        if (subject is not null && body.Input is { } saved)
         {
-            await DataChangeTriggerStarts.StartAfterUpdateAsync(
-                transaction,
-                tenantId,
-                active,
-                activeReleaseId,
-                task.ReleaseId,
-                entity,
-                previous,
-                updated,
-                saved.Rows.Select(rows => rows.Collection.Name).Concat(saved.Links.Select(links => links.Field.Name)),
-                write,
-                loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
-                cancellationToken);
-            await EffectRecordWrites.AppendAsync(
-                transaction,
-                tenantId,
-                active,
-                activeReleaseId,
-                task.ReleaseId,
-                task.ApplicationId,
-                task.ProcessInstanceId,
-                actor.Id,
-                effects,
-                write,
-                loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
-                cancellationToken);
+            await StartAfterWriteAsync(
+                transaction, tenantId, active, activeReleaseId, task, entity, saved, subject, write, actor.Id, task.ProcessInstanceId, loggerFactory, cancellationToken);
         }
 
         return new TaskCompletionResult(TaskCompletionOutcome.Completed);
+    }
+
+    /// <summary>
+    /// Saves the values of the locked <paramref name="task"/>'s form to its subject record in the caller's transaction and
+    /// leaves the task open. The parameters are those of <see cref="CompleteLockedAsync"/>. The result is
+    /// <see cref="TaskCompletionOutcome.Saved"/> with the record's new version, or a failure after which the caller rolls back.
+    /// </summary>
+    public static async Task<TaskCompletionResult> SaveLockedAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel active,
+        Guid activeReleaseId,
+        ProcessTaskRow? task,
+        RecordActor actor,
+        Func<ProcessTaskRow, CancellationToken, Task<ApplicationModel>> releaseOf,
+        RecordBodyReader readBody,
+        RecordCipher? cipher,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(active);
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(releaseOf);
+        ArgumentNullException.ThrowIfNull(readBody);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
+
+        if (task is null || task.ApplicationId != active.Manifest.Id)
+        {
+            return new TaskCompletionResult(TaskCompletionOutcome.NotFound);
+        }
+
+        if (!TaskQueries.MayComplete(task, actor.Id, actor.Roles))
+        {
+            return new TaskCompletionResult(TaskCompletionOutcome.Denied);
+        }
+
+        if (task.State != ProcessTasks.Open)
+        {
+            return new TaskCompletionResult(TaskCompletionOutcome.AlreadyCompleted);
+        }
+
+        if (await readBody(cancellationToken) is not { } utf8Body)
+        {
+            return new TaskCompletionResult(TaskCompletionOutcome.UnsupportedContent);
+        }
+
+        var release = await releaseOf(task, cancellationToken);
+        var (_, step) = StepOf(release, task);
+        var form = FormOf(release, task, step);
+        var entity = release.FindEntity(task.SubjectEntityId)
+            ?? throw new InvalidOperationException($"The subject entity of task '{task.Id}' is not in its release.");
+        var readable = Readable(active, actor.Roles, task.SubjectEntityId);
+        var body = TaskCompletionBody.ReadSave(utf8Body, form, entity, release, readable);
+        if (body.Errors is { } errors)
+        {
+            return new TaskCompletionResult(TaskCompletionOutcome.Invalid, errors);
+        }
+
+        // The body reader accepts a save only with values, so there is an input to write.
+        var input = body.Input!;
+        var write = new RecordWriteContext(actor.Id, null);
+        var (failure, written) = await WriteValuesAsync(
+            connection, transaction, tenantId, release, entity, form, task, input, write, cipher, loggerFactory, cancellationToken);
+        if (failure is not null)
+        {
+            return failure;
+        }
+
+        var subject = written!;
+        await AuditRecords.AppendAsync(
+            transaction,
+            RecordCommand.RecordAudit(actor, AuditActions.RecordUpdated, release, entity, task.SubjectId, subject.Written.Version, subject.Fields),
+            cancellationToken);
+        await StartAfterWriteAsync(
+            transaction, tenantId, active, activeReleaseId, task, entity, input, subject, write, actor.Id, null, loggerFactory, cancellationToken);
+        return new TaskCompletionResult(TaskCompletionOutcome.Saved, Version: subject.Written.Version);
+    }
+
+    /// <summary>The subject record before and after a write, the effects' records and the names of the fields the body set.</summary>
+    private sealed record SubjectWrite(Record Stored, Record Written, IReadOnlyList<EffectRecord> Effects, IReadOnlyList<string> Fields);
+
+    // The one record write of a completion and a save: the values are written as a record update on the task's release.
+    // The lock makes the read see the latest version, which the computed fields and validations use.
+    private static async Task<(TaskCompletionResult? Failure, SubjectWrite? Written)> WriteValuesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel release,
+        EntityModel entity,
+        FormModel form,
+        ProcessTaskRow task,
+        RecordInput input,
+        RecordWriteContext write,
+        RecordCipher? cipher,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        await RecordCommands.LockAsync(connection, entity, task.SubjectId, cancellationToken);
+        if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cipher, cancellationToken) is not { } stored)
+        {
+            return (new TaskCompletionResult(
+                TaskCompletionOutcome.WriteFailed, Write: new RecordWriteResult(RecordWriteOutcome.NotFound)), null);
+        }
+
+        var matched = await RecordMatcher.WithMatchesAsync(connection, release, entity, input.Values, stored, cancellationToken);
+        var computed = RecordComputer.ComputeUpdate(release, entity, stored, matched, input.Rows);
+        if (computed.Errors is { } computeErrors)
+        {
+            return (new TaskCompletionResult(TaskCompletionOutcome.Invalid, computeErrors), null);
+        }
+
+        var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+        var sent = RecordCommand.SetFields(entity, input).ToList();
+        var sets = entity.Validations.Count > 0 || form.HasRequiredWhen || (sent.Count > 0 && form.HasVisibleOrReadOnlyWhen)
+            ? await RecordSets.ReadAsync(connection, release, entity, stored, input.Links, cancellationToken)
+            : RecordSets.Empty;
+        var failures = RecordFormRequirements.Merge(
+            RecordFormRequirements.Check(release, entity, form, stored, computed.Values, computed.Rows, now, sent, sets),
+            RecordValidator.ValidateUpdate(release, entity, stored, computed.Values, computed.Rows, now, sets));
+        if (failures is not null)
+        {
+            return (new TaskCompletionResult(TaskCompletionOutcome.Invalid, failures), null);
+        }
+
+        var result = await RecordCommands.UpdateAsync(
+            connection, release, entity, task.ReleaseId, write, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
+        if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
+        {
+            if (result.Outcome == RecordWriteOutcome.StaleVersion)
+            {
+                return (new TaskCompletionResult(TaskCompletionOutcome.StaleVersion), null);
+            }
+
+            if (result.Outcome is RecordWriteOutcome.LifecycleRefused or RecordWriteOutcome.EffectRefused)
+            {
+                RecordLifecycleLog.Refused(loggerFactory, entity.Id, result.Point, task.SubjectId);
+            }
+
+            return (new TaskCompletionResult(TaskCompletionOutcome.WriteFailed, Write: result), null);
+        }
+
+        await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, release, entity, task.ReleaseId, cancellationToken);
+        return (null, new SubjectWrite(stored, written, result.Effects, sent));
+    }
+
+    // Starts the update triggers of the active release for the write, then audits the effects' records and starts their create
+    // triggers. The effects' audit records link to processInstanceId, which a save leaves null as its own audit record does.
+    private static async Task StartAfterWriteAsync(
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel active,
+        Guid activeReleaseId,
+        ProcessTaskRow task,
+        EntityModel entity,
+        RecordInput input,
+        SubjectWrite subject,
+        RecordWriteContext write,
+        string actorId,
+        Guid? processInstanceId,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        await DataChangeTriggerStarts.StartAfterUpdateAsync(
+            transaction,
+            tenantId,
+            active,
+            activeReleaseId,
+            task.ReleaseId,
+            entity,
+            subject.Stored,
+            subject.Written,
+            input.Rows.Select(rows => rows.Collection.Name).Concat(input.Links.Select(links => links.Field.Name)),
+            write,
+            loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+            cancellationToken);
+        await EffectRecordWrites.AppendAsync(
+            transaction,
+            tenantId,
+            active,
+            activeReleaseId,
+            task.ReleaseId,
+            task.ApplicationId,
+            processInstanceId,
+            actorId,
+            subject.Effects,
+            write,
+            loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+            cancellationToken);
     }
 
     /// <summary>The process and task step of <paramref name="task"/> in <paramref name="release"/>, the release the task is pinned to.</summary>
