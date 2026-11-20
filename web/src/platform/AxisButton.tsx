@@ -371,12 +371,13 @@ export function AxisSplitButton({
   }
   if (titleRow) {
     return (
-      <Flex data-testid={testId} align="center" gap="small">
-        <AxisButton role="plain" disabled={disabled} onClick={onClick}>
+      // The action and its menu are one pair, small as a title row's actions are, with no gap between them.
+      <Flex data-testid={testId} align="center">
+        <AxisButton role="plain" size="small" disabled={disabled} onClick={onClick}>
           {children}
         </AxisButton>
         <Dropdown trigger={['click']} menu={menu}>
-          <AxisButton role="icon" nameKey={menuNameKey} icon={<EllipsisOutlined />} />
+          <AxisButton role="icon" size="small" nameKey={menuNameKey} icon={<EllipsisOutlined />} />
         </Dropdown>
       </Flex>
     )
