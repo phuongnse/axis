@@ -69,11 +69,12 @@
   },
   "process": {
     "content": {
+      "title": { "textKey": "" },
       "entity": "",
       "start": "End",
       "steps": [{ "name": "End", "type": "end" }]
     },
-    "emptyReferences": ["/entity"]
+    "emptyReferences": ["/entity", "/title/textKey"]
   },
   "role": {
     "content": {
