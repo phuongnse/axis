@@ -16,7 +16,7 @@ namespace Axis.Server.Mcp;
 /// calling person through <see cref="StudioDrafts"/> and answer what the authoring API's matching route answers, or an error text
 /// that is a problem title of the authoring API or a fixed one, never text from the request or a path. A draft that is not the
 /// person's, or does not exist, answers the draft routes' title and changes nothing. Each successful write call appends one
-/// <c>mcp.toolCalled</c> audit record that holds ids only, see <c>docs/reference/storage.md#audit-actions</c>. <c>run_scenarios</c>
+/// <c>mcp.toolCalled</c> audit record that holds ids only, see <c>docs/reference/audit-records-and-sequence-counters.md#audit-actions</c>. <c>run_scenarios</c>
 /// changes no draft. It stores a <c>test</c> request of the draft's files, or reads one back, and records no audit record, as a
 /// <c>test</c> records none, see <c>docs/reference/authoring-publishing.md#test</c>. <c>accept_draft</c> changes no draft either. It stores an
 /// <c>accept</c> publish request of the draft, only under the rules of <c>docs/reference/authoring-requests.md#accepting</c>, and

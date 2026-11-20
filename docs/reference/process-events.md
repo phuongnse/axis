@@ -273,7 +273,7 @@ stored occurrence in `axis.events`, so every attempt sends the same bytes.
    redirect and cancels the request after the webhook's `timeout`.
 3. An answer that delivers runs one transaction. It deletes the item, sets the row `delivered` with
    the status code and the time, and writes the audit record `webhook.delivered`, see
-   [storage](storage.md#audit-records-and-sequence-counters). A worker that crashes after the send
+   [storage](audit-records-and-sequence-counters.md#audit-records-and-sequence-counters). A worker that crashes after the send
    sends the request again, with the same `webhook-id`.
 4. A failed attempt runs one transaction that counts the failure, adds one to the row's `attempts`,
    stores the status code of the answer, or null when there was none, and makes the item due after the
@@ -679,6 +679,6 @@ delivery again for that target only:
   redelivered.".
 
 Each success writes the audit record `deadLetter.redelivered` or `deadLetter.discarded` in the same
-transaction, see [audit records](storage.md#audit-records-and-sequence-counters). It names the
+transaction, see [audit records](audit-records-and-sequence-counters.md#audit-records-and-sequence-counters). It names the
 application and no entity, record or instance, and its details are `deadLetterId`, `kind`,
 `triggerId`, `eventId`, `occurrenceAt` and `reason`, with null for what the kind lacks.

@@ -458,7 +458,7 @@ A request keeps the whole story of the change, and its milestones write audit re
   each check, the review, the tokens and who accepted or dropped it.
 - **Audit records.** Sending a request, approving a plan, dropping it and accepting its draft each
   write an audit record with the author, the request id and the application, see
-  [audit actions](storage.md#audit-actions).
+  [audit actions](audit-records-and-sequence-counters.md#audit-actions).
 - **Usage.** Every model call, review included, adds its tokens to the tenant's
   [usage](tenant-quotas.md#usage) by binding and model, with a tenant's own key counted apart.
 

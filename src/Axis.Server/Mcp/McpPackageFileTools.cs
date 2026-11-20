@@ -15,7 +15,7 @@ namespace Axis.Server.Mcp;
 /// package file routes make, see <c>docs/reference/studio-packages.md#the-authoring-api</c>. They make one commit on the draft's
 /// branch and answer what the routes answer for a draft, or the route's problem title. Each write or delete appends one
 /// <c>mcp.toolCalled</c> audit record that holds ids only, with no package, path or content, see
-/// <c>docs/reference/storage.md#audit-actions</c>. <c>test_package</c> changes no draft. It stores a package <c>test</c> request of
+/// <c>docs/reference/audit-records-and-sequence-counters.md#audit-actions</c>. <c>test_package</c> changes no draft. It stores a package <c>test</c> request of
 /// the draft's files, or reads one back, and writes no audit record, as a <c>test</c> writes none, see
 /// <c>docs/reference/authoring-publishing.md#test</c>.
 /// </summary>

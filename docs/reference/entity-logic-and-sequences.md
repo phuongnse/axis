@@ -173,7 +173,7 @@ An entity `text` field names the sequence in its `sequence` property:
 - `sequence` names a loaded `sequence` resource, ignoring letter case.
 - The field gets its number on create, in the create's transaction, and clients cannot write it. See
   [the record API](record-api.md#create-update-and-delete) and
-  [storage](storage.md#audit-records-and-sequence-counters).
+  [storage](audit-records-and-sequence-counters.md#audit-records-and-sequence-counters).
 - A field with `sequence` cannot be `required` or have an `expression`, because the server always
   assigns its value. A child entity's field cannot have a `sequence` either. Each of these is
   `AXC0013`.

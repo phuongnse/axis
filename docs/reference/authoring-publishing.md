@@ -300,6 +300,6 @@ history stay as they were.
 
 ### Audit
 
-Each `publish` and `activate` writes an [audit record](storage.md#audit-records-and-sequence-counters)
+Each `publish` and `activate` writes an [audit record](audit-records-and-sequence-counters.md#audit-records-and-sequence-counters)
 with the actor, the application, the release and the request, when it succeeds and when it fails. A
 `validate`, a `preview` and a `test` write none.

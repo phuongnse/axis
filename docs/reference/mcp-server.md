@@ -256,11 +256,11 @@ What an agent did is recorded, but never the content it read or wrote.
 
 - **Calls.** Each successful write tool call writes an audit record with the person, the client id, the tool, the
   application, the draft and the resource ids. A package file tool records no resource id, because a package file has none.
-  The fields are in [audit actions](storage.md#audit-actions).
+  The fields are in [audit actions](audit-records-and-sequence-counters.md#audit-actions).
   `run_scenarios` and `test_package` write none, as a [test](authoring-publishing.md#test) writes none. `accept_draft` writes one only when it queues an accept,
   and none when it answers an accept that is already queued or running or reads one.
 - **Consent revocation.** A [revoke](user-administration.md#outside-mcp-clients) writes an audit record in the tenant
-  database and one in the platform database, see [audit actions](storage.md#audit-actions).
+  database and one in the platform database, see [audit actions](audit-records-and-sequence-counters.md#audit-actions).
 - **Consent** _(planned for M35)_. A consent that a person gives writes an audit record in the realm and a platform audit
   record in Axis.
 - **Logs.** The server logs each call's tool, client id and outcome, and the

@@ -3,7 +3,7 @@
 This page says how activation changes stored data that additive provisioning cannot change: the
 migrations that rename, drop, fill or convert a field, and the recompute that keeps stored computed
 fields true to their release. The schema planning that decides what changes is in
-[storage](storage.md#schema-planning).
+[storage](entity-tables.md#schema-planning).
 
 ## Recomputing computed fields
 
@@ -299,7 +299,7 @@ An activation with a pending migration runs these steps in one transaction:
    designer names its migrations by time, so the files of one entity run in the order they were
    written, and a hand-written migration of the same entity whose name sorts later runs after them.
    Nothing else orders them.
-6. Run the additive DDL, as [schema planning](storage.md#schema-planning) orders it.
+6. Run the additive DDL, as [schema planning](entity-tables.md#schema-planning) orders it.
 7. Recompute inline or mark pending with the release being activated, as
    [recomputing computed fields](#recomputing-computed-fields) says. This includes the rows that a
    `fill` or `convert` changed and the owners of changed child rows. An activation without a pending
@@ -326,7 +326,7 @@ release can still use the column.
 | `dropEntity`     | `DROP TABLE` for child tables, then the entity table, without `CASCADE` so a remaining foreign key fails. `DELETE` its provisioning records.                                                                                                                   | Yes                        |
 | `fill`           | `ADD COLUMN` as nullable when missing, then `UPDATE ... SET f = <value> WHERE f IS NULL`                                                                                                                                                                       | No                         |
 | `convert`        | For a type change, `ADD COLUMN axis_convert`, `UPDATE ... SET axis_convert = (<value>)::<type>`, `ALTER COLUMN ... TYPE ... USING axis_convert`, then `DROP COLUMN axis_convert`. For removed enum values, `UPDATE ... SET f = <value> WHERE f IN (<removed>)` | Yes                        |
-| Additive changes | As in [schema planning](storage.md#schema-planning)                                                                                                                                                                                                            | No                         |
+| Additive changes | As in [schema planning](entity-tables.md#schema-planning)                                                                                                                                                                                                            | No                         |
 
 - **Fill.** A `fill` on a missing column adds it as nullable before the `UPDATE`, and the additive
   step afterwards adds `NOT NULL` for a required field. The `UPDATE` counts the rows it left `null`,

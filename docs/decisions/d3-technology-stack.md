@@ -21,4 +21,4 @@ layer and the SPA all build on it.
 
 - Storage and engine behaviour is tested on real PostgreSQL, so those tests need Docker.
 - The generated tables stay out of EF Core, so Axis plans their schema changes itself, see
-  [storage](../reference/storage.md#schema-planning).
+  [storage](../reference/entity-tables.md#schema-planning).

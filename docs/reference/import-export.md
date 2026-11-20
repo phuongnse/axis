@@ -75,7 +75,7 @@ and hidden fields as the route it mirrors.
 - **Audit.** Each export writes `records.exported` after the file is complete and before it is
   sent, in a transaction of its own, and the audit record holds no value. An export that fails
   writes no audit record and sends no file. See
-  [audit records](storage.md#audit-records-and-sequence-counters).
+  [audit records](audit-records-and-sequence-counters.md#audit-records-and-sequence-counters).
 
 ## Import
 

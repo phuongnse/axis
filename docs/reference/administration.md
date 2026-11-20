@@ -382,7 +382,7 @@ It uses the same compile diagnostics, extension packages, modules, recompute lim
    `Activation:InlineRecomputeLimit` rows, with `CREATE INDEX CONCURRENTLY`. An index that PostgreSQL
    marks invalid, for example after a cancelled build, is dropped and built again. The step holds the
    tenant's schema lock while it builds, so other activations of the tenant wait. See
-   [schema planning](storage.md#schema-planning).
+   [schema planning](entity-tables.md#schema-planning).
 
 Steps 2, 3 and 5 run as the tenant's schema role, and step 4 as its runtime role. The tool runs no EF
 Core migrations. Each step writes one `ok` line. Each error diagnostic of a failed step is written as

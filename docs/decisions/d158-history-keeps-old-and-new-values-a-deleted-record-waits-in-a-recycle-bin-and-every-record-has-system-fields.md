@@ -44,7 +44,7 @@ transaction as the change. Event sourcing was weighed and not taken, for the rea
   dropping its key. Nothing else changes or removes an audit record.
 
 The detail is in [history](../reference/record-audit.md#audit-records-and-history),
-[audit records](../reference/storage.md#audit-records-and-sequence-counters) and the
+[audit records](../reference/audit-records-and-sequence-counters.md#audit-records-and-sequence-counters) and the
 [record API](../reference/record-api.md).
 
 ## Consequences

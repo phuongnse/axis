@@ -281,7 +281,7 @@ tenant database and not in a resource file. Today there is one, [auto-accept](ai
   holds. A `PATCH` that adds `autoAccept` to the manifest leaves the answer as it was.
 - **Kept and audited.** The setting is kept by the manifest's `id`, and each real change is audited, see
   [system tables](storage.md#system-tables) and
-  [audit actions](storage.md#audit-actions). A `PUT` that sets the value it already has writes nothing.
+  [audit actions](audit-records-and-sequence-counters.md#audit-actions). A `PUT` that sets the value it already has writes nothing.
 
 ## References
 

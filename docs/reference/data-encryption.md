@@ -170,7 +170,7 @@ the plain values, under the same grants as the record API.
 ## Changing the flag
 
 Adding or removing `sensitive` on a field that already has a column is a schema change that activation applies in its
-transaction, as [schema planning](storage.md#schema-planning) describes for other changes. A sensitive field's column
+transaction, as [schema planning](entity-tables.md#schema-planning) describes for other changes. A sensitive field's column
 is `bytea`, in a new table and in a new column, whatever the field's type.
 
 - **Marked `sensitive`.** Activation adds a `bytea` column, writes each row's encrypted value into it, drops the plain
@@ -201,7 +201,7 @@ is `bytea`, in a new table and in a new column, whatever the field's type.
   goes the planner cannot see a type change. The cast of each decrypted value fails the activation when it does not
   fit, and converts a value that does. Change the type in a release of its own.
 - **A required field.** A field that becomes `required` during the change follows the rules of
-  [schema planning](storage.md#schema-planning): the column must already be `NOT NULL`.
+  [schema planning](entity-tables.md#schema-planning): the column must already be `NOT NULL`.
 - **Limits.** The rewrite runs inline in the activation transaction with no row limit, so a large table stays locked
   for as long as the encryption takes. Process instances pinned to an older release are not checked, so one that reads
   the field after the change fails with a type error. Values that record history or exports already hold in plain text

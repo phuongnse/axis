@@ -52,7 +52,7 @@ goes live through [`Axis.Admin activate`](administration.md#activate) or the
   with more rows to a concurrent build.
 - **Indexes.** After a folder is activated and seeded in a tenant, the step builds the non-unique
   indexes that activation left out of large tables, over the tenant's schema connection, see
-  [schema planning](storage.md#schema-planning). It runs before the server listens, so readiness
+  [schema planning](entity-tables.md#schema-planning). It runs before the server listens, so readiness
   turns healthy only after the build. A failed build stops the start, and the next start builds the
   index again.
 - **Database roles.** Migrations, compiling, storing and activating use `SchemaConnectionString`.

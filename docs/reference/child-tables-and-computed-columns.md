@@ -1,13 +1,14 @@
 # Child collections in storage
 
 This page says how a `child-collection` field and a computed field are stored. The physical names,
-the column types, the database roles and the schema planning are in [storage](storage.md).
+the column types and the schema planning are in [entity tables and schema planning](entity-tables.md),
+and the database roles are in [storage](storage.md).
 
 ## Child tables and computed columns
 
 A child entity has a table of its own whose rows belong to one owner record, and a computed field
 is an ordinary column that Axis writes. How activation creates and checks child tables is in
-[schema planning](storage.md#schema-planning).
+[schema planning](entity-tables.md#schema-planning).
 
 - **Child table.** The entity that a `child-collection` field names has a table with the usual
   names. Besides `id` (`uuid`) and its field columns, it has two system columns:

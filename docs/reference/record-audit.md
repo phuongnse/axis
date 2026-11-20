@@ -204,7 +204,7 @@ changes or removes an audit record.
   never dropped, because one key protects every value of the tenant, see
   [tenant keys](data-encryption.md#tenant-keys).
 - **Storage.** The append-only triggers let this path through and nothing else, see
-  [audit records](storage.md#audit-records).
+  [audit records](audit-records-and-sequence-counters.md#audit-records).
 
 ## The tenant's audit
 
@@ -229,7 +229,7 @@ a tenant cannot reach, so they are not in it. The [audit page](platform-pages.md
   [filter](record-api.md#paging-and-sorting). It may name `actor`, `applicationId`, `entityId`,
   `recordId`, `action` and `occurredAt`, which finds records by person, application, entity, record,
   action and time. Any other name is a `400` keyed `filter`. An index serves the search, see
-  [audit records](storage.md#audit-records).
+  [audit records](audit-records-and-sequence-counters.md#audit-records).
 - **Items.** An item is as in [the history route](#the-history-route), with `applicationId`,
   `entityId` and `recordId`, and with no `inspectPath`. Its `details` follow
   [values in history](#values-in-history): a value shows only when the administrator may read its
