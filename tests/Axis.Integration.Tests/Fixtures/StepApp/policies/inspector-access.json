@@ -13,6 +13,9 @@
     { "name": "divideInspect", "process": "Divide", "actions": ["inspect"] },
     { "name": "departmentOrderInspect", "process": "DepartmentOrder", "actions": ["inspect"] },
     { "name": "timerWaitInspect", "process": "TimerWait", "actions": ["inspect"] },
-    { "name": "waitEventInspect", "process": "WaitEvent", "actions": ["inspect"] }
+    { "name": "waitEventInspect", "process": "WaitEvent", "actions": ["inspect"] },
+    { "name": "announceInspect", "process": "Announce", "actions": ["inspect"] },
+    { "name": "notifyInspect", "process": "Notify", "actions": ["inspect"] },
+    { "name": "notifyByEmailInspect", "process": "NotifyByEmail", "actions": ["inspect"] }
   ]
 }

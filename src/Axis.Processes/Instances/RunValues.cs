@@ -68,6 +68,36 @@ internal static class RunValues
         return result;
     }
 
+    /// <summary>
+    /// The recipients a <c>notify</c> step reached, as <c>{ "kind", "recipient", "value" }</c> in the order the step lists them.
+    /// <c>recipient</c> is the position in the step's <c>to</c> list. A user or role always has its <c>value</c>. An email address has
+    /// its <c>value</c> only when the expression's fields can be told in <paramref name="entity"/> and none is sensitive in
+    /// <paramref name="pinned"/>, so no sensitive address is stored and an address that cannot be checked is not stored either.
+    /// </summary>
+    public static JsonArray Notified(ApplicationModel pinned, EntityModel? entity, NotifyStepModel step, NewNotification notification)
+    {
+        var result = new JsonArray();
+        foreach (var recipient in notification.To)
+        {
+            var entry = new JsonObject { ["kind"] = recipient.Kind, ["recipient"] = recipient.Index };
+            if (recipient.Kind != ProcessNotifications.EmailRecipient || AddressKept(pinned, entity, step.Recipients[recipient.Index].Email!))
+            {
+                entry["value"] = recipient.Value;
+            }
+
+            result.Add(entry);
+        }
+
+        return result;
+    }
+
+    private static bool AddressKept(ApplicationModel pinned, EntityModel? entity, ExpressionModel expression) =>
+        entity is not null
+        && MappingFields.Collect(pinned, entity, expression) is { } fields
+        && !fields.Any(mapped => pinned.FindEntity(mapped.EntityId) is { } owner
+            && owner.TryGetField(mapped.Field, out var field)
+            && ProcessResults.IsSensitive(pinned, field));
+
     // A file field holds the file's name, which history never stores, see docs/reference/file-fields.md#storage-and-clean-up.
     private static bool KeepsValue(ApplicationModel pinned, FieldModel field) =>
         field.Type != FieldType.File && !ProcessResults.IsSensitive(pinned, field);

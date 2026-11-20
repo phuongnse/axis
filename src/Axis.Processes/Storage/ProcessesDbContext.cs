@@ -121,6 +121,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             history.Property(h => h.Problem).HasColumnName("problem").HasColumnType("jsonb");
             history.Property(h => h.Read).HasColumnName("read").HasColumnType("jsonb");
             history.Property(h => h.Changes).HasColumnName("changes").HasColumnType("jsonb");
+            history.Property(h => h.Notified).HasColumnName("notified").HasColumnType("jsonb");
             history.Property(h => h.StartedAt).HasColumnName("started_at");
             history.Property(h => h.FinishedAt).HasColumnName("finished_at");
             history.Property(h => h.TraceId).HasColumnName("trace_id");

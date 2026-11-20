@@ -54,6 +54,14 @@ public sealed class ProcessStepHistoryRow
     /// </summary>
     public string? Changes { get; init; }
 
+    /// <summary>
+    /// The recipients a <c>notify</c> step reached, as JSON text: <c>kind</c>, <c>recipient</c> and <c>value</c> per recipient, in the order
+    /// the step lists them. An email address that the pinned release marks sensitive, or that cannot be checked, holds no <c>value</c>.
+    /// <see langword="null"/> for other steps and for rows written before the column. Inspection shows it only under the masking rule,
+    /// see docs/reference/process-tables.md#step-history. It is never copied to <see cref="Output"/>, audit records or logs.
+    /// </summary>
+    public string? Notified { get; init; }
+
     public required DateTimeOffset StartedAt { get; init; }
 
     public required DateTimeOffset FinishedAt { get; init; }

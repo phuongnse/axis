@@ -20,15 +20,27 @@ import {
   type OnConnectEnd,
   Position,
   ReactFlow,
+  ReactFlowProvider,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Tooltip } from 'antd'
-import { type ComponentType, type CSSProperties, type KeyboardEvent, type ReactNode, useMemo, useRef } from 'react'
+import { ConfigProvider, Tooltip } from 'antd'
+import {
+  type ComponentType,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { type RunState, stepTypeText } from './inspection'
+import { ProcessGraphControls } from './ProcessGraphControls'
 import { type GraphPoint, roundedPath, routeBetween, useGraphLayout } from './processLayout'
 import { StateBadge } from './StateBadge'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
+import { useGraphMoves } from './useGraphMoves'
 
 /** The width of every card, in px. */
 export const cardWidth = 200
@@ -178,7 +190,9 @@ function StepCard({ data }: NodeProps<StepNode>) {
   const testId = `${testIdPrefix}-node-${step.id}`
   const name = step.name ?? step.label
   return (
-    <div style={{ position: 'relative', width: cardWidth, height: cardHeight }}>
+    // React Flow gives a node no pointer events when it has no click handler of its own, and the card is the target of a
+    // click and of the end of a drag from a handle, so it takes them itself.
+    <div style={{ position: 'relative', width: cardWidth, height: cardHeight, pointerEvents: 'all' }}>
       <Handle type="target" position={Position.Left} isConnectable={false} style={anchorStyle} aria-hidden />
       {onChoose ? (
         <button
@@ -306,26 +320,27 @@ const edgeTestIdPrefix = 'rf__edge-'
  * it onto another step calls `onConnect` with the two ids and the release point, relative to the canvas. No other step
  * has a handle. `transitionExtra` gives the content at the middle of a transition's route. A card is named by the test
  * id `{testIdPrefix}-node-{id}` and its handle by `{testIdPrefix}-handle-{id}`.
+ *
+ * `ProcessGraphControls` draws the graph's controls, Find a step and overview, see its own doc. `current` is the step an
+ * instance is at, which Go to the current step moves to, so that button shows only with `runStates` and `current`.
+ * While the focus is inside the graph, + and - zoom, 0 shows the whole process and F goes full screen, unless the focus
+ * is in a text field. The graph takes the focus when clicked, and is no Tab stop.
  */
-export function ProcessGraphCanvas({
-  steps,
-  transitions,
-  label,
-  chosen,
-  onChoose,
-  runStates,
-  taken,
-  chosenTransition,
-  onChooseTransition,
-  onConnect,
-  transitionExtra,
-  testIdPrefix = 'process-graph',
-}: {
+export function ProcessGraphCanvas(props: ProcessGraphProps) {
+  return (
+    <ReactFlowProvider>
+      <Canvas {...props} />
+    </ReactFlowProvider>
+  )
+}
+
+interface ProcessGraphProps {
   steps: GraphStep[]
   transitions: GraphTransition[]
   label: string
   chosen?: string
   onChoose?: (id: string) => void
+  current?: string
   runStates?: ReadonlyMap<string, RunState>
   taken?: ReadonlySet<string>
   chosenTransition?: string
@@ -333,7 +348,49 @@ export function ProcessGraphCanvas({
   onConnect?: (source: string, target: string, point: GraphPoint) => void
   transitionExtra?: (id: string) => ReactNode
   testIdPrefix?: string
-}) {
+}
+
+/** The text field a key is typed into, where the graph's keys do nothing. */
+function isTextField(target: EventTarget): boolean {
+  return target instanceof Element && target.closest('input, textarea, [contenteditable]') !== null
+}
+
+type KeyMove = 'zoomIn' | 'zoomOut' | 'showAll' | 'fullScreen'
+
+/** The move a key makes: + and - zoom, 0 shows the whole process and F goes full screen. */
+function keyMove(key: string): KeyMove | undefined {
+  switch (key) {
+    case '+':
+    case '=':
+      return 'zoomIn'
+    case '-':
+    case '\u2212':
+      return 'zoomOut'
+    case '0':
+      return 'showAll'
+    case 'f':
+    case 'F':
+      return 'fullScreen'
+    default:
+      return undefined
+  }
+}
+
+function Canvas({
+  steps,
+  transitions,
+  label,
+  chosen,
+  onChoose,
+  current,
+  runStates,
+  taken,
+  chosenTransition,
+  onChooseTransition,
+  onConnect,
+  transitionExtra,
+  testIdPrefix = 'process-graph',
+}: ProcessGraphProps) {
   const { mode } = useThemeMode()
   const section = useRef<HTMLElement>(null)
   const { colour } = useDesignTokens()
@@ -342,6 +399,23 @@ export function ProcessGraphCanvas({
     edges: transitions.map(({ id, source, target }) => ({ id, source, target })),
   })
   const instance = runStates !== undefined
+  const moves = useGraphMoves()
+  const [fullScreen, setFullScreen] = useState(false)
+
+  useEffect(() => {
+    const sync = () => setFullScreen(document.fullscreenElement === section.current)
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
+
+  const toggleFullScreen = () => {
+    // A browser may refuse full screen, which leaves the graph as it is.
+    const request =
+      document.fullscreenElement === section.current
+        ? document.exitFullscreen?.()
+        : section.current?.requestFullscreen?.()
+    Promise.resolve(request).catch(() => {})
+  }
 
   const flow = useMemo(() => {
     if (layout === null) {
@@ -453,15 +527,27 @@ export function ProcessGraphCanvas({
   // React Flow does not act on a key pressed on an edge while its elements are not selectable, so Enter and Space on a
   // focused transition choose it here.
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (onChooseTransition === undefined || (event.key !== 'Enter' && event.key !== ' ')) {
+    if (onChooseTransition !== undefined && (event.key === 'Enter' || event.key === ' ')) {
+      const element =
+        event.target instanceof Element ? event.target.closest(`[data-testid^="${edgeTestIdPrefix}"]`) : null
+      const id = element?.getAttribute('data-testid')?.slice(edgeTestIdPrefix.length)
+      if (id !== undefined && transitions.some((transition) => transition.id === id)) {
+        event.preventDefault()
+        onChooseTransition(id)
+      }
       return
     }
-    const element =
-      event.target instanceof Element ? event.target.closest(`[data-testid^="${edgeTestIdPrefix}"]`) : null
-    const id = element?.getAttribute('data-testid')?.slice(edgeTestIdPrefix.length)
-    if (id !== undefined && transitions.some((transition) => transition.id === id)) {
+    if (event.ctrlKey || event.metaKey || event.altKey || isTextField(event.target)) {
+      return
+    }
+    const move = keyMove(event.key)
+    if (move !== undefined) {
       event.preventDefault()
-      onChooseTransition(id)
+      if (move === 'fullScreen') {
+        toggleFullScreen()
+      } else {
+        moves[move]()
+      }
     }
   }
 
@@ -469,32 +555,47 @@ export function ProcessGraphCanvas({
     <section
       ref={section}
       aria-label={label}
-      style={{ width: '100%', height: '100%', position: 'relative' }}
+      tabIndex={-1}
+      style={{ width: '100%', height: '100%', position: 'relative', outline: 'none' }}
       onKeyDown={onKeyDown}
     >
-      {flow && (
-        <ReactFlow
-          nodes={flow.nodes}
-          edges={flow.edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          colorMode={mode}
-          fitView
-          fitViewOptions={{ maxZoom: 1 }}
-          minZoom={0.1}
-          maxZoom={1}
-          proOptions={{ hideAttribution: true }}
-          style={{ background: colour.fillSubtle }}
-          nodesDraggable={false}
-          nodesConnectable={onConnect !== undefined}
-          nodesFocusable={false}
-          elementsSelectable={false}
-          edgesFocusable={onChooseTransition !== undefined}
-          zoomOnScroll={false}
-          onConnectEnd={onConnect ? connectEnd : undefined}
-          onEdgeClick={onChooseTransition ? (_, edge) => onChooseTransition(edge.id) : undefined}
-        />
-      )}
+      {/* Pop-ups open inside the section, because only it is shown in full screen. */}
+      <ConfigProvider getPopupContainer={() => section.current ?? document.body}>
+        {flow && (
+          <ReactFlow
+            nodes={flow.nodes}
+            edges={flow.edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            colorMode={mode}
+            fitView
+            fitViewOptions={{ maxZoom: 1 }}
+            minZoom={0.1}
+            maxZoom={1}
+            proOptions={{ hideAttribution: true }}
+            style={{ background: colour.fillSubtle }}
+            nodesDraggable={false}
+            nodesConnectable={onConnect !== undefined}
+            nodesFocusable={false}
+            elementsSelectable={false}
+            edgesFocusable={onChooseTransition !== undefined}
+            zoomOnScroll={false}
+            onConnectEnd={onConnect ? connectEnd : undefined}
+            onEdgeClick={onChooseTransition ? (_, edge) => onChooseTransition(edge.id) : undefined}
+          >
+            <ProcessGraphControls
+              steps={steps}
+              cardWidth={cardWidth}
+              chosen={chosen}
+              onChoose={onChoose}
+              current={current}
+              runStates={runStates}
+              fullScreen={fullScreen}
+              onFullScreen={toggleFullScreen}
+            />
+          </ReactFlow>
+        )}
+      </ConfigProvider>
     </section>
   )
 }

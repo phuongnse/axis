@@ -13,7 +13,7 @@ Each kind of content has one home. Write a fact in its home and link to it from 
 
 | Content                                                        | Home                                                                                                                  |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| What Axis is, who it serves, the proving samples               | [Product brief](product-brief.md)                                                                                     |
+| What Axis is, who it is designed for, the proving samples      | [Product brief](product-brief.md)                                                                                     |
 | The vocabulary                                                 | [Concepts](domain/concepts.md)                                                                                        |
 | How the parts fit together, and the pitfalls the design avoids | [Architecture](architecture.md) and [Knowledge](domain/knowledge.md)                                                  |
 | A first walk through the platform for a newcomer               | [How Axis works](how-axis-works.md)                                                                                   |

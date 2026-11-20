@@ -8,7 +8,8 @@ A flag named `sensitive` that encrypts nothing invites authors to believe their 
 Disk encryption helps only against a stolen disk, not a leaked database login, a dump or a replica.
 A backup holds a whole tenant and leaves the installation. Audit records are kept forever, so a name
 or a full address in them conflicts with a person's right to have their data removed. The law of
-Axis's first customers protects sensitive personal data more strongly than basic personal data.
+Vietnam, where Axis is designed to be used first, protects sensitive personal data more strongly than
+basic personal data.
 
 ## Decision
 

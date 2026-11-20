@@ -8,6 +8,13 @@ in, the steps work goes through, the rules it must follow and who may do what. A
 description, publishes it and runs it. Nobody writes code, builds or deploys anything, and every
 change is a new version that you can go back from.
 
+## Start with Axis
+
+A business can run Axis on its own machine or server, and start from the sample applications. These
+are complete business applications built only as configuration. [Try it](#try-it) shows how to start
+them on your own computer, the [installation guide](docs/reference/installation.md) covers real use,
+and the [roadmap](docs/roadmap.md) says what comes next.
+
 ## Who it is for
 
 Every business runs work that no off-the-shelf product fits exactly: a request that needs two
@@ -55,9 +62,6 @@ flowchart LR
 - **Code where it is needed.** A developer adds what configuration cannot express as a tested
   extension package, without touching the platform.
 
-Coming next, as the [roadmap](docs/roadmap.md) shows: Axis as a service with sign-up and a trial,
-plans and online payment, and changes to an application described in words to an AI.
-
 ## Try it
 
 You need Docker, the .NET 10 SDK and Node.js.
@@ -98,6 +102,6 @@ Built with C# on .NET 10 and ASP.NET Core, React with TypeScript and Ant Design,
 ## Licence
 
 Axis is under the [GNU Affero General Public License, version 3 only](LICENSE). The extension
-contract in `src/Axis.Extensions` and everything under `samples/` are under the MIT licence. A
-commercial licence is available for those who cannot use the AGPL, see
-[D120](docs/decisions/d120-axis-is-agpl-licensed-with-a-commercial-licence.md).
+contract in `src/Axis.Extensions` and everything under `samples/` are under the MIT licence. The
+reasons are in
+[D165](docs/decisions/d165-axis-is-under-the-agpl-and-mit-licences-only-with-no-commercial-licence.md).

@@ -2,9 +2,9 @@
 
 _(planned for M34)_
 
-Axis issues a Vietnamese electronic invoice for each payment it takes in Vietnam. This page covers
-when an e-invoice is issued, the provider adapter, what an e-invoice holds and what happens after it
-is issued. A payment abroad gets Paddle's invoice instead, see
+The control plane issues a Vietnamese electronic invoice for each payment the operator takes in
+Vietnam. This page covers when an e-invoice is issued, the provider adapter, what an e-invoice holds
+and what happens after it is issued. A payment abroad gets Paddle's invoice instead, see
 [paying abroad](payments.md#paying-abroad).
 
 ## When
@@ -22,11 +22,11 @@ An e-invoice is issued once a payment is confirmed, never before.
 The control plane reaches the e-invoice provider through an adapter, so the provider can change.
 
 - **Any provider.** The control plane calls the e-invoice provider through an adapter: issue, read
-  the status, and adjust or replace an issued invoice. The provider is the one Axis's accountant
-  uses, such as VNPT, Viettel or MISA, and is chosen before the first payment is taken. A new
+  the status, and adjust or replace an issued invoice. The provider is the one the operator's
+  accountant uses, such as VNPT, Viettel or MISA, and is chosen before the first payment is taken. A new
   provider is a new adapter.
-- **Settings.** The provider's address, Axis's tax code, the invoice template and series, and the
-  VAT rate are settings of the control plane, which the accountant confirms. The credentials are
+- **Settings.** The provider's address, the operator's tax code, the invoice template and series, and the
+  VAT rate are settings of the control plane, which the operator's accountant confirms. The credentials are
   Kubernetes Secrets.
 
 ## What it holds

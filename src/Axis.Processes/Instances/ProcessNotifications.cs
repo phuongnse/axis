@@ -27,6 +27,9 @@ internal static class ProcessNotifications
     /// <summary>The in-app channel, the only one that stores a notification yet.</summary>
     internal const string InAppChannel = "inApp";
 
+    /// <summary>The kind of an entry of <see cref="NewNotification.To"/> that is one email address.</summary>
+    internal const string EmailRecipient = "email";
+
     /// <summary>The email channel. A <c>notify</c> step and a task escalation stage emails for it in the email outbox.</summary>
     internal const string EmailChannel = "email";
 
@@ -54,6 +57,7 @@ internal static class ProcessNotifications
     {
         var recipients = new List<(string Kind, string Recipient)>();
         var addresses = new List<string>();
+        var to = new List<NotifiedRecipient>();
         for (var index = 0; index < notification.Recipients.Count; index++)
         {
             var recipient = notification.Recipients[index];
@@ -68,11 +72,13 @@ internal static class ProcessNotifications
                 if (result.Value is string id && !string.IsNullOrWhiteSpace(id))
                 {
                     recipients.Add((UserRecipient, id));
+                    AddTo(to, UserRecipient, id, index);
                 }
             }
             else if (recipient.Role is { } role)
             {
                 recipients.Add((RoleRecipient, role));
+                AddTo(to, RoleRecipient, role, index);
             }
             else if (recipient.Email is { } email && notification.Channels.Contains(EmailChannel, StringComparer.Ordinal))
             {
@@ -85,6 +91,7 @@ internal static class ProcessNotifications
                 if (result.Value is string address && !string.IsNullOrWhiteSpace(address))
                 {
                     addresses.Add(address);
+                    to.Add(new NotifiedRecipient(EmailRecipient, address, index));
                 }
             }
         }
@@ -133,7 +140,17 @@ internal static class ProcessNotifications
             notification.Open?.Page.Name,
             openParameters,
             [.. recipients.Distinct()],
-            addresses);
+            addresses,
+            to);
+    }
+
+    // A user or role that an earlier recipient already named is listed once, as Recipients lists it.
+    private static void AddTo(List<NotifiedRecipient> to, string kind, string value, int index)
+    {
+        if (!to.Any(entry => entry.Kind == kind && entry.Value == value))
+        {
+            to.Add(new NotifiedRecipient(kind, value, index));
+        }
     }
 
     /// <summary>Whether <paramref name="notification"/> has a row to store: it has a recipient and goes out on the in-app channel. The email channel has its own outbox rows.</summary>
@@ -231,6 +248,7 @@ internal static class ProcessNotifications
 /// <param name="OpenParameters">The raw evaluated page parameters, keyed by the parameters' declared names, or null when there is no page.</param>
 /// <param name="Recipients">The distinct user and role recipients, each by kind and by user id or role name.</param>
 /// <param name="EmailAddresses">The addresses the <c>email</c> recipients gave, in order. It is empty unless the step has the <c>email</c> channel.</param>
+/// <param name="To">Every recipient the step reached in the order the step lists them, whatever the channel, for the step history's <c>notified</c> column.</param>
 internal sealed record NewNotification(
     Guid Id,
     Guid ApplicationId,
@@ -242,4 +260,11 @@ internal sealed record NewNotification(
     string? OpenPage,
     JsonObject? OpenParameters,
     IReadOnlyList<(string Kind, string Recipient)> Recipients,
-    IReadOnlyList<string> EmailAddresses);
+    IReadOnlyList<string> EmailAddresses,
+    IReadOnlyList<NotifiedRecipient> To);
+
+/// <summary>A recipient a notification reached: a user id, a role name or an email address.</summary>
+/// <param name="Kind"><c>user</c>, <c>role</c> or <c>email</c>.</param>
+/// <param name="Value">The user id, the role name or the address.</param>
+/// <param name="Index">The position of the recipient in the step's <c>to</c> list, which names its expression.</param>
+internal sealed record NotifiedRecipient(string Kind, string Value, int Index);

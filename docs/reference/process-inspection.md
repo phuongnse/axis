@@ -276,8 +276,10 @@ in any state. The body has these parts:
   claimed it, else `null`, and `completedById`, the id of the person who completed it, else `null`.
   `assignee` and `completedBy` hold a person's name, or the user id when that person has no profile,
   and a role assignee keeps its role's name.
-- **Runs.** Each `path` entry has `read` and `made`. The engine stores their values with the run, in the
-  `read` and `changes` columns of the step history, see [process tables](process-tables.md#step-history).
+- **Runs.** Each `path` entry has `read` and `made`. The engine stores the values of `read`, of `made.changes` and
+  of `made.notified`'s recipients with the run, in the `read`, `changes` and `notified` columns of the step history,
+  see [process tables](process-tables.md#step-history). The event and the created record are read from what the
+  run already keeps.
   - `read` is `[{ "name", "value", "hidden" }]` for a decision run: the subject fields that the conditions of its
     branches name, in the entity's field order, with the values the run saw. A reference path such as
     `department.name` gives the `department` entry, whose value is the referenced record's id, and a child
@@ -292,9 +294,20 @@ in any state. The body has these parts:
     computed field that the write recomputed counts. It is `[]` when no field differed, and `null` for a run
     that writes no subject field, such as a task completed without values, a call with no outputs or a call
     resolved as failed, and for a row stored before the engine kept it.
-- **Runs, event, notification and created record.** _(planned)_ `made.event` is `{ "name", "fields" }` for a
-  `raiseEvent` run, `made.notified` is `{ "to", "channels", "subject" }` for a `notify` run, and `made.created` is
-  `{ "entity", "id" }` for a `createRecord` run. Until then, each is `null`.
+  - `made.event` is `{ "name", "fields" }` for a `raiseEvent` run. `name` is the event's name and `fields` is
+    `[{ "name", "value", "hidden" }]`, one for each payload field of the step in the event's declaration order. They
+    are read from the stored occurrence that the history output's `eventId` names. It is `null` for a run that
+    raised no event.
+  - `made.notified` is `{ "to", "channels", "subject" }` for a `notify` run. `channels` and `subject`, the subject's
+    text key, are the pinned step's. `to` is `[{ "kind", "name", "id", "hidden" }]`, one for each recipient the run
+    reached, in the order the step lists them, whatever the channels, so an email-only run lists them too. A `user`
+    has `name`, the person's name or the user id when they have no profile, and `id`, the user id. A `role` has
+    `name`, the role's name, and `id` `null`. An `email` has `name`, the address, and `id` `null`. A user or role
+    that two recipients give is listed once, and a recipient that gives no text is not listed. It is `null` for a
+    run that is no `notify` and for a `notify` row stored before the engine kept its recipients.
+  - `made.created` is `{ "entity", "id" }` for a `createRecord` run: the name of the step's entity and the id
+    that the history output's `recordId` gives. It holds no field value, so no rule hides it, and opening the record
+    still follows the record API's own checks. It is `null` for a run that created no record.
 - **Calls.** A connector call has `request`, `{ "method", "url", "query", "headers", "body", "truncated" }`,
   the request of its last attempt that sent one. `url` is the base URL and the path, with no query string,
   and `query` and `headers` are objects that map each name to its text. `body` is text, or `null` when the
@@ -441,7 +454,7 @@ same for every user who may inspect the instance. `subjectLabel`, `studio`, a ca
 **Values by user.** A call's `request`, `response` and `returned` differ between users too, as the masking
 rule hides them.
 
-**Run values by user.** The values that the masking rule hides in a run differ between users as well, each over its own field.
+**Run values by user.** The values that the masking rule hides in a run differ between users as well. A run's `read` and `made.changes` are hidden each over its own field, and the fields of `made.event` and the addresses of `made.notified` over the fields their expression reads.
 
 **Paths and variables.** _(planned for M38)_ The `variables`, and the `commands` of each path and task,
 differ between users too. The rest of `paths` and `tasks` is the same for every user.
@@ -450,8 +463,9 @@ differ between users too. The rest of `paths` and `tasks` is the same for every 
 
 Inspection shows a stored field value only where this section says it does. The history's
 `input` and `output` hold only ids, versions, step names and outcomes, and a
-task row holds none, so they need no masking. The history's `read` and `changes` do hold field values, and
-the Kept run values bullet below masks them. A call's `input` is the
+task row holds none, so they need no masking. The history's `read`, `changes` and `notified` do hold field values. The Kept run values bullet below masks
+`read` and `made.changes`, and the Event fields and addresses bullet masks `notified`. A raised event's payload holds field values too, and
+the Event fields and addresses bullet masks it. A call's `input` is the
 evaluated input that the call sent, so it holds field values.
 
 - **The hiding rule.** A call's `input` is shown only when the user may read
@@ -526,6 +540,15 @@ evaluated input that the call sent, so it holds field values.
   value, so no row keeps it, see [process tables](process-tables.md#step-history). A field that only a later release
   marks sensitive was stored in clear, and inspection hides it when the detail is read. No kept run value is
   copied to history output, audit records or logs.
+- **Event fields and addresses.** A field of `made.event` and an email address of `made.notified` are hidden over
+  the fields that their expression reads, as a call's `input` is, and not field by field, because one value can
+  depend on several fields, such as `amount / divisor`. A value is hidden when the instance has no subject, when
+  the user may not read every one of those fields on the subject entity, when one of them is sensitive in the
+  pinned or the active release, or when the active release no longer has one. A hidden value is `null` with
+  `hidden` `true`, and the other fields of the same event stay shown. An address that the pinned release's
+  sensitive field gives is stored with no value, so it is hidden for everyone, and so is an address that the
+  engine could not check when it ran, such as one in a process without a subject. A user's id and a role's name are
+  shown, as a task's assignee is.
 - **Variables.** _(planned for M38)_ A variable's `value` is shown only when the user may read every field
   that each expression setting the variable reads. Those expressions are the `set` entries of each
   `setVariables` step that sets it, and the `gather.value` of each repeat that gathers into it, both from

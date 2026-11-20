@@ -10,8 +10,8 @@ An organization sets the addresses of its own policies, and Axis shows them wher
 in or work.
 
 - **The organization owns its policies.** A privacy policy and terms of service are the organization's, because it
-  decides what it collects about its people and on what terms. In Axis SaaS the organization is the controller and Axis
-  the processor. Axis writes no
+  decides what it collects about its people and on what terms. In Axis SaaS the organization is the controller and the operator
+  is the processor. Axis writes no
   policy text and ships no default one: it only links what the organization publishes.
 - **Set per tenant, with a site override.** A tenant sets the `https` addresses of its privacy policy and its terms,
   and the version of its terms. A site may set its own two addresses, which replace the tenant's on that site's legal

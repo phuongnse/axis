@@ -1,9 +1,9 @@
 # Plans
 
-A plan is what a tenant of Axis SaaS pays for: a price for the whole tenant and the quotas it sets.
-This page covers the catalogue of plans, how a plan becomes the tenant's quotas, add-ons, and
-changing a plan. The prices are set from what the [cell load test](performance.md#cell-load-test)
-and the first cell measure.
+A plan is what a tenant of Axis SaaS pays its operator for: a price for the whole tenant and the quotas
+it sets. This page covers the catalogue of plans, how a plan becomes the tenant's quotas, add-ons, and
+changing a plan. The operator sets the prices from what the [cell load test](performance.md#cell-load-test)
+and a running cell measure.
 
 ## The catalogue
 
@@ -40,9 +40,9 @@ The numbers above show the shape only. They are not prices.
   `quotas` of [tenant quotas](tenant-quotas.md#quotas) except `users`, `prices` and `addOns`.
 - **One price for the tenant.** A price is for the whole tenant, with `includedUsers` in it, not a
   price for each user.
-- **What a price covers.** A plan's lowest price covers its share of a cell's fixed cost, counted with
-  the cell 60% full of paying tenants, the cost of its quotas, the payment and invoice fees, time for
-  support, and a margin.
+- **What a price covers.** An operator's lowest price for a plan should cover its share of a cell's fixed
+  cost, counted with the cell 60% full of paying tenants, the cost of its quotas, the payment and invoice
+  fees, time for support, and the operator's margin. Axis does not set the price.
 - **Money in minor units.** Every amount is an integer in the currency's smallest unit: dong for
   `VND`, cents for `USD`. No amount is a decimal or a float.
 - **A year costs ten months.** A plan gives only monthly prices. A yearly period costs 10 times the

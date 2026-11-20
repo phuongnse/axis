@@ -6,7 +6,7 @@ Status: **Agreed**
 
 D119 and D125 let an agent change an application inside Axis, on a draft that a person or an allowed
 agent accepts. In Axis SaaS a plan includes a number of requests, counted as a quota, and the
-installation's key pays the model provider. Axis then carries the model cost, and must price and limit
+installation's key pays the model provider. The operator then carries the model cost, and must price and limit
 each tenant's use of a model it does not own.
 [D149](d149-a-persons-secrets-are-sealed-for-the-host-that-uses-them-and-every-secret-rests-on-a-key-service.md)
 lets a person seal their own AI key for the one host that uses it, so each author's key can pay for that
@@ -86,7 +86,7 @@ These parts change:
 
 _(planned for M35)_
 
-- Each author pays for their own AI use, and Axis carries no model cost and no request quota.
+- Each author pays for their own AI use, and the operator carries no model cost and no request quota.
 - A person who has no key cannot send an authoring request, and a binding that needs no key, such as a
   model the installation serves itself in a closed network, still runs requests with none.
 - Axis cannot cap an author's spending. The provider's own spending limit does, and Axis advises a key
