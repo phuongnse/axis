@@ -4,7 +4,7 @@ import { Flex, Modal, Select, Tabs, Typography } from 'antd'
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisButton } from '../platform/AxisButton'
+import { AxisButton, AxisButtonGroup } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { CodeBlock } from '../platform/CodeBlock'
 import { EmptyState } from '../platform/EmptyState'
@@ -619,7 +619,8 @@ export default function StudioPackage({
         tags={statusText === null ? undefined : <StatusTag tone="neutral">{statusText}</StatusTag>}
       >
         <PageActions>
-          <Flex gap="small" wrap>
+          {/* Proposed, see #3978: Build, Run tests and Run… are of equal weight, so they are one joined group. */}
+          <AxisButtonGroup nameKey="shell.studio.package.actions">
             <AxisButton
               role="secondary"
               data-testid="package-build"
@@ -650,7 +651,7 @@ export default function StudioPackage({
             >
               {t('shell.studio.package.runOperation')}
             </AxisButton>
-          </Flex>
+          </AxisButtonGroup>
         </PageActions>
         {!developer && (
           <AxisAlert data-testid="studio-package-read-only" kind="info" message={t('shell.studio.package.readOnly')} />

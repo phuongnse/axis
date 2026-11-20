@@ -990,6 +990,7 @@
   "shell.studio.package.quickOpen": "Mở tệp",
   "shell.studio.package.problemAt": "{file} (dòng {line})",
   "shell.studio.package.build": "Biên dịch",
+  "shell.studio.package.actions": "Thao tác với gói",
   "shell.studio.package.runTests": "Chạy kiểm thử",
   "shell.studio.package.runOperation": "Chạy thử…",
   "shell.studio.package.jobFailed": "Chưa gửi được yêu cầu. Hãy thử lại.",

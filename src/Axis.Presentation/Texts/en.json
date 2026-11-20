@@ -990,6 +990,7 @@
   "shell.studio.package.quickOpen": "Open a file",
   "shell.studio.package.problemAt": "{file} (line {line})",
   "shell.studio.package.build": "Build",
+  "shell.studio.package.actions": "Package actions",
   "shell.studio.package.runTests": "Run tests",
   "shell.studio.package.runOperation": "Run…",
   "shell.studio.package.jobFailed": "The request could not be sent. Try again.",

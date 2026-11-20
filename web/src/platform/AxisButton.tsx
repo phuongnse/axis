@@ -382,3 +382,21 @@ export function AxisSplitButton({
     </Space.Compact>
   )
 }
+
+/**
+ * Proposed, see #3978: actions of equal weight as one joined group, as Ant Design joins buttons with Space.Compact,
+ * such as a package's Build, Run tests and Run…, see docs/reference/actions-and-controls.md#buttons. Each button is as
+ * wide as the widest and stays a button of its own, and `nameKey` names the group for assistive technology.
+ */
+export function AxisButtonGroup({ nameKey, children }: { nameKey: string; children: ReactNode }) {
+  const t = useText()
+  return (
+    <Space.Compact
+      role="group"
+      aria-label={t(nameKey)}
+      style={{ display: 'inline-grid', gridAutoFlow: 'column', gridAutoColumns: '1fr' }}
+    >
+      {children}
+    </Space.Compact>
+  )
+}
