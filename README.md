@@ -15,12 +15,6 @@ are complete business applications built only as configuration. [Try it](#try-it
 them on your own computer, the [installation guide](docs/reference/installation.md) covers real use,
 and the [roadmap](docs/roadmap.md) says what comes next.
 
-## Get in touch
-
-A business that has a process it would like to run on Axis can contact the owner of Axis on
-[LinkedIn](https://www.linkedin.com/in/phuongnse). Such a process might be an approval that lives in
-email and spreadsheets.
-
 ## Who it is for
 
 Every business runs work that no off-the-shelf product fits exactly: a request that needs two
