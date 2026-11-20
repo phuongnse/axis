@@ -331,8 +331,8 @@ export interface SplitButtonItem {
 }
 
 /**
- * Proposed, see #3978: the main of three or more small actions of one thing as a button, with the others in a menu on a
- * joined caret button, such as a saved input's Save with Save as… and Delete, see
+ * Proposed, see #3978: the main of three or more actions that manage one thing as a button, with the others in a menu on
+ * a joined caret button, or in a region's title row as an icon with a "…" menu, such as a saved input's Save with Save as… and Delete, see
  * docs/reference/actions-and-controls.md#buttons. `menuNameKey` names the caret button.
  */
 export function AxisSplitButton({
@@ -342,42 +342,51 @@ export function AxisSplitButton({
   onClick,
   menuNameKey,
   items,
-  titleRow = false,
+  titleRow,
   'data-testid': testId,
 }: {
   role?: 'secondary' | 'main'
-  /**
-   * Proposed, see #3978: the button sits in a region's title row, so it is a borderless text button with a borderless
-   * caret beside it, as light as the row's icon actions.
-   */
-  titleRow?: boolean
+  /** The main action's text. A title row's split button shows its icon instead. */
   children: ReactNode
   disabled?: boolean
   onClick: () => void
   menuNameKey: string
   items: readonly SplitButtonItem[]
+  /**
+   * Proposed, see #3978: the button sits in a region's title row, so the main action is an icon button named by
+   * `nameKey` and the others are the entries of a "…" icon menu beside it, as light as the row's other icon actions and
+   * as a code editor's panel titles draw them.
+   */
+  titleRow?: { icon: ReactNode; nameKey: string }
   'data-testid'?: string
 }) {
-  const Group = titleRow ? Flex : Space.Compact
+  const menu = {
+    items: items.map((item) => ({
+      key: item.key,
+      label: item.label,
+      danger: item.destructive,
+      disabled: item.disabled,
+    })),
+    onClick: ({ key }: { key: string }) => items.find((item) => item.key === key)?.onClick(),
+  }
+  if (titleRow) {
+    return (
+      <Flex data-testid={testId} align="center" gap="small">
+        <AxisButton role="icon" nameKey={titleRow.nameKey} icon={titleRow.icon} disabled={disabled} onClick={onClick} />
+        <Dropdown trigger={['click']} menu={menu}>
+          <AxisButton role="icon" nameKey={menuNameKey} icon={<EllipsisOutlined />} />
+        </Dropdown>
+      </Flex>
+    )
+  }
   return (
-    <Group data-testid={testId} align="center">
-      <AxisButton role={titleRow ? 'plain' : role} disabled={disabled} onClick={onClick}>
+    <Space.Compact data-testid={testId}>
+      <AxisButton role={role} disabled={disabled} onClick={onClick}>
         {children}
       </AxisButton>
-      <Dropdown
-        trigger={['click']}
-        menu={{
-          items: items.map((item) => ({
-            key: item.key,
-            label: item.label,
-            danger: item.destructive,
-            disabled: item.disabled,
-          })),
-          onClick: ({ key }) => items.find((item) => item.key === key)?.onClick(),
-        }}
-      >
-        <AxisButton role="icon" joined={!titleRow} nameKey={menuNameKey} icon={<Chevron />} />
+      <Dropdown trigger={['click']} menu={menu}>
+        <AxisButton role="icon" joined nameKey={menuNameKey} icon={<Chevron />} />
       </Dropdown>
-    </Group>
+    </Space.Compact>
   )
 }

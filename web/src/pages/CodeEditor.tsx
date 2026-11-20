@@ -153,6 +153,7 @@ export default function CodeEditor({
               const mark = foldMark.current!.firstElementChild!.cloneNode(true) as HTMLElement
               mark.style.color = 'inherit'
               mark.style.transform = open ? '' : 'rotate(-90deg)'
+              mark.dataset.fold = open ? 'open' : 'folded'
               return mark
             },
           }),
@@ -352,6 +353,16 @@ const codeViewTheme = sharedTheme((tokens, mode) => {
         borderInlineEnd: `1px solid ${colour.borderSubtle}`,
       },
       '.cm-lineNumbers .cm-gutterElement': { paddingInline: `${spacing.sm}px` },
+      // Proposed, see #3978: the fold column sits between the line numbers and the gutter's rule, `spacing-sm` from
+      // each, as the code sits `spacing-sm` past the rule. An open fold's chevron shows while the pointer is over the
+      // gutter, and a folded one always, as a code editor shows them.
+      '.cm-foldGutter .cm-gutterElement': {
+        paddingInlineEnd: `${spacing.sm}px`,
+        display: 'flex',
+        alignItems: 'center',
+      },
+      '.cm-foldGutter [data-fold="open"]': { opacity: 0, transition: 'opacity 0.15s' },
+      '.cm-gutters:hover .cm-foldGutter [data-fold="open"]': { opacity: 1 },
       '.cm-panels': { backgroundColor: colour.surface, color: colour.text },
       '.cm-panels-top': { borderBottom: `1px solid ${colour.borderSubtle}` },
       '.cm-findBar': {
