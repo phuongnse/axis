@@ -135,6 +135,9 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
       state.getByRole("button", { name: "Submit for approval", exact: true }),
     "Saved record with a change": (state) => state.getByTestId("form-save-bar"),
     "Record not found": (state) => state.getByTestId("record-not-found"),
+    Task: (state) =>
+      state.getByRole("group", { name: "Decision", exact: true }),
+    "Task not found": (state) => state.getByTestId("record-not-found"),
     "Platform site": (state) =>
       state.getByText(
         "Runs the company's purchases, from the request to approval and ordering.",

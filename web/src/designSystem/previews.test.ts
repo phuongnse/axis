@@ -74,6 +74,8 @@ describe('design-system previews', () => {
         'Saved record',
         'Saved record with a change',
         'Record not found',
+        'Task',
+        'Task not found',
         'Dashboard',
         'Platform site',
         'App switcher',

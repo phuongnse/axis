@@ -3,10 +3,10 @@ import { join } from 'node:path'
 import { PlusOutlined } from '@ant-design/icons'
 import { ConfigProvider } from 'antd'
 import { useState } from 'react'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AxisActionRow, AxisButton } from './AxisButton'
+import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
 import { buttonRoles } from './buttonRoles'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
@@ -21,6 +21,7 @@ const texts = {
   'test.preview': 'Preview',
   'test.runTests': 'Run tests',
   'shell.actionRow.more': 'More actions',
+  'test.decision': 'Decision',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -462,5 +463,37 @@ describe('an action row that folds', () => {
     fireEvent.keyDown(document.activeElement!, { key: 'Enter', keyCode: 13 })
 
     expect(onClick).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the button group', () => {
+  const group = (labels: string[], onClick = vi.fn()) => (
+    <AxisButtonGroup
+      role="main"
+      nameKey="test.decision"
+      actions={labels.map((label) => ({ key: label, label, onClick: () => onClick(label) }))}
+    />
+  )
+
+  it('is one named group of its buttons, in order, in the role of the group', async () => {
+    const onClick = vi.fn()
+    renderIn('light', group(['Approve', 'Return', 'Reject'], onClick))
+
+    const named = screen.getByRole('group', { name: 'Decision' })
+    expect(
+      within(named)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Approve', 'Return', 'Reject'])
+    expect(within(named).getByRole('button', { name: 'Approve' })).toHaveClass('ant-btn-variant-outlined')
+    await userEvent.click(within(named).getByRole('button', { name: 'Return' }))
+    expect(onClick).toHaveBeenCalledWith('Return')
+  })
+
+  it('is a plain button when it holds one action', () => {
+    renderIn('light', group(['Approve']))
+
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument()
+    expect(screen.queryByRole('group')).not.toBeInTheDocument()
   })
 })

@@ -107,4 +107,27 @@ describe('the design-system shell states', () => {
     expect(await screen.findByTestId('record-not-found', {}, { timeout: 15000 })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Go to Requests' })).toBeVisible()
   }, 30000)
+
+  it('shows the task with its Decision group and its Overdue tag on the page heading', async () => {
+    render(<Preview states={[state('Task')]} />)
+
+    const actions = await screen.findByTestId('page-actions', {}, { timeout: 15000 })
+    const decision = await within(actions).findByRole('group', { name: 'Decision' }, { timeout: 15000 })
+    expect(
+      within(decision)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Approve', 'Reject'])
+    expect(within(screen.getByTestId('page-heading')).getByText('Overdue')).toBeVisible()
+    expect(screen.getByRole('heading', { level: 1, name: 'Review the request' })).toBeVisible()
+  }, 30000)
+
+  it('shows the missing-task line with a link to Tasks for an id the fixtures answer 404 for', async () => {
+    render(<Preview states={[state('Task not found')]} />)
+
+    expect(await screen.findByTestId('record-not-found', {}, { timeout: 15000 })).toHaveTextContent(
+      'This task does not exist, or you cannot open it.',
+    )
+    expect(screen.getByRole('link', { name: 'Go to Tasks' })).toBeVisible()
+  }, 30000)
 })

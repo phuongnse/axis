@@ -1,14 +1,20 @@
-import { Button, Descriptions, Flex, Form, Space, Typography } from 'antd'
+import { Flex, Form } from 'antd'
 import { AxisAlert } from './AxisAlert'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
-import { NotFoundPage } from '../pages/NotFoundPage'
+import { PageActions, PageLayout } from './PageLayout'
 import { formatValue } from './formatValue'
 import { buildCompleteBody } from './recordBody'
 import { fetchRecord, type RecordProblem } from './records'
 import { ReassignDialog } from './ReassignDialog'
+import { RecordLink } from './RecordLink'
+import { RecordList } from './recordList'
+import { RecordNotFound } from './RecordNotFound'
 import { requiredMark } from './requiredMark'
+import { SectionPart, SectionParts } from './SectionParts'
 import { StatusTag } from './StatusTag'
+import { TermList } from './TermList'
 import type { WidgetMetadata } from './site'
 import {
   assignedElsewhere,
@@ -23,7 +29,6 @@ import {
 } from './tasks'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
-import { useDesignTokens } from './themeMode'
 import { useReleaseTexts } from './useReleaseTexts'
 import { useFormSteps } from './useFormSteps'
 import { sectionsOf, useRecordForm } from './useRecordForm'
@@ -33,6 +38,8 @@ interface TaskPageProps {
   sitePath: string
   /** The name of the inbox page the task's address is under. */
   pageName: string
+  /** The text key of the inbox page's title, which heads the page until the task loads, and names the way back. */
+  titleKey: string
   /** The task inbox widget of that page. */
   widget: WidgetMetadata
   taskId: string
@@ -48,19 +55,24 @@ type TaskState = TaskItem | null | typeof assignedElsewhere | 'failed'
 const dueAtField = { name: 'dueAt', type: 'date-time' } as const
 
 /**
- * Shows one task under the page of its task inbox: the step's label, the subject's label, the due
- * date and the step's form over the subject record, with one button per outcome. A click completes
- * the task with the outcome, the changed editable values and the record's `version`, then returns
- * to the inbox. The form follows the task's form state endpoint: a field the answer hides or locks
- * is not sent. A task that is not open, or that another completion decided first, shows that it is
- * already completed, with no form or buttons. An expired task shows that its deadline passed, with
- * no form or buttons. A task assigned to someone else shows only that.
+ * Shows one task under the page of its task inbox, see docs/reference/task-inbox-widget.md#task-page. The page is headed
+ * by the step's label, with the Overdue tag beside it when the task is overdue and Task as its line. Its first part is
+ * the facts Record, the subject's label as a link where the person may open the record, and Due when the task has a due
+ * date. Its second part is the step's form over the subject record. The commands and the outcomes sit on the heading,
+ * the outcomes as one group named Decision. A click on an outcome completes the task with the outcome, the changed
+ * editable values and the record's `version`, then returns to the inbox. The form follows the task's form state
+ * endpoint: a field the answer hides or locks is not sent. A task that is not open, or that another completion decided
+ * first, shows that it is already completed, with no form or buttons. An expired task shows that its deadline passed,
+ * with no form or buttons.
  *
- * An overdue task shows an "Overdue" tag beside the due date. An open task shows a Claim and a
- * Release button for each of `claim` and `release` that the task read's `commands` lists. A click
- * shows the task the route returns. A 403 or 409 shows a message and loads the task again.
+ * Until the task loads, and for a task that is not shown, the page is headed by the inbox page's title. A task the task
+ * API has none for shows that it does not exist, or that the person cannot open it, with a link back to the inbox. A
+ * task assigned to someone else shows only that.
  *
- * An open task whose `commands` lists `reassign` also shows a Reassign button. It opens a dialog
+ * An open task shows a Release and a Claim button for each of `release` and `claim` that the task read's `commands`
+ * lists. A click shows the task the route returns. A 403 or 409 shows a message and loads the task again.
+ *
+ * An open task whose `commands` lists `reassign` also shows a Reassign… button. It opens a dialog
  * where the user picks a role of the task read's `reassignRoles` or a person, and gives a reason.
  * On success the page returns to the inbox. A 400 shows in the dialog. A 403 or 409 closes the
  * dialog, shows the same message as Claim and Release and loads the task again.
@@ -69,12 +81,14 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * locale, before the site texts and the platform texts. So a label a newer release reworded or
  * removed keeps its old text. If those texts fail to load, the page shows its load error.
  */
-export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackLocale }: TaskPageProps) {
+export function TaskPage({ sitePath, pageName, titleKey, widget, taskId, locale, fallbackLocale }: TaskPageProps) {
   const t = useText()
   const navigate = useNavigate()
   // The server sets the path on every task inbox.
   const tasksPath = widget.tasksPath!
   const inboxPath = siteAddress(sitePath, pageName.toLowerCase())
+  // The way back to the inbox, by the inbox page's title, which a missing task's line links to.
+  const inbox = useMemo(() => ({ labelKey: titleKey, to: inboxPath }), [titleKey, inboxPath])
   const [task, setTask] = useState<TaskState>()
   // Set when completing answered that another completion came first.
   const [decided, setDecided] = useState(false)
@@ -144,16 +158,22 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
   if (task === undefined) {
     return null
   }
+  // Until the task loads, and where it is not shown, the page is headed by the inbox page's title.
+  const inboxHeading = (content: ReactNode) => (
+    <RecordList value={inbox}>
+      <PageLayout title={t(titleKey)}>{content}</PageLayout>
+    </RecordList>
+  )
   if (task === null) {
-    return <NotFoundPage />
+    return inboxHeading(<RecordNotFound textKey="shell.task.notFound" />)
   }
   if (task === assignedElsewhere) {
-    return (
-      <AxisAlert data-testid="task-assigned-elsewhere" kind="warning" message={t('shell.task.assignedElsewhere')} />
+    return inboxHeading(
+      <AxisAlert data-testid="task-assigned-elsewhere" kind="warning" message={t('shell.task.assignedElsewhere')} />,
     )
   }
   if (task === 'failed' || releaseTexts.failed) {
-    return <AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />
+    return inboxHeading(<AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />)
   }
   // The previous release texts stay on screen while a new locale loads, so the form is not remounted.
   if (!releaseCatalog) {
@@ -161,19 +181,37 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
   }
 
   return (
-    <TextProvider catalogs={catalogs} development={outer.development}>
-      <TaskBody
-        task={task}
-        tasksPath={tasksPath}
-        locale={locale}
-        open={task.state === 'open' && !decided}
-        onDone={() => navigate(inboxPath)}
-        onAssignedElsewhere={() => setTask(assignedElsewhere)}
-        onDecided={() => void onDecided()}
-        onCommand={onCommand}
-        onReassign={onReassign}
-      />
-    </TextProvider>
+    <RecordList value={inbox}>
+      <TextProvider catalogs={catalogs} development={outer.development}>
+        <TaskHeading task={task}>
+          <TaskBody
+            task={task}
+            tasksPath={tasksPath}
+            locale={locale}
+            open={task.state === 'open' && !decided}
+            onDone={() => navigate(inboxPath)}
+            onAssignedElsewhere={() => setTask(assignedElsewhere)}
+            onDecided={() => void onDecided()}
+            onCommand={onCommand}
+            onReassign={onReassign}
+          />
+        </TaskHeading>
+      </TextProvider>
+    </RecordList>
+  )
+}
+
+/** The page of a loaded task: headed by the step's label, with the Overdue tag beside it and Task as its line. */
+function TaskHeading({ task, children }: { task: TaskItem; children: ReactNode }) {
+  const t = useText()
+  return (
+    <PageLayout
+      title={t(task.labelKey)}
+      tags={task.overdue ? <StatusTag tone="attention">{t('shell.tasks.overdue')}</StatusTag> : undefined}
+      line={t('shell.task.kind')}
+    >
+      {children}
+    </PageLayout>
   )
 }
 
@@ -207,8 +245,9 @@ interface TaskBodyProps {
 }
 
 /**
- * The task's label, subject and due date, then its Claim, Release and Reassign buttons and form
- * while it is open, or the message that it is expired or completed. It reads the release texts.
+ * The task's facts, Record and Due, as the page's first part, then its form part: the message that it is expired or
+ * completed, or the message of a failed command and the open task's form. The commands and the outcomes sit on the
+ * heading. It reads the release texts.
  */
 function TaskBody({
   task,
@@ -222,49 +261,55 @@ function TaskBody({
   onReassign,
 }: TaskBodyProps) {
   const t = useText()
-  return (
-    <Flex vertical gap="middle">
-      <Typography.Title level={4}>{t(task.labelKey)}</Typography.Title>
-      <Descriptions
-        column={1}
-        items={[
-          { key: 'subject', label: t('shell.tasks.subject'), children: task.subject.label ?? '' },
+  const commands = useTaskCommands({
+    commands: open ? task.commands : [],
+    reassignRoles: task.reassignRoles,
+    usersPath: usersPath(tasksPath),
+    onCommand,
+    onReassign,
+  })
+  const terms = [
+    {
+      key: 'subject',
+      term: t('shell.tasks.subject'),
+      value: <RecordLink entity={task.subject.entity} id={task.subject.id} label={task.subject.label} />,
+    },
+    ...(task.dueAt === null
+      ? []
+      : [
           {
             key: 'dueAt',
-            label: t('shell.tasks.dueAt'),
-            children: (
-              <Space size="small">
-                {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
-                {task.overdue && <StatusTag tone="attention">{t('shell.tasks.overdue')}</StatusTag>}
-              </Space>
-            ),
+            term: t('shell.tasks.dueAt'),
+            value: formatValue(dueAtField, task.dueAt, {}, { locale, text: t }),
           },
-        ]}
-      />
-      {task.state === 'expired' ? (
-        <AxisAlert data-testid="task-expired" kind="info" message={t('shell.task.expired')} />
-      ) : open ? (
-        <>
-          <TaskCommands
-            commands={task.commands}
-            reassignRoles={task.reassignRoles}
-            usersPath={usersPath(tasksPath)}
-            onCommand={onCommand}
-            onReassign={onReassign}
-          />
-          <OpenTaskForm
-            task={task}
-            tasksPath={tasksPath}
-            locale={locale}
-            onDone={onDone}
-            onAssignedElsewhere={onAssignedElsewhere}
-            onDecided={onDecided}
-          />
-        </>
-      ) : (
-        <AxisAlert data-testid="task-completed" kind="info" message={t('shell.task.completed')} />
-      )}
-    </Flex>
+        ]),
+  ]
+  return (
+    <SectionParts>
+      <SectionPart testId="task-facts">
+        <TermList terms={terms} />
+      </SectionPart>
+      <SectionPart testId="task-form">
+        {task.state === 'expired' ? (
+          <AxisAlert data-testid="task-expired" kind="info" message={t('shell.task.expired')} />
+        ) : open ? (
+          <Flex vertical gap="middle">
+            {commands.panel}
+            <OpenTaskForm
+              task={task}
+              tasksPath={tasksPath}
+              locale={locale}
+              commandButtons={commands.buttons}
+              onDone={onDone}
+              onAssignedElsewhere={onAssignedElsewhere}
+              onDecided={onDecided}
+            />
+          </Flex>
+        ) : (
+          <AxisAlert data-testid="task-completed" kind="info" message={t('shell.task.completed')} />
+        )}
+      </SectionPart>
+    </SectionParts>
   )
 }
 
@@ -276,13 +321,14 @@ interface TaskCommandsProps {
   onReassign: (body: ReassignBody) => Promise<ReassignAnswer>
 }
 
-const taskCommands = ['claim', 'release'] as const
+const taskCommands = ['release', 'claim'] as const
 
 /**
- * A button for each of `claim` and `release` that `commands` lists, a Reassign button with its
- * dialog when it lists `reassign`, and the message of a command that failed.
+ * The command buttons for the heading, in the order Release, Claim, then Reassign…, each of `release`, `claim` and
+ * `reassign` that `commands` lists, and the panel to show in the page: the message of a command that failed and the
+ * reassign dialog while it is open.
  */
-function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassign }: TaskCommandsProps) {
+function useTaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassign }: TaskCommandsProps) {
   const t = useText()
   // The command being sent, so both buttons wait for its answer.
   const [pending, setPending] = useState<string | null>(null)
@@ -315,31 +361,27 @@ function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassig
     return answer === null ? null : answer.problem
   }
 
-  if (listed.length === 0 && !canReassign && message === null) {
-    return null
+  const buttons: ReactNode[] = listed.map((command) => (
+    <AxisButton
+      key={command}
+      role="secondary"
+      loading={pending === command}
+      disabled={pending !== null && pending !== command}
+      onClick={() => void run(command)}
+    >
+      {t(`shell.task.${command}`)}
+    </AxisButton>
+  ))
+  if (canReassign) {
+    buttons.push(
+      <AxisButton key="reassign" role="secondary" disabled={pending !== null} onClick={() => setReassigning(true)}>
+        {t('shell.task.reassign')}
+      </AxisButton>,
+    )
   }
-  return (
-    <Flex vertical gap="small">
+  const panel = (
+    <>
       {message !== null && <AxisAlert data-testid="task-command-message" kind={message.type} message={message.text} />}
-      <Flex gap="small">
-        {listed.map((command) => (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button
-            key={command}
-            loading={pending === command}
-            disabled={pending !== null && pending !== command}
-            onClick={() => void run(command)}
-          >
-            {t(`shell.task.${command}`)}
-          </Button>
-        ))}
-        {canReassign && (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button disabled={pending !== null} onClick={() => setReassigning(true)}>
-            {t('shell.task.reassign')}
-          </Button>
-        )}
-      </Flex>
       {reassigning && (
         <ReassignDialog
           roles={reassignRoles}
@@ -348,23 +390,36 @@ function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassig
           onClose={() => setReassigning(false)}
         />
       )}
-    </Flex>
+    </>
   )
+  return { buttons, panel }
 }
 
 interface OpenTaskFormProps {
   task: TaskItem
   tasksPath: string
   locale: string
+  /** The command buttons, which go on the heading before the outcomes. */
+  commandButtons: ReactNode[]
   onDone: () => void
   onAssignedElsewhere: () => void
   onDecided: () => void
 }
 
-/** The step's form over the subject record of an open task, and its outcome buttons. */
-function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, onDecided }: OpenTaskFormProps) {
+/**
+ * The step's form over the subject record of an open task. The command buttons and the outcomes sit on the page's
+ * heading, in one `PageActions`, and a wizard shows the outcomes on its last step only.
+ */
+function OpenTaskForm({
+  task,
+  tasksPath,
+  locale,
+  commandButtons,
+  onDone,
+  onAssignedElsewhere,
+  onDecided,
+}: OpenTaskFormProps) {
   const t = useText()
-  const { spacing } = useDesignTokens()
   const { entity } = task.form
   const sections = useMemo(() => sectionsOf(entity, task.form), [entity, task.form])
   const conditions = useMemo(() => ({ statePath: `${tasksPath}/${task.id}/form-state` }), [tasksPath, task.id])
@@ -427,50 +482,64 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
     }
   }
 
+  const actions = (
+    <PageActions>
+      <Flex gap="small">
+        {commandButtons}
+        {steps.last && ready === true && (
+          <AxisButtonGroup
+            role="main"
+            nameKey="shell.task.outcomes"
+            actions={task.outcomes.map((outcome) => ({
+              key: outcome.name,
+              label: t(outcome.labelKey),
+              loading: sending === outcome.name,
+              disabled: sending !== null && sending !== outcome.name,
+              onClick: () => void complete(outcome.name),
+            }))}
+          />
+        )}
+      </Flex>
+    </PageActions>
+  )
   if (ready === false) {
-    return null
+    return actions
   }
   if (ready === 'failed') {
-    return <AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />
+    return (
+      <>
+        {actions}
+        <AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />
+      </>
+    )
   }
+  const back = !steps.first && (
+    <AxisButton role="secondary" onClick={steps.back} disabled={steps.checking || sending !== null}>
+      {t('shell.form.back')}
+    </AxisButton>
+  )
   return (
-    <Flex vertical gap="middle">
-      {form.formError}
-      {steps.progress}
-      <Flex vertical gap={spacing.lg}>
+    <>
+      {actions}
+      <Flex vertical gap="middle">
+        {form.formError}
+        {steps.progress}
         {/* Enter acts as Next on a step before the last, and does nothing on the last. */}
         <Form id={formId} layout="vertical" requiredMark={requiredMark} onFinish={() => void steps.next()}>
           {steps.fields}
         </Form>
-        <Flex gap="small">
-          {!steps.first && (
-            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-            <Button onClick={steps.back} disabled={steps.checking || sending !== null}>
-              {t('shell.form.back')}
-            </Button>
-          )}
-          {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
-          {!steps.last && (
-            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-            <Button htmlType="submit" form={formId} type="primary" loading={steps.checking && { delay: 200 }}>
+        {steps.last ? (
+          back && <Flex gap="small">{back}</Flex>
+        ) : (
+          <AxisActionRow>
+            {back}
+            {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
+            <AxisButton role="finish" htmlType="submit" form={formId} loading={steps.checking && { delay: 200 }}>
               {t('shell.form.next')}
-            </Button>
-          )}
-          {steps.last &&
-            task.outcomes.map((outcome, index) => (
-              // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-              <Button
-                key={outcome.name}
-                type={index === 0 ? 'primary' : 'default'}
-                loading={sending === outcome.name}
-                disabled={sending !== null && sending !== outcome.name}
-                onClick={() => void complete(outcome.name)}
-              >
-                {t(outcome.labelKey)}
-              </Button>
-            ))}
-        </Flex>
+            </AxisButton>
+          </AxisActionRow>
+        )}
       </Flex>
-    </Flex>
+    </>
   )
 }
