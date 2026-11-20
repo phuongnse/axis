@@ -266,9 +266,9 @@ export function PackageRun({
             overscrollBehavior: 'contain',
           }}
         >
-          {/* Proposed, see #3978: one block, Input, from what runs to its values: its title and its content with no rule
-              between them, and the Form and JSON tabs with the rule all workspace tabs have, run the pane's width. */}
-          <PaneHeader title={t('shell.studio.package.run.input')} height={rowHeight} rule={false} />
+          {/* Proposed, see #3978: one block, Input, from what runs to its values, under its title row: no rule between the
+              parts of its content, and the Form and JSON tabs with the rule all workspace tabs have. */}
+          <PaneHeader title={t('shell.studio.package.run.input')} height={rowHeight} />
           <div style={{ flex: 'none', padding: pad }}>
             <Flex vertical gap={spacing.sm}>
               <AxisField label={t('shell.studio.package.run.operation')} help="">
@@ -388,7 +388,7 @@ export function PackageRun({
           <>
             <PaneHeader
               height={rowHeight}
-              rule={false}
+
               title={
                 <Flex gap="small" align="center" wrap>
                   <Typography.Text strong>{t('shell.studio.package.run.output')}</Typography.Text>
@@ -402,7 +402,7 @@ export function PackageRun({
               }
             />
             {/* Proposed, see #3978: the output as read-only JSON in the code editor the input's JSON uses, filling its
-                block, and the log as a block of its own under a rule, its title and lines with no rule between them. */}
+                block, and the log as a block of its own under a rule, with its own title row. */}
             {run.error !== null ? (
               <div style={{ flex: 'none', padding: pad }}>
                 <AxisAlert kind="error" message={`${run.error.code}: ${run.error.message}`} />
@@ -428,7 +428,7 @@ export function PackageRun({
             )}
             {output.length > 0 && (
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', borderTop: rule }}>
-                <PaneHeader title={t('shell.studio.package.run.log')} height={rowHeight} rule={false} />
+                <PaneHeader title={t('shell.studio.package.run.log')} height={rowHeight} />
                 <div
                   style={{
                     flex: 1,
@@ -436,7 +436,6 @@ export function PackageRun({
                     overflowY: 'auto',
                     overscrollBehavior: 'contain',
                     padding: pad,
-                    paddingTop: 0,
                   }}
                 >
                   <CodeBlock text={output.join('\n')} plain wrap />

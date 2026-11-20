@@ -7,22 +7,7 @@ import { useDesignTokens } from '../platform/themeMode'
  * Input and Result. It is `height` high, as the editor's tab row, with the title in strong text on the left, its actions
  * on the right and a rule under it that runs the pane's whole width, so the workspace stays parted by rules, not boxes.
  */
-export function PaneHeader({
-  title,
-  actions,
-  height,
-  rule = true,
-}: {
-  title: ReactNode
-  actions?: ReactNode
-  height: number
-  /**
-   * Proposed, see #3978: whether a rule runs under the row. A title and the content under it are one block, so the row
-   * draws none when nothing else lines up with it, such as the Run tab's Input, Output and Log. The explorer's Files
-   * keeps it, as it continues the rule under the editor's tab row.
-   */
-  rule?: boolean
-}) {
+export function PaneHeader({ title, actions, height }: { title: ReactNode; actions?: ReactNode; height: number }) {
   const { colour, spacing } = useDesignTokens()
   return (
     <Flex
@@ -33,7 +18,7 @@ export function PaneHeader({
         flex: 'none',
         height,
         paddingInline: spacing.md,
-        borderBottom: rule ? `1px solid ${colour.borderSubtle}` : undefined,
+        borderBottom: `1px solid ${colour.borderSubtle}`,
       }}
     >
       {typeof title === 'string' ? <Typography.Text strong>{title}</Typography.Text> : title}
