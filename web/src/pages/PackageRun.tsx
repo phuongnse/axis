@@ -8,7 +8,6 @@ import { CodeBlock } from '../platform/CodeBlock'
 import { EmptyState } from '../platform/EmptyState'
 import { FieldInput } from '../platform/FieldInput'
 import { ReasonDialog } from '../platform/ReasonDialog'
-import { SectionPart, SectionParts } from '../platform/SectionParts'
 import type { RecordValue } from '../platform/records'
 import type { FieldMetadata, FieldType } from '../platform/site'
 import { StatusTag } from '../platform/StatusTag'
@@ -23,6 +22,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { ValueTable } from '../platform/ValueTable'
 import CodeEditor from './CodeEditor'
 import { codeLanguage } from './codeLanguage'
+import { PaneHeader } from './PaneHeader'
 
 /** One typed field of an operation's input, as the manifest lists it. */
 export interface OperationField {
@@ -84,6 +84,7 @@ export function PackageRun({
   run,
   output,
   onRun,
+  rowHeight,
 }: {
   application: string
   packageId: string
@@ -97,9 +98,11 @@ export function PackageRun({
   /** The lines the last run wrote. */
   output: readonly string[]
   onRun: (operation: string, input: Record<string, unknown>) => void
+  /** The height of a pane's title row, as the editor's tab row. */
+  rowHeight: number
 }) {
   const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const [saved, setSaved] = useState<{ items: StudioPackageRunInput[]; version: string | null }>({
     items: [],
     version: null,
@@ -214,170 +217,195 @@ export function PackageRun({
     </AxisButton>
   )
 
-  // Proposed, see #3978: what runs and Run on the first row, the saved input under it with its own small actions, the
-  // input's fields under a rule, and the result beside them, headed by its outcome and times on one line, as a request
-  // tool such as Postman or AWS Lambda's Test tab lays them out.
+  const rule = `1px solid ${colour.borderSubtle}`
+  const pad = `${spacing.sm}px ${spacing.md}px`
+
+  // Proposed, see #3978: two panes side by side, parted by a rule that runs the panel's height, as the explorer and the
+  // editor are. The input pane has what runs and Run, the saved input under it, then the Input title row and its fields;
+  // the result pane has the Result title row with the outcome and times, the output, then the Log title row and its
+  // lines. Each title row's rule runs its pane's width, and no region has a box of its own, as the workspace draws them.
   return (
-    <Flex gap="large" wrap align="start" data-testid="package-run">
-      <div style={{ flex: '1 1 360px', minWidth: 0 }}>
-        <SectionParts>
-          <SectionPart testName="run-what">
-            <Flex vertical gap={spacing.sm}>
-              <Flex gap="small" align="end">
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <AxisField label={t('shell.studio.package.run.operation')} help="">
-                    <Select
-                      data-testid="package-run-operation"
-                      value={operation}
-                      onChange={(next: string) => setOperation(next)}
-                      options={operations.map((candidate) => ({ value: candidate.name, label: candidate.name }))}
-                      style={{ width: '100%' }}
-                    />
-                  </AxisField>
-                </div>
-                {runButton}
-              </Flex>
-              <Flex gap="small" align="end">
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <AxisField label={t('shell.studio.package.run.savedInput')} help="">
-                    <Select
-                      placeholder={t('shell.studio.package.run.newInput')}
-                      value={chosen ?? undefined}
-                      onChange={(next: string) => choose(next)}
-                      allowClear
-                      onClear={() => choose(null)}
-                      options={saved.items
-                        .filter((item) => item.operation === operation)
-                        .map((item) => ({ value: item.name, label: item.name }))}
-                      style={{ width: '100%' }}
-                    />
-                  </AxisField>
-                </div>
-                {developer && (
-                  <Flex gap={spacing.xs}>
-                    <AxisButton
-                      role="icon"
-                      nameKey="shell.studio.package.run.saveInput"
-                      icon={<SaveOutlined />}
-                      disabled={chosen === null || input === null}
-                      onClick={() =>
-                        void store(
-                          saved.items.map((item) =>
-                            item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
-                          ),
-                        )
-                      }
-                    />
-                    <AxisButton
-                      role="icon"
-                      nameKey="shell.studio.package.run.saveInputAs"
-                      icon={<FileAddOutlined />}
-                      disabled={input === null}
-                      onClick={() => setSaveAsOpen(true)}
-                    />
-                    <AxisButton
-                      role="icon"
-                      nameKey="shell.studio.package.run.deleteInput"
-                      destructive
-                      icon={<DeleteOutlined />}
-                      disabled={chosen === null}
-                      onClick={() =>
-                        void store(saved.items.filter((item) => item.name !== chosen)).then(
-                          (done) => done && choose(null),
-                        )
-                      }
-                    />
-                  </Flex>
-                )}
-              </Flex>
-              {saveError !== null && <AxisAlert kind="error" message={saveError} />}
-            </Flex>
-          </SectionPart>
-          <SectionPart
-            testName="run-input"
-            heading={{ title: t('shell.studio.package.run.input') }}
-            action={
-              <Segmented<'form' | 'json'>
-                aria-label={t('shell.studio.package.run.inputAs')}
-                size="small"
-                value={shown}
-                onChange={switchTo}
-                options={[
-                  { value: 'form', label: t('shell.studio.package.run.form') },
-                  { value: 'json', label: t('shell.value.json') },
-                ]}
-              />
-            }
-          >
-            <Flex vertical gap={spacing.sm}>
-              {jsonError && <AxisAlert kind="error" message={t('shell.studio.package.run.jsonInvalid')} />}
-              {shown === 'form' ? (
-                fields.length === 0 ? (
-                  <Typography.Text type="secondary">{t('shell.studio.package.run.noInput')}</Typography.Text>
-                ) : (
-                  fields.map((field) => (
-                    <AxisField
-                      key={field.name}
-                      label={field.name}
-                      help={t(`shell.studio.package.run.type.${field.type}`)}
-                      required={field.required}
-                    >
-                      <FieldInput
-                        field={inputField(field)}
-                        value={(values[field.name] ?? null) as RecordValue}
-                        onChange={(next) => setValues((all) => ({ ...all, [field.name]: next }))}
-                        locale={locale}
-                      />
-                    </AxisField>
-                  ))
-                )
-              ) : (
-                <div style={{ height: 160, border: `1px solid ${colour.borderSubtle}`, borderRadius: radius.base }}>
-                  <CodeEditor
-                    label={t('shell.studio.package.run.inputJson')}
-                    value={jsonText}
-                    onChange={setJsonText}
-                    language={jsonLanguage}
-                    fill
-                    findTexts={{
-                      field: t('shell.studio.package.findField'),
-                      count: t('shell.studio.json.findCount'),
-                      none: t('shell.studio.json.findNone'),
-                    }}
+    <div data-testid="package-run" style={{ display: 'flex', height: '100%', minHeight: 0 }}>
+      <div
+        style={{
+          flex: '0 0 45%',
+          minWidth: 320,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          borderInlineEnd: rule,
+        }}
+      >
+        <div style={{ flex: 'none', padding: pad, borderBottom: rule }}>
+          <Flex vertical gap={spacing.sm}>
+            <Flex gap="small" align="end">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <AxisField label={t('shell.studio.package.run.operation')} help="">
+                  <Select
+                    data-testid="package-run-operation"
+                    value={operation}
+                    onChange={(next: string) => setOperation(next)}
+                    options={operations.map((candidate) => ({ value: candidate.name, label: candidate.name }))}
+                    style={{ width: '100%' }}
                   />
-                </div>
+                </AxisField>
+              </div>
+              {runButton}
+            </Flex>
+            <Flex gap="small" align="end">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <AxisField label={t('shell.studio.package.run.savedInput')} help="">
+                  <Select
+                    placeholder={t('shell.studio.package.run.newInput')}
+                    value={chosen ?? undefined}
+                    onChange={(next: string) => choose(next)}
+                    allowClear
+                    onClear={() => choose(null)}
+                    options={saved.items
+                      .filter((item) => item.operation === operation)
+                      .map((item) => ({ value: item.name, label: item.name }))}
+                    style={{ width: '100%' }}
+                  />
+                </AxisField>
+              </div>
+              {developer && (
+                <Flex gap={spacing.xs}>
+                  <AxisButton
+                    role="icon"
+                    nameKey="shell.studio.package.run.saveInput"
+                    icon={<SaveOutlined />}
+                    disabled={chosen === null || input === null}
+                    onClick={() =>
+                      void store(
+                        saved.items.map((item) =>
+                          item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
+                        ),
+                      )
+                    }
+                  />
+                  <AxisButton
+                    role="icon"
+                    nameKey="shell.studio.package.run.saveInputAs"
+                    icon={<FileAddOutlined />}
+                    disabled={input === null}
+                    onClick={() => setSaveAsOpen(true)}
+                  />
+                  <AxisButton
+                    role="icon"
+                    nameKey="shell.studio.package.run.deleteInput"
+                    destructive
+                    icon={<DeleteOutlined />}
+                    disabled={chosen === null}
+                    onClick={() =>
+                      void store(saved.items.filter((item) => item.name !== chosen)).then(
+                        (done) => done && choose(null),
+                      )
+                    }
+                  />
+                </Flex>
               )}
             </Flex>
-          </SectionPart>
-        </SectionParts>
-      </div>
-      <div style={{ flex: '1 1 360px', minWidth: 0 }} data-testid="package-run-result">
-        {run === null ? (
-          <EmptyState text={t('shell.studio.package.run.none')} />
+            {saveError !== null && <AxisAlert kind="error" message={saveError} />}
+          </Flex>
+        </div>
+        <PaneHeader
+          title={t('shell.studio.package.run.input')}
+          height={rowHeight}
+          actions={
+            <Segmented<'form' | 'json'>
+              aria-label={t('shell.studio.package.run.inputAs')}
+              size="small"
+              value={shown}
+              onChange={switchTo}
+              options={[
+                { value: 'form', label: t('shell.studio.package.run.form') },
+                { value: 'json', label: t('shell.value.json') },
+              ]}
+            />
+          }
+        />
+        {jsonError && <AxisAlert kind="error" message={t('shell.studio.package.run.jsonInvalid')} />}
+        {shown === 'form' ? (
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: pad }}>
+            {fields.length === 0 ? (
+              <Typography.Text type="secondary">{t('shell.studio.package.run.noInput')}</Typography.Text>
+            ) : (
+              <Flex vertical gap={spacing.sm}>
+                {fields.map((field) => (
+                  <AxisField
+                    key={field.name}
+                    label={field.name}
+                    help={t(`shell.studio.package.run.type.${field.type}`)}
+                    required={field.required}
+                  >
+                    <FieldInput
+                      field={inputField(field)}
+                      value={(values[field.name] ?? null) as RecordValue}
+                      onChange={(next) => setValues((all) => ({ ...all, [field.name]: next }))}
+                      locale={locale}
+                    />
+                  </AxisField>
+                ))}
+              </Flex>
+            )}
+          </div>
         ) : (
-          <SectionParts>
-            <SectionPart
-              testName="run-result"
-              heading={{
-                title: (
-                  <Flex gap="small" align="center" wrap>
-                    {t('shell.studio.package.run.outcome')}
-                    <StatusTag tone={run.outcome === 'succeeded' ? 'success' : 'danger'}>
-                      {t(`shell.studio.package.run.outcome.${run.outcome}`)}
-                    </StatusTag>
-                    <Typography.Text type="secondary" style={{ fontWeight: 'normal', fontSize: 'inherit' }}>
-                      {t('shell.studio.package.run.summary')
-                        .replace(
-                          '{duration}',
-                          t('shell.studio.package.run.milliseconds').replace('{count}', String(run.durationMs)),
-                        )
-                        .replace(
-                          '{cpu}',
-                          t('shell.studio.package.run.seconds').replace('{count}', String(run.cpuSeconds)),
-                        )}
-                    </Typography.Text>
-                  </Flex>
-                ),
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <CodeEditor
+              label={t('shell.studio.package.run.inputJson')}
+              value={jsonText}
+              onChange={setJsonText}
+              language={jsonLanguage}
+              fill
+              findTexts={{
+                field: t('shell.studio.package.findField'),
+                count: t('shell.studio.json.findCount'),
+                none: t('shell.studio.json.findNone'),
+              }}
+            />
+          </div>
+        )}
+      </div>
+      <div
+        data-testid="package-run-result"
+        style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}
+      >
+        {run === null ? (
+          <div style={{ padding: pad }}>
+            <EmptyState text={t('shell.studio.package.run.none')} />
+          </div>
+        ) : (
+          <>
+            <PaneHeader
+              height={rowHeight}
+              title={
+                <Flex gap="small" align="center" wrap>
+                  <Typography.Text strong>{t('shell.studio.package.run.outcome')}</Typography.Text>
+                  <StatusTag tone={run.outcome === 'succeeded' ? 'success' : 'danger'}>
+                    {t(`shell.studio.package.run.outcome.${run.outcome}`)}
+                  </StatusTag>
+                  <Typography.Text type="secondary" style={{ fontWeight: 'normal', fontSize: 'inherit' }}>
+                    {t('shell.studio.package.run.summary')
+                      .replace(
+                        '{duration}',
+                        t('shell.studio.package.run.milliseconds').replace('{count}', String(run.durationMs)),
+                      )
+                      .replace(
+                        '{cpu}',
+                        t('shell.studio.package.run.seconds').replace('{count}', String(run.cpuSeconds)),
+                      )}
+                  </Typography.Text>
+                </Flex>
+              }
+            />
+            {/* The output's rows run the pane's width, and its last row's rule parts it from the log. */}
+            <div
+              style={{
+                flex: 'none',
+                maxHeight: '50%',
+                overflowY: 'auto',
+                padding: run.error !== null ? pad : 0,
+                borderBottom: run.error !== null ? rule : undefined,
               }}
             >
               {run.error !== null ? (
@@ -385,13 +413,16 @@ export function PackageRun({
               ) : (
                 run.output !== null && <ValueTable value={run.output} testId="package-run-output" />
               )}
-            </SectionPart>
+            </div>
             {output.length > 0 && (
-              <SectionPart testName="run-log" heading={{ title: t('shell.studio.package.run.log') }}>
-                <CodeBlock text={output.join('\n')} wrap />
-              </SectionPart>
+              <>
+                <PaneHeader title={t('shell.studio.package.run.log')} height={rowHeight} />
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: pad }}>
+                  <CodeBlock text={output.join('\n')} plain wrap />
+                </div>
+              </>
             )}
-          </SectionParts>
+          </>
         )}
       </div>
       {saveAsOpen && (
@@ -424,6 +455,6 @@ export function PackageRun({
           }}
         />
       )}
-    </Flex>
+    </div>
   )
 }

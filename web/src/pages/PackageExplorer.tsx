@@ -6,13 +6,14 @@ import {
   ReloadOutlined,
   RightOutlined,
 } from '@ant-design/icons'
-import { Dropdown, Flex, Tree, Typography, type MenuProps, type TreeDataNode } from 'antd'
+import { Dropdown, Flex, Tree, type MenuProps, type TreeDataNode } from 'antd'
 import { useContext, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { navigationItemLook } from '../platform/antTheme'
 import { AxisButton } from '../platform/AxisButton'
 import { useText } from '../platform/texts'
 import { ThemeModeContext, useDesignTokens } from '../platform/themeMode'
 import { fileTree } from './packageTree'
+import { PaneHeader } from './PaneHeader'
 
 /** A node of the explorer: a file by its path, or a folder by its path with a trailing slash. */
 export type ExplorerTarget = { kind: 'file'; path: string } | { kind: 'folder'; path: string }
@@ -207,47 +208,41 @@ export function PackageExplorer({
           `.axis-file-tree-flat .ant-tree-switcher-noop { display: none; }`,
         ].join(' ')}
       </style>
-      <Flex
-        align="center"
-        justify="space-between"
-        style={{
-          flex: 'none',
-          height: titleHeight,
-          paddingInline: spacing.md,
-          borderBottom: `1px solid ${colour.borderSubtle}`,
-        }}
-      >
-        <Typography.Text strong>{t('shell.studio.package.files')}</Typography.Text>
-        <Flex gap={spacing.xs}>
-          {developer && (
-            <Dropdown
-              trigger={['click']}
-              menu={{
-                items: [
-                  { key: 'newFile', label: t('shell.studio.package.newFile') },
-                  { key: 'newFolder', label: t('shell.studio.package.newFolder') },
-                ],
-                onClick: (info) => (info.key === 'newFile' ? actions.onNewFile('') : actions.onNewFolder('')),
-              }}
-            >
-              <AxisButton
-                role="icon"
-                size="small"
-                nameKey="shell.studio.package.new"
-                icon={<PlusOutlined />}
-                data-testid="package-new"
-              />
-            </Dropdown>
-          )}
-          <AxisButton
-            role="icon"
-            size="small"
-            nameKey="shell.studio.package.refresh"
-            icon={<ReloadOutlined />}
-            onClick={actions.onRefresh}
-          />
-        </Flex>
-      </Flex>
+      <PaneHeader
+        title={t('shell.studio.package.files')}
+        height={titleHeight}
+        actions={
+          <Flex gap={spacing.xs}>
+            {developer && (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [
+                    { key: 'newFile', label: t('shell.studio.package.newFile') },
+                    { key: 'newFolder', label: t('shell.studio.package.newFolder') },
+                  ],
+                  onClick: (info) => (info.key === 'newFile' ? actions.onNewFile('') : actions.onNewFolder('')),
+                }}
+              >
+                <AxisButton
+                  role="icon"
+                  size="small"
+                  nameKey="shell.studio.package.new"
+                  icon={<PlusOutlined />}
+                  data-testid="package-new"
+                />
+              </Dropdown>
+            )}
+            <AxisButton
+              role="icon"
+              size="small"
+              nameKey="shell.studio.package.refresh"
+              icon={<ReloadOutlined />}
+              onClick={actions.onRefresh}
+            />
+          </Flex>
+        }
+      />
       <div
         onKeyDown={onKeyDown}
         onDragOver={(event) => {

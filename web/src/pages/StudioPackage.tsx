@@ -931,21 +931,20 @@ export default function StudioPackage({
                     key: 'run',
                     label: t('shell.studio.package.panel.run'),
                     children: panelOpen && (
-                      <PanelBody>
-                        <PackageRun
-                          application={application}
-                          packageId={packageId}
-                          operations={manifest.operations ?? []}
-                          developer={developer}
-                          locale={locale}
-                          running={running('run')}
-                          run={requests.run?.run ?? null}
-                          output={requests.run?.output ?? []}
-                          onRun={(operation, input) =>
-                            void start('run', () => runStudioPackage(application, packageId, operation, input))
-                          }
-                        />
-                      </PanelBody>
+                      <PackageRun
+                        application={application}
+                        packageId={packageId}
+                        operations={manifest.operations ?? []}
+                        developer={developer}
+                        locale={locale}
+                        running={running('run')}
+                        run={requests.run?.run ?? null}
+                        output={requests.run?.output ?? []}
+                        rowHeight={rowHeight}
+                        onRun={(operation, input) =>
+                          void start('run', () => runStudioPackage(application, packageId, operation, input))
+                        }
+                      />
                     ),
                   },
                 ]}
