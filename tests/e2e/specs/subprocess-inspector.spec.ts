@@ -50,13 +50,14 @@ test('an operator opens the child sub-process from its parent, and the child lin
   await page.getByTestId(`inspector-subprocess-${childId}`).click()
 
   await expect(page).toHaveURL(new RegExp(`/subprocess/children/${childId}$`))
-  const instance = page.getByTestId('inspector-instance')
-  await expect(instance).toBeVisible()
-  await expect(instance.getByText('Due', { exact: true })).toBeVisible()
-  await expect(page.getByTestId('inspector-parent-link')).toHaveAttribute('href', `/subprocess/parents/${parentId}`)
+  await expect(page.getByTestId('inspector-instance')).toBeVisible()
+  const facts = page.getByTestId('studio-section-inspector-facts')
+  await expect(facts.getByTestId('inspector-parent-link')).toHaveAttribute('href', `/subprocess/parents/${parentId}`)
 })
 
-test('an instance without a subject shows "No subject" in the list and on its page', async ({ page }) => {
+test('an instance without a subject shows "No subject" in the list and has no record fact on its page', async ({
+  page,
+}) => {
   const { parentId, childId } = await waitingParent(page)
 
   await page.goto('/subprocess/parents')
@@ -64,6 +65,6 @@ test('an instance without a subject shows "No subject" in the list and on its pa
 
   for (const address of [`/subprocess/parents/${parentId}`, `/subprocess/children/${childId}`]) {
     await page.goto(address)
-    await expect(page.getByTestId('inspector-instance')).toContainText('No subject')
+    await expect(page.getByTestId('studio-section-inspector-facts').getByText('Record', { exact: true })).toHaveCount(0)
   }
 })
