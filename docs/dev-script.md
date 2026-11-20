@@ -38,7 +38,7 @@ Docker, .NET and Node, and works on a fresh clone.
    there are none. The Development and E2E settings of the server point `Templates:Path` there. The
    production images, the Compose example and the Helm chart's server set no `Templates:Path`,
    so Studio lists no template there. In a cell the chart sets it on the publisher for the create job,
-   see [the publisher in a cell](reference/installation.md#the-publisher-in-a-cell).
+   see [the publisher in a cell](reference/installation-in-the-cloud.md#the-publisher-in-a-cell).
 9. It builds the agent host, `src/Axis.Agent`, before the server starts, and runs the built `Axis.Agent.dll`
    at once, not under `dotnet watch`. With no `Ai` settings it runs idle, and it serves its health
    endpoints at `http://127.0.0.1:5209`, see [health checks](reference/health-checks.md#agent-host).
@@ -54,7 +54,7 @@ Docker, .NET and Node, and works on a fresh clone.
     The publisher runs from the built `Axis.Admin.dll`, not under `dotnet watch`. The script sets its
     tenant settings as environment variables of that process only, because `Axis.Admin` reads no
     `appsettings` file. They cover `default` and `default-preview`, so it runs preview requests too, see
-    [publisher](reference/administration.md#publisher).
+    [publisher](reference/publisher.md#publisher).
 
 Each output line starts with `[server]`, `[worker]`, `[web]`, `[publisher]`, `[agent]` or `[package-host]`, and the script's own
 messages start with `[dev]`.

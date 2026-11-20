@@ -489,7 +489,7 @@ marks some of them as contract scenarios, which test the contract's points on ev
 - **On publish.** Every publish and every validate request of an application runs the contract
   scenarios of every module it pins, before activation, through the
   [publisher](authoring-publishing.md#publishing), as the `contracts` step of the request, see
-  [the publisher](administration.md#publisher). A failing one fails the request, which names the
+  [the publisher](publisher.md#publisher). A failing one fails the request, which names the
   module, the scenario and its failing step, with `AXC0342`, once for each failing scenario, and
   nothing is stored or activated. Without scenarios to run, nothing changes.
 - **Relaxed points.** A contract scenario that covers a relaxed point of its module is skipped, and the

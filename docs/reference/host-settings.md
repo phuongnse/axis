@@ -15,7 +15,7 @@ in [administration](administration.md).
 The server can compile and activate application folders when it starts, so a development or E2E
 server serves a real application without a separate step. Production leaves it off, and a release
 goes live through [`Axis.Admin activate`](administration.md#activate) or the
-[publisher](administration.md#publisher).
+[publisher](publisher.md#publisher).
 
 | Setting                           | Environment variable                                     | Default | Meaning                                                                                                                                                                                                                                                                                                                                                                |
 | --------------------------------- | -------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -132,7 +132,8 @@ allows in the authoring API, and the Studio fields of `GET /api/me` that follow 
   and the server stops if it cannot create it. Under several replicas it sits on the shared Studio
   volume, such as `/studio/apps`, and every replica mounts the folders at the same path, because the
   [write lock](authoring.md#versions) is keyed by the full path. The
-  [installation guide](installation.md) shows the Compose and Helm mounts.
+  [installation on premises](installation-on-premises.md) and [installation in the cloud](installation-in-the-cloud.md)
+  show the Compose and Helm mounts.
 - **Revisions.** With neither path set, the server keeps no revisions. In a cell the folder is
   `<Studio:ApplicationsPath>/<tenant id>/.revisions`. Setting `Studio:RevisionsPath` there stops the
   start, and the message names `Studio:RevisionsPath` and `Cell:Id`.
@@ -161,10 +162,10 @@ allows in the authoring API, and the Studio fields of `GET /api/me` that follow 
   only there. Studio creates the folder the first time it uses it. Another tenant's application, by
   name, resource id or path, answers `404`. A non-empty `Studio:Folders` stops the start, and the
   message names `Studio:Folders` and `Cell:Id`, because every tenant would reach those folders. The
-  publisher reads `Studio:ApplicationsPath` for the [create job](administration.md#create-job), which
-  copies a template into the tenant's folder, the [export job](administration.md#export-job), which
+  publisher reads `Studio:ApplicationsPath` for the [create job](publisher.md#create-job), which
+  copies a template into the tenant's folder, the [export job](publisher.md#export-job), which
   writes the folder into the tenant's [export](tenant-lifecycle.md#exporting-a-tenant), where an
-  unset setting means no entries, and the [purge job](administration.md#purge-job), whose `studio`
+  unset setting means no entries, and the [purge job](publisher.md#purge-job), whose `studio`
   step deletes it when the tenant is [deleted](tenant-lifecycle.md#deleting-a-tenant). The folder
   also joins the tenant's [backup](tenant-backup-and-restore.md#backups-in-a-cell), and a restore
   writes it under the new tenant. The worker reads `Studio:ApplicationsPath` to count each tenant's

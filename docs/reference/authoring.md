@@ -3,7 +3,7 @@
 The authoring API is how Studio, and any other client, reads and edits an application. It edits the
 resource files of an application folder on the server's disk, the same files that are kept in git,
 and it never activates a release: going live is a [publish request](authoring-publishing.md#publishing), which the server
-stores and a separate [publisher](administration.md#publisher) runs, so the server never activates
+stores and a separate [publisher](publisher.md#publisher) runs, so the server never activates
 in its own process. This page gives the API's settings, routes, versions, order of checks, writes and diagnostics,
 [answers](authoring-responses.md). The publishing routes are in
 [publishing in the authoring API](authoring-publishing.md). The page and form metadata routes are in
@@ -482,7 +482,7 @@ and module resource saves.
 - **Who wrote it.** A write also records its writer, see [resource activity](studio-resource-form.md#resource-activity).
 - **Never an activation.** A write never compiles against a database, never stores a release and never
   activates one. Only a [publish request](authoring-publishing.md#publishing) leads to an activation, which the
-  [publisher](administration.md#publisher) runs.
+  [publisher](publisher.md#publisher) runs.
 
 ### New files
 

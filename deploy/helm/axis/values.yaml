@@ -1,4 +1,4 @@
-# Values of the Axis chart. See docs/reference/installation.md.
+# Values of the Axis chart. See docs/reference/installation-in-the-cloud.md#values.
 # PostgreSQL and the source of secrets are external. The chart runs Axis's identity provider.
 
 image:
@@ -15,7 +15,7 @@ server:
   repository: axis-server
   # Replicas share the data protection key ring in the platform database, so
   # sessions work on every replica. With Studio on, they also share the
-  # studio.persistence volume, see docs/reference/installation.md.
+  # studio.persistence volume, see docs/reference/installation-in-the-cloud.md.
   replicas: 1
   # A Kubernetes resources block: requests and limits.
   resources: {}
@@ -162,7 +162,7 @@ cell:
     # Required. The host of PostgreSQL, and its port.
     databaseHost: ""
     databasePort: 5432
-    # Required. The role that PgBouncer looks passwords up with, see docs/reference/installation.md.
+    # Required. The role that PgBouncer looks passwords up with, see docs/reference/installation-in-the-cloud.md#pgbouncer.
     authUser: ""
     # The database that holds the lookup function pgbouncer.user_lookup of the auth user.
     authDatabase: postgres

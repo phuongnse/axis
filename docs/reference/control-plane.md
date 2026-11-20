@@ -94,7 +94,7 @@ every business change.
 
 - **Durable jobs.** Provisioning a tenant, the subscription clock, emails, invoice issuing and the
   daily reconciliation run as jobs in the control plane's database, on the queue below, which follows
-  the [publisher](administration.md#publisher) in claiming with a lease.
+  the [publisher](publisher.md#publisher) in claiming with a lease.
   - **The `control_plane.jobs` table.** `id`, `kind`, `payload` (JSON), `state` (`queued`,
     `running`, `succeeded` or `failed`), `attempts`, `next_attempt_at`, `lease_owner`,
     `lease_until`, `last_error`, `created_at` and `finished_at`. Code enqueues a job of a kind with a

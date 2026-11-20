@@ -9,7 +9,7 @@ activate an application, list its releases and record its audit. The other route
 An author validates, publishes, previews and tests an application from Studio, and activates any
 release of its history. The server holds no tenant schema connection and never activates in its own
 process: it stores a **publish request** in the tenant database, and a separate
-[publisher](administration.md#publisher) runs it with the tenant's schema role. The tables are in
+[publisher](publisher.md#publisher) runs it with the tenant's schema role. The tables are in
 [publish requests and release history](publish-request-storage.md#publish-requests-and-release-history).
 
 A request runs for the tenant of the author's session, so Studio on a tenant's host publishes to that
@@ -110,7 +110,7 @@ What each kind does:
   real users.
 - **Where it is stored and where it runs.** The request is stored in the session tenant's database,
   so Studio polls `GET .../requests/{id}` on the main host as for any request. The publisher runs it
-  against the preview tenant's database, see [the publisher](administration.md#publisher).
+  against the preview tenant's database, see [the publisher](publisher.md#publisher).
 - **History.** The activation goes in the preview tenant's own release history, with the request id,
   and the preview's release number is its own. `GET .../releases` on the main host shows only the main
   tenant's history.
@@ -141,7 +141,7 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
 - **Where it runs.** The server stores the request with a snapshot, taken as for `validate`, or of
   the person's [draft](revisions-and-drafts.md#drafts) for the MCP server's `run_scenarios` and `test_package`. The
   publisher runs it with `Scenarios:ServerConnectionString`, in a new database for each scenario, see
-  [the publisher](administration.md#publisher), and touches the tenant database only for the
+  [the publisher](publisher.md#publisher), and touches the tenant database only for the
   request's status and outcomes. Without the setting, the request ends `failed` with `AXC0217`, which
   names it, and a snapshot that does not compile ends it `failed` with the compile diagnostics. In
   these cases, and for an unknown name, no scenario runs.

@@ -472,13 +472,13 @@ package reaches nothing of the host and no binding of another call.
   and stops it when told. The images and containers are in [images](installation.md#images).
 - **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they, the worker and
   the publisher share, and the publisher calls only `application-package-host` there. Each gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
-  CPU and memory limits, see [on premises](installation.md#on-premises).
+  CPU and memory limits, see [on premises](installation-on-premises.md#on-premises).
 - **The C#, Node.js and Python hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python`, each as a Deployment, a Service on port 5310 and a
   NetworkPolicy, with the command `host` and a read-only root file system apart from `/tmp`. It has no env entry, no secret and no
   service link, and the worker is pointed at its Service with `Extensions__Runners__Dotnet`, `Extensions__Runners__Node` and `Extensions__Runners__Python`. Its CPU and memory limits come from
   `packageHost.dotnet.resources`, `packageHost.node.resources` and `packageHost.python.resources`, and rendering fails without them. Each NetworkPolicy admits only worker pods, on TCP 5310, lets the host send traffic only to worker
   pods and allows no DNS. It holds only where the network plugin enforces NetworkPolicy, see
-  [in the cloud](installation.md#in-the-cloud). With `applicationPackageHost.enabled`, the chart also runs
+  [in the cloud](installation-in-the-cloud.md#in-the-cloud). With `applicationPackageHost.enabled`, the chart also runs
   `<release>-application-package-host` from the same templates, under gVisor, see
   [the sandbox](#an-applications-packages).
 - **The Python runner.** For a `start` that names a `python` version, the host runs `python3 -I -B <sdk>/axis_runner.py <version
@@ -827,7 +827,7 @@ installation, loading, the capability limits, the server's metadata-only load an
   `scripts/build.sh` and `scripts/dev.sh` install it there, and the Compose image holds it in
   `/extensions`. In every run mode `Extensions:Path` names that folder. The on-premises smoke test builds the
   package with the `build` command of its package host image. It also runs the operation in a runner of the C# package host
-  when tenant one's manager approves a request, see [tests of the example](installation.md#tests-of-the-example).
+  when tenant one's manager approves a request, see [tests of the example](installation-on-premises.md#tests-of-the-example).
 - **Python sample package.** `samples/packages/phone-numbers/` holds `phone-numbers` 1.0.0 as plain
   files. Its adapter wraps the PyPI library `phonenumbers` and leaves it unchanged. Its one
   operation, `normalize`, is pure and has no capabilities. It takes a `number` and an optional
@@ -865,7 +865,7 @@ installation, loading, the capability limits, the server's metadata-only load an
   host that holds it, and point their worker at it, see [development](../development.md). The on-premises smoke test
   builds the package with the `build` command of its package host image. It also runs the operation in a runner of the
   Node.js package host when tenant one's manager approves a request, see
-  [tests of the example](installation.md#tests-of-the-example).
+  [tests of the example](installation-on-premises.md#tests-of-the-example).
 - **Test package.** A test-only package, `test-package`, lives under
   `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
   tests install it to cover installation and loading. Its `probe` operation
@@ -873,7 +873,7 @@ installation, loading, the capability limits, the server's metadata-only load an
   and `secret` bindings, and in the other modes it asks for a host or a secret
   it does not declare. The on-premises smoke test builds 1.0.0 with the `build` command of the C# package host
   image and runs `probe` in the `ownOtherHost` mode in a runner, see
-  [tests of the example](installation.md#tests-of-the-example). Its `ExitOperation` type ends its own process only when it runs in a
+  [tests of the example](installation-on-premises.md#tests-of-the-example). Its `ExitOperation` type ends its own process only when it runs in a
   package runner and throws anywhere else, so tests can stand in for a runner that crashes.
 - **Initializer package.** A test-only package, `initializer-package` 1.0.0, lives under
   `tests/packages/`. Its module initializer and its operation's static constructor each write a

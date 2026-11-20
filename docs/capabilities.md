@@ -659,10 +659,10 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Stated recovery point and recovery time | _(planned for M57)_ |
 | Fail over to another region | _(planned for M57)_ |
 | Several server replicas | [Shared state](reference/several-server-replicas.md#shared-state) |
-| Several worker replicas | [Values](reference/installation.md#values) |
+| Several worker replicas | [Values](reference/installation-in-the-cloud.md#values) |
 | Performance objectives and load tests | [Objectives](reference/performance.md#objectives) |
-| Install on premises | [On premises](reference/installation.md#on-premises) |
-| Install in the cloud | [In the cloud](reference/installation.md#in-the-cloud) |
+| Install on premises | [On premises](reference/installation-on-premises.md#on-premises) |
+| Install in the cloud | [In the cloud](reference/installation-in-the-cloud.md#in-the-cloud) |
 | Upgrade the platform | [Upgrade](reference/upgrade.md#upgrade) |
 | Upgrade the platform without downtime | _(planned for M57)_ |
 | Tell tenants about maintenance ahead of time | _(planned for M57)_ |

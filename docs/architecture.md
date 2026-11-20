@@ -108,7 +108,7 @@ flowchart LR
   tenants as the server does, connects to each tenant database with that tenant's schema role, and
   runs the publish requests that Studio stores. It has no HTTP endpoint, and the server holds no
   tenant schema connection. The production installs, `scripts/dev.sh`, Docker Compose and the E2E
-  script each start one. See [publisher](reference/administration.md#publisher).
+  script each start one. See [publisher](reference/publisher.md#publisher).
 - **The platform database** holds installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform settings.
 - **A tenant database** holds everything else of one tenant: releases, system tables, process
@@ -198,8 +198,9 @@ Axis ships as production images, as
 - `deploy/compose/` and `deploy/helm/axis/` install the images that [images](reference/installation.md#images)
   lists, on one machine and on Kubernetes.
 
-The steps, every setting and the upgrade order are in the
-[installation guide](reference/installation.md).
+The Compose and Helm steps are in [installation on premises](reference/installation-on-premises.md)
+and [installation in the cloud](reference/installation-in-the-cloud.md). Every setting and the upgrade
+order are in the [installation guide](reference/installation.md).
 
 ## Crosscutting concepts
 

@@ -515,7 +515,7 @@ A command writes its record either when its work for a tenant starts or together
 The publisher and the server also write records for the operator's work in a cell:
 
 - **Provisioning jobs.** Each job of the [provisioning API](tenant-lifecycle.md#provisioning-api) that
-  the [publisher](administration.md#publisher) runs writes one record when it ends, succeeded or failed,
+  the [publisher](publisher.md#publisher) runs writes one record when it ends, succeeded or failed,
   in the same transaction as the job's final state. Its command is `tenant <kind>` after the job's kind,
   such as `tenant suspend` or `tenant purge`, its `changed` holds `job:<id>` and its actor is the job's.
 - **Host verification.** When the publisher verifies a [host request](tenant-lifecycle.md#hosts) and the

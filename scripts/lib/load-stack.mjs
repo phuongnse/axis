@@ -122,7 +122,7 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results
     `Host=postgres;Port=5432;Database=axis_identity;Username=axis_identity_reader;Password=${passwords.reader}${trusted}`,
   )
 
-  // The database roles: the SQL of the installation guide.
+  // The database roles: the SQL of docs/reference/installation-on-premises.md#database-roles.
   const initSql = join(folder, 'init-roles.sql')
   writeFile(
     initSql,

@@ -134,7 +134,7 @@ fetch_gvisor() {
 }
 
 # Registers gVisor's runsc runtime with Docker, which the application-packages profile of the Compose
-# example needs, see docs/reference/installation.md#on-premises. It skips the step on systems other than
+# example needs, see docs/reference/installation-on-premises.md#on-premises. It skips the step on systems other than
 # Linux, when Docker is not reachable and when Docker already lists runsc. Otherwise it downloads the
 # pinned release into the tools cache, checks its SHA-512, copies it to /usr/local/bin, runs
 # runsc install and reloads Docker. Only runsc is installed: Docker calls it directly, and the

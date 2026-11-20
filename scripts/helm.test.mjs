@@ -79,13 +79,13 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(agent, /PlatformSchema|Admin__|Cell__|Extensions__|Modules__|serviceAccountName/)
   })
 
-  test("the installation doc's agent host row of 'Which pod gets which secret' lists the secrets the chart gives the agent host", () => {
+  test("the cloud install doc's agent host row of 'Which pod gets which secret' lists the secrets the chart gives the agent host", () => {
     const keys = [...readFileSync(new URL('../deploy/helm/axis/values.yaml', import.meta.url), 'utf8').matchAll(/^  ([a-z][A-Za-z]+):\n    name:/gm)].map((match) => match[1])
     assert.ok(keys.length > 10, 'no secrets in values.yaml')
     const agent = find(renderOk(...keys.flatMap((key) => ['--set', `secrets.${key}.name=named-${key}`])), 'Deployment', 'axis-agent')
     const rendered = [...new Set([...agent.matchAll(/(?:secretName|name): "named-([A-Za-z]+)"/g)].map((match) => match[1]))].sort()
 
-    const doc = readFileSync(new URL('../docs/reference/installation.md', import.meta.url), 'utf8')
+    const doc = readFileSync(new URL('../docs/reference/installation-in-the-cloud.md', import.meta.url), 'utf8')
     const row = doc.split('\n').find((line) => line.startsWith('| Agent host | '))
     assert.ok(row, 'no Agent host row in the secrets table')
     const listed = [...new Set([...row.matchAll(/`([a-z][A-Za-z]+)`/g)].map((match) => match[1]).filter((name) => keys.includes(name)))].sort()
@@ -936,13 +936,13 @@ describe('the Axis Helm chart', () => {
     assert.match(publisher, /- name: templates\n\s+persistentVolumeClaim:\n\s+claimName: axis-templates\n/)
   })
 
-  test("the installation doc's publisher row of 'Which pod gets which secret' lists the secrets the chart gives the publisher", () => {
+  test("the cloud install doc's publisher row of 'Which pod gets which secret' lists the secrets the chart gives the publisher", () => {
     const keys = [...readFileSync(new URL('../deploy/helm/axis/values.yaml', import.meta.url), 'utf8').matchAll(/^  ([a-z][A-Za-z]+):\n    name:/gm)].map((match) => match[1])
     assert.ok(keys.length > 10, 'no secrets in values.yaml')
     const publisher = find(renderOk(...keys.flatMap((key) => ['--set', `secrets.${key}.name=named-${key}`])), 'Deployment', 'axis-publisher')
     const rendered = [...new Set([...publisher.matchAll(/(?:secretName|name): "named-([A-Za-z]+)"/g)].map((match) => match[1]))].sort()
 
-    const doc = readFileSync(new URL('../docs/reference/installation.md', import.meta.url), 'utf8')
+    const doc = readFileSync(new URL('../docs/reference/installation-in-the-cloud.md', import.meta.url), 'utf8')
     const row = doc.split('\n').find((line) => line.startsWith('| Publisher | '))
     assert.ok(row, 'no Publisher row in the secrets table')
     const listed = [...new Set([...row.matchAll(/`([a-z][A-Za-z]+)`/g)].map((match) => match[1]).filter((name) => keys.includes(name)))].sort()

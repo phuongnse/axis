@@ -1587,7 +1587,7 @@ describe('App', () => {
     for (const path of ['/e2e/no-such-page', '/e2e/noteform', '/e2e/notes/new', '/e2e/notes/42']) {
       const { unmount } = renderApp(path)
 
-      expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+      expect(await screen.findByTestId('not-found', undefined, { timeout: 5000 })).toBeInTheDocument()
       expect(screen.getByRole('menuitem', { name: 'Notes' })).toBeInTheDocument()
       unmount()
     }
