@@ -292,7 +292,7 @@ not an administrator and a preview tenant do not see it. Its texts are `shell.us
 _(planned for M37)_
 
 The People tab has a "Package runners" section below Application packages, where an administrator adds a
-[customer-hosted runner](extension-packages.md#customer-hosted-runners), sees the tenant's runners and revokes one, see
+[customer-hosted runner](package-runners.md#customer-hosted-runners), sees the tenant's runners and revokes one, see
 [package runners](user-administration.md#package-runners). The section is a component of its own, like Model key. It
 loads `GET /api/tenant/package-runners` and renders nothing unless the route answers `200`, so a user who is not an
 administrator and a preview tenant do not see it. Its texts are `shell.users.packageRunners.*`.

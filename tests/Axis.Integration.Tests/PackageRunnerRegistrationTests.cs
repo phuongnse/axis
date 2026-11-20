@@ -8,7 +8,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// A customer-hosted runner signs in with its client's token and registers its packages at <c>POST /api/package-runner/packages</c>, see
-/// <c>docs/reference/extension-packages.md#routes</c>, with real PostgreSQL and Keycloak. The checks that come before a route's work are
+/// <c>docs/reference/package-runners.md#routes</c>, with real PostgreSQL and Keycloak. The checks that come before a route's work are
 /// the same for <c>POST /api/package-runner/calls/take</c>, so its denied cases are here too. Each test makes the realms of its tenants with
 /// unique names and deletes them at the end.
 /// </summary>

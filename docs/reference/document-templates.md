@@ -156,7 +156,7 @@ documents in a runner that has a sandbox, never in the server or the worker.
 
 - **One mechanism.** The runner runs under the sandbox of the runners of an application's packages, gVisor,
   with an empty environment, a read-only file system, the resource limits of
-  [package runners](extension-packages.md#package-runners), and no network route at all, because a document
+  [package runners](package-runners.md#package-runners), and no network route at all, because a document
   needs none. See [in package runners](extension-package-limits.md#in-package-runners).
 - **What it gets.** One call carries the template's file, the values of the places as JSON and the images
   that the document shows, and the runner answers one file. It keeps nothing after the call and serves one

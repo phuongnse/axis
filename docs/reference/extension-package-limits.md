@@ -1,7 +1,8 @@
 # Extension package limits
 
 This page says what the limits on an extension package's operations do not protect against. The
-package, its manifest and its runners are in [extension packages](extension-packages.md).
+package and its manifest are in [extension packages](extension-packages.md), and its runners are in
+[package runners](package-runners.md).
 
 ## Not a sandbox
 
@@ -35,11 +36,11 @@ A C# package that loads in the host's process and uses .NET APIs directly can do
 
 ### In package runners
 
-Outside Development, an installation's packages run in [package runners](extension-packages.md#package-runners). There, the
+Outside Development, an installation's packages run in [package runners](package-runners.md#package-runners). There, the
 runner's network route, empty environment, read-only file system, resource limits and kill at the
 timeout stop the items in the list above, and the runner holds nothing of the host to reach by
 reflection. Static state shared across tenants is the one item still possible, because one set of
 runners serves every tenant.
 
 - **Runners for each tenant.** An application's packages run in runners that serve only their tenant,
-  which closes that gap, see [An application's packages](extension-packages.md#an-applications-packages).
+  which closes that gap, see [An application's packages](package-runners.md#an-applications-packages).

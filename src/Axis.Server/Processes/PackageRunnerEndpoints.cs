@@ -13,7 +13,7 @@ using Axis.Server.Tenancy;
 namespace Axis.Server.Processes;
 
 /// <summary>
-/// The routes of a customer-hosted package runner, see <c>docs/reference/extension-packages.md#routes</c>. A request is checked in
+/// The routes of a customer-hosted package runner, see <c>docs/reference/package-runners.md#routes</c>. A request is checked in
 /// order: the tenant of the host (<c>404</c>), the runner's token and row (<c>401</c>, see <see cref="PackageRunnerCaller"/>), the body
 /// (<c>400</c>), then the releases (<c>409</c>).
 /// <para>

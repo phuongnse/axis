@@ -33,7 +33,7 @@
 # The Node.js package host runs from the built Axis.PackageHost.dll, whose build output holds the Node.js runner, and reads
 # the packages in artifacts/extensions. It listens on 127.0.0.1:5310 only, because the runner protocol has no
 # authentication, and AXIS_PACKAGE_HOST_NODE_PORT moves that port. The worker sends its `node` calls to it through
-# Extensions__Runners__Node, see docs/reference/extension-packages.md#package-runners.
+# Extensions__Runners__Node, see docs/reference/package-runners.md#package-runners.
 # The server creates Studio's new applications in artifacts/studio-apps, which git ignores. An exported
 # Studio__ApplicationsPath replaces that folder.
 # The publisher runs from the built Axis.Admin.dll, not under dotnet watch, so a change to its code

@@ -45,7 +45,7 @@ internal static class PackageHostProgram
 
     /// <summary>
     /// Runs the <c>connect</c> command until Ctrl+C or SIGTERM, with the settings of <c>Connect:*</c> and <c>Extensions:Path</c>, see
-    /// docs/reference/extension-packages.md#customer-hosted-runners.
+    /// docs/reference/package-runners.md#customer-hosted-runners.
     /// </summary>
     private static async Task<int> ConnectAsync(string[] args)
     {
@@ -70,7 +70,7 @@ internal static class PackageHostProgram
 
     /// <summary>
     /// Runs host mode until it is stopped, on the port and address of <c>PackageHost:Port</c> and <c>PackageHost:Address</c>, see
-    /// docs/reference/extension-packages.md#the-runner-protocol. It does not start when <c>Extensions:Path</c> is missing or names no
+    /// docs/reference/package-runners.md#the-runner-protocol. It does not start when <c>Extensions:Path</c> is missing or names no
     /// folder, or when either of the other two settings is malformed.
     /// </summary>
     private static async Task<int> RunHostAsync(string[] args)

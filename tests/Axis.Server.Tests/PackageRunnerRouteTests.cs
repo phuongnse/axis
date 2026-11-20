@@ -10,7 +10,7 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// The marker <see cref="PackageRunnerRoute"/> picks the runner's bearer scheme, so only the routes of a package runner may carry it, see
-/// <c>docs/reference/extension-packages.md#routes</c>.
+/// <c>docs/reference/package-runners.md#routes</c>.
 /// </summary>
 public sealed class PackageRunnerRouteTests
 {

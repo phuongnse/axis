@@ -1,7 +1,7 @@
 "use strict";
 
 // The Node.js runner: runs the operations of one installed Node.js package version, one `run` at a time, as the C#
-// runner does, see docs/reference/extension-packages.md#the-runner-protocol. It is started as
+// runner does, see docs/reference/package-runners.md#the-runner-protocol. It is started as
 // `node runner.js runner <root> <id> <version>`. The protocol goes over the standard input and output. Package code
 // that writes to the console writes to standard error, so it cannot corrupt the protocol stream. The exit code is 0
 // when the input ends or a `stop` arrives, 1 when the version does not load, and 2 when a line is not a `run` or a

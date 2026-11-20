@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 namespace Axis.PackageHost;
 
 /// <summary>
-/// Runs the <c>unittest</c> tests of a built Python package, see docs/reference/extension-packages.md#the-runner-protocol.
+/// Runs the <c>unittest</c> tests of a built Python package, see docs/reference/package-runners.md#the-runner-protocol.
 /// The runner script is embedded in this assembly. It runs with the <c>PackageBuild:Python</c> command, <c>-I -B</c>, an empty
 /// environment and the built copy as its working folder, and it prints one JSON line with the outcome of each test.
 /// </summary>

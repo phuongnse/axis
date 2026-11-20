@@ -8,7 +8,7 @@ namespace Axis.PackageHost;
 
 /// <summary>
 /// Runs <see cref="RunnerHost"/> on the endpoint that <see cref="TryReadEndpoint"/> reads for the life of the host, see
-/// docs/reference/extension-packages.md#the-runner-protocol.
+/// docs/reference/package-runners.md#the-runner-protocol.
 /// </summary>
 internal sealed class RunnerHostService(RunnerHost host, IPEndPoint bind) : IHostedService
 {

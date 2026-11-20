@@ -4,7 +4,7 @@ namespace Axis.Configuration.Packages;
 
 /// <summary>
 /// The one reader of <c>Extensions:ApplicationPackages</c>, see
-/// docs/reference/extension-packages.md#an-applications-packages. <see cref="On"/> is the setting, <see langword="false"/> when it is
+/// docs/reference/package-runners.md#an-applications-packages. <see cref="On"/> is the setting, <see langword="false"/> when it is
 /// unset. <see cref="RunnerHost"/> and <see cref="RunnerPort"/> are the <c>host:port</c> of <c>application-package-host</c> from
 /// <c>Extensions:Runners:Application</c>, <see langword="null"/> and 0 when it is not set.
 /// </summary>

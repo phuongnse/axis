@@ -2,7 +2,7 @@
 {{- $values := $.Values }}
 {{- range splitList "." $host.values }}{{- $values = index $values . | default dict }}{{- end }}
 ---
-# A package host, see docs/reference/extension-packages.md#package-runners. It gets no env entry, no credential and no
+# A package host, see docs/reference/package-runners.md#package-runners. It gets no env entry, no credential and no
 # service account token, and it has no health endpoint, so it has no probe.
 apiVersion: apps/v1
 kind: Deployment
@@ -24,7 +24,7 @@ spec:
     spec:
       {{- if $host.sandbox }}
       # The application package host runs tenant code, so it runs under gVisor, see
-      # docs/reference/extension-packages.md#an-applications-packages and threat P145 of
+      # docs/reference/package-runners.md#an-applications-packages and threat P145 of
       # docs/reference/threat-model-product.md. The package hosts of the runtimes set no runtimeClassName.
       runtimeClassName: {{ required "applicationPackageHost.runtimeClassName is required: the RuntimeClass of gVisor that the application package host runs under" $values.runtimeClassName | quote }}
       {{- end }}

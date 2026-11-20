@@ -4,7 +4,7 @@ namespace Axis.Worker;
 
 /// <summary>
 /// With <c>Extensions:ApplicationPackages</c> on, asks <c>application-package-host</c> at <c>Extensions:Runners:Application</c>
-/// whether it runs under gVisor, see docs/reference/extension-packages.md#an-applications-packages. Only a <c>gvisor</c> of
+/// whether it runs under gVisor, see docs/reference/package-runners.md#an-applications-packages. Only a <c>gvisor</c> of
 /// <see langword="true"/> passes. A refused or closed connection, another message and a wait that runs out each count as no answer, which fails the
 /// check too. With the setting off the check never connects.
 /// </summary>

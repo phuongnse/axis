@@ -12,7 +12,7 @@ public static class RealmPackageRunnerClient
     /// <summary>The start of the client id of a package runner.</summary>
     public const string ClientIdPrefix = "runner-";
 
-    /// <summary>The audience of the runner's access tokens (<c>docs/reference/extension-packages.md#customer-hosted-runners</c>).</summary>
+    /// <summary>The audience of the runner's access tokens (<c>docs/reference/package-runners.md#customer-hosted-runners</c>).</summary>
     public const string Audience = "axis-package-runner";
 
     /// <summary>The name of the mapper that puts <see cref="Audience"/> into the access token.</summary>

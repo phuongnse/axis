@@ -10,7 +10,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// A customer-hosted runner posts the <c>succeeded</c>, <c>retryable</c> or <c>failed</c> result of a call it took at <c>POST /api/package-runner/leases/{leaseId}/result</c>, see
-/// <c>docs/reference/extension-packages.md#routes</c>, with real PostgreSQL and Keycloak. The calls are left as staging leaves them, and the runner
+/// <c>docs/reference/package-runners.md#routes</c>, with real PostgreSQL and Keycloak. The calls are left as staging leaves them, and the runner
 /// takes each one first. The denied cases of the token and the body are in <see cref="PackageRunnerRegistrationTests"/>. Each test makes the
 /// realm of its tenant with a unique name and deletes it at the end.
 /// </summary>

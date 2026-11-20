@@ -6,7 +6,7 @@ namespace Axis.Configuration.Packages;
 
 /// <summary>
 /// Where the worker runs the operations of a package, see
-/// docs/reference/extension-packages.md#package-runners. <see cref="InProcess"/> loads each C# package into
+/// docs/reference/package-runners.md#package-runners. <see cref="InProcess"/> loads each C# package into
 /// the worker. Otherwise the worker sends each attempt of a C# package to a runner of the package host at
 /// <see cref="DotnetHost"/> and <see cref="DotnetPort"/>, which are <see langword="null"/> and 0 when
 /// <c>Extensions:Runners:Dotnet</c> is not set. A <c>node</c> package always goes to a runner of the package host at

@@ -42,7 +42,7 @@
 # publish requests of Studio. The run fails if it exits during the run or never finds the database migrated.
 # One Node.js package host, `Axis.PackageHost host`, runs from the build output on a free loopback port and reads
 # artifacts/extensions. It writes artifacts/logs/e2e-package-host.log. The worker sends its `node` calls to it through
-# Extensions__Runners__Node, see docs/reference/extension-packages.md#package-runners. The run fails if it exits during the run.
+# Extensions__Runners__Node, see docs/reference/package-runners.md#package-runners. The run fails if it exits during the run.
 # The purchase request release spec also holds the Studio journey: edit, validate, preview on localhost, publish and
 # activation, all through the publisher and with no admin command.
 # The purchasing system stub from tests/Axis.PurchasingStub runs from the build output on

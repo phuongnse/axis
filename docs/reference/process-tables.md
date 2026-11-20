@@ -322,7 +322,7 @@ masking rule of `input`, see [call input kept](process-inspection.md#call-input-
 | `last_error` | `text`, null | The error of the last attempt: an exception type or a fixed sentence. It holds no exception message and no value |
 | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
-| `runner_id` | `uuid`, null | The [customer-hosted runner](extension-packages.md#customer-hosted-runners) that holds the lease |
+| `runner_id` | `uuid`, null | The [customer-hosted runner](package-runners.md#customer-hosted-runners) that holds the lease |
 | `lease_id` | `uuid`, null | The lease of the current attempt. A unique index finds the call by its lease |
 | `lease_until` | `timestamptz`, null | When the lease ends |
 

@@ -22,18 +22,18 @@ The file holds no password, client secret or key.
   `ConnectionStrings__PlatformSchema` and `Platform__SecretKey` files and not
   `Admin__ConnectionString`, and it publishes no port. Its `stop_grace_period` is six minutes, longer
   than the five-minute lease, so a stop lets the running request finish. It sits on the default network and on the internal network `runners`,
-  and sets `Extensions__Runners__Application` to `application-package-host:5310`, so a publish can build the packages of an application, see [an application's packages](extension-packages.md#an-applications-packages).
+  and sets `Extensions__Runners__Application` to `application-package-host:5310`, so a publish can build the packages of an application, see [an application's packages](package-runners.md#an-applications-packages).
 - **The agent host** runs the `axis-agent` image. It mounts the `ConnectionStrings__Platform` and
   `Platform__SecretKey` files and no folder, and it publishes only its health port on `127.0.0.1`.
 - **The package hosts** are `package-host-dotnet`, `package-host-python` and `package-host-node`. They run the `axis-package-host-dotnet`, `axis-package-host-python` and `axis-package-host-node`
-  images with the command `host`, and run the C#, the `python` and the `node` package operations of the worker, see [package runners](extension-packages.md#package-runners).
+  images with the command `host`, and run the C#, the `python` and the `node` package operations of the worker, see [package runners](package-runners.md#package-runners).
   Each has a read-only root file system apart from a `/tmp` tmpfs, no environment, secret or published port, and `/extensions` read-only and
   nothing else. Its limits are 1 CPU and 1g of memory. `AXIS_PACKAGE_HOST_CPUS` and `AXIS_PACKAGE_HOST_MEMORY` change those of the C# host, `AXIS_PACKAGE_HOST_PYTHON_CPUS` and `AXIS_PACKAGE_HOST_PYTHON_MEMORY` those of the Python host, and `AXIS_PACKAGE_HOST_NODE_CPUS` and `AXIS_PACKAGE_HOST_NODE_MEMORY` those of the Node.js host.
   A host sits only on the internal network `runners`, which no other service but the worker, the publisher and the other package hosts share, so only they reach its port 5310, which
   does not authenticate a connection, and it reaches nothing outside that network. The worker sets `Extensions__Runners__Dotnet` to
   `package-host-dotnet:5310`, `Extensions__Runners__Python` to `package-host-python:5310` and `Extensions__Runners__Node` to `package-host-node:5310`.
 - **The application package host** is `application-package-host`, behind the `application-packages` profile. `docker compose --profile application-packages up -d application-package-host` starts it and `docker compose up` does not.
-  It runs the `axis-package-host-node` image under the `runsc` runtime, which is gVisor, and runs the code of [an application's packages](extension-packages.md#an-applications-packages).
+  It runs the `axis-package-host-node` image under the `runsc` runtime, which is gVisor, and runs the code of [an application's packages](package-runners.md#an-applications-packages).
   gVisor installed and registered with Docker as `runsc` is a prerequisite of that profile only, and `scripts/setup.sh` does it on Linux, see [development](../development.md#setup).
   It has the rules of a package host for its root, environment, secret, port, mount and network, and its own limits, 1 CPU and 1g, which `AXIS_APPLICATION_PACKAGE_HOST_CPUS` and
   `AXIS_APPLICATION_PACKAGE_HOST_MEMORY` change. The worker and the publisher set `Extensions__Runners__Application` to `application-package-host:5310` and ask it only when `Extensions__ApplicationPackages` is `true`.

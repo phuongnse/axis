@@ -492,7 +492,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Capability | Where |
 | --- | --- |
 | Add operations written in C#, TypeScript or Python | [What a package is](reference/extension-packages.md#what-a-package-is) |
-| Run package code in runners that reach only declared hosts | [Package runners](reference/extension-packages.md#package-runners) |
+| Run package code in runners that reach only declared hosts | [Package runners](reference/package-runners.md#package-runners) |
 | A tenant's author writes packages that run in a sandbox | _(planned for M37)_ |
 | Run a package in the customer's own network | _(planned for M37)_ |
 | Call custom code from an expression | _(planned for M45)_ |

@@ -71,7 +71,7 @@ cannot use up a replica.
 | ---------- | ------------------------------------------------------------- | -------------------- | ----------------------- |
 | Sign-in    | `GET /api/auth/sign-in` and `GET /api/auth/callback`, and the [cell console](cell-console.md#sign-in)'s `GET /api/cell/auth/sign-in` and `GET /api/cell/auth/callback` | Client address       | `RateLimits:SignIn`     |
 | Session    | Every other route that takes a session                        | Tenant and user      | `RateLimits:Session`    |
-| Bearer     | Inbound endpoints, [service accounts](security.md#service-accounts) and [customer-hosted runners](extension-packages.md#customer-hosted-runners) | Tenant and caller id | `RateLimits:Bearer`     |
+| Bearer     | Inbound endpoints, [service accounts](security.md#service-accounts) and [customer-hosted runners](package-runners.md#customer-hosted-runners) | Tenant and caller id | `RateLimits:Bearer`     |
 | Publishing | Studio validate, publish, preview, activate and test requests | Tenant and user      | `RateLimits:Publishing` |
 | MCP        | `/mcp`, the [MCP server](mcp-server.md)                       | Tenant and client id | `RateLimits:Mcp`        |
 

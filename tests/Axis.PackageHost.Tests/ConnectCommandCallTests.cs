@@ -10,7 +10,7 @@ namespace Axis.PackageHost.Tests;
 /// <summary>
 /// The <c>connect</c> command against a fake tenant, with the real C# runner of the test package: how each answer of a runner is posted,
 /// what happens when a lease ends, and how the token and a <c>401</c> are handled, see
-/// docs/reference/extension-packages.md#customer-hosted-runners. Each wait ends on a state, under a deadline that only bounds a hang.
+/// docs/reference/package-runners.md#customer-hosted-runners. Each wait ends on a state, under a deadline that only bounds a hang.
 /// </summary>
 public sealed class ConnectCommandCallTests
 {

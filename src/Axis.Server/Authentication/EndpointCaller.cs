@@ -185,7 +185,7 @@ internal static class EndpointCaller
 /// caller scheme expects <c>Oidc:EndpointAudience</c> and the service account scheme <c>Oidc:ServiceAudience</c>. The
 /// MCP caller scheme has no configured audience: it expects the request's own MCP URL, see <see cref="McpCaller.Resource"/>. The
 /// package runner scheme expects <see cref="RealmPackageRunnerClient.Audience"/> and reads the runner's row, see
-/// <c>docs/reference/extension-packages.md#customer-hosted-runners</c>. The token checks and the claim mapping are the same for all. A token must be signed with an algorithm in
+/// <c>docs/reference/package-runners.md#customer-hosted-runners</c>. The token checks and the claim mapping are the same for all. A token must be signed with an algorithm in
 /// <see cref="Algorithms"/> and must not be marked as another type than an access token, so an ID token is refused.
 /// A refused token writes a warning with the tenant and the reason. The reason is a fixed text, or the type name of the
 /// exception that the token library threw, and never the exception message or any part of the token. The client still gets

@@ -6,7 +6,7 @@ namespace Axis.PackageHost;
 
 /// <summary>
 /// Tells whether the host runs under gVisor, the sandbox that isolates an application's package, see
-/// docs/reference/extension-packages.md#an-applications-packages. gVisor's kernel log begins with its <c>Starting gVisor</c> line,
+/// docs/reference/package-runners.md#an-applications-packages. gVisor's kernel log begins with its <c>Starting gVisor</c> line,
 /// which <c>dmesg</c> reads with <c>klogctl</c>. <paramref name="readKernelLog"/> is the seam that tests feed a log through. It returns the
 /// log, or <see langword="null"/> when the read is refused or the system is not Linux.
 /// </summary>

@@ -9,7 +9,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// What the package host answers to a <c>build</c> of the sample Python package <c>phone-numbers</c>, see
-/// docs/reference/extension-packages.md#the-runner-protocol. The package goes over a real TCP connection to the host of this
+/// docs/reference/package-runners.md#the-runner-protocol. The package goes over a real TCP connection to the host of this
 /// process, with its <c>phonenumbers</c> wheel from the wheel cache that <c>scripts/setup.sh</c> fills, so pip installs it
 /// offline. The scan is a stub script that reports what the test says. Each test checks that the extensions folder stays empty
 /// and that the host leaves no <c>axis-package-build-*</c> folder behind. Each wait ends on the host's answer.
