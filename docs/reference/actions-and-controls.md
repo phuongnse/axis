@@ -409,7 +409,7 @@ be kept right.
 - **Group rows.** A row that heads a group shows its heading and leaves its other cells blank, with no dash,
   as `AxisTable`'s `blankRow` draws them.
 - **Folding group rows** _(planned for M35)_. A row with children folds, closed at first, behind an `AxisButton`
-  of the role `icon` with `FoldIcon`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
+  of the role `icon` with `Chevron`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
   first column's padding, every row's words start where the heading does, and each level of rows starts one fold
   further in. A table that groups rows uses this, and never a list inside a cell.
 - **A row's details** _(planned)_. A row with more to show than its columns, such as a call's attempt, folds open to

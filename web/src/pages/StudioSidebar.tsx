@@ -1,6 +1,6 @@
-import { DownOutlined } from '@ant-design/icons'
 import { Button, Dropdown, type MenuProps } from 'antd'
 import { useContext, useState } from 'react'
+import { Chevron } from '../platform/Chevron'
 import { useShellSidebar } from '../platform/shellSidebarContext'
 import { ShellNavigation, type ShellNavigationEntry, type ShellNavigationGroup } from '../platform/ShellNavigation'
 import { SiteMark } from '../platform/SiteMark'
@@ -101,7 +101,7 @@ export function StudioSidebar({
                 >
                   {title}
                 </span>
-                <DownOutlined aria-hidden style={{ flex: 'none', fontSize: 12 }} />
+                <Chevron />
               </>
             )}
           </Button>

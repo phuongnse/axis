@@ -1,22 +1,10 @@
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { diagnosticCount, linter, lintGutter, nextDiagnostic } from '@codemirror/lint'
-import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
-import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state'
-import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import type { ValidateFunction } from 'ajv'
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref, type RefObject } from 'react'
-import { selectedItemTint } from '../platform/antTheme'
+import { useEffect, useRef, type Ref, type RefObject } from 'react'
 import { loadKindValidator } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
-import { useDesignTokens, useThemeMode } from '../platform/themeMode'
-import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
-import { findPanel, type FindTexts } from './jsonFindPanel'
-import { jsonLanguage } from './jsonLanguage'
+import CodeEditor, { type CodeEditorHandle } from './CodeEditor'
+import type { FindTexts } from './jsonFindPanel'
 import { jsonProblems } from './jsonProblems'
-import { jsonViewHeight, minHeight } from './jsonViewHeight'
-
-/** Marks a change that came from the value, not from the author, so it is not reported as an edit. */
-const external = Annotation.define<boolean>()
 
 export interface JsonViewProps {
   /** The accessible name of the editor. */
@@ -38,19 +26,9 @@ export interface JsonViewProps {
 }
 
 /** What the owner of a JSON view can ask it to do. */
-export interface JsonViewHandle {
-  /** Selects the next problem, and the first one after the last. */
-  nextProblem: () => void
-  /** Opens the find bar, or focuses its field when it is open. */
-  openFind(): void
-  /** Replaces the whole text as an author's edit, so `onChange` reports it. */
-  replace(text: string): void
-}
+export type JsonViewHandle = CodeEditorHandle
 
-/** How long the checks wait after the last keystroke. */
-const checkDelay = 250
-
-/** A code editor for a resource's JSON, with line numbers, that fills the window down to the shell footer. */
+/** A code editor for a resource's JSON that fills the window down to the shell footer and checks the text as it is typed. */
 export default function JsonView({
   label,
   value,
@@ -62,208 +40,35 @@ export default function JsonView({
   ref,
 }: JsonViewProps) {
   const t = useText()
-  const { mode } = useThemeMode()
-  const tokens = useDesignTokens()
-  const hostRef = useRef<HTMLDivElement>(null)
-  const viewRef = useRef<EditorView | null>(null)
-  const [themeCompartment] = useState(() => new Compartment())
-  const [height, setHeight] = useState(minHeight)
-  const latest = useRef({
-    onChange,
-    value,
-    findTexts,
-    theme: jsonTheme(tokens, mode),
-    themeCompartment,
-    kind,
-    onProblems,
-    t,
+  const latest = useRef({ kind, t })
+  useEffect(() => {
+    latest.current = { kind, t }
   })
   const validator = useRef<{ kind: string | undefined; loaded: Promise<ValidateFunction | undefined> }>(null)
 
-  useEffect(() => {
-    latest.current = {
-      onChange,
-      value,
-      findTexts,
-      theme: jsonTheme(tokens, mode),
-      themeCompartment,
-      kind,
-      onProblems,
-      t,
-    }
-  })
-
-  useEffect(() => {
-    const initial = latest.current
-    let reported = 0
-    const view = new EditorView({
-      parent: hostRef.current!,
-      state: EditorState.create({
-        doc: initial.value,
-        extensions: [
-          lineNumbers(),
-          jsonLanguage,
-          history(),
-          search({ top: true, createPanel: findPanel(() => latest.current.findTexts) }),
-          // Go to line opens a dialog with CodeMirror's own English text, so the view leaves it out.
-          keymap.of([
-            ...defaultKeymap,
-            ...historyKeymap,
-            ...searchKeymap.filter((binding) => binding.key !== 'Mod-Alt-g'),
-          ]),
-          initial.themeCompartment.of(initial.theme),
-          EditorView.contentAttributes.of({ 'aria-label': label }),
-          lintGutter(),
-          linter(
-            async (editor) => {
-              const current = latest.current
-              const cached =
-                validator.current && validator.current.kind === current.kind
-                  ? validator.current
-                  : {
-                      kind: current.kind,
-                      loaded: current.kind === undefined ? Promise.resolve(undefined) : loadKindValidator(current.kind),
-                    }
-              validator.current = cached
-              return jsonProblems(editor.state.doc.toString(), await cached.loaded, current.t)
-            },
-            { delay: checkDelay },
-          ),
-          EditorView.updateListener.of((update) => {
-            const count = diagnosticCount(update.state)
-            if (count !== reported) {
-              reported = count
-              latest.current.onProblems?.(count)
-            }
-            if (update.docChanged && !update.transactions.some((transaction) => transaction.annotation(external))) {
-              latest.current.onChange(update.state.doc.toString())
-            }
-          }),
-        ],
-      }),
-    })
-    viewRef.current = view
-    return () => {
-      view.destroy()
-      viewRef.current = null
-      if (reported !== 0) {
-        latest.current.onProblems?.(0)
-      }
-    }
-    // The view is built once for its label. The value reaches it through the effect below.
-  }, [label])
-
-  useEffect(() => {
-    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(jsonTheme(tokens, mode)) })
-  }, [themeCompartment, tokens, mode])
-
-  useEffect(() => {
-    const view = viewRef.current
-    if (view && view.state.doc.toString() !== value) {
-      view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: value },
-        annotations: [external.of(true), Transaction.addToHistory.of(false)],
-      })
-    }
-  }, [value])
-
-  useImperativeHandle(ref, () => ({
-    nextProblem() {
-      const view = viewRef.current
-      if (view) {
-        nextDiagnostic(view)
-        view.focus()
-      }
-    },
-    openFind() {
-      if (viewRef.current) {
-        openSearchPanel(viewRef.current)
-      }
-    },
-    replace(text) {
-      const view = viewRef.current
-      if (view && view.state.doc.toString() !== text) {
-        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, userEvent: 'input.format' })
-      }
-    },
-  }))
-
-  const gap = tokens.spacing.md
-  const fit = () => {
-    const host = hostRef.current
-    if (!host || host.offsetParent === null) {
-      return
-    }
-    const rect = host.getBoundingClientRect()
-    const content = host.closest('main')
-    const next = jsonViewHeight({
-      windowHeight: window.innerHeight,
-      top: rect.top + window.scrollY,
-      footerHeight: document.querySelector('[role=contentinfo]')?.getBoundingClientRect().height ?? 0,
-      below:
-        (boundary?.current ? Math.max(boundary.current.getBoundingClientRect().bottom - rect.bottom, 0) : 0) +
-        (content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0) +
-        // The bar slot is under the page, so the view ends above the bar that sticks to the window's foot.
-        (document.querySelector('[data-shell-bar-slot]')?.getBoundingClientRect().height ?? 0),
-      gap,
-    })
-    setHeight((current) => (current === next ? current : next))
-  }
-  const fitRef = useRef(fit)
-
-  useLayoutEffect(() => {
-    fitRef.current = fit
-    fit()
-  })
-
-  useEffect(() => {
-    const onResize = () => fitRef.current()
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-
-  return <div ref={hostRef} style={{ height }} />
+  return (
+    <CodeEditor
+      label={label}
+      value={value}
+      onChange={onChange}
+      language="json"
+      findTexts={findTexts}
+      fill
+      boundary={boundary}
+      onProblems={onProblems}
+      lint={async (editor) => {
+        const current = latest.current
+        const cached =
+          validator.current && validator.current.kind === current.kind
+            ? validator.current
+            : {
+                kind: current.kind,
+                loaded: current.kind === undefined ? Promise.resolve(undefined) : loadKindValidator(current.kind),
+              }
+        validator.current = cached
+        return jsonProblems(editor.state.doc.toString(), await cached.loaded, current.t)
+      }}
+      ref={ref}
+    />
+  )
 }
-
-const jsonTheme = sharedTheme((tokens, mode) => {
-  const { colour, spacing, radius, type } = tokens
-  return [
-    codeEditorTheme(tokens, mode),
-    EditorView.theme({
-      '&': { height: '100%' },
-      // A scroll area stops at its end, so the page does not scroll,
-      // see docs/reference/actions-and-controls.md#scroll-areas.
-      '.cm-scroller': { overflow: 'auto', overscrollBehavior: 'contain' },
-      '.cm-content': { padding: `${spacing.sm}px 0` },
-      '.cm-line': { paddingInline: `${spacing.sm}px` },
-      '.cm-gutters': {
-        backgroundColor: colour.surface,
-        color: colour.textMuted,
-        border: 'none',
-        borderInlineEnd: `1px solid ${colour.borderSubtle}`,
-      },
-      '.cm-lineNumbers .cm-gutterElement': { paddingInline: `${spacing.sm}px` },
-      '.cm-panels': { backgroundColor: colour.surface, color: colour.text },
-      '.cm-panels-top': { borderBottom: `1px solid ${colour.borderSubtle}` },
-      '.cm-findBar': {
-        display: 'flex',
-        alignItems: 'center',
-        gap: `${spacing.xs}px`,
-        padding: `${spacing.xs}px ${spacing.sm}px`,
-      },
-      '.cm-findBar input': {
-        backgroundColor: colour.surface,
-        color: colour.text,
-        border: `1px solid ${colour.border}`,
-        borderRadius: `${radius.base}px`,
-        fontFamily: type.codeFontFamily,
-        fontSize: 'inherit',
-        padding: `2px ${spacing.xs}px`,
-      },
-      '.cm-findBar input:focus': { outline: `2px solid ${colour.focusRing}` },
-      '.cm-findCount': { color: colour.textMuted },
-      '.cm-searchMatch': { backgroundColor: 'transparent', outline: `1px solid ${colour.border}` },
-      '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: selectedItemTint(mode) },
-    }),
-  ]
-})

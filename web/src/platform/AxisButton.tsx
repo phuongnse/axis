@@ -1,4 +1,4 @@
-import { DownOutlined, EllipsisOutlined } from '@ant-design/icons'
+import { EllipsisOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
 import {
   createContext,
@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
+import { Chevron } from './Chevron'
 import type { ButtonRole } from './buttonRoles'
 import { fillText } from './fillText'
 import { useText } from './texts'
@@ -273,9 +274,7 @@ export function AxisButton(props: AxisButtonProps) {
   const { role, style, disabled, caret, children, ...rest } = props
   const body = {
     ...rest,
-    children: caret
-      ? [children, <DownOutlined key="caret" aria-hidden style={{ flex: 'none', fontSize: 12 }} />]
-      : children,
+    children: caret ? [children, <Chevron key="caret" />] : children,
   }
   const outline = (text: string): CSSProperties => (disabled ? {} : { color: text, borderColor: text })
   const tinted = (text: string): CSSProperties => (disabled ? {} : { color: text })

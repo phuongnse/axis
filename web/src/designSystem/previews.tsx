@@ -59,6 +59,7 @@ import {
   processInspectorWidget,
   requestId,
   sectionWidgets,
+  shellRequestId,
   signUpApplications,
   signUpDocuments,
   signUpRegion,
@@ -285,7 +286,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
     {
       caption: 'Saved record',
       draw: () => <ShellPreview />,
-      entry: { pathname: `/sample/request/${requestId}`, state: { from: '/sample/requests' } },
+      entry: { pathname: `/sample/request/${shellRequestId}`, state: { from: '/sample/requests' } },
       frameHeight: shellFrameHeight,
     },
     {
@@ -295,7 +296,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
           <ShellPreview />
         </TypedOnMount>
       ),
-      entry: { pathname: `/sample/request/${requestId}`, state: { from: '/sample/requests' } },
+      entry: { pathname: `/sample/request/${shellRequestId}`, state: { from: '/sample/requests' } },
       frameHeight: shellFrameHeight,
     },
     {

@@ -53,8 +53,9 @@ component holds a number of its own.
 - **One meaning, one sign** _(planned)_. A sign means one thing and looks one way. The same icon for the same meaning
   has one shape, size and colour on every screen, whichever widget draws it.
 - **One chevron** _(planned)_. Every chevron is Ant Design's `DownOutlined` at 12 px in `textMuted`, turned to point
-  down for open or a menu below, right for closed and up for a panel that opens upwards: a select's arrow, a caret, a
-  fold and a panel's collapse. `Chevron` draws it.
+  down for open or a menu below, right for closed and up for a panel that opens upwards, and left for a previous
+  arrow and right for a next arrow of a pagination or a date panel: a select's arrow, a caret, a fold and a panel's
+  collapse. `Chevron` draws it.
 - **A surface for a graph**. `fillSubtle` is a shade off `surface` in both modes, with a light and a dark
   value, under a process graph and a step's icon tile, see [process graph](process-inspector-widget.md#process-graph).
 - **A site's brand** _(planned for M42)_. A site's `brand.primary` is its main colour, see [sites](configuration.md#sites)
@@ -70,6 +71,7 @@ component holds a number of its own.
 - **Sizes.** The size group holds `bar`, the height of the shell's header, a page's band and Studio's application row,
   `smallControl`, a small icon button and the line of text beside it, `tableRow`, a table's row and header, and
   `sidePanel`, the width a side panel opens at until a person sets one and its least width, see [layout](shell.md#layout).
+  It also holds `chevron`, the 12 px icon size that every chevron draws at.
 - **Dialog sizes.** The size group also holds `dialog`, the dialog widths `small` (400 px), `medium` (560 px) and
   `large` (880 px), see [dialogs](actions-and-controls.md#dialogs).
 - **No value of its own.** No size, space, type, radius or colour is a number of its own in a component, and a layout

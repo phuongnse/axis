@@ -145,6 +145,7 @@ describe('size tokens', () => {
       smallControl: 24,
       tableRow: 40,
       sidePanel: 320,
+      chevron: 12,
       dialog: { small: 400, medium: 560, large: 880 },
     })
   })

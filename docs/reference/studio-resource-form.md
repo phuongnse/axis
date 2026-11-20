@@ -195,8 +195,9 @@ The JSON view is a CodeMirror editor with JSON highlighting and line numbers.
 - **Its height.** It reaches down to `spacing-md` above the footer, or above the save bar while that
   shows, at any window height, and scrolls inside and stops at its end, as
   [scroll areas](actions-and-controls.md#scroll-areas) say.
-- **One code editor** _(planned for M37)_. The JSON view is the same editor as a package's files, with its folding,
-  bracket matching and closing and word completion, see [a package's files](studio-packages.md#a-packages-files).
+- **One code editor.** The JSON view is the same editor as a package's files, `CodeEditor`, with its folding, bracket
+  matching and closing, indent on input, word completion and the current line, see
+  [a package's files](studio-packages.md#a-packages-files).
 - **No box of its own** _(planned for M37)_. In place of a field's border and its own scroll, the JSON view has no
   border and is as tall as its text. It keeps a least height and reaches the footer, or the save bar while that shows,
   when its text is shorter, and the page scrolls once, as [scroll areas](actions-and-controls.md#scroll-areas) say.

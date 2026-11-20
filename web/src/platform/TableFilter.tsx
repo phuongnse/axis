@@ -2,6 +2,7 @@ import { CloseOutlined, FilterOutlined } from '@ant-design/icons'
 import { Badge, DatePicker, Flex, Input, InputNumber, Modal, Segmented, Select, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useState } from 'react'
+import { datePickerChevrons } from './datePickerChevrons'
 import { AxisButton } from './AxisButton'
 import {
   countConditions,
@@ -239,6 +240,7 @@ function ValueInput({
     case 'date':
       return (
         <DatePicker
+          {...datePickerChevrons}
           aria-label={label}
           format={dateFormat}
           value={typeof value === 'string' && value ? dayjs(value) : null}
