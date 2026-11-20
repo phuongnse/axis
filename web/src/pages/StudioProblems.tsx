@@ -97,7 +97,6 @@ function DiagnosticRow({
   onSelect?: (resourceId: string, path: string) => void
   onOpenFile?: { name: (diagnostic: StudioDiagnostic) => string; open: (diagnostic: StudioDiagnostic) => void }
 }) {
-  const t = useText()
   const { spacing } = useDesignTokens()
   const resourceId = diagnostic.resourceId
   const resource = resourceId === null ? undefined : resources?.find((item) => item.id === resourceId)
@@ -112,17 +111,11 @@ function DiagnosticRow({
           <strong>{diagnostic.code}</strong> {diagnostic.message}
         </span>
         {resourceId === null && onOpenFile ? (
-          <AxisButton
-            role="link"
-            onClick={() => onOpenFile.open(diagnostic)}
-            style={{ height: 'auto', whiteSpace: 'normal', textAlign: 'start' }}
-          >
-            {diagnostic.line === undefined
-              ? onOpenFile.name(diagnostic)
-              : t('shell.studio.package.problemAt')
-                  .replace('{file}', onOpenFile.name(diagnostic))
-                  .replace('{line}', String(diagnostic.line))}
-          </AxisButton>
+          <FileAtLine
+            file={onOpenFile.name(diagnostic)}
+            line={diagnostic.line}
+            onOpen={() => onOpenFile.open(diagnostic)}
+          />
         ) : (
           <ResourceReference
             resource={resource}
@@ -132,5 +125,20 @@ function DiagnosticRow({
         )}
       </Flex>
     </div>
+  )
+}
+
+/**
+ * Proposed, see #3978: a link to a file that no resource holds, such as a package's file, named by the file and, when
+ * known, its line in parentheses. A problem's file and a failed test's place are drawn by it.
+ */
+export function FileAtLine({ file, line, onOpen }: { file: string; line?: number; onOpen: () => void }) {
+  const t = useText()
+  return (
+    <AxisButton role="link" onClick={onOpen} style={{ height: 'auto', whiteSpace: 'normal', textAlign: 'start' }}>
+      {line === undefined
+        ? file
+        : t('shell.studio.package.problemAt').replace('{file}', file).replace('{line}', String(line))}
+    </AxisButton>
   )
 }

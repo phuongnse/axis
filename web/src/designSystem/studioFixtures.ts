@@ -1086,6 +1086,9 @@ function packageJobRoutes(files: readonly StudioPackageFile[]): Record<string, F
             outcome: 'failed',
             message: "AssertionError: Expected '2026-02-28', got '2026-01-31'.",
             durationMs: 2,
+            file: 'index.test.mjs',
+            line: 22,
+            column: 5,
           },
         ],
         output: [

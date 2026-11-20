@@ -2353,6 +2353,10 @@ export interface StudioPackageTestOutcome {
   message: string | null
   /** How long the test took, in milliseconds. */
   durationMs?: number
+  /** Proposed, see #3978: where a failed test failed, a file of the package and its line and column, else absent. */
+  file?: string
+  line?: number
+  column?: number
 }
 
 /** Proposed, see #3978: what one run of a package's operation answered. */

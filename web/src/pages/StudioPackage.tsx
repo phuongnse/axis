@@ -45,7 +45,7 @@ import { jsonViewHeight } from './jsonViewHeight'
 import { PackageExplorer, type ExplorerTarget } from './PackageExplorer'
 import { PackageRun, type PackageOperation } from './PackageRun'
 import { SaveBar } from './SaveBar'
-import { StudioProblemList } from './StudioProblems'
+import { FileAtLine, StudioProblemList } from './StudioProblems'
 
 /** What the workspace reads from a package's manifest. */
 interface PackageManifest {
@@ -111,7 +111,8 @@ function nameOf(path: string): string {
  * footer: the explorer of files and folders on the left, the open files as tabs with the open file's path above its
  * editor and a status line of the cursor's place, its language and what is unsaved below it, and the output panel under
  * the editor, whose height a handle sets, with Problems, Output, Tests and Run. The heading's Build, Run tests and Run…
- * send their request to the package host in the tenant's sandbox, and each opens its tab. Ctrl+S saves every changed
+ * save every changed file first, then send their request to the package host in the tenant's sandbox, and each opens
+ * its tab. A failed test's place opens its file at that line, as a problem's does. Ctrl+S saves every changed
  * file, Ctrl+P opens a file by its name and Ctrl+Shift+B builds. Without the developer role the files are read-only and
  * no save bar, write or run shows.
  */
@@ -340,10 +341,15 @@ export default function StudioPackage({
     }
   }
 
-  async function saveAll() {
-    if (!developer || saving || dirty.length === 0) {
-      return
+  /** Saves every changed file, and answers whether all of them are saved. */
+  async function saveAll(): Promise<boolean> {
+    if (dirty.length === 0) {
+      return true
     }
+    if (!developer || saving) {
+      return false
+    }
+    let saved = true
     setSaving(true)
     setSaveError(null)
     let answered: StudioDiagnostic[] | null = null
@@ -351,11 +357,13 @@ export default function StudioPackage({
       for (const path of dirty) {
         const entry = open[path]
         if (entry.conflict) {
+          saved = false
           continue
         }
         const result = await saveStudioPackageFile(application, packageId, path, entry.loaded.version, entry.text)
         if (result.status === 'conflict') {
           setOpen((current) => ({ ...current, [path]: { ...current[path], conflict: true } }))
+          saved = false
           continue
         }
         answered = result.diagnostics
@@ -372,9 +380,11 @@ export default function StudioPackage({
       }
     } catch (error) {
       setSaveError(error instanceof QuotaRefusedError ? error.message : t('shell.studio.package.saveFailed'))
+      saved = false
     } finally {
       setSaving(false)
     }
+    return saved
   }
 
   /** Closes a tab, and opens the tab beside it when it was the open one. */
@@ -494,6 +504,11 @@ export default function StudioPackage({
 
   async function start(job: Job, send: () => Promise<StudioRequest>) {
     setJobError(null)
+    // Proposed, see #3978: a build, a test or a run takes the files as the editor shows them, so it saves every changed
+    // file first, as a code editor saves before it runs a task. A file it cannot save stops it, with that file's notice.
+    if (!(await saveAll())) {
+      return
+    }
     setLastJob(job)
     setPanelOpen(true)
     setPanelTab(job === 'build' ? 'output' : job === 'test' ? 'tests' : 'run')
@@ -566,16 +581,34 @@ export default function StudioPackage({
           ? null
           : t('shell.studio.package.run.milliseconds').replace('{count}', String(test.durationMs)),
     },
-    { key: 'message', kind: 'freeText', title: t('shell.studio.package.tests.message'), dataIndex: 'message' },
+    {
+      key: 'message',
+      kind: 'freeText',
+      title: t('shell.studio.package.tests.message'),
+      // Proposed, see #3978: a failed test's place follows its message and opens its file at that line.
+      render: (_value, test) => {
+        const file = test.file
+        if (file === undefined) {
+          return test.message
+        }
+        return (
+          <Flex wrap align="baseline" style={{ columnGap: spacing.md }}>
+            {test.message}
+            <FileAtLine file={file} line={test.line} onOpen={() => goTo(file, test.line, test.column)} />
+          </Flex>
+        )
+      },
+    },
   ]
   const fileName = (diagnostic: StudioDiagnostic) => diagnostic.file.slice(packagePrefix.length)
-  const goToProblem = (diagnostic: StudioDiagnostic) => {
-    const path = fileName(diagnostic)
-    if (diagnostic.line !== undefined) {
-      pendingGoTo.current = { path, line: diagnostic.line, column: diagnostic.column }
+  /** Opens a file of the package, at a line when one is given. */
+  const goTo = (path: string, line?: number, column?: number) => {
+    if (line !== undefined) {
+      pendingGoTo.current = { path, line, column }
     }
     openFile(path)
   }
+  const goToProblem = (diagnostic: StudioDiagnostic) => goTo(fileName(diagnostic), diagnostic.line, diagnostic.column)
   // A problem in a file marks its line in the editor, as a code editor's checks do.
 
   return (
