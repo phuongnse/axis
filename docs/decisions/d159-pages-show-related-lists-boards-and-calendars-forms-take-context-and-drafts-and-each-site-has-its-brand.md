@@ -89,7 +89,7 @@ keeps every part of them that still holds.
 
 The shapes are in [resource files](../reference/resource-files.md#resource-file-shape), the drawing
 in [container widgets](../reference/container-widgets.md), the policies and the breakpoint in
-[frontend](../reference/frontend.md), the editor in [Studio](../reference/studio.md#widget-tree), the
+[frontend](../reference/frontend.md), the editor in [Studio](../reference/studio-editors-by-kind.md#widget-tree), the
 binding in [widget binding](../reference/data-sources.md#widget-binding) and the views in
 [detail, chart and KPI widgets](../reference/detail-chart-kpi-widgets.md).
 

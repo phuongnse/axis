@@ -404,7 +404,7 @@ tenant failed. `2` for a folder that does not exist, an unknown `--tenant`, a `-
 
 ## Publisher
 
-`publisher` runs the [publish requests](authoring.md#publishing) that Studio stores, and the
+`publisher` runs the [publish requests](authoring-publishing.md#publishing) that Studio stores, and the
 provisioning jobs of a cell. It is the only host that activates a release on an author's behalf, so
 the server never needs a tenant schema connection. It takes no option and, unlike the other commands,
 runs until it is stopped. It has no HTTP endpoint and listens on no port, so nothing can call it.
@@ -412,7 +412,7 @@ runs until it is stopped. It has no HTTP endpoint and listens on no port, so not
 The `axis-admin` image runs it. Both production installs start one, see
 [installation](installation.md), and `scripts/dev.sh`, the Docker Compose file in the repository root
 and the E2E script each start one too. It runs `publish`, `validate`,
-[`activate`](authoring.md#publishing), `accept` and `test` requests under both tenancy sources, and `publish`
+[`activate`](authoring-publishing.md#publishing), `accept` and `test` requests under both tenancy sources, and `publish`
 requests with the target `preview`, see [preview requests](#preview-requests).
 
 One process runs these loops:
@@ -420,7 +420,7 @@ One process runs these loops:
 | Loop         | What it does                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Requests     | Claims and runs `publish`, `validate`, `activate` and `accept` requests, see [claiming](#claiming). Only this loop reads the tenants again.                                                                                                                                                                                                                                                      |
-| Tests        | Claims and runs `test` requests, which run an application's [test scenarios](test-scenarios.md) from Studio, see [test](authoring.md#test).                                                                                                                                                                                                                                                      |
+| Tests        | Claims and runs `test` requests, which run an application's [test scenarios](test-scenarios.md) from Studio, see [test](authoring-publishing.md#test).                                                                                                                                                                                                                                                      |
 | Jobs         | Under `Tenancy:Source=directory`, runs the jobs of `platform.jobs`, see [provisioning API](tenant-lifecycle.md#provisioning-api). It claims each job with a lease, runs one job at a time for each tenant and lets a running job finish when it is stopped. A job that it ends writes one [platform audit record](tenant-setting-commands.md#platform-audit-records) that names the job's actor. |
 | Host checks  | Checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS every `Cell:HostCheckInterval`, `00:10:00` by default, and adds a verified host to its tenant. It also creates the host's cert-manager `Certificate` when `Cell:HostCertificateIssuer` is set, and the host's Ingress when `Cell:HostRouteService` is set. The record of that add is named `tenant host verify` and names the operator or the tenant administrator who asked for the host.                     |
 | Export sweep | Runs only when the `Cell:ExportStorage` settings are set. Every hour it deletes each ZIP under `exports/` in that bucket that was stored more than 7 days ago, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant), and writes one line for each deletion. A failed round writes one line, and the next round tries again.                                                          |
@@ -509,7 +509,7 @@ way.
   out is claimed again by any publisher, because its publisher died. A request whose publisher lost
   its tenant database connection is claimed again in the next round, without waiting for the lease. A
   request that has been claimed three times and whose lease runs out again ends `failed` with
-  `AXC0215`, see the [lifecycle](authoring.md#lifecycle). A `publish` gets a
+  `AXC0215`, see the [lifecycle](authoring-publishing.md#lifecycle). A `publish` gets a
   `release.publishFailed` audit record with it, an `activate` gets a `release.activateFailed` one, and
   a `validate` and an `accept` get none.
 - **Fencing.** The `claims` count is the fencing token. Renewal and the final update change the
@@ -574,7 +574,7 @@ tenant's schema role unless it says otherwise.
      realm to match the activated release.
    - `seed` then sets the schedule triggers and the seed records of that release, and `indexes`
      builds the indexes of that release that its tables lack. See
-     [activating a release](authoring.md#activating-a-release).
+     [activating a release](authoring-publishing.md#activating-a-release).
 7. For `test`: `version`, then the step `test`. It checks, in this order, that the setting is set
    (`AXC0217`), that the snapshot can be read, that it compiles, and that every name in the request
    is a scenario of the application (`AXC0218`, once for each unknown name). The first check that
@@ -600,7 +600,7 @@ tenant's schema role unless it says otherwise.
 
    A `test` request that names a package runs only the step `package`, in place of `version` and
    `test`, and needs no `Scenarios:ServerConnectionString`. It sends that package to
-   `application-package-host` as a `test`, see [test](authoring.md#test). It writes
+   `application-package-host` as a `test`, see [test](authoring-publishing.md#test). It writes
    `<tenant> package ok`, `<tenant> package failed: <n> of <m> tests failed.` or, for each
    diagnostic, `<tenant> package failed: <code> <message>`, then stores the outcomes in
    `package_tests` and the status over the tenant's schema role.
@@ -645,7 +645,7 @@ and an activation of the release that is already active adds no history row.
 ### Preview requests
 
 A request with target `preview` is stored in the main tenant's database, see
-[preview](authoring.md#preview), and only a `publish` is claimed with that target.
+[preview](authoring-publishing.md#preview), and only a `publish` is claimed with that target.
 
 - **Where it runs.** The publisher runs its steps against the main tenant's preview tenant, with that
   tenant's database, schema role and bindings. It compiles, activates and seeds there, and adds the

@@ -181,7 +181,7 @@ developer role and the switch as a write has, and answers `403` otherwise.
   [tools](mcp-server.md#tools). A write or a delete needs the developer role and the switch, as the routes do, takes
   no version and does not check the storage quota, as `write_resource` does not.
 - **Testing a package.** The MCP server's `test_package` tests a package's files in a draft, see
-  [tools](mcp-server.md#tools) and [a package's tests](authoring.md#test). It needs the developer role and the switch,
+  [tools](mcp-server.md#tools) and [a package's tests](authoring-publishing.md#test). It needs the developer role and the switch,
   as a write does.
 - **A build without a publish** _(planned for M37)_. `POST .../build` queues a `build` request that the publisher
   sends to `application-package-host`, as a publish's build is sent, and it releases nothing. A Node.js package
@@ -193,7 +193,7 @@ developer role and the switch as a write has, and answers `403` otherwise.
   for that package's files, as `test_package` does. Its answer has `package`, `packageTests` and `output`. Each of
   `packageTests` has `name`, `outcome`, `message` and `durationMs`, and a failed test has `file`, `line` and `column`,
   where it failed in the package. Without `package` the request is the application's scenario test, see
-  [test](authoring.md#test).
+  [test](authoring-publishing.md#test).
 - **A run of one operation** _(planned for M37)_. `POST .../run` with `{ package, operation, input }` queues a `run`
   request. The host builds the package's working files and calls the operation with the folder's bindings for its
   capabilities. The request ends with `run`, which has `operation`, `outcome`, `output`, `error` (`code` and

@@ -62,7 +62,7 @@ function bindingName(value: unknown): string {
 }
 
 /**
- * The editor of a connector, in the four sections of docs/reference/studio.md#connector-editor: General, Service,
+ * The editor of a connector, in the four sections of docs/reference/studio-editors-by-kind.md#connector-editor: General, Service,
  * Authentication and Operations. It shows the base URL binding, the auth type and its bindings, the timeout, the
  * idempotency header and the operations. A binding is only a name: the field neither shows nor writes a value, because
  * values live in tenant settings. A binding is chosen from the tenant's names of its kind once they load, and is a name box

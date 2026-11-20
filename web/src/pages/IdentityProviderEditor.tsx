@@ -45,7 +45,7 @@ function bindingName(value: unknown): string {
 
 /**
  * The editor of an identity provider, in the shared sections General, Sign-in, Claims, Roles and Assurance, see
- * docs/reference/studio.md#identity-provider-editor. General holds the name, the type and the description. Sign-in
+ * docs/reference/studio-editors-by-kind.md#identity-provider-editor. General holds the name, the type and the description. Sign-in
  * and Claims show only for `oidc` and `saml`: the bindings, the client credential and the "Continue with" label, and
  * the claims. Roles holds the role mapping and Assurance the assurance levels. Each field is drawn through
  * `AxisField` with its label and help. A binding is only a name: the box neither shows nor writes a value, because

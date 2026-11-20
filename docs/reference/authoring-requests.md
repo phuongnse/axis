@@ -63,7 +63,7 @@ loses no work.
 - **Deleting model messages** _(planned for M35)_. A step's model messages are deleted after 30 days,
   and are kept until then for the author and the audit.
 - **Claimed with a lease.** The agent host claims a request whose state needs work, as the publisher
-  claims [publish requests](authoring.md#lifecycle): it sets `claimed_by` and `claimed_until`, renews
+  claims [publish requests](authoring-publishing.md#lifecycle): it sets `claimed_by` and `claimed_until`, renews
   the lease while it works, and lets it lapse when it stops. A host that dies leaves the request
   claimable after the lease. The host claims only a state whose step it has, and a `ready` request only when it asked
   for auto-accept, has a draft and no `accept` step has finished since its newest `review` step. An `accept` step
@@ -167,7 +167,7 @@ an accept, which [accepting](#accepting) describes.
   `{ aiConnected, mcp }`. `aiConnected` is true when the tenant's AI authoring setting is on and the person has
   stored a key, or when `Ai:DefaultBinding` needs none, see
   [a person's own key](model-bindings.md#a-persons-own-key). `mcp` is `https://<host>/mcp`.
-- **Draft preview** _(planned for M35)_. The route follows the rules of [preview](authoring.md#preview) and takes its
+- **Draft preview** _(planned for M35)_. The route follows the rules of [preview](authoring-publishing.md#preview) and takes its
   snapshot from the draft's tip. It answers `404` for a draft that is not the person's, and `409` when the tenant
   has no preview tenant.
 - **New answer fields** _(planned for M35)_. A request answers `title` (at most 80 characters, from the plan, null
@@ -391,7 +391,7 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
 ## Accepting
 
 Accepting moves a draft's changes into the working folder as one revision. It never puts them live:
-only [publishing](authoring.md#publishing) does.
+only [publishing](authoring-publishing.md#publishing) does.
 
 - **Who.** The author of a `ready` request accepts its draft through the accept route, see
   [routes](#routes). The route stores an `accept` with the client `studio`, and the request stays
@@ -422,7 +422,7 @@ only [publishing](authoring.md#publishing) does.
   the application allows auto-accept, the request asked for it when its plan was proposed, and the newest check and
   review passed. A `notReviewed` review never passes. The agent host's accept step claims an outside app's `ready`
   request as it claims any other.
-- **Through the publisher.** An accept is a [publish request](authoring.md#publishing) of the kind
+- **Through the publisher.** An accept is a [publish request](authoring-publishing.md#publishing) of the kind
   `accept`. The publisher runs the requests of one application one at a time, so two accepts never
   interleave. When an accept succeeds, the publisher moves the `ready` request of that draft to
   `accepted`, sets its `finishedAt`, erases its refresh token and writes an `authoringRequest.accepted`

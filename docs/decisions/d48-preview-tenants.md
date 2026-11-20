@@ -24,7 +24,7 @@ the author needs a place with its own data and bindings.
 - **A preview starts with seed data,** and its records stay until the operator recreates it.
 
 The hosts' rules are in [preview tenants](../architecture.md#preview-tenants) and the route in
-[preview](../reference/authoring.md#preview).
+[preview](../reference/authoring-publishing.md#preview).
 
 ## Consequences
 
