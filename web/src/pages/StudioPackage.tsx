@@ -817,6 +817,35 @@ export default function StudioPackage({
                   </div>
                 ))}
             </div>
+            {/* Proposed, see #3978: the status line tells of the open file, so it sits at the editor's foot, right above
+                the output panel, not under the panel. */}
+            <Flex
+              align="center"
+              gap="middle"
+              data-testid="package-status-line"
+              style={{
+                flex: 'none',
+                minHeight: 24,
+                paddingInline: spacing.md,
+                borderTop: `1px solid ${colour.borderSubtle}`,
+                color: colour.textMuted,
+                fontSize: type.fontSize - 2,
+              }}
+            >
+              <span>
+                {t('shell.studio.package.cursor')
+                  .replace('{line}', String(cursor.line))
+                  .replace('{column}', String(cursor.column))}
+              </span>
+              <span>{languageLabel(file, t)}</span>
+              <span style={{ marginInlineStart: 'auto' }}>
+                {dirty.length === 0
+                  ? t('shell.studio.package.allSaved')
+                  : t(
+                      dirty.length === 1 ? 'shell.studio.package.unsavedOne' : 'shell.studio.package.unsavedMany',
+                    ).replace('{count}', String(dirty.length))}
+              </span>
+            </Flex>
             <section
               ref={panel}
               aria-label={t('shell.studio.package.panel')}
@@ -950,33 +979,6 @@ export default function StudioPackage({
                 ]}
               />
             </section>
-            <Flex
-              align="center"
-              gap="middle"
-              data-testid="package-status-line"
-              style={{
-                flex: 'none',
-                minHeight: 24,
-                paddingInline: spacing.md,
-                borderTop: `1px solid ${colour.borderSubtle}`,
-                color: colour.textMuted,
-                fontSize: type.fontSize - 2,
-              }}
-            >
-              <span>
-                {t('shell.studio.package.cursor')
-                  .replace('{line}', String(cursor.line))
-                  .replace('{column}', String(cursor.column))}
-              </span>
-              <span>{languageLabel(file, t)}</span>
-              <span style={{ marginInlineStart: 'auto' }}>
-                {dirty.length === 0
-                  ? t('shell.studio.package.allSaved')
-                  : t(
-                      dirty.length === 1 ? 'shell.studio.package.unsavedOne' : 'shell.studio.package.unsavedMany',
-                    ).replace('{count}', String(dirty.length))}
-              </span>
-            </Flex>
           </div>
         </div>
         {developer && (
