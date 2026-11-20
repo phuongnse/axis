@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { installFixtureFetch } from './fixtureFetch'
 import { categoryId, fixtureScopes, requestId, routes } from './fixtures'
@@ -59,5 +60,24 @@ describe('the design-system shell states', () => {
     expect(await screen.findByDisplayValue('Office furniture', {}, { timeout: 15000 })).toBeVisible()
     const breadcrumb = within(screen.getByRole('navigation', { name: 'Breadcrumb' }))
     expect(breadcrumb.getByRole('link', { name: 'Requests' })).toHaveAttribute('href', '/sample/requests')
+  }, 30000)
+
+  it("opens a saved request's Category on the default record page, not the not-found page", async () => {
+    const saved = {
+      caption: 'Saved record',
+      draw: () => <ShellPreview />,
+      entry: `/sample/request/${requestId}`,
+      frameHeight: 800,
+    }
+    render(<Preview states={[saved]} />)
+    // Each of the request's collection rows has its own Open link, so the link is found in the field's own group.
+    const field = await screen.findByTestId('reference-category', {}, { timeout: 15000 })
+
+    const open = await within(field).findByRole('link', { name: 'Open Office furniture' })
+    expect(open).toHaveAttribute('href', `/sample/records/category/${categoryId}`)
+    await userEvent.click(open)
+
+    expect(await screen.findByRole('heading', { name: 'Category' }, { timeout: 15000 })).toBeVisible()
+    expect(screen.queryByTestId('not-found')).toBeNull()
   }, 30000)
 })

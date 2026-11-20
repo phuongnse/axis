@@ -10,6 +10,7 @@ import { LocaleLoadFailed, ShellError } from './LocaleLoadFailed'
 import { NotFoundPage } from './NotFoundPage'
 import { platformTextsFor, useApplicationSite, usePlatform, type SiteOutlet } from './context'
 import { PlatformShellRoute } from './PlatformShellRoute'
+import { RecordPagesContext } from '../platform/recordPages'
 import { siteAddress } from '../platform/siteLinks'
 
 interface LoadedSite {
@@ -116,6 +117,12 @@ function SiteShell({ path }: { path: string }) {
     [loaded, platform.fallbackTexts],
   )
 
+  const recordPages = useMemo(
+    () =>
+      typeof loaded === 'object' ? { sitePath: loaded.site.path, recordPages: loaded.site.recordPages ?? {} } : null,
+    [loaded],
+  )
+
   if (loaded === 'missing') {
     return (
       <PlatformShellRoute>
@@ -149,7 +156,9 @@ function SiteShell({ path }: { path: string }) {
         legal={site.legal}
       >
         {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
-        <Outlet context={{ site, locale } satisfies SiteOutlet} />
+        <RecordPagesContext value={recordPages}>
+          <Outlet context={{ site, locale } satisfies SiteOutlet} />
+        </RecordPagesContext>
       </Shell>
     </TextProvider>
   )
