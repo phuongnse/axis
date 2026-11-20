@@ -12,7 +12,7 @@ export const StudioApplicationContext = createContext<string | undefined>(undefi
  * A choice of a name: the name the file keeps and the key of its label, or no key when its format has no label. `id` is
  * the id of the resource the name is, absent for a name that is no resource.
  */
-export type ReferenceOption = { name: string; labelKey?: string | null; id?: string }
+export type ReferenceOption = { name: string; labelKey?: string | null; id?: string; label?: string }
 
 /**
  * The label for `labelKey` in the author's language, else in `en`, or `undefined` when there is no key or no text,

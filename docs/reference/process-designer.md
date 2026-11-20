@@ -11,8 +11,8 @@ The canvas is the process graph. The designer stores no position, and every edit
 the process file holds no layout. The canvas and the step panel read the same unsaved draft, so an edit in the
 panel, the Form tab or the JSON view redraws the graph at once.
 
-- **One graph** _(planned)_. The designer draws and edits through `ProcessGraphCanvas`, with the layout, the step
-  cards, the transition labels, the controls, the zoom limit and a diagnostic's `danger` border of the
+- **One graph.** The designer draws and edits through `ProcessGraphCanvas`, with the layout, the step cards, the
+  transition labels, the controls, the zoom limit and a diagnostic's `danger` border of the
   [process graph](process-inspector-widget.md#process-graph). The selected step is the chosen card. Find a step
   selects the step it finds. A step shows no run duration and no state icon, which belong to an instance.
 - **Selecting.** Clicking a node selects its step, and the step's panel shows beside the graph. Clicking

@@ -40,9 +40,9 @@ function TransitionDropTarget({ path }: { path: string }) {
  * selects itself and the step it leaves. The selected step has `aria-current`, and the selected transition is drawn in
  * the primary colour. A step that a diagnostic path names has an error-coloured border and "has problems" in its name.
  * Tab reaches the transitions, which come before the cards, and each transition is named by its two steps and its branch
- * or outcome. Enter or Space on a transition selects it. Delete or Backspace in the graph calls `onRemove`. The graph
- * and the middle of each transition's route are drop targets of the process designer's palette: the graph for
- * `/steps`, and a transition for its path. Every step but an `end` step has a handle on its card's right edge. Dragging
+ * or outcome. Enter or Space on a transition selects it. Delete or Backspace in the graph calls `onRemove`, except in a
+ * text field, such as Find a step's search. The graph and the middle of each transition's route are drop targets of the
+ * process designer's palette: the graph for `/steps`, and a transition for its path. Every step but an `end` step has a handle on its card's right edge. Dragging
  * from it and releasing on a step, anywhere on the card, calls `onConnect` with the two step numbers and the release
  * point, relative to the graph. The graph sets no transition itself. It has no keyboard way to connect, which the step
  * panel's pickers give. With `readOnly` no step has a handle and Delete or Backspace calls nothing, so the graph only
@@ -122,6 +122,10 @@ export default function StudioProcessGraph({
   const transitionExtra = useCallback((id: string) => <TransitionDropTarget path={id} />, [])
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    // A key typed into Find a step's search is for the text, so it removes nothing.
+    if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable]') !== null) {
+      return
+    }
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
       if (!readOnly) {

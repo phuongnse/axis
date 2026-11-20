@@ -1,5 +1,6 @@
 import { DndContext } from '@dnd-kit/core'
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
@@ -106,5 +107,30 @@ describe('StudioProcessGraph', () => {
     const edge = screen.getByTestId(`rf__edge-${paths[0]}`)
     fireEvent.keyDown(edge, { key: 'Enter' })
     expect(props.onSelectEdge).toHaveBeenCalledWith(graph.transitions[0])
+  })
+
+  it('selects a step from Find a step, which lists the steps in the file order', async () => {
+    const props = renderGraph()
+
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Find a step' }, slow))
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'submit',
+      'review',
+      'approve',
+      'done',
+    ])
+    await userEvent.click(screen.getByRole('option', { name: 'approve' }))
+
+    expect(props.onSelect).toHaveBeenCalledWith(2)
+  })
+
+  it('removes nothing for a Backspace typed into the search of Find a step', async () => {
+    const props = renderGraph()
+
+    const search = await screen.findByRole('combobox', { name: 'Find a step' }, slow)
+    await userEvent.type(search, 'rev{Backspace}')
+
+    expect(props.onRemove).not.toHaveBeenCalled()
+    expect(search).toHaveValue('re')
   })
 })
