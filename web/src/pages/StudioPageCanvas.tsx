@@ -100,7 +100,7 @@ export function StudioPageCanvas({
   /**
    * The version of the saved file. A save changes it, and the canvas then posts the draft again, because Save writes
    * the texts that the draft names before the patch and the draft stays the same, see
-   * docs/reference/studio.md#page-designer.
+   * docs/reference/studio-editors-by-kind.md#page-designer.
    */
   version?: string
   /** The pointer of the selected widget, or of the selected action of a widget. */

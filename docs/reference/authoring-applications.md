@@ -45,5 +45,5 @@ What it writes:
   files and changes the ids, the name and the site path, see
   [application templates](modules-and-templates.md#application-templates). The answer has the
   template's diagnostics, so a template that does not compile gives a copy that does not compile.
-- **Never an activation.** As for every write, the author [publishes](authoring.md#publishing) the new
+- **Never an activation.** As for every write, the author [publishes](authoring-publishing.md#publishing) the new
   application. The diagnostics in the answer are the folder's, as for [Diagnostics](authoring.md#diagnostics).

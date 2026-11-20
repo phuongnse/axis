@@ -5,7 +5,7 @@ This page is part of [Studio](studio.md): the buttons that run an application's 
 ## Running tests
 
 Studio runs the application's [test scenarios](test-scenarios.md) through the
-[test route](authoring.md#test) and lists each scenario's result.
+[test route](authoring-publishing.md#test) and lists each scenario's result.
 
 - **Two buttons.** Run tests, on the band, sends `POST .../test` with no body, so every scenario runs.
   Run, on an open `scenario` resource, sends `{ "scenarios": ["<name>"] }`, so only that scenario runs.

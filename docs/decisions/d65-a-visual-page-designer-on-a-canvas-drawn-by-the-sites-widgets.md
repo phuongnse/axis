@@ -31,8 +31,8 @@ page is a file in git, so the designer must write the same format as the Form an
   clears.
 - **Drag and drop comes from the stable `@dnd-kit` packages,** in a lazy chunk that the designers share.
 
-The screens are in [Studio](../reference/studio.md) and the route in
-[draft page metadata](../reference/draft-page-metadata.md).
+The screens are in [Studio editors by kind](../reference/studio-editors-by-kind.md#page-designer) and
+the route in [draft page metadata](../reference/draft-page-metadata.md).
 
 ## Consequences
 

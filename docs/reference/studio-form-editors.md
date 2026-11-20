@@ -2,7 +2,7 @@
 
 This page describes the editors of Studio that keep the generic form and add one part to it: the seed's grid of
 records, the rows of an endpoint's `values` and the steps of a form. What Studio's other editors do is in
-[Studio](studio.md), and the form they share is in [Studio resource form](studio-resource-form.md).
+[Studio](studio.md) and [Studio editors by kind](studio-editors-by-kind.md), and the form they share is in [Studio resource form](studio-resource-form.md).
 
 ## Seed editor
 

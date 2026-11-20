@@ -18,7 +18,7 @@ namespace Axis.Server.Mcp;
 /// person's, or does not exist, answers the draft routes' title and changes nothing. Each successful write call appends one
 /// <c>mcp.toolCalled</c> audit record that holds ids only, see <c>docs/reference/storage.md#audit-actions</c>. <c>run_scenarios</c>
 /// changes no draft. It stores a <c>test</c> request of the draft's files, or reads one back, and records no audit record, as a
-/// <c>test</c> records none, see <c>docs/reference/authoring.md#test</c>. <c>accept_draft</c> changes no draft either. It stores an
+/// <c>test</c> records none, see <c>docs/reference/authoring-publishing.md#test</c>. <c>accept_draft</c> changes no draft either. It stores an
 /// <c>accept</c> publish request of the draft, only under the rules of <c>docs/reference/authoring-requests.md#accepting</c>, and
 /// appends one <c>mcp.toolCalled</c> audit record only when it queues an accept.
 /// </summary>
@@ -319,7 +319,7 @@ internal static class McpWriteTools
     /// Without <paramref name="request"/>, stores a <c>test</c> publish request whose snapshot is the files of the person's draft, with
     /// the draft in <c>draft_id</c> and the scenario <paramref name="names"/> (a JSON list, none or empty for every scenario), and answers
     /// it queued. With <paramref name="request"/>, answers that request, only when it is a scenario <c>test</c> of this draft by this person, not a package test, see
-    /// <c>test_package</c>. The working folder plays no part. See <c>docs/reference/authoring.md#test</c>.
+    /// <c>test_package</c>. The working folder plays no part. See <c>docs/reference/authoring-publishing.md#test</c>.
     /// </summary>
     public static async Task<(object? Output, string? Error)> RunScenariosAsync(
         McpToolContext context, string application, string draft, string? names, string? request, CancellationToken ct)

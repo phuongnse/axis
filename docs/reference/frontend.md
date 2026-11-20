@@ -735,7 +735,7 @@ narrow one.
   actions fold into one menu and the shell navigation collapses. A widget has no setting of its own for it.
 - **One value.** The narrow-width hook reads the token, and each card's marker in the Design System artifact sets that
   width, see [widget previews](widget-previews.md). Studio's page designer previews the narrow layout,
-  see [Studio](studio.md).
+  see [page designer](studio-editors-by-kind.md#page-designer).
 - **Tables.** Every platform table, form line items and the reference lookup included, scrolls sideways inside its
   widget, so the page never does.
 - **The shell header** folds the navigation and the language and theme menu into a Menu panel, see

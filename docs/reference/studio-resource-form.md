@@ -5,7 +5,7 @@ lists, the controls that choose what Axis knows, what uses the resource, its sav
 application, role, policy, rule, event, trigger, sequence, data source, migration and webhook. The
 schema part of the editors that have a designer follows it too. How Studio is laid out around the form
 is in [Studio workspace](studio-workspace.md), and what each editor and designer does is in
-[Studio](studio.md).
+[Studio](studio.md) and [Studio editors by kind](studio-editors-by-kind.md).
 
 ## Sections
 
@@ -227,7 +227,7 @@ release routes are in [release page](studio-workspace.md#release-page).
   `{ url, secret, storage }`, sorted by name. It never answers a value, because a release names bindings
   and never holds them, and an author needs only their names.
 - `GET /api/studio/apps/{application}/relaxed` answers `{ items }`, the relax entries of the
-  application's folder, each as in the [release history](authoring.md#release-history), with the id of
+  application's folder, each as in the [release history](authoring-publishing.md#release-history), with the id of
   its contract, `contractId`. Its words come from the installed module version that the folder pins.
 
 ### Resource activity

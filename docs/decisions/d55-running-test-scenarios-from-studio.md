@@ -31,7 +31,7 @@ that a separate publisher runs ([D47](d47-publishing-from-studio.md)).
   the publisher's settings, and with tenants from configuration the publisher writes nothing the
   server could read, so an installation turns both on together.
 
-The route is in [test](../reference/authoring.md#test), the run in
+The route is in [test](../reference/authoring-publishing.md#test), the run in
 [publisher](../reference/administration.md#publisher), the role in
 [database roles](../reference/storage.md#database-roles), the settings in
 [Studio settings](../reference/host-settings.md#studio-settings) and the controls in

@@ -383,7 +383,7 @@ both tenant sources. Its settings are in
 - **Publishing.** Studio on the main tenant's host stores a preview request in the main tenant's
   database, and the publisher runs it against the preview tenant. The server opens no connection to
   another tenant's database, except that a preview session reads its main tenant's given roles. See
-  [preview](reference/authoring.md#preview).
+  [preview](reference/authoring-publishing.md#preview).
 
 #### Request resolution
 

@@ -1,7 +1,7 @@
 # Draft page metadata
 
 The page metadata routes answer what Studio draws on the canvas of its
-[page designer](studio.md#page-designer) and [form designer](form-designer.md): the metadata that a page or a
+[page designer](studio-editors-by-kind.md#page-designer) and [form designer](form-designer.md): the metadata that a page or a
 form would have, compiled from a draft that is not saved yet, or from a module's page. They are part
 of the [authoring API](authoring.md), and nothing they do is written.
 

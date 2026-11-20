@@ -12,7 +12,7 @@ namespace Axis.Server.Studio;
 /// technical name. The words come from the module files that the release stores: the module's label, the kind of point
 /// (<see cref="Parts"/>), the entity's label and the point's label in each locale. A part without a label shows its name
 /// in each locale of the module's texts, or in <c>en</c> when the module has none. A release without a copy of the module,
-/// and a contract without the point, have no words, see <c>docs/reference/authoring.md#release-history</c>.
+/// and a contract without the point, have no words, see <c>docs/reference/authoring-publishing.md#release-history</c>.
 /// </summary>
 internal static class StudioRelaxedWords
 {
