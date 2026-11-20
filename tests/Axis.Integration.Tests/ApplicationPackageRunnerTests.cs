@@ -9,7 +9,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// What a worker records when it sends the attempt of a call to an application's own package to a runner of
-/// <c>application-package-host</c>, see docs/reference/extension-packages.md#an-applications-packages. The calls run through the worker, a
+/// <c>application-package-host</c>, see docs/reference/package-runners.md#an-applications-packages. The calls run through the worker, a
 /// package host in this process, which stands in for <c>application-package-host</c>, and a real Python runner process that the host starts from the
 /// built files of the call's release. The tests need <c>python3</c> on the path, so they are skipped on Windows. Each wait ends on a state,
 /// never on elapsed time.

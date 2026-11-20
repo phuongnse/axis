@@ -60,7 +60,7 @@ Build an image from the repository root with `docker build --target axis-server 
 - **The package runners.** The `dotnet` image runs the C# runner from `Axis.PackageHost` itself, the `node` image holds the Node.js runner in `/app/sdk/node/` and the `python` image holds the Python runner in `/app/sdk/python/`.
   Compose's `package-host-dotnet`, `package-host-python` and `package-host-node` and the chart's `<release>-package-host-dotnet`, `<release>-package-host-python` and `<release>-package-host-node` run the host with `host` on a read-only root, see [on premises](installation-on-premises.md#on-premises) and [in the cloud](installation-in-the-cloud.md#in-the-cloud).
 - **At the customer.** Every package host image takes `connect`, so a customer runs it in its own network as a
-  [customer-hosted runner](extension-packages.md#customer-hosted-runners).
+  [customer-hosted runner](package-runners.md#customer-hosted-runners).
 - **Signed images** _(planned for M32)_. A release workflow publishes the images to the GitHub
   container registry, each signed with cosign and with a CycloneDX SBOM. Check the signature before
   an install or an upgrade.

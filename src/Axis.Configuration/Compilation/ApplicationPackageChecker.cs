@@ -8,7 +8,7 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Checks the packages an application holds under <c>packages/&lt;id&gt;/</c>, see
-/// <c>docs/reference/extension-packages.md#an-applications-packages</c>. Each package's
+/// <c>docs/reference/package-runners.md#an-applications-packages</c>. Each package's
 /// <c>axis-package.json</c> is read with the schema and rules of an installed package's manifest, its id must be its
 /// folder name and no installed package may use it, and no package is allowed while <c>allowed</c> is false, except a
 /// customer-hosted one, which holds only its manifest. Every problem is reported at the package's manifest file, except an

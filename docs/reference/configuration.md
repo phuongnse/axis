@@ -82,7 +82,7 @@ them is resolved.
 - **Unique ids and names.** Resource ids are unique across the application, compared as UUIDs.
   Names are unique per kind, ignoring letter case.
 - **An application's packages.** No file under `packages/` at the folder root is loaded as a resource,
-  whatever its extension, see [an application's packages](extension-packages.md#an-applications-packages).
+  whatever its extension, see [an application's packages](package-runners.md#an-applications-packages).
   Each is read as UTF-8 text, and one that is not UTF-8 is `AXC0010`.
 - **Stored releases.** The same checks run on a release's stored resources when the server rebuilds
   its model.

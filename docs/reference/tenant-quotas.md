@@ -102,7 +102,7 @@ nothing:
 - **Package runners.** A tenant administrator's [create and revoke of a package runner](user-administration.md#package-runners)
   are never refused over the `storage` quota. A create writes one small row and one audit record, and a revoke is a
   security action that a billing limit must never stop.
-- **A runner's registration, take and result.** A [customer-hosted runner](extension-packages.md#customer-hosted-runners)'s
+- **A runner's registration, take and result.** A [customer-hosted runner](package-runners.md#customer-hosted-runners)'s
   registration of its packages, its take of a call and its result for a call are never refused over the `storage`
   quota. A registration adds to the list of its one row, and a billing limit must never stop a runner from starting.
   A take marks a call as a step's Mark does, and a billing limit must never stop running work. A result records a
@@ -221,13 +221,13 @@ In a cell the worker counts each email it sends for a tenant, and holds an email
 ## Package run time a day
 
 In a cell the worker counts the CPU seconds that the runners of a tenant's
-[application packages](extension-packages.md#an-applications-packages) use, against the tenant's
+[application packages](package-runners.md#an-applications-packages) use, against the tenant's
 `packageCpuSecondsPerDay`. Outside a cell nothing is counted or held.
 
 - **Counting.** After each call the worker adds the runner's CPU seconds for that call, rounded up, to
   the counter `packageCpuSeconds` in `platform.tenant_daily_counters`, see [emails a day](#emails-a-day).
   The runner's package host reports them in a `usage` line, which counts the runner process's own CPU time
-  from the `run` to the answer, see [the runner protocol](extension-packages.md#the-runner-protocol). A
+  from the `run` to the answer, see [the runner protocol](package-runners.md#the-runner-protocol). A
   runner's start and idle time count for no tenant, and the CPU of the processes that a package starts
   does not count. A call counts whatever its outcome: a result, a failure or a refused request. A call that
   times out, or whose runner exits, or whose `usage` line does not come counts the seconds from the `run`
@@ -242,7 +242,7 @@ In a cell the worker counts the CPU seconds that the runners of a tenant's
   read for the check, the call waits one lease, nothing is written, and the worker logs one warning for
   the tenant.
 - **Customer-hosted packages** _(planned for M37)_. The calls to a
-  [customer-hosted](extension-packages.md#customer-hosted-runners) package are neither counted nor held,
+  [customer-hosted](package-runners.md#customer-hosted-runners) package are neither counted nor held,
   because they use no CPU of Axis.
 - **A run from Studio** _(planned for M37)_. A [run](studio-packages.md#the-authoring-api) of one operation from
   Studio's package workspace counts its CPU seconds against `packageCpuSecondsPerDay`, as a call does.

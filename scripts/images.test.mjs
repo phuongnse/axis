@@ -476,7 +476,7 @@ describe('the package host images', () => {
   })
 
   test('axis-package-host-python imports axis_sdk from /app/sdk/python', { timeout }, () => {
-    // The host starts the Python runner from this folder, see docs/reference/extension-packages.md#package-runners.
+    // The host starts the Python runner from this folder, see docs/reference/package-runners.md#package-runners.
     const output = run([
       'run',
       '--rm',

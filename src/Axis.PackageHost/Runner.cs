@@ -7,7 +7,7 @@ namespace Axis.PackageHost;
 
 /// <summary>
 /// Runner mode: runs the operations of one installed C# package version, one <c>run</c> at a time, see
-/// docs/reference/extension-packages.md#the-runner-protocol. The protocol goes over the standard input and
+/// docs/reference/package-runners.md#the-runner-protocol. The protocol goes over the standard input and
 /// output. Package code that writes to the console writes to standard error, so it cannot corrupt the protocol
 /// stream. The exit code is 0 when the input ends or a <c>stop</c> arrives, 1 when the version does not load,
 /// and 2 when a line is not a <c>run</c> or a <c>stop</c>. Each <c>run</c> gets exactly one answer. The context

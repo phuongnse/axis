@@ -45,7 +45,7 @@ namespace Axis.Processes.Instances;
 /// With <see cref="PackageRunnerPools"/>, a C# package runs in a runner of the C# package host instead of in the worker,
 /// and a <c>node</c> package always runs in a runner of the Node.js package host, because the worker cannot load
 /// JavaScript, and a <c>python</c> package always runs in a runner of the Python package host, because it cannot load Python,
-/// see docs/reference/extension-packages.md#package-runners. The runner gets only the declared bindings, and the same
+/// see docs/reference/package-runners.md#package-runners. The runner gets only the declared bindings, and the same
 /// outcomes follow: a runner's <c>retryable</c> and <c>failure</c> answers are the exceptions above, a timeout and a
 /// runner that closes its connection are unknown outcomes, and a host that cannot be reached, is not set or starts no
 /// runner is a retryable error that names the setting of the call's runtime. A request that a runner sends to a host no declared <c>url</c> binding names is
@@ -54,7 +54,7 @@ namespace Axis.Processes.Instances;
 /// An application's own package is not installed. When the worker finds no installed version, it reads the package's built files from the
 /// call's release, in the mark transaction. With them, the attempt goes to a runner of <c>application-package-host</c> at
 /// <c>Extensions:Runners:Application</c>, whatever the package's language, which gets the files and the call's tenant, and the same outcomes
-/// follow, see docs/reference/extension-packages.md#an-applications-packages. Without a pool the attempt is retryable like one whose host
+/// follow, see docs/reference/package-runners.md#an-applications-packages. Without a pool the attempt is retryable like one whose host
 /// is not set. A release that holds the package's source but no usable built files, such as one that <c>activate</c> stored, fails the call at
 /// once: the error names the package and no path, no runner starts and no attempt is counted. A release that holds neither keeps the retryable
 /// "not installed" error.
@@ -333,7 +333,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         // A package that has a runner pool never loads in the worker, see
-        // docs/reference/extension-packages.md#package-runners. An application's own package never runs in the worker, so without
+        // docs/reference/package-runners.md#package-runners. An application's own package never runs in the worker, so without
         // a pool its attempt is retryable, like one whose host is not set.
         Run run;
         if (PoolFor(target) is { } pool)
@@ -549,7 +549,7 @@ internal sealed partial class PackageCallHandler(
     }
 
     /// <summary>
-    /// Sends the attempt to a runner of the package host, see docs/reference/extension-packages.md#package-runners. The
+    /// Sends the attempt to a runner of the package host, see docs/reference/package-runners.md#package-runners. The
     /// step's timeout starts when the <c>run</c> is sent, and the start of a runner has its own bound. The <c>run</c> holds the stored input and
     /// the declared bindings of the call's tenant, nothing else. An attempt that fails before the
     /// <c>run</c> is sent is retryable, because the operation never ran. After it, a timeout closes the

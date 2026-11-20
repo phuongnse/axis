@@ -46,7 +46,7 @@ Docker, .NET and Node, and works on a fresh clone.
     at once, not under `dotnet watch`. The build output holds the Node.js runner beside the dll. The host
     reads `artifacts/extensions` and listens on `127.0.0.1:5310` only, because the runner protocol has no
     authentication. The worker's `Extensions__Runners__Node` names that address, see
-    [package runners](reference/extension-packages.md#package-runners).
+    [package runners](reference/package-runners.md#package-runners).
 11. It runs the server and the worker under `dotnet watch` and the SPA on Vite, in one terminal. It
     starts the worker once the server has migrated the tenant databases. The SPA proxies `/api`,
     `/health` and `/licences.json` to the server, so the licences page works signed out too.

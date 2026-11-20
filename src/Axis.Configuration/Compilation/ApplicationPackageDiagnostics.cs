@@ -4,7 +4,7 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// The diagnostics about application packages that more than one project reports, so each has one text, see
-/// <c>docs/reference/extension-packages.md#an-applications-packages</c>.
+/// <c>docs/reference/package-runners.md#an-applications-packages</c>.
 /// </summary>
 public static class ApplicationPackageDiagnostics
 {

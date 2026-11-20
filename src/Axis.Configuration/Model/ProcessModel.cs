@@ -253,7 +253,7 @@ public sealed record RetryPolicyModel(int Attempts, TimeSpan Backoff);
 /// <see cref="Idempotent"/>, <see cref="Timeout"/> and <see cref="Capabilities"/> come from the
 /// manifest of that version. <see cref="Capabilities"/> names the <c>url</c> and <c>secret</c>
 /// deployment bindings the operation declares. <see cref="CustomerHosted"/> is true when the package runs in a
-/// customer-hosted runner, see <c>docs/reference/extension-packages.md#customer-hosted-runners</c>.
+/// customer-hosted runner, see <c>docs/reference/package-runners.md#customer-hosted-runners</c>.
 /// </summary>
 public sealed record PackageOperationStepModel(
     string Name,

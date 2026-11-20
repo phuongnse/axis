@@ -9,7 +9,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// A customer-hosted runner takes a waiting call at <c>POST /api/package-runner/calls/take</c>, see
-/// <c>docs/reference/extension-packages.md#routes</c>, with real PostgreSQL and Keycloak. The calls are left as staging leaves them, because
+/// <c>docs/reference/package-runners.md#routes</c>, with real PostgreSQL and Keycloak. The calls are left as staging leaves them, because
 /// staging is tested with <see cref="PackageCallTests"/>. The denied cases are in <see cref="PackageRunnerRegistrationTests"/>. Each test makes
 /// the realm of its tenant with a unique name and deletes it at the end.
 /// </summary>

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Axis package runner protocol message",
-  "description": "One line of the runner protocol. See docs/reference/extension-packages.md#the-runner-protocol.",
+  "description": "One line of the runner protocol. See docs/reference/package-runners.md#the-runner-protocol.",
   "oneOf": [
     { "$ref": "#/$defs/start" },
     { "$ref": "#/$defs/ready" },

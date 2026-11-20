@@ -143,7 +143,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
                 pageSize={historyPageSize}
                 total={totalCount}
                 showSizeChanger={false}
-                itemRender={paginationItems(page)}
+                itemRender={paginationItems(page, t)}
                 onChange={setPage}
               />
             </Flex>

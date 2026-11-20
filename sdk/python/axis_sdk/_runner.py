@@ -1,4 +1,4 @@
-"""Runs the operations of one installed Python package version, see docs/reference/extension-packages.md#the-runner-protocol.
+"""Runs the operations of one installed Python package version, see docs/reference/package-runners.md#the-runner-protocol.
 
 The protocol goes over the standard input and the stream that axis_runner.py saved. Each ``run`` gets exactly one
 answer. The exit code is 0 when the input ends or a ``stop`` arrives, 1 when the version does not load, and 2 when a

@@ -2,7 +2,7 @@ namespace Axis.Server.Authentication;
 
 /// <summary>
 /// A customer-hosted package runner that calls the runner's routes with the access token of its own client, see
-/// <c>docs/reference/extension-packages.md#customer-hosted-runners</c>. A route opts in with <see cref="PackageRunnerRoute"/>. On such a
+/// <c>docs/reference/package-runners.md#customer-hosted-runners</c>. A route opts in with <see cref="PackageRunnerRoute"/>. On such a
 /// route the token is judged against the audience <c>axis-package-runner</c>, every request reads the runner's row, the session cookie is
 /// never read or renewed, and no CSRF header is needed. Every other route refuses the token, because its audience is not the one the route
 /// expects.

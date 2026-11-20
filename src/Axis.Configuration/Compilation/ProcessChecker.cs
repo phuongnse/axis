@@ -2586,6 +2586,6 @@ internal static class ProcessChecker
 /// <summary>
 /// The pinned version of an extension package: its id, its <c>major.minor.patch</c> version and the operations its manifest offers.
 /// <paramref name="CustomerHosted"/> is true when the package runs in a customer-hosted runner, see
-/// <c>docs/reference/extension-packages.md#customer-hosted-runners</c>.
+/// <c>docs/reference/package-runners.md#customer-hosted-runners</c>.
 /// </summary>
 internal sealed record PinnedOperations(string Id, string Version, IReadOnlyList<PackageOperation> Operations, bool CustomerHosted = false);

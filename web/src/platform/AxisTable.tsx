@@ -639,7 +639,7 @@ export function AxisTable<T extends object>({
                       total: paging.total,
                       showSizeChanger: picker,
                       hideOnSinglePage: !picker,
-                      itemRender: paginationItems(paging.current),
+                      itemRender: paginationItems(paging.current, t),
                       // A shared widget keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
                       style: { marginBottom: 0 },
                       showTotal: (all, [from, to]) =>

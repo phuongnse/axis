@@ -262,7 +262,7 @@ ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
 
 # Production package host for Node.js packages: the same as axis-package-host-dotnet, with Node.js and npm, and the
 # Node.js runner that the host starts for a `node` package, see
-# docs/reference/extension-packages.md#the-runner-protocol.
+# docs/reference/package-runners.md#the-runner-protocol.
 FROM package-host-node AS axis-package-host-node
 ARG AXIS_VERSION
 LABEL org.opencontainers.image.version=$AXIS_VERSION
@@ -289,7 +289,7 @@ USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
 
 # Production package host for Python packages: the same as axis-package-host-dotnet, with Python 3 and pip, and the Python
-# runner and SDK in /app/sdk/python, see docs/reference/extension-packages.md#package-runners.
+# runner and SDK in /app/sdk/python, see docs/reference/package-runners.md#package-runners.
 FROM package-host-python AS axis-package-host-python
 ARG AXIS_VERSION
 LABEL org.opencontainers.image.version=$AXIS_VERSION

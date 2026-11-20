@@ -24,7 +24,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The server and the tenants that the tests of the customer-hosted runner routes share, see
-/// <c>docs/reference/extension-packages.md#routes</c>: a platform database, tenants with a Keycloak realm each, runners that sign in with their
+/// <c>docs/reference/package-runners.md#routes</c>: a platform database, tenants with a Keycloak realm each, runners that sign in with their
 /// client's token, and the requests of a runner and of a tenant administrator. A test makes the realms of its tenants with unique names and
 /// deletes them at the end.
 /// </summary>

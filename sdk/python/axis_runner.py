@@ -1,4 +1,4 @@
-# The Python runner of a package host, see docs/reference/extension-packages.md#the-runner-protocol.
+# The Python runner of a package host, see docs/reference/package-runners.md#the-runner-protocol.
 # Usage: python3 -I -B axis_runner.py <version folder>
 import os
 import sys

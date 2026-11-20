@@ -37,12 +37,12 @@ spec:
             # The image keeps the health address on loopback. The kubelet probes the pod address.
             - name: Health__Urls
               value: http://0.0.0.0:5208
-            # The package hosts, see docs/reference/extension-packages.md#package-runners.
+            # The package hosts, see docs/reference/package-runners.md#package-runners.
             {{- range $runtime, $_ := include "axis.packageHostRuntimes" . | fromYaml }}
             - name: Extensions__Runners__{{ title $runtime }}
               value: {{ printf "%s-package-host-%s:5310" $.Release.Name $runtime | quote }}
             {{- end }}
-            {{- /* The application package host, see docs/reference/extension-packages.md#an-applications-packages. */}}
+            {{- /* The application package host, see docs/reference/package-runners.md#an-applications-packages. */}}
             {{- with include "axis.applicationRunnerEnv" . }}
             {{- . | nindent 12 }}
             {{- end }}

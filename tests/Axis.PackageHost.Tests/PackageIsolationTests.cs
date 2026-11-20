@@ -6,7 +6,7 @@ namespace Axis.PackageHost.Tests;
 
 /// <summary>
 /// How <see cref="PackageIsolation.Load"/> reads <c>Extensions:Runners:Python</c>, see
-/// docs/reference/extension-packages.md#package-runners.
+/// docs/reference/package-runners.md#package-runners.
 /// </summary>
 public sealed class PackageIsolationTests
 {

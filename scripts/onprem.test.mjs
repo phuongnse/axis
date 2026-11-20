@@ -10,7 +10,7 @@
 // application-packages profile and checks that Docker runs it under runsc, gVisor, and no package-host-* container, and that the
 // worker and the publisher reach it on 5310. It recreates the worker with
 // Extensions__ApplicationPackages on, and the worker becomes ready only because that host answers that it runs under gVisor, see
-// docs/reference/extension-packages.md#an-applications-packages. Each start of a service that publishes a port picks that
+// docs/reference/package-runners.md#an-applications-packages. Each start of a service that publishes a port picks that
 // port right before it, and Docker's bind error starts it again on new ports. Before any start it builds the sample packages
 // payment-references and payment-terms with the `build` command of their package host images, into the folder that
 // AXIS_EXTENSIONS_DIR names, which the worker and the package hosts mount read-only. It gives tenant one the deployment
@@ -479,7 +479,7 @@ describe('the default model binding setting', () => {
 })
 
 describe('the package hosts', () => {
-  // See docs/reference/extension-packages.md#package-runners and the threats P151 and P152 in docs/reference/threat-model-product.md.
+  // See docs/reference/package-runners.md#package-runners and the threats P151 and P152 in docs/reference/threat-model-product.md.
   for (const [name, host] of Object.entries(packageHosts)) {
     test(`${name} runs the host command on a read-only root with limits, no settings, secret or port, and only the packages, read-only`, () => {
       const { services } = render()
@@ -504,7 +504,7 @@ describe('the package hosts', () => {
   }
 
   test('application-package-host runs the Node.js package host image under runsc, behind the application-packages profile, with the rules of the others', () => {
-    // See docs/reference/extension-packages.md#an-applications-packages and the threat P145 in docs/reference/threat-model-product.md.
+    // See docs/reference/package-runners.md#an-applications-packages and the threat P145 in docs/reference/threat-model-product.md.
     const { services } = render()
     const host = services[applicationPackageHost]
     assert.match(host.image, /axis-package-host-node:/)
@@ -1281,7 +1281,7 @@ describe('the on-premises installation', () => {
 
       // The application package host runs under gVisor, which the profile starts, and no package host does. The worker, recreated with
       // Extensions__ApplicationPackages on, asks it at start and becomes ready only when it answers that it runs under gVisor.
-      // See docs/reference/extension-packages.md#an-applications-packages.
+      // See docs/reference/package-runners.md#an-applications-packages.
       run(['--profile', 'application-packages', 'up', '-d', applicationPackageHost])
       const applicationHost = inspect(run(['--profile', 'application-packages', 'ps', '-q', applicationPackageHost]))
       assert.equal(applicationHost.HostConfig.Runtime, 'runsc', `${applicationPackageHost} runtime`)

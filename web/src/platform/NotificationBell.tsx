@@ -178,7 +178,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
               total={data.totalCount}
               showSizeChanger={false}
               hideOnSinglePage
-              itemRender={paginationItems(data.page)}
+              itemRender={paginationItems(data.page, t)}
               onChange={(next) => void load(next)}
             />
           )}
