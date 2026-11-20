@@ -17,12 +17,19 @@ export function ActionBar({
   fold,
   end,
   docked = false,
+  pane = false,
   'data-testid': testId,
 }: {
   start?: ReactNode
   fold?: AxisFoldAction[]
   end?: ReactNode
   docked?: boolean
+  /**
+   * Proposed, see #3978: the bar sits at the foot of one pane of a workspace and holds the pane's main action, such as the
+   * Run tab's Run, so its sides line up with the pane's content at `spacing-md` instead of the page's `spacing-lg`, and its
+   * actions keep their outlines, as the bar has no finish button.
+   */
+  pane?: boolean
   'data-testid'?: string
 }): ReactNode {
   const { size, colour, spacing } = useDesignTokens()
@@ -58,13 +65,13 @@ export function ActionBar({
         minHeight: size.bar,
         boxSizing: 'border-box',
         paddingBlock: spacing.xs,
-        paddingInline: spacing.lg,
+        paddingInline: pane ? spacing.md : spacing.lg,
         background: colour.surface,
         borderTop: `1px solid ${colour.borderSubtle}`,
       }}
     >
       {start !== undefined && <AxisActionRow align="center">{start}</AxisActionRow>}
-      <AxisActionRow align="center" justify="flex-end" fold={fold ?? []} end={end} />
+      <AxisActionRow align="center" justify="flex-end" fold={fold ?? []} end={end} outlined={pane} />
     </Flex>
   )
   if (!docked) {

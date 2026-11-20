@@ -151,12 +151,18 @@ export function AxisActionRow({
   end,
   justify,
   align,
+  outlined = false,
 }: {
   children?: ReactNode
   fold?: AxisFoldAction[]
   end?: ReactNode
   justify?: FlexProps['justify']
   align?: FlexProps['align']
+  /**
+   * Proposed, see #3978: the row has no finish button by its kind, such as a pane's action bar that holds the pane's main
+   * action, so its buttons keep their outlines, as a main action with no solid button beside it does.
+   */
+  outlined?: boolean
 }) {
   const t = useText()
   const rowRef = useRef<HTMLDivElement>(null)
@@ -210,7 +216,7 @@ export function AxisActionRow({
       }
     : { wrap: true }
   return (
-    <ActionRowContext.Provider value={true}>
+    <ActionRowContext.Provider value={!outlined}>
       <Flex gap="small" justify={justify} align={align} {...rowProps}>
         {children}
         {fold &&

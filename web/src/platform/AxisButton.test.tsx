@@ -295,6 +295,19 @@ describe.each(['light', 'dark'] as const)('the roles of the button inside an act
     }
   })
 
+  it('keeps a main action outlined in a row drawn outlined', () => {
+    renderIn(
+      mode,
+      <AxisActionRow outlined>
+        <AxisButton role="main">Run</AxisButton>
+      </AxisActionRow>,
+    )
+
+    const button = screen.getByRole('button', { name: 'Run' })
+    expect(button).toHaveClass('ant-btn-variant-outlined')
+    expect(button.style.borderColor).not.toBe('')
+  })
+
   it('draws main in primaryText, destructive in dangerText and secondary in the default colour', () => {
     renderRow()
 

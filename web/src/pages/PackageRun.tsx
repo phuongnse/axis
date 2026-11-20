@@ -1,5 +1,6 @@
 import { Flex, Segmented, Select, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
+import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, AxisSplitButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -221,7 +222,7 @@ export function PackageRun({
 
   // Proposed, see #3978: two panes side by side, parted by a rule that runs the panel's height, as the explorer and the
   // editor are. The input pane follows what a person does: the operation, then the Input title row with a saved input
-  // and the fields, then Run right after them, as Google Cloud puts its Test under the event; the result pane has the Output title row with the
+  // and the fields, then Run in the action bar at the pane's foot, where it stays in view; the result pane has the Output title row with the
   // outcome and duration, the output, then the Log title row and its lines. Each rule runs its pane's width, and no
   // region has a box of its own, as the workspace draws them.
   return (
@@ -236,7 +237,7 @@ export function PackageRun({
           borderInlineEnd: rule,
         }}
       >
-        {/* One scroll for the whole pane, so no region scrolls inside another. */}
+        {/* One scroll for the pane above its action bar, so no region scrolls inside another and Run stays in view. */}
         <div
           style={{
             flex: 1,
@@ -372,13 +373,8 @@ export function PackageRun({
               />
             </div>
           )}
-          <Flex
-            justify="flex-end"
-            style={{ flex: 'none', padding: pad, borderTop: shown === 'json' ? rule : undefined }}
-          >
-            {runButton}
-          </Flex>
         </div>
+        <ActionBar pane end={runButton} />
       </div>
       <div
         data-testid="package-run-result"
