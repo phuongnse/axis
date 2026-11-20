@@ -71,7 +71,7 @@ every log.
 - **Failed work items.** A failed work item logs its kind, its id and the exception type only. The
   exception message and its inner exceptions can quote a record value, so the log leaves them out.
 - **Query timeouts.** An interactive read that runs past `Data:QueryTimeout`, or a record write,
-  process start, task complete or inbound endpoint call that runs past `Data:WriteTimeout`, logs a
+  process start, task complete or save, or inbound endpoint call that runs past `Data:WriteTimeout`, logs a
   warning with the entity, data source or page name as the route spells it and how long it ran, never
   a value or the query string. The counter `axis.queries.timeouts` counts each one by tenant and
   application, see [errors](record-api.md#errors).

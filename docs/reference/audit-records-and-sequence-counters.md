@@ -13,8 +13,8 @@ records. Both are system tables in the `axis` schema of the tenant database.
 
 `axis.audit_records` is append-only, and each row is written in the same transaction as the action
 it records. The record API, the process [start endpoint](processes.md#start-endpoint),
-[process steps](process-execution.md#running-a-step), [task completions](task-api.md#completing-a-task)
-and the [operator commands](process-operator-commands.md#operator-commands) write them, the last with the
+[process steps](process-execution.md#running-a-step), [task completions](task-api.md#completing-a-task) and
+[saves](task-api.md#saving-a-task) and the [operator commands](process-operator-commands.md#operator-commands) write them, the last with the
 user or service account as actor, and so do the actions that [audit actions](#audit-actions) lists.
 
 | Column                | Type                             | Meaning                                                                                                                                                                                                                           |

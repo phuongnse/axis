@@ -12,7 +12,7 @@ escalations and deadlines are in [task deadlines and claims](task-deadlines.md).
 | `GET /api/apps/{app}/tasks/{id}`             | Reads one task, see [read one task](#read-one-task)                                               |
 | `POST /api/apps/{app}/tasks/{id}/form-state` | Answers what the task's form shows for a draft, see [form state of a task](#form-state-of-a-task) |
 | `POST /api/apps/{app}/tasks/{id}/complete`   | Completes a task with an outcome, see [completing a task](#completing-a-task)                     |
-| `POST /api/apps/{app}/tasks/{id}/save` _(planned)_ | Saves the changes to a task's subject record without completing the task, see [saving a task](#saving-a-task) |
+| `POST /api/apps/{app}/tasks/{id}/save` | Saves the changes to a task's subject record without completing the task, see [saving a task](#saving-a-task) |
 | `POST /api/apps/{app}/tasks/complete-many` _(planned for M43)_ | Decides several tasks with one outcome, see [deciding several tasks](#deciding-several-tasks) |
 
 ## Who may act
@@ -260,8 +260,6 @@ part fails, nothing is written. The worker then runs the next step as usual.
 
 ## Saving a task
 
-_(planned)_
-
 `POST /api/apps/{app}/tasks/{id}/save` saves the changes to a task's subject record and leaves the task open:
 
 ```http
@@ -271,17 +269,19 @@ Content-Type: application/json
 { "values": { "decisionComments": "Fine for Q4." }, "version": 3 }
 ```
 
-- `values` is required and holds at least one field. It is checked as a completion's `values` is: only fields
-  the task's form makes editable and the user may read, in the record API's
-  [value format](record-api.md#request-bodies-and-values).
-- `version` is required. It is the subject record's version, as the record API reads it.
+- `values` is required and holds at least one field, so a missing or empty `values` is a `400` at `/values`
+  with "Required.". It is checked as a completion's `values` is: only fields the task's form makes editable and
+  the user may read, in the record API's [value format](record-api.md#request-bodies-and-values).
+- `version` is required, so a missing one is a `400` at `/version` with "Required.". It is the subject record's
+  version, as the record API reads it. An `outcome` is a `400` at `/outcome` with "Unknown property.".
 - The keys and messages of these checks are a completion's, with no `/outcome`, and the request needs the
   [CSRF header](record-api.md#create-update-and-delete) and JSON, as completing does.
 - The response is `200` with `{ "version": 4 }`, the subject record's new version.
 
 One transaction saves the values:
 
-1. It locks the task row and checks that the task is `open`.
+1. It locks the task row and checks that the task is `open`. Only someone who may complete the task may save
+   it, so only the claimer may save a claimed role task, and another holder gets `403`.
 2. It writes `values` through the record update command, so computed fields are recomputed and validations
    run, and it writes the usual `record.updated` audit record, as the record API does.
 3. It changes nothing else. The task stays open, and its instance, its history rows and its work items are
@@ -374,7 +374,7 @@ record API's [rules](record-api.md#create-update-and-delete), so a wrong one is 
 
 A request is checked in this order, and the first failure is the response: `401`, then `404`, then
 `403`, then `409`, then `415`, then `400`. So a user who may not act on a task never learns its state.
-A completion or a form state call without the [CSRF header](record-api.md#create-update-and-delete)
+A completion, a save or a form state call without the [CSRF header](record-api.md#create-update-and-delete)
 is a `403` before any of these checks, and so is one in a
 [read-only tenant](subscriptions.md#the-read-only-tenant).
 
@@ -404,8 +404,8 @@ is a `403` before any of these checks, and so is one in a
 
 - **`403`.** The user is not the assignee and does not hold the assignee role, or the active release
   does not declare that role. It is also the answer when a role holder completes a role task that
-  another holder claimed. This applies to reading one task, asking for its form state and completing
-  it.
+  another holder claimed. This applies to reading one task, asking for its form state, saving it and
+  completing it.
 
   ```json
   {
@@ -489,7 +489,7 @@ is a `403` before any of these checks, and so is one in a
   exists.
 - **`503` for a changed release.** The application's active release changed on
   each of three attempts, found under the [start lock](processes.md#releases-and-running-work).
-  The server already ran the completion again on the new release each time.
+  The server already ran the completion or save again on the new release each time.
   Nothing was written, and the client may send the request again. It is not in
   the check order, because it can follow any check that passed.
 
@@ -501,7 +501,7 @@ is a `403` before any of these checks, and so is one in a
   }
   ```
 
-- **`503` for a write timeout.** The completion's transaction ran past
+- **`503` for a write timeout.** The completion's or save's transaction ran past
   `Data:WriteTimeout` and PostgreSQL cancelled it. Nothing was written, and the
   client may send the request again. The title is fixed: "The write took too
   long. Try again." See [data settings](host-settings.md#data-settings).

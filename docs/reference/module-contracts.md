@@ -200,7 +200,7 @@ by it.
 An effect creates one record when a transition happens, in the transaction of the write that made
 the transition, such as a ledger entry when a request is approved. The compiled contract holds each
 effect with its compiled values, and the shared record update runs them. Every write that can make a
-transition runs them: the record API, a task completion, a process step, a connector or package
+transition runs them: the record API, a task completion or save, a process step, a connector or package
 output and a call resolution. An inbound endpoint call only creates records, so it makes no
 transition and runs no effect.
 
@@ -239,7 +239,7 @@ transition and runs no effect.
   opposite entry.
 - **Audit and triggers.** The created record writes `record.created`, with the actor of the write
   that made the transition and details `{ "version", "effect" }`, where `effect` is the effect's
-  named point. The actor is the completing user for a task completion and the operator for a call
+  named point. The actor is the completing user for a task completion, the saving user for a task save and the operator for a call
   resolution, and `system` for a process step or a connector or package output. Data change
   triggers fire for it as for any create.
 
@@ -297,6 +297,7 @@ does. It is how a guard knows who decided.
 | The record API and import | The user of the session, or the service account |
 | An inbound endpoint call | The calling service account |
 | A task completion that writes values | The user who completes the task |
+| A task save | The user who saves the task |
 | A process step: `updateRecord`, `createRecord`, connector and package outputs | The user of the instance's last completed task, or, before any task, the instance's starter |
 | An operator command that writes, such as resolving a call | The operator |
 | An effect | The accountable user of the write that made the transition |
@@ -344,7 +345,7 @@ promise that each step is decided once.
 
 `Axis.Data` checks the contract inside every record write, so no caller can go around it.
 
-- **Every write.** The record API, task completions, process steps, connector and package outputs,
+- **Every write.** The record API, task completions, task saves, process steps, connector and package outputs,
   call resolution, imports, inbound endpoints, test scenarios and seed data.
 - **Not a write of a record.** A [migration](migrations.md#migrations), a recompute of stored
   computed fields, a data key rotation and a restore change stored values in bulk and check no
@@ -374,7 +375,7 @@ what refused it.
   same `409`, keyed by the state field. A failing effect is a `409` with the fixed title "A
   required change could not be recorded." and the effect's named point in a `point` member, such as
   `Claim/effects/entryRecorded`. It has no `errors`. Nothing is written.
-- **Task completion.** The completion is refused with the same answers, and the task stays open.
+- **Task completion or save.** The completion or save is refused with the same answers, and the task stays open.
 - **Connector or package output and call resolution.** A refused output fails the call as a refused
   `updateRecord` does. A refused call resolution is a `400` keyed `/output`, and its message
   names the point.

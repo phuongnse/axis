@@ -25,6 +25,8 @@ This section says which writes leave an audit record and what it holds. The
     writes `record.updated` with the actor `system` and its instance id.
   - A [task completion](task-api.md#completing-a-task) that writes values writes no
     `record.updated`, and its `task.completed` record names the fields.
+  - A [task save](task-api.md#saving-a-task) writes `record.updated` with the user who saves as the actor,
+    as the record API does, and no instance id.
   - An [endpoint call](inbound-endpoints.md) writes `record.created` with the caller as the actor.
 - **Details.** `details` is `{ "version": n }` with the record's new version, and a delete holds the
   version the record had when it was deleted. An endpoint call's `record.created` also has

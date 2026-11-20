@@ -660,7 +660,7 @@ The **start lock** keeps a start from running on a release that is being replace
 
 - Each start takes `pg_advisory_xact_lock_shared` keyed on the application `id`, before it reads the
   active release, as the first statement of the transaction that inserts the instance. This covers
-  the process start endpoint, the inbound endpoint, record API creates and updates, task completion,
+  the process start endpoint, the inbound endpoint, record API creates and updates, task completion and save,
   event delivery, `sync` event triggers, update triggers from worker steps and schedule fan-out. A
   record delete takes the lock shared too, and the subject's row lock decides between a start and a
   delete of the same record.

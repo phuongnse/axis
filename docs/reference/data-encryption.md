@@ -54,7 +54,7 @@ Every path that writes or reads a stored sensitive value goes through the cipher
 collection, and none writes a sensitive value in clear.
 
 - **Writes and reads.** The record API, forms, the detail widget, record imports (the dry run and the commit), inbound
-  endpoints, process steps, connector and package call outputs, the process start endpoint, task completion, the task
+  endpoints, process steps, connector and package call outputs, the process start endpoint, task completion and save, the task
   form state and the operator's call resolve encrypt and decrypt with the cipher. An import by key checks and updates
   a record that holds a stored sensitive value, and an inbound endpoint reads the record for its output with the
   cipher.
@@ -71,7 +71,7 @@ collection, and none writes a sensitive value in clear.
   in the publisher. A synced seed decrypts the stored value and compares it with the declared one, so an unchanged
   value writes nothing.
 - **Scenarios.** A scenario's tenant gets a random data key and lookup key, held in memory for the run only and never
-  stored. Its record steps, task completions, seeds and process steps use the cipher. A read under a grant whose
+  stored. Its record steps, task completions and saves, seeds and process steps use the cipher. A read under a grant whose
   `filter` tests an exact lookup field matches through the lookup hashes, and so do a data source `filter` and a
   measure's `filter` in the rows, the export and the id read of the trigger fan-out.
 - **History** _(planned for M41)_. The history route, the record at a time and the tenant's audit with its export

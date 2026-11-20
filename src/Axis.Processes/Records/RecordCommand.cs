@@ -1114,7 +1114,7 @@ public static class RecordCommand
     /// effect's named point. They never hold a field value. Its actor is <paramref name="actor"/>, with
     /// their display name.
     /// </summary>
-    private static AuditEntry RecordAudit(
+    internal static AuditEntry RecordAudit(
         RecordActor actor,
         string action,
         ApplicationModel application,

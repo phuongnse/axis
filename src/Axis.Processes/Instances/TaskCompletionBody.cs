@@ -11,7 +11,8 @@ namespace Axis.Processes.Instances;
 /// case, and the optional <c>values</c> and <c>version</c>. A value is allowed only for a field the
 /// task's form makes editable and the user may read. The allowed values and the version are then
 /// parsed by the record update parser, so they follow the record API's value format and keys.
-/// Every problem is reported in one pass, keyed by JSON Pointer into the body.
+/// The body of a task save has no <c>outcome</c>, and a <c>values</c> with at least one field and a
+/// <c>version</c> are required. Every problem is reported in one pass, keyed by JSON Pointer into the body.
 /// </summary>
 internal static class TaskCompletionBody
 {
@@ -34,6 +35,8 @@ internal static class TaskCompletionBody
 
     private const string UnknownOutcome = "Must be one of the step's outcomes.";
 
+    private const string Required = "Required.";
+
     /// <summary>
     /// Reads <paramref name="utf8Body"/> against the task <paramref name="step"/> and its
     /// <paramref name="form"/> over <paramref name="entity"/>, the subject entity in
@@ -43,6 +46,29 @@ internal static class TaskCompletionBody
     public static TaskCompletionBodyResult Read(
         byte[] utf8Body,
         TaskStepModel step,
+        FormModel form,
+        EntityModel entity,
+        ApplicationModel release,
+        IReadOnlySet<string>? readable) =>
+        ReadCore(utf8Body, step, form, entity, release, readable);
+
+    /// <summary>
+    /// Reads <paramref name="utf8Body"/> as the body of a task save against <paramref name="form"/>
+    /// over <paramref name="entity"/>. It takes no <c>outcome</c>, and needs a <c>values</c> object with
+    /// at least one field and a <c>version</c>. <see cref="TaskCompletionBodyResult.Outcome"/> is null.
+    /// </summary>
+    public static TaskCompletionBodyResult ReadSave(
+        byte[] utf8Body,
+        FormModel form,
+        EntityModel entity,
+        ApplicationModel release,
+        IReadOnlySet<string>? readable) =>
+        ReadCore(utf8Body, null, form, entity, release, readable);
+
+    // A null step reads a task save.
+    private static TaskCompletionBodyResult ReadCore(
+        byte[] utf8Body,
+        TaskStepModel? step,
         FormModel form,
         EntityModel entity,
         ApplicationModel release,
@@ -92,7 +118,7 @@ internal static class TaskCompletionBody
 
                 switch (name)
                 {
-                    case OutcomeProperty:
+                    case OutcomeProperty when step is not null:
                         outcome = property.Value.ValueKind == JsonValueKind.String
                             ? step.Outcomes.FirstOrDefault(candidate =>
                                 string.Equals(candidate.Name, property.Value.GetString(), StringComparison.OrdinalIgnoreCase))
@@ -113,7 +139,7 @@ internal static class TaskCompletionBody
                 }
             }
 
-            if (outcome is null)
+            if (step is not null && outcome is null)
             {
                 errors.TryAdd(Pointer("", OutcomeProperty), [UnknownOutcome]);
             }
@@ -155,6 +181,20 @@ internal static class TaskCompletionBody
                 else
                 {
                     input = parsed.Input;
+                }
+            }
+
+            // A save has something to write and a version to write it on.
+            if (step is null)
+            {
+                if (values is not { } sentValues || !sentValues.EnumerateObject().Any())
+                {
+                    errors.TryAdd(Pointer("", ValuesProperty), [Required]);
+                }
+
+                if (version is null)
+                {
+                    errors.TryAdd(Pointer("", VersionProperty), [Required]);
                 }
             }
 
