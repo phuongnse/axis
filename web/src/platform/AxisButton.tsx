@@ -1,5 +1,5 @@
 import { EllipsisOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
+import { Button, Dropdown, Flex, Space, Tooltip, type ButtonProps, type FlexProps } from 'antd'
 import {
   createContext,
   useContext,
@@ -318,4 +318,67 @@ export function AxisButton(props: AxisButtonProps) {
         />
       )
   }
+}
+
+/** One entry of a split button's menu. */
+export interface SplitButtonItem {
+  key: string
+  label: string
+  /** Draws the entry in `dangerText`, as a menu draws a destructive entry. */
+  destructive?: boolean
+  disabled?: boolean
+  onClick: () => void
+}
+
+/**
+ * Proposed, see #3978: one button with two parts, the main of three or more actions that manage one thing and a caret
+ * that opens a menu of the others, joined in one shape as Ant Design joins a split button with Space.Compact, such as a
+ * saved item's Overwrite with Rename and Delete, see docs/reference/actions-and-controls.md#buttons. `menuNameKey` names
+ * the caret.
+ */
+export function AxisSplitButton({
+  role = 'secondary',
+  children,
+  disabled,
+  onClick,
+  menuNameKey,
+  items,
+  nameSuffix,
+  'data-testid': testId,
+}: {
+  role?: 'secondary' | 'main'
+  /** The main action's text. */
+  children: ReactNode
+  disabled?: boolean
+  onClick: () => void
+  menuNameKey: string
+  items: readonly SplitButtonItem[]
+  /** Appended to both parts' accessible names, such as the name of the item they act on, as an icon button's is. */
+  nameSuffix?: string
+  'data-testid'?: string
+}) {
+  const menu = {
+    items: items.map((item) => ({
+      key: item.key,
+      label: item.label,
+      danger: item.destructive,
+      disabled: item.disabled,
+    })),
+    onClick: ({ key }: { key: string }) => items.find((item) => item.key === key)?.onClick(),
+  }
+  return (
+    <Space.Compact data-testid={testId}>
+      <AxisButton
+        role={role}
+        disabled={disabled}
+        onClick={onClick}
+        aria-label={nameSuffix !== undefined && typeof children === 'string' ? `${children} ${nameSuffix}` : undefined}
+      >
+        {children}
+      </AxisButton>
+      <Dropdown trigger={['click']} menu={menu}>
+        <AxisButton role="icon" joined nameKey={menuNameKey} nameSuffix={nameSuffix} icon={<Chevron />} />
+      </Dropdown>
+    </Space.Compact>
+  )
 }

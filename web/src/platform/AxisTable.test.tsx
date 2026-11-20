@@ -45,6 +45,7 @@ const texts = {
   'shell.table.viewsSave': 'Save view',
   'shell.table.viewsSaveFailed': 'The view could not be saved.',
   'shell.table.viewsRename': 'Rename',
+  'shell.actionRow.more': 'More actions',
   'shell.table.viewsRenameFailed': 'The view could not be renamed.',
   'shell.table.viewsOverwrite': 'Overwrite',
   'shell.table.viewsOverwriteConfirm': 'Overwrite the view {name} with the current search, filter and sort?',
@@ -1070,7 +1071,7 @@ describe('AxisTable', () => {
         expect(viewsDialog()).toBe(dialog)
         expect(screen.getByTestId('address')).toHaveTextContent('?search=pen')
         expect(screen.getByTestId('navigation')).toHaveTextContent('POP')
-        expect(within(dialog).getAllByRole('button', { name: /^(Rename|Overwrite|Delete) / })).toHaveLength(3)
+        expect(within(dialog).getAllByRole('button', { name: /^(Overwrite|More actions) / })).toHaveLength(2)
         expect(server.views).toHaveLength(1)
       })
 
@@ -1093,7 +1094,8 @@ describe('AxisTable', () => {
         open()
 
         const dialog = await openViews()
-        await userEvent.click(within(dialog).getByRole('button', { name: 'Rename Old' }))
+        await userEvent.click(within(dialog).getByRole('button', { name: 'More actions Old' }))
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }))
         const input = within(dialog).getByRole('textbox', { name: 'Name', description: '' })
         await userEvent.clear(input)
         await userEvent.type(input, 'New{Enter}')
@@ -1184,14 +1186,16 @@ describe('AxisTable', () => {
         open()
 
         const dialog = await openViews()
-        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete Old' }))
+        await userEvent.click(within(dialog).getByRole('button', { name: 'More actions Old' }))
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
         expect(within(dialog).getByText('Delete the view Old?')).toBeInTheDocument()
         expect(mutations(fetchMock)).toHaveLength(0)
         // The line's Cancel comes before the dialog's own.
         await userEvent.click(within(dialog).getAllByRole('button', { name: 'Cancel' })[0])
         expect(within(dialog).getByRole('button', { name: 'Old' })).toBeInTheDocument()
 
-        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete Old' }))
+        await userEvent.click(within(dialog).getByRole('button', { name: 'More actions Old' }))
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
         await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
 
         await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Old' })).not.toBeInTheDocument())

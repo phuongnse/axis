@@ -1,8 +1,7 @@
-import { DeleteOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons'
 import { ConfigProvider, Flex, Form, Input, Modal } from 'antd'
 import { useContext, useState } from 'react'
 import { AxisAlert } from './AxisAlert'
-import { AxisButton } from './AxisButton'
+import { AxisButton, AxisSplitButton } from './AxisButton'
 import { AxisField } from './AxisField'
 import { EmptyState } from './EmptyState'
 import { nameCompare } from './listOrder'
@@ -129,33 +128,25 @@ function ItemLine<T extends SavedItem>({
           <AxisButton role="link" onClick={onOpen}>
             {view.name}
           </AxisButton>
-          <Flex gap="small">
-            <AxisButton
-              role="icon"
-              nameKey={texts.rename}
-              nameSuffix={view.name}
-              icon={<EditOutlined />}
-              onClick={() => {
-                setName(view.name)
-                setMode('rename')
-              }}
-            />
-            <AxisButton
-              role="icon"
-              nameKey={texts.overwrite}
-              nameSuffix={view.name}
-              icon={<SaveOutlined />}
-              onClick={() => setMode('overwrite')}
-            />
-            <AxisButton
-              role="icon"
-              nameKey={texts.delete}
-              nameSuffix={view.name}
-              destructive
-              icon={<DeleteOutlined />}
-              onClick={() => setMode('delete')}
-            />
-          </Flex>
+          {/* Rename, Overwrite and Delete manage one item, so Overwrite stays a button and the others are in its menu. */}
+          <AxisSplitButton
+            nameSuffix={view.name}
+            onClick={() => setMode('overwrite')}
+            menuNameKey="shell.actionRow.more"
+            items={[
+              {
+                key: 'rename',
+                label: t(texts.rename),
+                onClick: () => {
+                  setName(view.name)
+                  setMode('rename')
+                },
+              },
+              { key: 'delete', label: t(texts.delete), destructive: true, onClick: () => setMode('delete') },
+            ]}
+          >
+            {t(texts.overwrite)}
+          </AxisSplitButton>
         </Flex>
       )}
       {mode === 'rename' && (
@@ -213,8 +204,8 @@ function ItemLine<T extends SavedItem>({
 /**
  * Proposed, see #3978: the one dialog that keeps a person's named, saved items, such as a table's views or a package's
  * run inputs, see docs/reference/actions-and-controls.md#tables. It lists the items by name in the page language's
- * collation. A name opens its item, and Rename, Overwrite and Delete work in the item's own line, Overwrite and Delete
- * after a question, so the dialog opens no dialog of its own. The Name field and Save save what is shown now as a new
+ * collation. A name opens its item, and Rename, Overwrite and Delete work in the item's own line, through one split
+ * button of Overwrite with Rename and Delete in its menu, Overwrite and Delete after a question, so the dialog opens no dialog of its own. The Name field and Save save what is shown now as a new
  * item. A save the server refuses keeps the dialog open and says so. `texts` names each text by its key, so each use
  * says it in its own words.
  */
