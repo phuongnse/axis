@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { RecordPagesContext, useRecordOpener } from './recordPages'
+import { isRecordPage, RecordPagesContext, useRecordOpener } from './recordPages'
 import { setHostSite } from './siteLinks'
 
 const id = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
@@ -42,5 +42,20 @@ describe('useRecordOpener', () => {
     setHostSite('sample')
 
     expect(opener()('Category', id)).toBe(`/records/category/${id}`)
+  })
+})
+
+describe('isRecordPage', () => {
+  it('is true when the site names the page for the entity, ignoring letter case', () => {
+    expect(isRecordPage('sample', recordPages, 'Request', 'request')).toBe(true)
+    expect(isRecordPage('Sample', recordPages, 'Request', 'REQUEST')).toBe(true)
+  })
+
+  it('is false for another page, an entity with no entry, a name of the object prototype and no pages', () => {
+    expect(isRecordPage('sample', recordPages, 'Request', 'requests')).toBe(false)
+    expect(isRecordPage('sample', recordPages, 'Invoice', 'request')).toBe(false)
+    expect(isRecordPage('sample', recordPages, 'toString', 'request')).toBe(false)
+    expect(isRecordPage('sample', null, 'Request', 'request')).toBe(false)
+    expect(isRecordPage('sample', undefined, 'Request', 'request')).toBe(false)
   })
 })

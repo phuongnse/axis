@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formatValue } from './formatValue'
+import { RecordPagesContext } from './recordPages'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
 import type { WidgetMetadata } from './site'
@@ -106,14 +107,23 @@ function stubTasks(
 }
 
 function CurrentSearch() {
-  return <output data-testid="search">{useLocation().search}</output>
+  const location = useLocation()
+  return (
+    <>
+      <output data-testid="search">{location.search}</output>
+      <output data-testid="path">{location.pathname}</output>
+      <output data-testid="from">{(location.state as { from?: string } | null)?.from}</output>
+    </>
+  )
 }
 
-function renderWidget(search = '', outerCatalogs: TextCatalog[] = catalogs) {
+function renderWidget(search = '', outerCatalogs: TextCatalog[] = catalogs, recordPages?: Record<string, string>) {
   return render(
     <MemoryRouter initialEntries={[`/e2e/tasks${search}`]}>
       <TextProvider catalogs={outerCatalogs} development={false}>
-        <TaskInboxWidget sitePath="e2e" pageName="Tasks" widget={inboxWidget} locale="en" fallbackLocale="en" />
+        <RecordPagesContext value={recordPages ? { sitePath: 'e2e', recordPages } : null}>
+          <TaskInboxWidget sitePath="e2e" pageName="Tasks" widget={inboxWidget} locale="en" fallbackLocale="en" />
+        </RecordPagesContext>
       </TextProvider>
       <CurrentSearch />
     </MemoryRouter>,
@@ -172,6 +182,51 @@ describe('TaskInboxWidget', () => {
     expect(within(approve).getByText('Order chairs')).toBeInTheDocument()
     // No due date shows the em dash.
     expect(within(approve).getAllByRole('cell')[2]).toHaveTextContent('—')
+  })
+
+  it("links the Record column to the subject's record page, passing the inbox's address as from", async () => {
+    stubTasks()
+
+    renderWidget('?pageSize=10', catalogs, { Note: '/e2e/noteform' })
+
+    const link = await screen.findByRole('link', { name: 'Buy paper' })
+    expect(link).toHaveAttribute('href', '/e2e/noteform/11111111-1111-4111-8111-111111111111')
+    await userEvent.click(link)
+    expect(screen.getByTestId('path')).toHaveTextContent('/e2e/noteform/11111111-1111-4111-8111-111111111111')
+    expect(screen.getByTestId('from')).toHaveTextContent('/e2e/tasks?pageSize=10')
+  })
+
+  it('shows the Record column as plain text when the subject entity has no record page', async () => {
+    stubTasks()
+
+    renderWidget('', catalogs, { Request: '/e2e/requestform' })
+
+    expect(await screen.findByText('Buy paper')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Buy paper' })).not.toBeInTheDocument()
+  })
+
+  it('shows the muted dash, not a link or the id, when the subject has no label', async () => {
+    const [review, approve] = (JSON.parse(taskPage) as { items: Record<string, unknown>[] }).items
+    stubTasks(
+      JSON.stringify({
+        items: [
+          { ...review, subject: { entity: 'Note', id: '11111111-1111-4111-8111-111111111111', label: null } },
+          approve,
+        ],
+        page: 1,
+        pageSize: 20,
+        totalCount: 2,
+      }),
+    )
+
+    renderWidget('', catalogs, { Note: '/e2e/noteform' })
+
+    await screen.findByRole('row', { name: /Review the note/ })
+    const [first, second] = screen.getAllByRole('row').slice(1)
+    expect(within(first).getAllByRole('cell')[1]).toHaveTextContent('—')
+    expect(within(first).queryByText('11111111-1111-4111-8111-111111111111')).not.toBeInTheDocument()
+    expect(within(first).queryByRole('link', { name: /1111/ })).not.toBeInTheDocument()
+    expect(within(second).getByRole('link', { name: 'Order chairs' })).toBeInTheDocument()
   })
 
   it("renders a step label from the texts of the task's release when the site texts lack the key", async () => {

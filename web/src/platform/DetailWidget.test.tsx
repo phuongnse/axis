@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DetailWidget } from './DetailWidget'
 import { RecordList, type RecordListValue } from './recordList'
+import { RecordPagesContext } from './recordPages'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
 import { hostileMarkup } from '../test/hostile'
@@ -182,13 +183,19 @@ function CurrentLocation() {
   )
 }
 
-function renderDetail(widget: EntityWidgetMetadata = noteWidget, list: RecordListValue | null = null) {
+function renderDetail(
+  widget: EntityWidgetMetadata = noteWidget,
+  list: RecordListValue | null = null,
+  recordPages?: Record<string, string>,
+) {
   return render(
     <MemoryRouter initialEntries={[`/e2e/notedetail?note=${noteId}`]}>
       <TextProvider catalogs={catalogs} development={false}>
-        <RecordList value={list}>
-          <DetailWidget widget={widget} sitePath="e2e" recordId={noteId} locale="en" />
-        </RecordList>
+        <RecordPagesContext value={recordPages ? { sitePath: 'e2e', recordPages } : null}>
+          <RecordList value={list}>
+            <DetailWidget widget={widget} sitePath="e2e" recordId={noteId} locale="en" />
+          </RecordList>
+        </RecordPagesContext>
       </TextProvider>
       <CurrentLocation />
     </MemoryRouter>,
@@ -405,6 +412,71 @@ describe('DetailWidget', () => {
     const tags = within(screen.getByTestId('detail-references-software')).getAllByText(/./)
     expect(fieldItem('Software')).toContainElement(tags[0])
     expect(tags.map((tag) => tag.textContent)).toEqual(['Word', 'id-excel', 'Visio'])
+  })
+
+  it('shows a reference as a link to its record page that passes where it came from', async () => {
+    stubFetch({ status: 200, body: noteJson('Laptop') })
+
+    renderDetail(noteWidget, null, { Category: '/e2e/categories' })
+
+    const link = await screen.findByRole('link', { name: 'Office' })
+    expect(link).toHaveAttribute('href', `/e2e/categories/${categoryId}`)
+    await userEvent.click(link)
+    expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/categories/${categoryId}`)
+    expect(screen.getByTestId('from')).toHaveTextContent(`/e2e/notedetail?note=${noteId}`)
+  })
+
+  it('shows a reference as plain text when its entity has no record page or its label is missing', async () => {
+    stubFetch(
+      { status: 200, body: noteJson('Laptop') },
+      {
+        status: 200,
+        body: `{"id":"${noteId}","version":1,"values":{"title":"Laptop","category":"${categoryId}"},"labels":{}}`,
+      },
+    )
+
+    const { unmount } = renderDetail(noteWidget, null, { Software: '/e2e/software' })
+    expect(await screen.findByText('Office')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Office' })).toBeNull()
+    unmount()
+
+    renderDetail(noteWidget, null, { Category: '/e2e/categories' })
+    expect(await screen.findByText(categoryId)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: categoryId })).toBeNull()
+  })
+
+  it('shows each entry of a references field as a link inside its tag, and the id as text where a label is missing', async () => {
+    const widget: EntityWidgetMetadata = {
+      ...noteWidget,
+      entity: {
+        ...noteWidget.entity,
+        fields: [
+          {
+            ...field('software', 'references', 'note.software'),
+            target: {
+              entity: 'Software',
+              displayField: 'name',
+              recordsPath: '/api/apps/E2eApp/entities/Software/records',
+            },
+          },
+        ],
+      },
+    }
+    const body = `{"id":"${noteId}","version":1,"values":{"software":["id-word","id-excel"]},"labels":{"software":["Word",null]}}`
+    stubFetch({ status: 200, body }, { status: 200, body })
+
+    const { unmount } = renderDetail(widget, null, { Software: '/e2e/software' })
+
+    const word = await screen.findByRole('link', { name: 'Word' })
+    expect(word).toHaveAttribute('href', '/e2e/software/id-word')
+    expect(word.closest('.ant-tag')).not.toBeNull()
+    expect(screen.getByText('id-excel').closest('.ant-tag')).not.toBeNull()
+    expect(screen.queryByRole('link', { name: 'id-excel' })).toBeNull()
+    unmount()
+
+    renderDetail(widget)
+    expect(await screen.findByText('Word')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).toBeNull()
   })
 
   it('shows the label of a reference in a child row instead of its id', async () => {

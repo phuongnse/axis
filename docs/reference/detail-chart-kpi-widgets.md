@@ -28,7 +28,7 @@ A `detail` widget shows one record read-only, read through the record API, and w
 - **Record.** The SPA reads the record that the page parameter `record` names, from the entity's `recordsPath`. A
   missing or malformed parameter shows the not-found page inside the site shell. A `detail` inside `columns`, `tabs` or
   a `section` is drawn too, see [container widgets](container-widgets.md).
-- **Record from the address** _(planned)_. On a page that a site names as a record page, the SPA reads `record` from the
+- **Record from the address**. On a page that a site names as a record page, the SPA reads `record` from the
   address's `/{id}`, as [routing](frontend.md#routing) says.
 - **A missing record.** A record that the record API answers `404` for, because it is missing or the person cannot open
   it, keeps the page's heading and shows the missing-record line and its link, see
@@ -39,7 +39,7 @@ A `detail` widget shows one record read-only, read through the record API, and w
   references and a file that is not set among them, shows "Not set" in muted italics, see
   [shown values](frontend.md#shown-values). The widget ignores `visibleWhen`, `requiredWhen`, `readOnlyWhen` and
   `steps`.
-- **Reference links** _(planned)_. A `reference` value is a link to its record page, and so is each entry of a
+- **Reference links**. A `reference` value is a link to its record page, and so is each entry of a
   `references` field, see [opening things](actions-and-controls.md#opening-things).
 - **Sections as parts** _(planned)_. With a `form`, each titled section is a part, as a form's sections are: its
   title is drawn by `SectionPart`, and a `borderSubtle` rule sits above a section drawn after another.

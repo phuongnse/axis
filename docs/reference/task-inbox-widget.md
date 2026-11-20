@@ -52,7 +52,7 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
   shows under the toolbar.
 - **Links.** Each row opens the task page at `/{site}/{inboxpage}/{taskId}`, with the inbox page name
   in lower case.
-- **Record links** _(planned)_. The Record column, which shows the subject's label, links to the subject's record page.
+- **Record links**. The Record column, which shows the subject's label, links to the subject's record page.
   The link is built from the row's `subject.entity` and `subject.id`, see [list my tasks](task-api.md#list-my-tasks).
   It is plain text when the person cannot open the record.
 - **Signed out.** With nobody signed in, the task API answers `401`, and the widget shows the sign-in
