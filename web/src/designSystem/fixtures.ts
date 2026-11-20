@@ -889,9 +889,13 @@ const currentUser: CurrentUser = {
   tenantExports: false,
 }
 
-/** The first task of the inbox as the task page reads it: open, claimed by the signed-in person and overdue. */
+/**
+ * The first task of the inbox as the task page reads it: open, claimed by the signed-in person and overdue. Its subject
+ * is the shell's request, with Urgent unchecked, as `shellRecord` says.
+ */
 const openTask: TaskItem = {
   ...taskPage.items[0],
+  subject: { entity: 'Request', id: shellRequestId, label: shellRecord.values.title as string },
   instanceId: '5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d',
   state: 'open',
   assignee: { user: null, role: 'Operator' },
