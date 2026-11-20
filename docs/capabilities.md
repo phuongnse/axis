@@ -35,8 +35,8 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Keep values of a case beyond the fields of its record | [Variables](reference/processes.md#variables) _(planned for M38)_ |
 | Update the record a case runs for | [Steps](reference/processes.md#steps) |
 | Create a record of another entity from a step | [Create record operation](reference/process-flow.md#create-record-operation) |
-| Call another system from a step | [Connector calls](reference/process-execution.md#connector-calls) |
-| Run custom code from a step | [Package operations](reference/process-execution.md#package-operations) |
+| Call another system from a step | [Connector calls](reference/connector-and-package-calls.md#connector-calls) |
+| Run custom code from a step | [Package operations](reference/connector-and-package-calls.md#package-operations) |
 
 ### Starts, waits and time
 
@@ -58,7 +58,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 
 | Capability | Where |
 | --- | --- |
-| Retry a call to another system on its own, with a wait between tries | [Step shape](reference/process-execution.md#step-shape) |
+| Retry a call to another system on its own, with a wait between tries | [Step shape](reference/connector-and-package-calls.md#step-shape) |
 | Let an operator run a failed step again | [Retry](reference/process-operator-commands.md#retry) |
 | Settle a call whose outcome is unknown | [Resolve](reference/process-operator-commands.md#resolve) |
 | Take another path when a step fails | [Error paths](reference/processes.md#error-paths) _(planned for M38)_ |
@@ -394,8 +394,8 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Sign in on behalf of the user who acts | _(planned for M55)_ |
 | Sign in with a client certificate | _(planned for M55)_ |
 | Call a SOAP or XML service | _(planned for M55)_ |
-| Retry a failed call with backoff | [Call outcomes](reference/process-execution.md#call-outcomes) |
-| Act once even when a response is lost | [Reconciliation](reference/process-execution.md#reconciliation) |
+| Retry a failed call with backoff | [Call outcomes](reference/connector-and-package-calls.md#call-outcomes) |
+| Act once even when a response is lost | [Reconciliation](reference/connector-and-package-calls.md#reconciliation) |
 | Wait as long as the other system asks before a retry | _(planned for M45)_ |
 | Limit how fast calls go to one system | _(planned for M55)_ |
 | Turn a response's list into records or child rows | _(planned for M45)_ |
@@ -464,7 +464,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Refuse executables and files whose content does not match their type | [Field and value](reference/file-fields.md#field-and-value) |
 | Scan uploads for malware | [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md) |
 | Keep files outside the database | [Object storage](reference/file-fields.md#storage-and-clean-up) _(planned for M40)_ |
-| Pass a file to a connector, a package or an email | [Files in calls](reference/process-execution.md#files-in-calls) _(planned for M40)_ |
+| Pass a file to a connector, a package or an email | [Files in calls](reference/connector-and-package-calls.md#files-in-calls) _(planned for M40)_ |
 | Have a document signed electronically | [E-signature through a connector](reference/document-templates.md#e-signature-through-a-connector) _(planned for M40)_ |
 | Read values out of a scanned or uploaded document | _(planned for M48)_ |
 

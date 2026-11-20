@@ -48,7 +48,7 @@ public abstract record PackageCallResult
 
 /// <summary>
 /// Records the result of a customer-hosted runner for the call it took, in the caller's transaction, see
-/// docs/reference/process-execution.md#staging-a-package-call and #package-call-outcomes. The call is found and locked by its lease, after its
+/// docs/reference/connector-and-package-calls.md#staging-a-package-call and #package-call-outcomes. The call is found and locked by its lease, after its
 /// instance. A <c>succeeded</c> output is decoded and checked against the manifest as a package runner's <c>result</c> is, and a fitting output is
 /// written with <see cref="PackageCallRecords"/>, the same writes that the worker makes after a run. A <c>retryable</c> result counts as a
 /// <see cref="RetryableException"/>: while the step's retry policy has attempts left, the call is set back to <c>pending</c> and a

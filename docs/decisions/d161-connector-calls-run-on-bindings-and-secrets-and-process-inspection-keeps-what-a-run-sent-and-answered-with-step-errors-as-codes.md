@@ -75,7 +75,7 @@ decision replaces D25 and D34 and keeps every part of them that still holds, as 
 
 The detail is in
 [connectors and deployment bindings](../reference/integration-resources.md#connectors-and-deployment-bindings),
-[connector calls](../reference/process-execution.md#connector-calls) and
+[connector calls](../reference/connector-and-package-calls.md#connector-calls) and
 [process inspection](../reference/process-inspection.md#process-inspection), with the
 [process inspector widget](../reference/process-inspector-widget.md) and the
 [call input kept](../reference/process-inspection.md#call-input-kept) rule.

@@ -71,8 +71,9 @@ flowchart LR
 - **Axis.Worker** runs durable work: the steps of process instances, connector and package calls,
   task escalations and deadlines, email, event delivery to async triggers, schedule triggers and
   their fan-out, and the backfill of pending computed fields. The work is described in
-  [process execution](reference/process-execution.md), [process flow](reference/process-flow.md),
-  [events and triggers](reference/process-events.md) and
+  [process execution](reference/process-execution.md),
+  [connector and package calls](reference/connector-and-package-calls.md),
+  [process flow](reference/process-flow.md), [events and triggers](reference/process-events.md) and
   [recomputing computed fields](reference/migrations.md#recomputing-computed-fields). It loads the
   same modules as the server. It also reads the installed
   [extension packages](reference/extension-packages.md) as metadata, as the server does, and sends their
@@ -172,9 +173,9 @@ start endpoint, the states, the task API, the worker settings and the tables are
   call in its transaction, and the worker sends it and records its result in a following
   transaction. An attempt that is safe to retry is retried under the step's retry policy, with the
   same identity, and an unknown outcome is reconciled through the operation's lookup. See
-  [connector calls](reference/process-execution.md#connector-calls). A package operation step is
+  [connector calls](reference/connector-and-package-calls.md#connector-calls). A package operation step is
   staged and run the same way, see
-  [package operations](reference/process-execution.md#package-operations).
+  [package operations](reference/connector-and-package-calls.md#package-operations).
 - **History.** Every attempt, input, output, decision and error is recorded for inspection.
 
 ## Deployment view

@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// What a worker records when a call that it sends to a runner does not get an answer, see
-/// docs/reference/process-execution.md#package-call-outcomes. <c>PackageSlow</c> runs in a real runner of a
+/// docs/reference/connector-and-package-calls.md#package-call-outcomes. <c>PackageSlow</c> runs in a real runner of a
 /// package host in this process. <c>PackageExit</c> and <c>PackageExitIdempotent</c> end their own runner process and
 /// stand in for a runner that crashes. A <see cref="RecordingRelay"/> that closes the connection after the <c>run</c>
 /// stands in for a runner that closes its connection. A closed port, and no setting, stand in for a package host that is not there. Each

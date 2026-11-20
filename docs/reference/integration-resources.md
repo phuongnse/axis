@@ -3,7 +3,7 @@
 This page describes the resources that connect an application to other systems: connectors and the
 deployment bindings they use, events and triggers, and inbound endpoints. It covers each resource's
 shape and its compile checks. The [outbound webhooks](outbound-webhooks.md) have a page of their own.
-How a process calls a connector is in [connector calls](process-execution.md#connector-calls), how it
+How a process calls a connector is in [connector calls](connector-and-package-calls.md#connector-calls), how it
 raises an event and how triggers start processes is in [events and triggers](process-events.md), and
 how a caller calls an endpoint is in [inbound endpoints](inbound-endpoints.md).
 
@@ -13,7 +13,7 @@ A `connector` resource describes an external system that a process can call. Its
 are deployment bindings, so a release holds only their names and each tenant holds the values. A
 [package operation](extension-packages.md#capabilities) declares the bindings it needs in the same
 way. How a process calls a connector, retries and reconciles is in
-[connector calls](process-execution.md#connector-calls).
+[connector calls](connector-and-package-calls.md#connector-calls).
 
 ### Deployment bindings
 
@@ -340,7 +340,7 @@ anywhere in the response through its `source`. Bodies are always JSON.
 - **`file`.** _(planned for M40)_ An operation input may have the type `file`, which sends a file of the
   subject record. The operation's `encoding` says how it goes: `multipart`, as a part of a
   `multipart/form-data` body, or `json`, the default, encoded as base64 in the JSON body. An output may have the
-  type too, and the step writes the file to a `file` field. See [files in calls](process-execution.md#files-in-calls).
+  type too, and the step writes the file to a `file` field. See [files in calls](connector-and-package-calls.md#files-in-calls).
 - **`object` and `list`.** An `object` input has nested `fields`. A `list`
   input's items are objects with `fields`. Both need at least one nested field,
   and a scalar input has none. A nested field takes no `in`. Only inputs may be
@@ -352,9 +352,9 @@ anywhere in the response through its `source`. Bodies are always JSON.
   - A nested field name repeats an earlier name of the same `fields`, ignoring
     letter case, is `AXC0096`.
   - A `callConnector` step maps them as in
-    [Step shape](process-execution.md#step-shape), and a plain expression for
+    [Step shape](connector-and-package-calls.md#step-shape), and a plain expression for
     one is `AXC0318`. The step stores the nested body when it stages the call,
-    as [Staging and the call](process-execution.md#staging-and-the-call) says,
+    as [Staging and the call](connector-and-package-calls.md#staging-and-the-call) says,
     and the worker sends it as it is.
   - When a step stages its call, an `object` input is stored as a JSON object
     of its nested fields. A `list` input is stored as an array with one object
