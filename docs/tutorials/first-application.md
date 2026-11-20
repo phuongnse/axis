@@ -91,8 +91,8 @@ does not change it.
 
 ## 6. Build the approval process
 
-Create a process named `ExpenseApproval` for the entity `Expense`. The process runs the following
-steps, in this order:
+Create a process named `ExpenseApproval` for the entity `Expense`. Type **Expense approval** into its
+**Title**, the name people see for the process. The process runs the following steps, in this order:
 
 | Step           | Type      | What it does                                                                                    |
 | -------------- | --------- | ----------------------------------------------------------------------------------------------- |

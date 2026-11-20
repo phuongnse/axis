@@ -172,11 +172,13 @@ test.describe('an author publishes a module application on the journey tenant, a
     await createResource(page, 'process', 'QuickBudgetApproval')
     const quickApproval = (await resources(page)).find((item) => item.file === 'processes/quick-budget-approval.json')!
     await openTab(page, 'JSON')
+    await writeText(page, 'processes.quickBudgetApproval.title', 'Quick budget approval')
     const content = {
       id: quickApproval.id,
       kind: 'process',
       name: 'QuickBudgetApproval',
       formatVersion: 1,
+      title: { textKey: 'processes.quickBudgetApproval.title' },
       entity: 'department-budgets/Budget',
       start: 'approve',
       steps: [

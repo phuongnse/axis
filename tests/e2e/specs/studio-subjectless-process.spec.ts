@@ -7,7 +7,7 @@ import { startServer } from '../activate'
 import { pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { createResource, openFormTab } from '../studio-resources'
+import { createResource, openFormTab, writeLabel } from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -73,6 +73,8 @@ test.describe('Studio builds a process without a subject and its triggers in the
 
     await createResource(page, 'process', 'DailyReminder')
     await openFormTab(page)
+    // The sample has an en and a vi text, so the title needs both to keep the diagnostics as they are.
+    await writeLabel(page, 'studio-field-/title', { en: 'Daily reminder', vi: 'Nhắc việc hằng ngày' })
     await page.getByRole('radio', { name: /^Parameters/ }).click()
     await expect(page.getByTestId('studio-field-/entity')).toHaveCount(0)
     await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
@@ -110,6 +112,7 @@ test.describe('Studio builds a process without a subject and its triggers in the
 
     expect(await saved('processes/daily-reminder.json')).toMatchObject({
       name: 'DailyReminder',
+      title: { textKey: 'processes.dailyReminder.title' },
       parameters: [{ name: 'daysOverdue', type: 'integer' }],
     })
     expect(await saved('processes/daily-reminder.json')).not.toHaveProperty('entity')

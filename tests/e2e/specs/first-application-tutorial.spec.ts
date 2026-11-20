@@ -44,6 +44,7 @@ const en = {
   'task.review': 'Review expense',
   'task.approve': 'Approve',
   'task.reject': 'Reject',
+  'processes.expenseApproval.title': 'Expense approval',
   'pages.expenseForm.title': 'Expense',
   'pages.expenses.title': 'Expenses',
   'nav.expenses': 'Expenses',
@@ -265,6 +266,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await createResource(page, 'process', 'ExpenseApproval')
     await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Expense')
+    await writeLabel(page, 'studio-field-/title', { en: en['processes.expenseApproval.title'] })
     await page.getByTestId('studio-step-0').getByRole('button', { name: 'Delete', exact: true }).click()
 
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
@@ -315,7 +317,12 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await expect(condition.locator('.cm-editor')).toBeVisible()
     await condition.getByRole('textbox').fill("status == 'draft'")
     await writeLabel(page, 'studio-field-/startCondition/message', { en: en['expense.cannotSubmit'] })
-    await save(page)
+    const diagnostics = await save(page)
+    expect(
+      diagnostics.filter(
+        (diagnostic) => diagnostic.file === 'processes/expense-approval.json' && diagnostic.severity === 'error',
+      ),
+    ).toEqual([])
     await expectForm(page)
   })
 
