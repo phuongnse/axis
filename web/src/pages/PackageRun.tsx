@@ -396,7 +396,14 @@ export function PackageRun({
                   <StatusTag tone={run.outcome === 'succeeded' ? 'success' : 'danger'}>
                     {t(`shell.studio.package.run.outcome.${run.outcome}`)}
                   </StatusTag>
-                  <Typography.Text type="secondary">
+                </Flex>
+              }
+              actions={
+                // How long the run took is a fact of the output, so it sits on the row's right, named, apart from
+                // the state beside the title.
+                <Flex gap="small" align="baseline" data-testid="package-run-duration">
+                  <Typography.Text type="secondary">{t('shell.studio.package.run.duration')}</Typography.Text>
+                  <Typography.Text>
                     {t('shell.studio.package.run.milliseconds').replace('{count}', String(run.durationMs))}
                   </Typography.Text>
                 </Flex>
