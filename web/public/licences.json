@@ -73,14 +73,6 @@
       "licence": "MIT"
     },
     {
-      "name": "@dagrejs/dagre",
-      "licence": "MIT"
-    },
-    {
-      "name": "@dagrejs/graphlib",
-      "licence": "MIT"
-    },
-    {
       "name": "@dnd-kit/accessibility",
       "licence": "MIT"
     },
