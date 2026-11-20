@@ -14,7 +14,7 @@ The tag defaults to the chart's appVersion.
 
 {{/*
 The package hosts, one for each package runner: the runtime and the name that errors use. See
-docs/reference/extension-packages.md#package-runners. Call with the root context and read it with fromYaml.
+docs/reference/package-runners.md#package-runners. Call with the root context and read it with fromYaml.
 */}}
 {{- define "axis.packageHostRuntimes" -}}
 dotnet: "C#"
@@ -25,7 +25,7 @@ python: "Python"
 {{/*
 The package host objects the chart renders: the name of each, the path of its values and the name that errors use.
 It lists the host of each runtime and, when applicationPackageHost.enabled is set, the application package host, which
-runs under gVisor, see docs/reference/extension-packages.md#an-applications-packages. Call with the root context and
+runs under gVisor, see docs/reference/package-runners.md#an-applications-packages. Call with the root context and
 read it with fromYaml. The application package host also takes calls from the publisher, which its publisher key marks.
 */}}
 {{- define "axis.packageHosts" -}}
@@ -45,7 +45,7 @@ application-package-host:
 
 {{/*
 The environment entry that points a caller at the application package host, which runs under gVisor, see
-docs/reference/extension-packages.md#an-applications-packages. It renders nothing while applicationPackageHost.enabled is
+docs/reference/package-runners.md#an-applications-packages. It renders nothing while applicationPackageHost.enabled is
 off. It sets no Extensions__ApplicationPackages. Call with the root context.
 */}}
 {{- define "axis.applicationRunnerEnv" -}}

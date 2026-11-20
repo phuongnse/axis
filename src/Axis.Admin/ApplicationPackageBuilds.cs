@@ -8,7 +8,7 @@ namespace Axis.Admin;
 
 /// <summary>
 /// Sends each <c>packages/&lt;id&gt;/</c> of a snapshot to <c>application-package-host</c> as a <c>build</c>, and one package of it as a <c>test</c>, see
-/// docs/reference/extension-packages.md#an-applications-packages. The publisher runs no pip, npm or install script itself. A <c>refused</c> answer
+/// docs/reference/package-runners.md#an-applications-packages. The publisher runs no pip, npm or install script itself. A <c>refused</c> answer
 /// gives <c>AXC0149</c> for each problem, at the problem's file in the package. A host that gives no answer within <c>wait</c> gives
 /// <c>AXC0152</c> at the package's manifest, and no message names the host's address. The files of a <c>built</c> answer are stored with a new release, see <see cref="ReleaseCompiler"/>.
 /// </summary>

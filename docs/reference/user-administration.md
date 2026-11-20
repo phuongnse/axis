@@ -282,9 +282,9 @@ switch routes, and lists and revokes the consents through the connected apps rou
 
 _(planned for M37)_
 
-An administrator turns on the tenant's [application packages](extension-packages.md#an-applications-packages)
+An administrator turns on the tenant's [application packages](package-runners.md#an-applications-packages)
 and reads whether they are on. The one switch governs both kinds of package, those that Axis runs and the
-[customer-hosted](extension-packages.md#customer-hosted-runners) ones. The routes answer to an administrator with a browser session only, as the
+[customer-hosted](package-runners.md#customer-hosted-runners) ones. The routes answer to an administrator with a browser session only, as the
 command routes do.
 
 | Route                                              | Body              | Answer                    |
@@ -295,7 +295,7 @@ command routes do.
 - **The order of the checks.** A request is checked in this order: a signed-in user (`401`),
   `Users:AdministratorRole` (`403`), then a tenant with a row in the tenant directory that is not a preview
   tenant (`404`), and for `PUT` the body (`400`). With `Extensions:ApplicationPackages` off, the switch
-  allows only customer-hosted packages, see [an application's packages](extension-packages.md#an-applications-packages).
+  allows only customer-hosted packages, see [an application's packages](package-runners.md#an-applications-packages).
 - **The quota.** While `packageCpuSecondsPerDay` is 0, a `PUT` that turns packages on answers the quota's
   `403`, see [package run time a day](tenant-quotas.md#package-run-time-a-day).
 - **Off by default.** A tenant has packages off until an administrator turns them on.
@@ -310,7 +310,7 @@ command routes do.
 
 ### Package runners
 
-An administrator creates a [customer-hosted runner](extension-packages.md#customer-hosted-runners), sees the
+An administrator creates a [customer-hosted runner](package-runners.md#customer-hosted-runners), sees the
 runners of the tenant and revokes one. The routes answer to an administrator with a browser session only, as the
 command routes do.
 
@@ -335,7 +335,7 @@ command routes do.
   `404`. When the identity provider fails, the route answers `502`, the stored revoke stays, and repeating the
   revoke deletes the client. A repeat keeps the first revoke time and writes no second record.
 - **The runner's requests.** From the stored revoke on, the runner's requests answer `401`, see
-  [customer-hosted runners](extension-packages.md#customer-hosted-runners).
+  [customer-hosted runners](package-runners.md#customer-hosted-runners).
 - **Last call.** `lastCallAt` is the time of the runner's last take of a call. It is `null` before the first.
 - **Audit.** A create and a revoke each write an audit record, see [audit](#audit).
 

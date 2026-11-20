@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The worker's egress proxy on its own, with two stubs as upstream hosts, see
-/// docs/reference/extension-packages.md#package-runners. The tests need no database. A request goes through
+/// docs/reference/package-runners.md#package-runners. The tests need no database. A request goes through
 /// the proxy as a runner's client sends it, with the runner's token as the proxy credentials.
 /// </summary>
 public sealed class EgressProxyTests : IAsyncLifetime

@@ -7,7 +7,7 @@ namespace Axis.PackageHost.Tests;
 
 /// <summary>
 /// Host mode as a real process, which listens on the port and address that <c>PackageHost:Port</c> and <c>PackageHost:Address</c>
-/// name and stops at start when either is malformed, see docs/reference/extension-packages.md#the-runner-protocol.
+/// name and stops at start when either is malformed, see docs/reference/package-runners.md#the-runner-protocol.
 /// Each wait ends on a state, under a cancellation deadline that only bounds a hang.
 /// </summary>
 public sealed class HostModeTests

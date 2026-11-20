@@ -158,7 +158,7 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
 - **Order.** At most one `test` request per application runs at a time, oldest first. Its queue is
   separate from `validate`, `publish` and `activate`, so a `test` never waits behind a `publish`.
 - **A package's tests.** A `test` whose request names a `package` tests that one application package, see
-  [an application's packages](extension-packages.md#an-applications-packages). The publisher compiles
+  [an application's packages](package-runners.md#an-applications-packages). The publisher compiles
   nothing and runs no scenario. It sends the package's files from the snapshot to `application-package-host`
   as a `test` and stores each test's outcome in `package_tests`, so it needs no scenario server. The request
   ends `succeeded` when every test passed and `failed` otherwise. A refused build is `AXC0149` at the problem's

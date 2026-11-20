@@ -37,7 +37,7 @@ agent:
   resources: {}
 
 # The package hosts run the extension packages for the worker, one host for each runtime, see
-# docs/reference/extension-packages.md#package-runners. They get no env entry and no Secret. Both limits are
+# docs/reference/package-runners.md#package-runners. They get no env entry and no Secret. Both limits are
 # required, and rendering fails without either.
 packageHost:
   dotnet:
@@ -63,7 +63,7 @@ packageHost:
         memory: 1Gi
 
 # The application package host runs the packages of an application under gVisor, see
-# docs/reference/extension-packages.md#an-applications-packages. It is off by default, so a cluster without a gVisor
+# docs/reference/package-runners.md#an-applications-packages. It is off by default, so a cluster without a gVisor
 # RuntimeClass still installs. When it is on, the cluster needs a RuntimeClass named runtimeClassName, the worker and the
 # publisher are pointed at the host, and rendering fails without the RuntimeClass name or either limit. The chart does not set
 # Extensions__ApplicationPackages.

@@ -1,9 +1,9 @@
 # Packages in Studio
 
 This page describes how Studio lists, edits and compares the files of an application's own
-[packages](extension-packages.md#an-applications-packages), and what the authoring API checks when a
+[packages](package-runners.md#an-applications-packages), and what the authoring API checks when a
 file is written. It is the screen and API side of those packages. How they run, are counted and are
-switched on is in [extension packages](extension-packages.md#an-applications-packages), and the rest of
+switched on is in [extension packages](package-runners.md#an-applications-packages), and the rest of
 Studio is in [Studio](studio.md) and [Studio workspace](studio-workspace.md).
 
 ## The Packages entry
@@ -175,7 +175,7 @@ developer role and the switch as a write has, and answers `403` otherwise.
   file has changed on `main` since.
 - **Publishing.** _(planned for M37)_ A publish of an application that holds a package needs the publisher
   role only, and builds and scans each package that Axis runs, see
-  [an application's packages](extension-packages.md#an-applications-packages).
+  [an application's packages](package-runners.md#an-applications-packages).
 - **The tools.** The MCP server's `list_package_files`, `read_package_file`, `write_package_file` and
   `delete_package_file` list, read, write and delete package files, in the person's own draft for a write, see
   [tools](mcp-server.md#tools). A write or a delete needs the developer role and the switch, as the routes do, takes

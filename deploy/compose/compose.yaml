@@ -74,7 +74,7 @@ x-host: &host
 # The package hosts, the containers that run the package operations of the worker. Each sets its own image and
 # limits. The rules are the same for all, so they cannot drift apart. Port 5310 has no authentication, so a host
 # sits only on the internal network `runners`, which only the worker, the publisher and the hosts share. It gets no environment,
-# secret, port or module folder, only the packages, read-only. See docs/reference/extension-packages.md#package-runners
+# secret, port or module folder, only the packages, read-only. See docs/reference/package-runners.md#package-runners
 # and the threats P151 and P152 in
 # docs/reference/threat-model-product.md.
 x-package-host: &package-host
@@ -248,7 +248,7 @@ services:
 
   # The application package host, which runs the code of an application's own packages. It is the Node.js package
   # host image under gVisor (`runsc`), and the profile keeps `docker compose up` working on a machine without
-  # gVisor. See docs/reference/extension-packages.md#an-applications-packages and the threat P145 in
+  # gVisor. See docs/reference/package-runners.md#an-applications-packages and the threat P145 in
   # docs/reference/threat-model-product.md.
   application-package-host:
     <<: *package-host

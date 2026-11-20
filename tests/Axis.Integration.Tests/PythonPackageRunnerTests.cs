@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// What a worker records when it sends the attempt of a Python package call to the Python package host, see
-/// docs/reference/extension-packages.md#package-runners. The calls run through the worker, a package host in this
+/// docs/reference/package-runners.md#package-runners. The calls run through the worker, a package host in this
 /// process and a real Python runner process. A closed port stands in for a host that is not there. The tests need
 /// <c>python3</c> on the path, so they are skipped on Windows. Each wait ends on a state, never on elapsed time.
 /// </summary>

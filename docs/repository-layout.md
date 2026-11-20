@@ -99,12 +99,12 @@ tree does not list it.
   Python package, see [building a package](reference/extension-packages.md#building-a-package). Its `host`
   mode listens for runner protocol connections, starts a runner process for each and also builds a package that a
   `build` message sends, and builds and tests one that a `test` message sends, and its `runner` mode
-  runs one installed C# package version over [the runner protocol](reference/extension-packages.md#the-runner-protocol).
+  runs one installed C# package version over [the runner protocol](reference/package-runners.md#the-runner-protocol).
   For a Node.js package the host starts the runner in `sdk/node/` instead, and for a Python package the runner in
   `sdk/python/`.
 - **`axis-package-host-<language>` images.** The `Dockerfile` builds one for each language. Each holds
   `Axis.PackageHost`, Trivy, one runtime and its runner, and runs the `build` command and the `host` mode, see
-  [images](reference/installation.md#images) and [package runners](reference/extension-packages.md#package-runners).
+  [images](reference/installation.md#images) and [package runners](reference/package-runners.md#package-runners).
 - **`sdk/`**. The runner protocol's schema, `package-runner-protocol.schema.json`.
 - **`sdk/node/`**. The Node.js runner and its SDK, which the package host starts for a `node` package.
 - **`sdk/python/`**. The Python runner, `axis_runner.py`, and the SDK module `axis_sdk`, which uses only the Python

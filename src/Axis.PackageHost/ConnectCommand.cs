@@ -13,7 +13,7 @@ namespace Axis.PackageHost;
 
 /// <summary>
 /// The <c>connect</c> command: runs the installed packages of <c>Extensions:Path</c> as a customer-hosted runner, see
-/// docs/reference/extension-packages.md#customer-hosted-runners. It signs in with the runner's credential, registers the manifest of every
+/// docs/reference/package-runners.md#customer-hosted-runners. It signs in with the runner's credential, registers the manifest of every
 /// installed version and then takes calls, one at a time, under a lease. Each call runs in the runner of the manifest's language, which
 /// the command starts with no environment variables and keeps, one for each version. The <c>run</c> carries only the <c>url</c> and
 /// <c>secret</c> bindings that the operation declares, read from <c>Connect:Urls:&lt;binding&gt;</c> and <c>Connect:Secrets:&lt;binding&gt;</c>.

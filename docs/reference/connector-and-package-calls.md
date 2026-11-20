@@ -321,7 +321,7 @@ The compiler reports these as compile errors.
 - The package is one of the application's
   [`packages`](declaring-packages.md#declaring-packages-in-an-application), or an application's own
   package in `packages/<id>/`, see
-  [an application's packages](extension-packages.md#an-applications-packages), with the package id
+  [an application's packages](package-runners.md#an-applications-packages), with the package id
   matched exactly. Otherwise it is `AXC0150` at `/steps/{i}/operation`. A listed package that failed
   pinning (`AXC0139` to `AXC0142`) is not reported again, and neither is a package folder that has
   its own problem, nor any package when `application.json` was not loaded. A module process is
@@ -366,18 +366,18 @@ operation in place of the HTTP request:
   [Capabilities](extension-packages.md#capabilities). With `inProcess`, the worker loads the pinned package
   version and passes the operation a cancellation token that is cancelled at the `timeout`.
 - **Run in a package runner.** With `process`, the default, a C# attempt goes to a
-  [package runner](extension-packages.md#package-runners) instead. The worker sends the stored input and the
+  [package runner](package-runners.md#package-runners) instead. The worker sends the stored input and the
   resolved bindings in a `run`, and closes the connection at the `timeout`, which kills the runner. A `node` or
   `python` attempt always goes to a package runner, with `inProcess` too.
   An attempt of an application's own package, in any language, always goes to a runner of
-  `application-package-host`, see [an application's packages](extension-packages.md#an-applications-packages). The
+  `application-package-host`, see [an application's packages](package-runners.md#an-applications-packages). The
   worker reads the package's built files from the call's release in the mark transaction and sends them with the call's
   tenant when it starts the runner. Without `Extensions:Runners:Application`, the attempt is retryable and names the setting.
 - **Run in a customer-hosted runner**. A call to a customer-hosted package, whether
   the application's own package or an installation's package that the application
   [declares](declaring-packages.md#declaring-packages-in-an-application) with `runner: customer`, see
-  [customer-hosted runners](extension-packages.md#customer-hosted-runners), waits `pending`, its retry due, until a
-  [customer-hosted runner](extension-packages.md#customer-hosted-runners) that registers the package and
+  [customer-hosted runners](package-runners.md#customer-hosted-runners), waits `pending`, its retry due, until a
+  [customer-hosted runner](package-runners.md#customer-hosted-runners) that registers the package and
   version takes it, and the runner receives no binding value.
   - **The take is the Mark step.** It marks the call `sending`, counts the attempt and gives a lease that
     lasts the operation's `timeout`. It also queues a `package.call` item that is due when the lease ends,
@@ -429,7 +429,7 @@ input under the same operation identity.
   hour. A retry writes no history row and no audit record. A call with a missing version counts the
   attempt without marking the call `sending`, because the operation never ran. A release without the
   step, or an installed manifest without the operation, is not retried, since a retry cannot fix it. A
-  `retryable` result of a [customer-hosted runner](extension-packages.md#customer-hosted-runners) queues a
+  `retryable` result of a [customer-hosted runner](package-runners.md#customer-hosted-runners) queues a
   `package.call` item due after the same backoff. A runner can take the call only once that item is gone,
   and the worker deletes it when it is due, with no other write, because the call is `pending` and a runner took
   it before. The next take gives the same operation identity.

@@ -15,10 +15,10 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The <c>connect</c> command of <c>Axis.PackageHost</c> against the server, with real PostgreSQL and Keycloak and the real runners of the C#, Node.js
-/// and Python test packages, see <c>docs/reference/extension-packages.md#customer-hosted-runners</c>. The command runs in the test process and talks to the server
+/// and Python test packages, see <c>docs/reference/package-runners.md#customer-hosted-runners</c>. The command runs in the test process and talks to the server
 /// in memory. The server and the command each hold their own copy of the installed package. Each test makes the realm of its tenant with a unique
 /// name and deletes it at the end. Two instances may share one runner credential and each takes a different call, and a revoke of the runner stops both,
-/// see <c>docs/reference/extension-packages.md#customer-hosted-runners</c> ("The program" and "Revoked").
+/// see <c>docs/reference/package-runners.md#customer-hosted-runners</c> ("The program" and "Revoked").
 /// </summary>
 public sealed class ConnectCommandTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>, IDisposable
 {

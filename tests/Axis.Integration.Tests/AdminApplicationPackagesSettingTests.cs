@@ -5,7 +5,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// <c>activate</c> and the publisher read <c>Extensions:ApplicationPackages</c> for the compile that stores a release, see
-/// docs/reference/extension-packages.md#an-applications-packages. Unset is off, and a value that is not <c>true</c> or <c>false</c>
+/// docs/reference/package-runners.md#an-applications-packages. Unset is off, and a value that is not <c>true</c> or <c>false</c>
 /// is a problem that names the setting. A publisher with the setting on also needs <c>Extensions:Runners:Application</c>, the
 /// host that builds the packages, and stops at start without it.
 /// </summary>

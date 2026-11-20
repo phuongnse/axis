@@ -482,7 +482,7 @@ internal sealed class Publisher(
     }
 
     // Builds the application packages in application-package-host before the compile, see
-    // docs/reference/extension-packages.md#an-applications-packages. Only a publish builds them.
+    // docs/reference/package-runners.md#an-applications-packages. Only a publish builds them.
     private async Task<ReleaseCompilationResult> CompilePublishAsync(IReadOnlyList<ResourceContent> files, ConfigurationDbContext configuration)
     {
         IReadOnlyDictionary<string, byte[]> builtFiles = new Dictionary<string, byte[]>();
@@ -627,7 +627,7 @@ internal sealed class Publisher(
     }
 
     // Sends the one package of a test request to application-package-host to test, see
-    // docs/reference/extension-packages.md#an-applications-packages. It compiles nothing and runs no scenario, so it needs no scenario
+    // docs/reference/package-runners.md#an-applications-packages. It compiles nothing and runs no scenario, so it needs no scenario
     // server, and it touches no tenant data. The host's wait bounds it, so the test limit never applies. A stop ends it at once.
     private async Task<bool> TestPackageAsync(string tenantId, IReadOnlyList<ResourceContent>? files, string package, List<Diagnostic> diagnostics, JsonArray tests)
     {

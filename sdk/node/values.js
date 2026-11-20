@@ -2,7 +2,7 @@
 
 // The Node.js codec between the values of an operation's input and output and the JSON values of the runner
 // protocol, with the rules of RunnerValues in the C# runner, see
-// docs/reference/extension-packages.md#the-runner-protocol. Values keep their protocol form: text, integer,
+// docs/reference/package-runners.md#the-runner-protocol. Values keep their protocol form: text, integer,
 // decimal, date and date-time are strings, boolean is a boolean and a missing value is null. The runner refuses
 // here whatever the worker would refuse when it decodes the output.
 

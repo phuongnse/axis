@@ -6,7 +6,7 @@ namespace Axis.PackageHost.Tests;
 
 /// <summary>
 /// The settings of the <c>connect</c> command: a missing or malformed one stops it with exit code 2 and a message that names the
-/// setting, and <c>http</c> is allowed only in Development, see docs/reference/extension-packages.md#customer-hosted-runners.
+/// setting, and <c>http</c> is allowed only in Development, see docs/reference/package-runners.md#customer-hosted-runners.
 /// </summary>
 public sealed class ConnectCommandTests
 {

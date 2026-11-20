@@ -24,7 +24,7 @@ public enum RegisteredManifestOutcome
 
 /// <summary>
 /// Compares the manifest that a customer-hosted runner registers with the manifests that the releases in use pin, see
-/// docs/reference/extension-packages.md#customer-hosted-runners. A release is in use when it is active or has a running or
+/// docs/reference/package-runners.md#customer-hosted-runners. A release is in use when it is active or has a running or
 /// waiting process instance, as <see cref="PinnedReleaseCheck"/> counts it.
 /// </summary>
 public static class RegisteredManifestCheck

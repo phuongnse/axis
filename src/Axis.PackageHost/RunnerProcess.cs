@@ -5,7 +5,7 @@ using Axis.Configuration.Packages;
 namespace Axis.PackageHost;
 
 /// <summary>
-/// Starts and kills the runner process of a package language, see docs/reference/extension-packages.md#the-runner-protocol. Host mode
+/// Starts and kills the runner process of a package language, see docs/reference/package-runners.md#the-runner-protocol. Host mode
 /// and the <c>connect</c> command start every runner here. The runner's environment is cleared and holds only the variables the caller
 /// passes. Its standard input and output carry the protocol.
 /// </summary>

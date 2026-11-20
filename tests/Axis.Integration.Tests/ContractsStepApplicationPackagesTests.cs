@@ -13,7 +13,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The <c>contracts</c> step compiles the snapshot with the same <c>Extensions:ApplicationPackages</c> as the compile that stores
-/// the release, see docs/reference/extension-packages.md#an-applications-packages. An application that holds a package must not
+/// the release, see docs/reference/package-runners.md#an-applications-packages. An application that holds a package must not
 /// make the step skip the contract scenarios of its modules without a word.
 /// </summary>
 public sealed class ContractsStepApplicationPackagesTests

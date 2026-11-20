@@ -9,7 +9,7 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Reads the files of an application's own package from a release over a connection to a tenant database, see
-/// docs/reference/extension-packages.md#an-applications-packages. A published release stores the built files under
+/// docs/reference/package-runners.md#an-applications-packages. A published release stores the built files under
 /// <c>packages/&lt;id&gt;/</c> in <c>axis.release_package_files</c> and the package's source in <c>axis.release_resources</c>.
 /// </summary>
 internal static class ReleasePackageFiles

@@ -168,7 +168,7 @@ A tool with an optional draft reads the working folder without it and the person
 - **No other tool.** No tool publishes, activates a release, reads a record, a secret or a file other than
   a resource file or a package file, runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
 - **Package tests.** `test_package` runs only the package's own tests, in `application-package-host`, see
-  [an application's packages](extension-packages.md#an-applications-packages).
+  [an application's packages](package-runners.md#an-applications-packages).
 - **Checked.** `McpToolsDocumentationTests` compares the table with the tools the server serves and
   with the `tools/list` answer. `McpToolOutputTests` calls every tool of `tools/list` on a tenant that holds
   a record, a `secret` binding, a `url` binding and the sign-in client secret, and fails when an output

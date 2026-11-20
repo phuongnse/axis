@@ -10,10 +10,10 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// The worker's connections to the runners of one package host, the C# one, the Node.js one, the Python one or the application
-/// one, see docs/reference/extension-packages.md#package-runners. A runner is one connection, which the host pipes to one
+/// one, see docs/reference/package-runners.md#package-runners. A runner is one connection, which the host pipes to one
 /// runner process, and it runs one call at a time. An idle runner waits in the pool of its package version,
 /// and <see cref="RentAsync"/> starts a new one when the pool has none that is still connected. The application pool serves an
-/// application's own package, see docs/reference/extension-packages.md#an-applications-packages: its idle runners wait for
+/// application's own package, see docs/reference/package-runners.md#an-applications-packages: its idle runners wait for
 /// one tenant, one package version and one build of the package, which is a digest of its built files, so a runner never
 /// serves another tenant or a release whose built files differ. A runner that
 /// exits, times out or fails is dropped, and closing its connection makes the host kill the process. Runners
@@ -22,14 +22,14 @@ namespace Axis.Processes.Instances;
 /// owns. Each runner gets its own proxy token in <c>start</c>, together with the address of the proxy as the host
 /// reaches it. <paramref name="setting"/> is the name of the setting that holds the host's address. When
 /// <paramref name="idleTime"/> is set, the pool stops a runner that has waited that long, which makes the host kill it and delete its
-/// copy of the files, see docs/reference/extension-packages.md#an-applications-packages. Only the application pool sets it.
+/// copy of the files, see docs/reference/package-runners.md#an-applications-packages. Only the application pool sets it.
 /// The pools of installation packages keep their idle runners until the worker stops.
 /// </summary>
 internal sealed class PackageRunners : IAsyncDisposable
 {
     /// <summary>
     /// How long a runner of an application's package may sit idle in its pool before the worker stops it, see
-    /// docs/reference/extension-packages.md#an-applications-packages.
+    /// docs/reference/package-runners.md#an-applications-packages.
     /// </summary>
     public static readonly TimeSpan ApplicationIdleTime = TimeSpan.FromMinutes(5);
 
@@ -214,11 +214,11 @@ internal sealed class PackageRunners : IAsyncDisposable
 
 /// <summary>
 /// The worker's package runner pools, one for each runtime and one for application packages, which share the worker's one
-/// <see cref="EgressProxy"/>, see docs/reference/extension-packages.md#package-runners. The C# pool exists unless
+/// <see cref="EgressProxy"/>, see docs/reference/package-runners.md#package-runners. The C# pool exists unless
 /// <c>Extensions:Isolation</c> is <c>inProcess</c>, which loads C# packages into the worker. The Node.js pool always exists,
 /// because the worker cannot load JavaScript, and so does the Python pool, because the worker cannot load Python. The
 /// <see cref="Application"/> pool always exists too: it runs an application's own package, of any language, in a runner of
-/// <c>application-package-host</c>, see docs/reference/extension-packages.md#an-applications-packages. Only that pool stops a runner that
+/// <c>application-package-host</c>, see docs/reference/package-runners.md#an-applications-packages. Only that pool stops a runner that
 /// has been idle for <see cref="PackageRunners.ApplicationIdleTime"/> unless <c>applicationIdleTime</c> says otherwise, and the pools of installation
 /// packages keep their idle runners until the worker stops.
 /// </summary>

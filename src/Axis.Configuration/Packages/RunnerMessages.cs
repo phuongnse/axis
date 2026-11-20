@@ -9,7 +9,7 @@ namespace Axis.Configuration.Packages;
 
 /// <summary>
 /// A message of the runner protocol, one line of JSON that a <c>type</c> property names, see
-/// docs/reference/extension-packages.md#the-runner-protocol. The exact shapes are in
+/// docs/reference/package-runners.md#the-runner-protocol. The exact shapes are in
 /// <c>sdk/package-runner-protocol.schema.json</c>. No message carries an exception message.
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]

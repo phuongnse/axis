@@ -8,7 +8,7 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// The worker's egress proxy, the one network route of a package runner, see
-/// docs/reference/extension-packages.md#package-runners. Each runner has its own token, which it sends as the proxy
+/// docs/reference/package-runners.md#package-runners. Each runner has its own token, which it sends as the proxy
 /// credentials. For the call that a runner is running, the proxy admits only the scheme, host and port of the
 /// <c>url</c> bindings the call declares, and plain <c>http</c> only when it was built to allow it. A runner with no
 /// call reaches nothing. A request that is not admitted gets <c>403</c> and marks the runner's call refused, and a

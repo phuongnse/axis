@@ -14,7 +14,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The check of a registered package manifest against the releases in use, see
-/// docs/reference/extension-packages.md#customer-hosted-runners. Each test has its own database, because the releases in
+/// docs/reference/package-runners.md#customer-hosted-runners. Each test has its own database, because the releases in
 /// use span the whole database.
 /// </summary>
 public sealed class RegisteredManifestCheckTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>

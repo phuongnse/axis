@@ -59,7 +59,7 @@ public sealed class PackageCatalog
 
     /// <summary>
     /// The manifest file of the loaded version as JSON, for a comparison of JSON values with a manifest that a customer-hosted
-    /// runner registers, see docs/reference/extension-packages.md#customer-hosted-runners. Null when this catalog did not
+    /// runner registers, see docs/reference/package-runners.md#customer-hosted-runners. Null when this catalog did not
     /// load the version, when the catalog has no root folder, or when the file cannot be read or parsed.
     /// </summary>
     public JsonElement? ReadManifestJson(string id, string version)
@@ -367,7 +367,7 @@ public sealed class PackageCatalog
     /// <summary>
     /// Reads the manifest of an application's package from its text, with the schema and rules of an installed package's
     /// manifest, and says why in no diagnostic. Returns <see langword="null"/> when the text has any problem. The worker reads the
-    /// manifest of the built files that a release stores this way, see docs/reference/extension-packages.md#an-applications-packages.
+    /// manifest of the built files that a release stores this way, see docs/reference/package-runners.md#an-applications-packages.
     /// </summary>
     public static PackageManifest? ReadManifestText(string content)
     {
@@ -423,7 +423,7 @@ public sealed class PackageCatalog
 
     /// <summary>
     /// True when the text of an application's package manifest says <c>"runner": "customer"</c>, see
-    /// docs/reference/extension-packages.md#an-applications-packages. A text that is not a JSON object is not customer-hosted: the compile reports it.
+    /// docs/reference/package-runners.md#an-applications-packages. A text that is not a JSON object is not customer-hosted: the compile reports it.
     /// </summary>
     public static bool IsCustomerHosted(string manifestContent)
     {

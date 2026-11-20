@@ -536,7 +536,7 @@ internal static class McpWriteTools
     internal static JsonElement EmptyList() => JsonDocument.Parse("[]").RootElement.Clone();
 
     // The compile diagnostics of the draft as its branch now holds it. The draft's own packages compile when the tenant's application
-    // packages switch is on, see docs/reference/extension-packages.md#an-applications-packages.
+    // packages switch is on, see docs/reference/package-runners.md#an-applications-packages.
     internal static async Task<(IReadOnlyList<StudioDiagnostic>? Diagnostics, string? Error)> DiagnosticsAsync(
         McpToolContext context, string folder, string draft, CancellationToken ct)
     {

@@ -313,7 +313,7 @@ describe('the Axis Helm chart', () => {
     assert.match(server, /mountPath: \/modules\n\s+readOnly: true/)
   })
 
-  // docs/reference/extension-packages.md#package-runners
+  // docs/reference/package-runners.md#package-runners
   for (const [runtime, label, setting] of [
     ['dotnet', 'C#', 'Dotnet'],
     ['node', 'Node.js', 'Node'],
@@ -414,7 +414,7 @@ describe('the Axis Helm chart', () => {
     })
   }
 
-  // docs/reference/extension-packages.md#an-applications-packages
+  // docs/reference/package-runners.md#an-applications-packages
   describe('the application package host', () => {
     const on = ['--set', 'applicationPackageHost.enabled=true']
     const name = 'axis-application-package-host'

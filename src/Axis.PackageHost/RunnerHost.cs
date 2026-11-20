@@ -15,7 +15,7 @@ namespace Axis.PackageHost;
 
 /// <summary>
 /// Host mode: accepts TCP connections and starts one runner process for each, see
-/// docs/reference/extension-packages.md#the-runner-protocol. The first line of a connection must be a
+/// docs/reference/package-runners.md#the-runner-protocol. The first line of a connection must be a
 /// <c>start</c> for an installed version whose id and version are well formed. Any other first line, or a
 /// version that is not installed, or whose <c>proxy</c> is not a <c>host:port</c>, closes the connection and starts
 /// no runner. So does a version whose language has no runner, or whose runner's program is missing from the image.
@@ -173,7 +173,7 @@ internal sealed partial class RunnerHost(
     }
 
     /// <summary>
-    /// Runs a <c>start</c> with files, see docs/reference/extension-packages.md#the-runner-protocol. A bad path or a manifest that names
+    /// Runs a <c>start</c> with files, see docs/reference/package-runners.md#the-runner-protocol. A bad path or a manifest that names
     /// another id or version starts no runner. The temporary root is deleted when the runner has ended, whatever the cause.
     /// </summary>
     private async Task RunFromFilesAsync(StartMessage start, PipeReader reader, Stream socket)
@@ -511,7 +511,7 @@ internal sealed partial class RunnerHost(
     /// side ends. The caller then kills the runner, so a runner that exits closes the connection and a closed
     /// connection kills the runner. With <paramref name="reportUsage"/>, which is set for a runner started from files, the copies work on lines.
     /// The host notes the runner's CPU time when a line goes to the runner and sends a <c>usage</c> line after each answer that comes from it,
-    /// see docs/reference/extension-packages.md#the-runner-protocol. A <c>usage</c> line from the runner is dropped.
+    /// see docs/reference/package-runners.md#the-runner-protocol. A <c>usage</c> line from the runner is dropped.
     /// </summary>
     private async Task PipeAsync(PipeReader fromSocket, Stream socket, Process runner, bool reportUsage)
     {

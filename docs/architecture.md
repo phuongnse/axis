@@ -83,15 +83,15 @@ flowchart LR
 - **Axis.PackageHost as a runner.** It runs package operations in package runners, outside the
   worker, in a container for each runtime, see [images](reference/installation.md#images). The worker
   sends each attempt to a runner, and loads package code itself only in Development. An installation's package runs in runners
-  that every tenant shares. See [package runners](reference/extension-packages.md#package-runners).
+  that every tenant shares. See [package runners](reference/package-runners.md#package-runners).
 - **The application package host.** The `application-package-host` container runs the `axis-package-host-node`
   image under gVisor (`runsc`). It runs an application's own packages in runners that serve only its tenant.
   Compose starts it behind the `application-packages` profile, and the chart does so with
   `applicationPackageHost.enabled`. With `Extensions:ApplicationPackages` on, the worker checks at start that it runs under gVisor.
-  See [an application's packages](reference/extension-packages.md#an-applications-packages).
+  See [an application's packages](reference/package-runners.md#an-applications-packages).
 - **Customer-hosted runners.** A package host image run with `connect` runs packages in the customer's own network.
   It connects out to the installation with a credential that the tenant's administrator can revoke. See
-  [customer-hosted runners](reference/extension-packages.md#customer-hosted-runners) and
+  [customer-hosted runners](reference/package-runners.md#customer-hosted-runners) and
   [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md).
 - **Axis.Agent** is the agent host. It runs [AI authoring requests](reference/authoring-requests.md#the-agent-host).
   With AI authoring on, it reads its tenants as the worker does. Under `Tenancy:Source=directory` it reads

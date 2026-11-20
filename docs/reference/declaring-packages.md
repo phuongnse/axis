@@ -45,7 +45,7 @@ declares the real sample package the same way, with
   attempt, resolves no binding and starts no Axis runner, see
   [staging a package call](connector-and-package-calls.md#staging-a-package-call).
 - **Where a customer-hosted package's calls run** _(planned for M37)_. They go to a
-  [customer-hosted runner](extension-packages.md#customer-hosted-runners).
+  [customer-hosted runner](package-runners.md#customer-hosted-runners).
 - **Pinning.** Compilation picks the highest installed version in each range and pins it in the
   release, in the Release step of the [pipeline](configuration.md#configuration-pipeline), as
   [versions and pinning](extension-packages.md#versions-and-pinning) says. A module's `packages` share

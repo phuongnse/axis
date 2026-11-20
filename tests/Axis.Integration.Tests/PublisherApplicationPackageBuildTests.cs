@@ -15,7 +15,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// With <c>Extensions:ApplicationPackages</c> on, a <c>publish</c> sends each package of its snapshot to the package host as a
-/// <c>build</c> before it compiles, see docs/reference/extension-packages.md#an-applications-packages. The host of this process
+/// <c>build</c> before it compiles, see docs/reference/package-runners.md#an-applications-packages. The host of this process
 /// runs the build, with a stub Trivy and the real pip, while the publisher's <c>PackageBuild:Python</c> names a missing command,
 /// so the publisher itself installs nothing. A refused build and a host that gives no answer each fail the publish at the
 /// <c>compile</c> step, store no release and write one <c>release.publishFailed</c>. Each wait ends on the request's status.

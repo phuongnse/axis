@@ -1,4 +1,4 @@
-# The test runner of a package host, see docs/reference/extension-packages.md#the-runner-protocol.
+# The test runner of a package host, see docs/reference/package-runners.md#the-runner-protocol.
 # Usage: python3 -I -B -c <this script> <built copy> <SDK folder> <relative path of a test file>...
 # It runs each test file with unittest and prints one JSON line with the outcome of each test.
 import json

@@ -11,7 +11,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// With <c>Extensions:ApplicationPackages</c> on, the worker asks the real package host, <see cref="TestPackageHost"/>, whether it runs
-/// under gVisor before it reads a tenant, see docs/reference/extension-packages.md#an-applications-packages. The host's answer comes from
+/// under gVisor before it reads a tenant, see docs/reference/package-runners.md#an-applications-packages. The host's answer comes from
 /// the kernel log that each test feeds it.
 /// </summary>
 public sealed class ApplicationSandboxStartTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>

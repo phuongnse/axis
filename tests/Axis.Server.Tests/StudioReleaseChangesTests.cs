@@ -6,7 +6,7 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// The release compare of Studio reads resources as JSON. An application's package files under <c>packages/</c>, see
-/// docs/reference/extension-packages.md#an-applications-packages, are not resources, so a release that holds a package
+/// docs/reference/package-runners.md#an-applications-packages, are not resources, so a release that holds a package
 /// compares and lists without an error and the files are not shown as changes.
 /// </summary>
 public sealed class StudioReleaseChangesTests

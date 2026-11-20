@@ -7,7 +7,7 @@ namespace Axis.Configuration.Packages;
 
 /// <summary>
 /// The one codec between the .NET values of an operation's input and output and the JSON values of the
-/// runner protocol, see docs/reference/extension-packages.md#the-runner-protocol. <c>text</c> is a string,
+/// runner protocol, see docs/reference/package-runners.md#the-runner-protocol. <c>text</c> is a string,
 /// <c>integer</c> and <c>decimal</c> are invariant strings so that no language loses precision,
 /// <c>boolean</c> is a JSON boolean, <c>date</c> is <c>yyyy-MM-dd</c> and <c>date-time</c> is ISO 8601 with an
 /// offset. A missing value is <see langword="null"/>.

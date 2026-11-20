@@ -24,7 +24,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Two tenant databases, <c>a</c> and <c>b</c>, each with the same application: a copy of the StepApp fixture that holds the Python test
 /// package as a package of its own under <c>packages/python-test-package</c>, see
-/// docs/reference/extension-packages.md#an-applications-packages. The copy adds an integer field <c>runnerPid</c> and a text field <c>runnerFolder</c> to <c>Request</c> and these
+/// docs/reference/package-runners.md#an-applications-packages. The copy adds an integer field <c>runnerPid</c> and a text field <c>runnerFolder</c> to <c>Request</c> and these
 /// processes: <c>ApplicationPid</c>, which runs <c>python-test-package/pid</c> and writes the process id of its runner to <c>runnerPid</c> and the folder it runs from to <c>runnerFolder</c>,
 /// and <c>ApplicationProbeOwnOtherHost</c>, which runs <c>python-test-package/probe</c> in the mode <c>ownOtherHost</c>, whose request to a
 /// host that no <c>url</c> binding declares goes through the worker's egress proxy, <c>ApplicationSpin</c>, which runs <c>python-test-package/spin</c> for

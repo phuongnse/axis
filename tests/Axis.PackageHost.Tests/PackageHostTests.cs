@@ -16,7 +16,7 @@ namespace Axis.PackageHost.Tests;
 
 /// <summary>
 /// Host mode over real loopback TCP, with real runner processes that run the test package 1.0.0 and the Python test
-/// package from the test output, see docs/reference/extension-packages.md#the-runner-protocol. The Python package is
+/// package from the test output, see docs/reference/package-runners.md#the-runner-protocol. The Python package is
 /// copied with its dependency folder, so the tests need no pip, and they run only where <c>python3</c> is on the path. A stub on a loopback port answers the
 /// package's HTTP request. Every line the tests send and receive is checked against the protocol's schema.
 /// Each wait ends on a state, under a cancellation deadline that only bounds a hang. The Node.js tests run the

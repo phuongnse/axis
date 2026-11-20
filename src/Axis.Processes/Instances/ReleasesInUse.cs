@@ -7,7 +7,7 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// The releases a tenant still uses. A release is in use when it is active or when a running or waiting
 /// process instance is pinned to it. The start check and the check of a registered package manifest share
-/// this query, see docs/reference/extension-packages.md#customer-hosted-runners.
+/// this query, see docs/reference/package-runners.md#customer-hosted-runners.
 /// </summary>
 internal static class ReleasesInUse
 {
