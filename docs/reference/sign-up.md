@@ -12,7 +12,7 @@ The sign-up page asks for who the person is, the business, its subdomain and wha
 sends nothing outside the region.
 
 - **Where.** `https://account.<region domain>/sign-up`, on the regional control plane, which serves the
-  page from its web root. Axis's public site links each region's page, so the person picks the region
+  page from its web root. The operator's public site links each region's page, so the person picks the region
   by the link they follow, and the form never sends their data to another region.
 - **No third party.** The page loads no script, font or image from another host. Its
   Content-Security-Policy allows `'self'` only, as the platform's
@@ -82,7 +82,7 @@ The box accepts the business's agreements.
   [accepting the terms](legal.md#accepting-the-terms).
 - **The privacy notice**. A line under the box, before sending, names the Privacy
   policy as a link and has no box: the person's name and email are used to run the contract, which needs
-  no separate consent. A lawyer confirms this before sign-up opens. If Vietnamese law needs an explicit
+  no separate consent. The operator has a lawyer confirm this before sign-up opens. If Vietnamese law needs an explicit
   consent, it is a box of its own, never joined to the terms.
 
 ### The documents
@@ -471,4 +471,4 @@ changed.
   [billing portal](billing-portal.md) asks the owner to accept it before any other action.
 - **Versions.** Each document's version and its address in each language are settings of the control
   plane, and [the documents' route](#the-documents) serves them. A sign-up that sends a version that is no longer
-  current is refused. The texts come from a lawyer before sign-up opens.
+  current is refused. The operator has a lawyer confirm the texts before sign-up opens.

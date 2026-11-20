@@ -2,8 +2,8 @@
 
 A tenant of Axis SaaS pays for its subscription by bank transfer in Vietnam and through a merchant of
 record abroad. This page covers the billing invoices, the two ways to pay, the providers' webhooks,
-the daily reconciliation and the ledger that holds every amount. No payment is taken before the
-company, the providers' contracts and the accountant are in place.
+the daily reconciliation and the ledger that holds every amount. Before it takes a payment, the operator
+signs its own contracts with the providers and checks that each one accepts a seller from its country.
 
 ## Invoices
 
@@ -96,7 +96,7 @@ In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
 - **No automatic charge** _(planned for M34)_. A bank transfer cannot be pulled, so each period the owner or a billing
   contact pays its invoice. The reminders of [the timeline](subscriptions.md#the-timeline) ask them
   to.
-- **A transfer without a link** _(planned for M34)_. A transfer that reaches Axis's account outside PayOS is recorded by
+- **A transfer without a link** _(planned for M34)_. A transfer that reaches the operator's account outside PayOS is recorded by
   the operator against its invoice, with `Axis.ControlPlane.Admin`, see
   [operators](control-plane.md#operators).
 
@@ -107,7 +107,7 @@ _(planned for M34)_
 Abroad a merchant of record sells the subscription and takes the payment.
 
 - **Merchant of record.** Paddle Billing sells the subscription, takes the payment, handles tax and
-  issues the invoice. Axis is the seller to Paddle, not to the customer.
+  issues the invoice. The operator is the seller to Paddle, not the customer.
 - **Subscriptions in Paddle.** The control plane creates a Paddle subscription for the plan's price
   in `USD`, and Paddle charges the card each period and retries a failed charge.
 - **Mapped to Axis's states.** Paddle's `past_due` makes the Axis subscription `pastDue`, and Axis's

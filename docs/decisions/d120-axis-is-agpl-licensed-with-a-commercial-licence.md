@@ -5,8 +5,8 @@ Status: **Agreed**
 ## Context
 
 Axis is meant to be open source, and nobody may use, change or share code that has no licence. Axis
-is also a business that sells a SaaS, as
-[D118](d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) agrees, so its licence must keep
+also runs as a SaaS that an operator runs, as
+[D166](d166-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) agrees, so its licence must keep
 the code open without letting another company run a closed copy of it as a competing service. The
 owner holds the copyright of all the code, so the licence can still be chosen freely.
 

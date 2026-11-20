@@ -4,7 +4,7 @@ Status: **Agreed**
 
 ## Context
 
-[D118](d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) gives each tenant a plan with one
+[D166](d166-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) gives each tenant a plan with one
 price for the whole tenant, and payments and invoices run by the
 [control plane](d126-sign-up-trials-and-the-control-plane.md). A price change must never surprise a
 customer, a bank transfer cannot be pulled, webhooks get lost and repeat, and the person who pays is
@@ -37,5 +37,5 @@ often not a user of the application.
   [threat model](../reference/threat-model.md).
 - There are two payment integrations, an e-invoice adapter, a portal and a nightly reconciliation to
   watch.
-- Taking a payment needs a company that signs with the providers, and another merchant of record if
+- An operator signs its own contracts with the providers, and needs another merchant of record if
   Paddle does not accept a seller based in Vietnam.

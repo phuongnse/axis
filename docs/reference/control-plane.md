@@ -1,6 +1,6 @@
 # Control plane
 
-The control plane is the service that runs Axis's own business around the [cells](cells.md):
+The control plane is the service that runs the operator's business around the [cells](cells.md):
 sign-up, trials, plans, payments and invoices. This page covers what the service is, how it reaches
 the cells, the work it runs, its operators and settings, its image and chart, and its health. The
 business it runs is on the pages of [sign-up](sign-up.md), [subscriptions](subscriptions.md),

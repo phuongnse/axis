@@ -1,4 +1,4 @@
-# D117. Small businesses first, and the milestones in three phases
+# D165. Axis is designed for small businesses first, and the milestones in three phases
 
 Status: **Agreed**
 
@@ -10,11 +10,13 @@ ready applications they can change, little operations and a hosted service. They
 conformance runs, image signatures or alert rules, which are what a large or regulated customer's
 procurement asks for.
 
+This decision replaces D117 and keeps every part of it that still holds.
+
 ## Decision
 
-- **Axis serves individuals and small and medium businesses first,** and large organizations, banks
-  and government later. Who they are and what they need is in the
-  [product brief](../product-brief.md#who-axis-serves-first).
+- **Axis is designed first for individuals and small and medium businesses, and later for large
+  organizations, banks and government.** Who they are and what they need is in the
+  [product brief](../product-brief.md#who-axis-is-designed-for).
 - **What sets Axis apart is its built-in modules:** a business changes them anywhere in Studio, keeps
   their upgrades, and their contract holds on every write, as
   [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees.
@@ -26,8 +28,8 @@ procurement asks for.
     developers and partners. It starts when every milestone of phase 1 is broken down.
   - **Phase 3, large organizations and government:** what only they ask for, such as conformance
     runs and certification, signed images and SBOMs for their own registries, and alert rules and a
-    hardening checklist for their own operations teams. It starts when the owner names a first large
-    or regulated customer.
+    hardening checklist for their own operations teams. It starts when the owner decides to break it
+    down.
 - **A milestone that mixes the phases is split, and each part keeps its design.** Phase 1 builds the
   customization layer, which already holds only the changes by element name, and phase 2 the module
   upgrades that merge it. Phase 1 builds the first two built-in modules, and phase 2 the rest. Phase 1
@@ -45,4 +47,4 @@ Which milestone is in which phase, and their order, is in the [roadmap](../roadm
 - The parts that move keep their designs, so they can be broken down when their phase starts.
 - A business cannot get a new version of a built-in module that it has a layer over until module
   upgrades are built.
-- A large or regulated customer that comes early waits for phase 3.
+- A large or regulated organization that adopts Axis early waits for phase 3 for what only it asks for.
