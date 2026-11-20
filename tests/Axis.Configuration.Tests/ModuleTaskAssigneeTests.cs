@@ -92,7 +92,7 @@ public sealed class ModuleTaskAssigneeTests
     {
         using var modules = Modules(assignee: """{ "user": "'u1'" }""");
         using var folder = Application().With("processes/Audit.json", """
-            { "id": "44444444-4444-4444-8444-444444444431", "kind": "process", "name": "Audit", "formatVersion": 1,
+            { "id": "44444444-4444-4444-8444-444444444431", "kind": "process", "name": "Audit", "title": { "textKey": "invoice.title" }, "formatVersion": 1,
               "entity": "Invoice", "start": "check", "steps": [
                 { "name": "check", "type": "task", "label": { "textKey": "audit.check" }, "assignee": { "role": "approver" }, "form": "InvoiceForm",
                   "outcomes": [ { "name": "close", "label": { "textKey": "audit.check" }, "next": "done" } ] },
@@ -123,7 +123,7 @@ public sealed class ModuleTaskAssigneeTests
                   "sections": [ { "name": "approval", "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" } ] } ] }
                 """)
             .With("approvals/1.0.0/processes/Review.json", $$"""
-                { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "formatVersion": 1,
+                { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "title": { "textKey": "approvals.approval" }, "formatVersion": 1,
                   "entity": "Approval", "start": "review", "steps": [
                     { "name": "review", "type": "task", "label": { "textKey": "approvals.review" }, "assignee": {{assignee}}, "form": "ApprovalForm",
                       "outcomes": [ { "name": "approve", "label": { "textKey": "approvals.approve" }, "next": "done" } ]{{escalations}} },

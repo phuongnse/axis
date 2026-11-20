@@ -56,7 +56,7 @@ public sealed class WidgetActionCompilerTests
     public void Action_naming_a_process_that_failed_to_load_is_not_reported_again()
     {
         using var folder = Folder("Order")
-            .With("processes/order-review.json", """{ "id": "99999999-9999-4999-8999-999999999991", "kind": "process", "name": "OrderReview", "formatVersion": 1 }""")
+            .With("processes/order-review.json", """{ "id": "99999999-9999-4999-8999-999999999991", "kind": "process", "name": "OrderReview", "title": { "textKey": "orderForm.title" }, "formatVersion": 1 }""")
             .With(PageFile, FormPage(Action("OrderReview")));
 
         var result = ApplicationCompiler.Compile(folder.Path);
@@ -70,7 +70,7 @@ public sealed class WidgetActionCompilerTests
     {
         using var folder = Folder("Order")
             .With("processes/nightly-job.json", """
-                { "id": "99999999-9999-4999-8999-999999999992", "kind": "process", "name": "NightlyJob", "formatVersion": 1,
+                { "id": "99999999-9999-4999-8999-999999999992", "kind": "process", "name": "NightlyJob", "title": { "textKey": "orders.title" }, "formatVersion": 1,
                   "parameters": [{ "name": "days", "type": "integer" }],
                   "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
                 """)
@@ -269,7 +269,7 @@ public sealed class WidgetActionCompilerTests
         PresentationCompilerTests.Folder()
             .With("texts/en.json", TextsEn)
             .With("processes/order-review.json", $$"""
-                { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+                { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "title": { "textKey": "orderForm.title" }, "formatVersion": 1,
                   "entity": "{{processEntity}}", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
                 """);
 

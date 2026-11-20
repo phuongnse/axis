@@ -256,7 +256,7 @@ public sealed class TaskEscalationCompilerTests
     private static TemporaryFolder Folder(string? escalations, string? deadline = """{ "after": "P5D", "next": "done" }""")
     {
         var process = $$"""
-            { "id": "{{ProcessId}}", "kind": "process", "name": "TicketTask", "formatVersion": 1,
+            { "id": "{{ProcessId}}", "kind": "process", "name": "TicketTask", "title": { "textKey": "ticket.title" }, "formatVersion": 1,
               "entity": "Ticket", "start": "resolve", "steps": [
                 { "name": "resolve", "type": "task", "label": { "textKey": "task.label" }, "assignee": { "role": "agent" }, "form": "TicketForm",
                   "outcomes": [ { "name": "close", "label": { "textKey": "task.close" }, "next": "done" } ],

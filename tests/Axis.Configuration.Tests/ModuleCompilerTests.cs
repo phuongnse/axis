@@ -37,7 +37,7 @@ public sealed class ModuleCompilerTests
           "fields": [ { "name": "name", "type": "text" } ] }
         """;
     private const string RenamedProcess = """
-        { "id": "6f8a0b12-3c4d-4e5f-8a6b-9c0d1e2f3a4b", "kind": "process", "name": "RenameReview", "formatVersion": 1,
+        { "id": "6f8a0b12-3c4d-4e5f-8a6b-9c0d1e2f3a4b", "kind": "process", "name": "RenameReview", "title": { "textKey": "process.title" }, "formatVersion": 1,
           "entity": "departments/Department", "start": "announce",
           "steps": [
             { "name": "announce", "type": "operation", "operation": "raiseEvent", "event": "departments/DepartmentRenamed",
@@ -461,8 +461,10 @@ public sealed class ModuleCompilerTests
     [Fact]
     public void An_application_process_over_a_module_entity_can_raise_a_module_event()
     {
-        using var modules = Modules("1.0.0").With("departments/1.0.0/DepartmentRenamed.json", DepartmentRenamed);
-        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("processes/rename-review.json", RenamedProcess);
+        using var modules = Modules("1.0.0").With("departments/1.0.0/DepartmentRenamed.json", DepartmentRenamed).With("departments/1.0.0/TextsEn.json", DepartmentTexts);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
+            .With("processes/rename-review.json", RenamedProcess);
 
         var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
 
@@ -476,8 +478,9 @@ public sealed class ModuleCompilerTests
     [Fact]
     public void An_application_event_trigger_can_name_a_module_event()
     {
-        using var modules = Modules("1.0.0").With("departments/1.0.0/DepartmentRenamed.json", DepartmentRenamed);
+        using var modules = Modules("1.0.0").With("departments/1.0.0/DepartmentRenamed.json", DepartmentRenamed).With("departments/1.0.0/TextsEn.json", DepartmentTexts);
         using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("processes/rename-review.json", RenamedProcess)
             .With("triggers/on-rename.json", """
                 { "id": "7a9b1c23-4d5e-4f60-8b7c-0d1e2f3a4b5c", "kind": "trigger", "name": "ReviewRenames", "formatVersion": 1,
@@ -1470,7 +1473,7 @@ public sealed class ModuleCompilerTests
         var (modules, folder) = RuleApplication(DepartmentsModule, "[]",
             ("roles/employee.json", Role),
             ("processes/review.json", """
-                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Request",
+                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "Review", "title": { "textKey": "role.employee" }, "formatVersion": 1, "entity": "Request",
                   "startCondition": { "expression": "departments:IsPositive(quantity)", "message": { "textKey": "request.cannotStart" } },
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """),
@@ -1648,6 +1651,12 @@ public sealed class ModuleCompilerTests
         new TemporaryFolder().With("application.json", $$"""
             { "id": "{{ApplicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1, "modules": {{modules}} }
             """);
+
+    /// <summary>The English texts of the module <c>departments</c>, which an application with English texts needs from each module it declares.</summary>
+    private const string DepartmentTexts = """
+        { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b7c", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+          "texts": { "departments.department": "Department" } }
+        """;
 
     private static string Texts(string id, string locale, string texts) => $$"""
         { "id": "{{id}}", "kind": "text", "name": "Texts{{locale}}", "formatVersion": 1, "locale": "{{locale}}", "texts": {{texts}} }

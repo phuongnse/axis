@@ -84,7 +84,7 @@ public sealed class ModuleTriggerTests
     {
         using var modules = Modules();
         using var folder = Application(ApplicationId).With("processes/Audit.json", """
-            { "id": "44444444-4444-4444-8444-444444444431", "kind": "process", "name": "Audit", "formatVersion": 1,
+            { "id": "44444444-4444-4444-8444-444444444431", "kind": "process", "name": "Audit", "title": { "textKey": "process.title" }, "formatVersion": 1,
               "entity": "Invoice", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
             """);
         modules.With("approvals/1.0.0/triggers/CloseNew.json", CloseTrigger(process: "Audit"));
@@ -188,7 +188,7 @@ public sealed class ModuleTriggerTests
     {
         using var modules = Modules()
             .With("approvals/1.0.0/processes/Sweep.json", $$"""
-                { "id": "{{SweepId}}", "kind": "process", "name": "Sweep", "formatVersion": 1,
+                { "id": "{{SweepId}}", "kind": "process", "name": "Sweep", "title": { "textKey": "approvals.process" }, "formatVersion": 1,
                   "parameters": [ { "name": "days", "type": "integer" } ],
                   "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
                 """)
@@ -307,18 +307,26 @@ public sealed class ModuleTriggerTests
                   "entity": "Approval", "fields": [ { "name": "title", "path": "title" } ] }
                 """)
             .With("approvals/1.0.0/processes/Close.json", $$"""
-                { "id": "{{CloseId}}", "kind": "process", "name": "Close", "formatVersion": 1,
+                { "id": "{{CloseId}}", "kind": "process", "name": "Close", "title": { "textKey": "approvals.process" }, "formatVersion": 1,
                   "entity": "Approval", "start": "close", "steps": [
                     { "name": "close", "type": "operation", "operation": "updateRecord", "set": { "state": "'closed'" }, "next": "done" },
                     { "name": "done", "type": "end" }
                   ] }
                 """)
             .With("approvals/1.0.0/processes/Note.json", $$"""
-                { "id": "{{NoteId}}", "kind": "process", "name": "Note", "formatVersion": 1,
+                { "id": "{{NoteId}}", "kind": "process", "name": "Note", "title": { "textKey": "approvals.process" }, "formatVersion": 1,
                   "entity": "departments/Department", "start": "note", "steps": [
                     { "name": "note", "type": "operation", "operation": "updateRecord", "set": { "name": "'noted'" }, "next": "done" },
                     { "name": "done", "type": "end" }
                   ] }
+                """)
+            .With("departments/1.0.0/TextsEn.json", """
+                { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b7c", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "departments.department": "Department" } }
+                """)
+            .With("approvals/1.0.0/TextsEn.json", """
+                { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b7d", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "approvals.process": "Process" } }
                 """)
             .With("approvals/1.0.0/triggers/CloseNew.json", CloseTrigger())
             .With("approvals/1.0.0/triggers/NoteRenamed.json", NoteTrigger());
@@ -330,6 +338,7 @@ public sealed class ModuleTriggerTests
                   {{(timeZone is null ? "" : $"\"timeZone\": \"{timeZone}\",")}}
                   "modules": [{ "id": "approvals", "version": "1.0.0" }] }
                 """)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("entities/Invoice.json", """
                 { "id": "44444444-4444-4444-8444-444444444411", "kind": "entity", "name": "Invoice", "formatVersion": 1,
                   "fields": [ { "name": "number", "type": "text" } ] }

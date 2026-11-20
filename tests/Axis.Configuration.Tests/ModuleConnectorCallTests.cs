@@ -141,7 +141,7 @@ public sealed class ModuleConnectorCallTests
                   "fields": [ { "name": "code", "type": "text" }, { "name": "orderId", "type": "text" } ] }
                 """)
             .With("departments/1.0.0/processes/Place.json", $$"""
-                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c42", "kind": "process", "name": "Place", "formatVersion": 1,
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c42", "kind": "process", "name": "Place", "title": { "textKey": "departments.orders" }, "formatVersion": 1,
                   "entity": "Order", "start": "call", "steps": [
                     { "name": "call", "type": "operation", "operation": "callConnector", {{call}}, "next": "done" },
                     { "name": "done", "type": "end" }
@@ -158,6 +158,7 @@ public sealed class ModuleConnectorCallTests
                 { "id": "{{ApplicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1,
                   "modules": [{ "id": "departments", "version": "1.0.0", "connectors": { "orders": "{{connector}}" } }] }
                 """)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("connectors/purchasing.json", $$"""
                 { "id": "66666666-6666-4666-8666-666666666601", "kind": "connector", "name": "{{connector}}", "formatVersion": 1,
                   "baseUrl": { "binding": "PurchasingUrl" }, "operations": [ {{operation}} ] }

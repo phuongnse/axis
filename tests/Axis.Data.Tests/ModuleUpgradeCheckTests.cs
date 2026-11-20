@@ -40,7 +40,7 @@ public sealed class ModuleUpgradeCheckTests
         var next = Module("1.1.0", Entity("Department.json", _departmentId, Code));
         next.Add(Resource(
             "modules/departments/processes/Review.json",
-            $$"""{"id":"{{Guid.NewGuid()}}","kind":"process","name":"Review","entity":"Department","start":"done","steps":[{"name":"done","type":"end"}]}"""));
+            $$"""{"id":"{{Guid.NewGuid()}}","kind":"process","name":"Review","title":{"textKey":"departments.review"},"entity":"Department","start":"done","steps":[{"name":"done","type":"end"}]}"""));
 
         Assert.Empty(ModuleUpgradeCheck.Check(active, next));
     }

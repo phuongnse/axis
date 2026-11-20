@@ -207,7 +207,7 @@ public sealed class DetailCompilerTests
                   "sections": [ { "name": "main", "title": { "textKey": "orderSections.main" }, "fields": [ { "field": "number" } ] } ] }
                 """)
             .With("processes/order-review.json", $$"""
-                { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+                { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "title": { "textKey": "orderForm.title" }, "formatVersion": 1,
                   "entity": "Order", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
                 """)
             .With(PageFile, Page("OrderDetail", widgets, PageId, "orderDetail.title", parameters));

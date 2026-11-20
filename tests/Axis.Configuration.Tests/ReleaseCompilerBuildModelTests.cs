@@ -128,9 +128,9 @@ public sealed class ReleaseCompilerBuildModelTests
         [
             new ResourceContent("application.json", Manifest),
             new ResourceContent("entities/order.json", Order),
-            new ResourceContent("texts/en.json", """{ "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": { "order.cannotStart": "Cannot start" } }"""),
+            new ResourceContent("texts/en.json", """{ "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": { "order.cannotStart": "Cannot start", "order.label": "Order" } }"""),
             new ResourceContent("processes/review.json", """
-                { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Order",
+                { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Review", "title": { "textKey": "order.label" }, "formatVersion": 1, "entity": "Order",
                   "startCondition": { "expression": "number is not null", "message": { "textKey": "order.cannotStart" } },
                   "start": "check",
                   "steps": [
@@ -162,8 +162,9 @@ public sealed class ReleaseCompilerBuildModelTests
                 { "id": "66666666-6666-4666-8666-666666666601", "kind": "rule", "name": "NeedsReview", "formatVersion": 1,
                   "parameters": [{ "name": "total", "type": "decimal" }], "resultType": "boolean", "expression": "total >= 10000" }
                 """),
+            new ResourceContent("texts/en.json", PresentationCompilerTests.ProcessTitleTexts),
             new ResourceContent("processes/nightly.json", """
-                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "Nightly", "formatVersion": 1,
+                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "Nightly", "title": { "textKey": "process.title" }, "formatVersion": 1,
                   "parameters": [{ "name": "limit", "type": "decimal" }, { "name": "label", "type": "text" }],
                   "start": "check",
                   "steps": [
@@ -196,8 +197,9 @@ public sealed class ReleaseCompilerBuildModelTests
                 { "id": "11111111-1111-4111-8111-111111111112", "kind": "entity", "name": "Ticket", "formatVersion": 1,
                   "fields": [ { "name": "title", "type": "text" }, { "name": "code", "type": "text" } ] }
                 """),
+            new ResourceContent("texts/en.json", PresentationCompilerTests.ProcessTitleTexts),
             new ResourceContent("processes/close.json", """
-                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "Close", "formatVersion": 1, "entity": "Ticket",
+                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "Close", "title": { "textKey": "process.title" }, "formatVersion": 1, "entity": "Ticket",
                   "start": "close",
                   "steps": [
                     { "name": "close", "type": "operation", "operation": "updateRecord", "set": { "title": "'Closed'", "code": "'C'" }, "next": "done" },
@@ -242,7 +244,7 @@ public sealed class ReleaseCompilerBuildModelTests
                   "widgets": [ { "name": "taskInbox", "type": "taskInbox" } ] }
                 """),
             new ResourceContent("processes/tell.json", """
-                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "Tell", "formatVersion": 1, "entity": "Ticket",
+                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "Tell", "title": { "textKey": "page.title" }, "formatVersion": 1, "entity": "Ticket",
                   "start": "tell",
                   "steps": [
                     { "name": "tell", "type": "operation", "operation": "notify",
@@ -300,8 +302,9 @@ public sealed class ReleaseCompilerBuildModelTests
                     { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
                       "fields": [ { "name": "total", "type": "integer" } ] }
                     """),
+                new ResourceContent("texts/en.json", PresentationCompilerTests.ProcessTitleTexts),
                 new ResourceContent("processes/add.json", """
-                    { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Add", "formatVersion": 1,
+                    { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Add", "title": { "textKey": "process.title" }, "formatVersion": 1,
                       "entity": "Order", "start": "add",
                       "steps": [
                         { "name": "add", "type": "operation", "operation": "test-package/sum",
@@ -334,8 +337,9 @@ public sealed class ReleaseCompilerBuildModelTests
                     { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
                       "fields": [ { "name": "total", "type": "integer" } ] }
                     """),
+                new ResourceContent("texts/en.json", PresentationCompilerTests.ProcessTitleTexts),
                 new ResourceContent("processes/add.json", """
-                    { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Add", "formatVersion": 1,
+                    { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Add", "title": { "textKey": "process.title" }, "formatVersion": 1,
                       "entity": "Order", "start": "add",
                       "steps": [
                         { "name": "add", "type": "operation", "operation": "test-package/sum",

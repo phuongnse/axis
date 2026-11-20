@@ -521,7 +521,7 @@ public sealed class ApplicationLoaderTests
         """;
 
     private static string Process(string steps) => $$"""
-        { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Order",
+        { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Review", "title": { "textKey": "order.cannotStart" }, "formatVersion": 1, "entity": "Order",
           "startCondition": { "expression": "number is null", "message": { "textKey": "order.cannotStart" } },
           "start": "check", "steps": {{steps}} }
         """;

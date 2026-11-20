@@ -92,6 +92,7 @@ public sealed class RaiseEventSensitiveTests
     private static TemporaryFolder Folder(string detail) =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("entities/ticket.json", $$"""
                 { "id": "{{TicketId}}", "kind": "entity", "name": "Ticket", "formatVersion": 1,
                   "fields": [
@@ -116,7 +117,7 @@ public sealed class RaiseEventSensitiveTests
                   "fields": [ { "name": "detail", "type": "text" } ] }
                 """)
             .With("processes/ticket-close.json", $$"""
-                { "id": "{{ProcessId}}", "kind": "process", "name": "TicketClose", "formatVersion": 1,
+                { "id": "{{ProcessId}}", "kind": "process", "name": "TicketClose", "title": { "textKey": "process.title" }, "formatVersion": 1,
                   "entity": "Ticket", "start": "raise", "steps": [
                     { "name": "raise", "type": "operation", "operation": "raiseEvent", "event": "TicketClosed",
                       "fields": { "detail": "{{detail}}" }, "next": "done" },

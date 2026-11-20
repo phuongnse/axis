@@ -98,7 +98,7 @@ public sealed class ModulePackageTests
         using var packages = new TemporaryFolder().Install("1.0.0", "1.1.0");
         using var modules = Modules(modulePackages: ModulePackages("^1.0.0"), step: SumStep);
         using var folder = Application().With("processes/Audit.json", """
-            { "id": "44444444-4444-4444-8444-444444444431", "kind": "process", "name": "Audit", "formatVersion": 1,
+            { "id": "44444444-4444-4444-8444-444444444431", "kind": "process", "name": "Audit", "title": { "textKey": "process.title" }, "formatVersion": 1,
               "entity": "Invoice", "start": "add", "steps": [
                 { "name": "add", "type": "operation", "operation": "test-package/sum", "input": { "a": "1", "b": "2" }, "next": "done" },
                 { "name": "done", "type": "end" }
@@ -121,7 +121,11 @@ public sealed class ModulePackageTests
         using var modules = Modules(modulePackages: ModulePackages("^1.0.0"), step: SumStep);
         modules.With("other/1.0.0/module.json", $$"""
             { "kind": "module", "id": "other", "version": "1.0.0", "label": "Other"{{ModulePackages("^2.0.0")}} }
-            """);
+            """)
+            .With("other/1.0.0/TextsEn.json", """
+                { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b7f", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "other.process": "Process" } }
+                """);
         using var folder = Application(applicationModules: """{ "id": "approvals", "version": "1.0.0" }, { "id": "other", "version": "1.0.0" }""");
 
         var compiled = Compile(folder, modules, packages);
@@ -154,8 +158,12 @@ public sealed class ModulePackageTests
                 { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c21", "kind": "entity", "name": "Approval", "formatVersion": 1,
                   "fields": [ { "name": "title", "type": "text" } ] }
                 """)
+            .With("approvals/1.0.0/TextsEn.json", """
+                { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b7e", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "approvals.process": "Process" } }
+                """)
             .With("approvals/1.0.0/processes/Review.json", $$"""
-                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c41", "kind": "process", "name": "Review", "formatVersion": 1,
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c41", "kind": "process", "name": "Review", "title": { "textKey": "approvals.process" }, "formatVersion": 1,
                   "entity": "Approval", "start": "{{start}}", "steps": [
                     {{(step.Length == 0 ? "" : step + ",")}}
                     { "name": "done", "type": "end" }
@@ -169,6 +177,7 @@ public sealed class ModulePackageTests
                 { "id": "{{ApplicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1,
                   "modules": [{{applicationModules}}]{{applicationPackages}} }
                 """)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("entities/Invoice.json", """
                 { "id": "44444444-4444-4444-8444-444444444411", "kind": "entity", "name": "Invoice", "formatVersion": 1,
                   "fields": [ { "name": "number", "type": "text" } ] }

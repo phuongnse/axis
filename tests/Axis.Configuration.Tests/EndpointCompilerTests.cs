@@ -121,7 +121,7 @@ public sealed class EndpointCompilerTests
     {
         using var folder = Folder()
             .With("processes/nightly-job.json", """
-                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "NightlyJob", "formatVersion": 1,
+                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "NightlyJob", "title": { "textKey": "process.title" }, "formatVersion": 1,
                   "parameters": [{ "name": "days", "type": "integer" }],
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """)
@@ -322,7 +322,7 @@ public sealed class EndpointCompilerTests
                 { "id": "11111111-1111-4111-8111-111111111119", "kind": "entity", "name": "Broken", "formatVersion": 1, "fields": "none" }
                 """)
             .With("processes/broken.json", """
-                { "id": "77777777-7777-4777-8777-777777777709", "kind": "process", "name": "BrokenReview", "formatVersion": 1 }
+                { "id": "77777777-7777-4777-8777-777777777709", "kind": "process", "name": "BrokenReview", "title": { "textKey": "process.title" }, "formatVersion": 1 }
                 """)
             .With("endpoints/import-note.json", Endpoint("ImportNote", "Broken", "BrokenReview", "[]", "{}"));
 
@@ -370,6 +370,7 @@ public sealed class EndpointCompilerTests
     private static TemporaryFolder Folder() =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("entities/note.json", Note)
             .With("entities/note-line.json", NoteLine)
             .With("entities/person.json", Person)
@@ -377,11 +378,11 @@ public sealed class EndpointCompilerTests
                 { "id": "88888888-8888-4888-8888-888888888801", "kind": "sequence", "name": "NoteNumber", "formatVersion": 1, "format": "N-{n:5}" }
                 """)
             .With("processes/note-close.json", $$"""
-                { "id": "{{NoteCloseId}}", "kind": "process", "name": "NoteClose", "formatVersion": 1, "entity": "Note",
+                { "id": "{{NoteCloseId}}", "kind": "process", "name": "NoteClose", "title": { "textKey": "process.title" }, "formatVersion": 1, "entity": "Note",
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """)
             .With("processes/person-review.json", """
-                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "PersonReview", "formatVersion": 1, "entity": "Person",
+                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "PersonReview", "title": { "textKey": "process.title" }, "formatVersion": 1, "entity": "Person",
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """);
 }
