@@ -144,7 +144,7 @@ the refusal without one, `SensitiveValuesTests` for the hash, and `SchemaPlanner
 
 ## What a sensitive field cannot do
 
-Compilation refuses each of these on a sensitive field with [`AXC0308`](diagnostic-codes.md), at the path of the use,
+Compilation refuses each of these on a sensitive field with [`AXC0308`](diagnostic-codes-resources.md), at the path of the use,
 and the message names the field and the use.
 
 - A filter, other than the equality of an exact lookup in a policy grant's, data source's or measure's `filter`.
@@ -160,7 +160,7 @@ and the message names the field and the use.
   of an exact lookup in a policy grant's, data source's or measure's `filter`. A migration `fill` or `convert` value is
   one, so it may not read a sensitive field.
 
-`exactLookup` on a field that is not `sensitive` is [`AXC0309`](diagnostic-codes.md) at `/fields/{i}/exactLookup`.
+`exactLookup` on a field that is not `sensitive` is [`AXC0309`](diagnostic-codes-resources.md) at `/fields/{i}/exactLookup`.
 
 At run time, a caller's `sort` on a sensitive field, in the record API or a data source, is a `400` problem keyed
 `sort`. The record API has no other filter, and a data source's parameters only reach its `filter`, which tests an

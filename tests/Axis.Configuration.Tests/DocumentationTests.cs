@@ -22,48 +22,43 @@ public sealed class DocumentationTests
     private const string SchemaResourceSuffix = ".schema.json";
 
     [Fact]
-    public void Diagnostic_code_table_matches_DiagnosticCodes()
+    public void Diagnostic_code_tables_match_DiagnosticCodes()
     {
-        var tables = new List<(List<string> Built, List<string> Planned)>();
-        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
-        {
-            for (var i = 0; i < lines.Length; i++)
-            {
-                // Other tables, such as the form condition checks, also begin with a Code column but are not this table.
-                if (!Regex.IsMatch(lines[i], @"^\|\s*Code\s*\|\s*Meaning\s*\|"))
-                {
-                    continue;
-                }
-
-                var built = new List<string>();
-                var planned = new List<string>();
-                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
-                {
-                    var match = Regex.Match(lines[j], @"^\|\s*`(AXC\d{4})`\s*\|");
-                    if (match.Success)
-                    {
-                        // A row marked _(planned for Mx)_ is not built yet, so it is listed apart from the built codes.
-                        var isPlanned = Regex.IsMatch(lines[j], @"^\|[^|]*\|\s*_\(planned for M\d+\)_");
-                        (isPlanned ? planned : built).Add(match.Groups[1].Value);
-                    }
-                }
-
-                tables.Add((built, planned));
-            }
-        }
-
-        Assert.True(tables.Count == 1, $"Expected exactly one table with header '| Code | Meaning |' under docs/, found {tables.Count}.");
-        var (builtCodes, plannedCodes) = tables[0];
-        var documented = builtCodes.Concat(plannedCodes).ToList();
-        // Configuration and expression codes share one number range and one table.
+        // Configuration and expression codes share one number range and the same tables.
         var declared = Constants(typeof(DiagnosticCodes)).Concat(Constants(typeof(ExpressionDiagnosticCodes))).ToList();
         var duplicates = declared.GroupBy(code => code).Where(group => group.Count() > 1).Select(group => group.Key).ToList();
 
         Assert.True(duplicates.Count == 0, $"Declared more than once: {string.Join(", ", duplicates)}.");
-        Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}.");
-        Assert.True(!plannedCodes.Intersect(declared).Any(), $"Marked planned in the docs but already declared: {string.Join(", ", plannedCodes.Intersect(declared))}.");
-        Assert.True(!builtCodes.Except(declared).Any(), $"Not in DiagnosticCodes or ExpressionDiagnosticCodes: {string.Join(", ", builtCodes.Except(declared))}. Mark the row _(planned for Mx)_ or declare the code.");
-        Assert.Equal(documented.Count, documented.Distinct().Count());
+        var problems = DiagnosticCodeTableProblems(DocsPages(), declared);
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+    }
+
+    [Fact]
+    public void Diagnostic_code_tables_report_a_declared_code_on_no_page()
+    {
+        var pages = new[] { ("reference/diagnostic-codes-resources.md", DiagnosticCodeTable("| `AXC0001` | The file is not valid JSON. |")) };
+
+        var problems = DiagnosticCodeTableProblems(pages, new List<string> { "AXC0001", "AXC0002" });
+
+        Assert.Single(problems);
+        Assert.Contains("AXC0002", problems[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Diagnostic_code_tables_report_a_code_on_two_pages()
+    {
+        var pages = new[]
+        {
+            ("reference/diagnostic-codes-resources.md", DiagnosticCodeTable("| `AXC0001` | The file is not valid JSON. |")),
+            ("reference/diagnostic-codes-expressions.md", DiagnosticCodeTable("| `AXC0001` | The file is not valid JSON. |")),
+        };
+
+        var problems = DiagnosticCodeTableProblems(pages, new List<string> { "AXC0001" });
+
+        Assert.Single(problems);
+        Assert.Contains("AXC0001", problems[0], StringComparison.Ordinal);
+        Assert.Contains("reference/diagnostic-codes-resources.md", problems[0], StringComparison.Ordinal);
+        Assert.Contains("reference/diagnostic-codes-expressions.md", problems[0], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -296,8 +291,84 @@ public sealed class DocumentationTests
         }
     }
 
+    private static string DocsFolder => Path.Combine(AppContext.BaseDirectory, "Docs");
+
     private static IEnumerable<string> DocsFiles() =>
-        Directory.EnumerateFiles(Path.Combine(AppContext.BaseDirectory, "Docs"), "*.md", SearchOption.AllDirectories);
+        Directory.EnumerateFiles(DocsFolder, "*.md", SearchOption.AllDirectories);
+
+    // Every doc under docs/ as (its path relative to docs/, its lines).
+    private static List<(string Page, string[] Lines)> DocsPages() =>
+        DocsFiles().Select(file => (Page: Path.GetRelativePath(DocsFolder, file), Lines: File.ReadAllLines(file))).ToList();
+
+    // A page with one diagnostic code table of the given rows.
+    private static string[] DiagnosticCodeTable(params string[] rows) =>
+        ["| Code | Meaning |", "| --- | --- |", .. rows];
+
+    // What is wrong with the diagnostic code tables of the pages, given the declared codes. A table is one that
+    // starts with the header '| Code | Meaning |'; the pages may hold several.
+    internal static List<string> DiagnosticCodeTableProblems(IEnumerable<(string Page, string[] Lines)> pages, IReadOnlyCollection<string> declared)
+    {
+        var rows = new List<(string Code, string Page, bool Planned)>();
+        var tables = 0;
+        foreach (var (page, lines) in pages)
+        {
+            for (var i = 0; i < lines.Length; i++)
+            {
+                // Other tables, such as the form condition checks, also begin with a Code column but are not this table.
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Code\s*\|\s*Meaning\s*\|"))
+                {
+                    continue;
+                }
+
+                tables++;
+                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
+                {
+                    var match = Regex.Match(lines[j], @"^\|\s*`(AXC\d{4})`\s*\|");
+                    if (match.Success)
+                    {
+                        // A row marked _(planned for Mx)_ is not built yet, so it is listed apart from the built codes.
+                        var isPlanned = Regex.IsMatch(lines[j], @"^\|[^|]*\|\s*_\(planned for M\d+\)_");
+                        rows.Add((match.Groups[1].Value, page, isPlanned));
+                    }
+                }
+            }
+        }
+
+        var problems = new List<string>();
+        if (tables == 0)
+        {
+            problems.Add("Expected a table with header '| Code | Meaning |' under docs/, found none.");
+        }
+
+        var documented = rows.Select(row => row.Code).ToHashSet();
+        var built = rows.Where(row => !row.Planned).Select(row => row.Code).ToList();
+        var planned = rows.Where(row => row.Planned).Select(row => row.Code).ToList();
+
+        var missing = declared.Except(documented).ToList();
+        if (missing.Count > 0)
+        {
+            problems.Add($"Missing from the diagnostic code tables under docs/: {string.Join(", ", missing)}.");
+        }
+
+        foreach (var group in rows.GroupBy(row => row.Code).Where(group => group.Count() > 1))
+        {
+            problems.Add($"{group.Key} is on more than one row, on {string.Join(", ", group.Select(row => row.Page))}.");
+        }
+
+        var plannedDeclared = planned.Intersect(declared).ToList();
+        if (plannedDeclared.Count > 0)
+        {
+            problems.Add($"Marked planned in the docs but already declared: {string.Join(", ", plannedDeclared)}.");
+        }
+
+        var undeclared = built.Except(declared).ToList();
+        if (undeclared.Count > 0)
+        {
+            problems.Add($"Not in DiagnosticCodes or ExpressionDiagnosticCodes: {string.Join(", ", undeclared)}. Mark the row _(planned for Mx)_ or declare the code.");
+        }
+
+        return problems;
+    }
 
     // The relationships of the one erDiagram under a '## ' heading of storage.md, as (principal table, dependent table).
     private static List<(string Principal, string Dependent)> ErDiagramRelationships(string heading)

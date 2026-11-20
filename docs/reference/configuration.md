@@ -753,7 +753,7 @@ The rules below keep activation atomic and say how the server serves the active 
 ## Diagnostics
 
 Every problem that the pipeline finds is a diagnostic with a file, a JSON Pointer path and a code.
-Their shape and the table of every code are in [diagnostic codes](diagnostic-codes.md).
+Their shape is in [diagnostic codes](diagnostic-codes.md), which links the pages that list every code by topic.
 
 ## Reference index
 

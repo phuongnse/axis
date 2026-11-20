@@ -109,7 +109,7 @@ The integration tests share their containers, so a run starts each service at mo
   `samples/apps/` from the integration tests, on their PostgreSQL container, see
   [test scenarios](reference/test-scenarios.md).
 - **Doc facts.** `scripts/lint.sh` checks every relative Markdown link and `#anchor` in the
-  repository. Unit tests in `Axis.Configuration.Tests` compare the diagnostic code table and the
+  repository. Unit tests in `Axis.Configuration.Tests` compare the diagnostic code tables and the
   resource kinds in the [configuration pipeline](reference/configuration.md#configuration-pipeline)
   with `DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by heading or table
   header, so the sections may move within `docs/`. `scripts/check-docs.mjs` compares the Studio spec

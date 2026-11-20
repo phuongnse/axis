@@ -191,7 +191,7 @@ Data sources handle enum labels and file fields, and can be exported:
 ## Compile checks
 
 A data source is checked when the application is compiled. Any failure is a compile error and no
-release is produced. Every code is in the [diagnostic codes](diagnostic-codes.md) table.
+release is produced. Every code is on one of the [diagnostic codes](diagnostic-codes.md) pages, by topic.
 
 The root entity, the projection and the default order:
 

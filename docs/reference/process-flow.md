@@ -4,7 +4,7 @@ Most processes run straight from step to step. This page covers the steps that m
 for a time, wait for an event or run another process, the loops that such waiting steps allow, the
 `createRecord` operation, and processes that run without a subject record. The process resource and
 its other steps are in [processes](processes.md), and each compile problem on this page is a
-diagnostic with its own code in the [diagnostic code table](diagnostic-codes.md).
+diagnostic with its own code, listed by topic in [diagnostic codes](diagnostic-codes.md).
 
 ## Timer step
 

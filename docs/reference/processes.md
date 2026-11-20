@@ -344,7 +344,8 @@ system that cannot take an order is one case.
 
 The compiler reports each of these problems as a diagnostic in
 [the Resolve step](configuration.md#resolve), and it reports every problem of a process in one pass.
-Each code is in the [diagnostic code table](diagnostic-codes.md).
+The process codes are on the [process diagnostic codes](diagnostic-codes-processes.md) page. The other
+codes that a process reports are on the page of their topic.
 
 - `entity` names a loaded entity, ignoring letter case (`AXC0067` at `/entity`), that is not a child
   entity (`AXC0068` at `/entity`, naming the owner). With an unknown entity the conditions are not

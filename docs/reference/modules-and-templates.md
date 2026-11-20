@@ -221,8 +221,8 @@ so labels in module resources resolve.
 
 A diagnostic in a module file has `file` set to `modules/<id>/<relative path>` and `resourceId` set to
 the id declared in the file. The codes of modules are `AXC0200` to `AXC0214`, `AXC0292` to `AXC0307`
-and `AXC0335`, and [diagnostic codes](diagnostic-codes.md) says what each means and where it is
-reported.
+and `AXC0335`, and the [package and module diagnostic codes](diagnostic-codes-packages.md) say what each means and
+where it is reported.
 
 ### Processes, pages, policies and dependencies
 

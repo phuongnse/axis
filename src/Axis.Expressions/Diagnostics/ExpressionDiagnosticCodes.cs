@@ -1,7 +1,7 @@
 namespace Axis.Expressions.Diagnostics;
 
 /// <summary>
-/// Stable diagnostic codes for expressions. They share the <c>AXCnnnn</c> range and the docs table
+/// Stable diagnostic codes for expressions. They share the <c>AXCnnnn</c> range and the docs pages
 /// with the configuration codes. A code never changes meaning once published.
 /// </summary>
 public static class ExpressionDiagnosticCodes

@@ -145,7 +145,7 @@ Limits keep one instance bounded, so that one process cannot hold the worker for
 _(planned for M38)_
 
 The compiler reports each problem of a block as a diagnostic, at the path of the element, in the same pass
-as the rest of the process. Each code is in the [diagnostic code table](diagnostic-codes.md).
+as the rest of the process. The block codes are on the [process diagnostic codes](diagnostic-codes-processes.md) page.
 
 - `AXC0378` at a transition: a transition crosses a block boundary. A step inside a block names a step
   outside its list, or a step outside a block names a step inside it.

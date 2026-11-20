@@ -314,4 +314,4 @@ agrees.
       marker. It also checks the decisions that the code and the docs cite, the sections the code links and
       the milestones the code names, as [references in the code](#references-in-the-code) says. It runs one
       module per rule under `scripts/lib/docs/`, each with its own test.
-    - The unit tests of rule 7 compare each list with the code, such as the diagnostic code table.
+    - The unit tests of rule 7 compare each list with the code, such as the diagnostic code tables.

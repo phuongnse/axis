@@ -698,8 +698,8 @@ The compiler reports a problem in an expression as a diagnostic, in one of three
 - **Cost.** The limits on length, depth, nodes, hops, rule call depth and rule call cycles.
 
 Each diagnostic points at the JSON Pointer of the expression string, and its message gives the
-character position inside the expression. Every code is in the
-[diagnostic codes](diagnostic-codes.md) table.
+character position inside the expression. Every expression code is on the
+[expression diagnostic codes](diagnostic-codes-expressions.md) page.
 
 - **`AXC0035`.** Every syntax error: an unknown character, a bad token, a literal that cannot be
   held exactly, or text the grammar does not allow. An integer above the signed 64-bit maximum and
