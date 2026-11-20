@@ -98,6 +98,39 @@ export function routeBetween(
   return route?.source === source && route.target === target ? route.points : undefined
 }
 
+/** The smallest box that holds every card of a layout and every point of its routes. */
+export interface GraphBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * The box that covers every node's card, `width` by `height` from its position, and every point of every route, so a
+ * route back to an earlier step that passes outside the cards is inside it. An empty layout gives an empty box.
+ */
+export function layoutBounds(layout: GraphLayout, width: number, height: number): GraphBounds {
+  const xs: number[] = []
+  const ys: number[] = []
+  for (const { x, y } of layout.positions.values()) {
+    xs.push(x, x + width)
+    ys.push(y, y + height)
+  }
+  for (const route of layout.routes.values()) {
+    for (const { x, y } of route.points) {
+      xs.push(x)
+      ys.push(y)
+    }
+  }
+  if (xs.length === 0) {
+    return { x: 0, y: 0, width: 0, height: 0 }
+  }
+  const [left, right] = [Math.min(...xs), Math.max(...xs)]
+  const [top, bottom] = [Math.min(...ys), Math.max(...ys)]
+  return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
 /**
  * The last finished layout of a graph, or `null` before the first one. It lays the graph out again when a node, a size
  * or an edge changes. The previous layout stays until the new one is done, and a layout that finishes after a newer

@@ -233,6 +233,8 @@ A process is drawn as one graph, with the same layout, cards and controls wherev
   of those buttons names its key in `aria-keyshortcuts`. Go to the current step has no key.
 - **Moves.** Every move of the view is animated over 300 ms. Under [reduced motion](frontend.md#reduced-motion), a
   move happens at once.
+- **Download.** In the process designer only, the controls also hold Download, see
+  [download](process-designer.md#download).
 - **No React Flow controls.** React Flow's own controls and attribution are not drawn, as its MIT licence allows.
 
 ## Commands

@@ -397,6 +397,27 @@ test.describe("Studio edits a process in the process editor", () => {
     }
   });
 
+  test("an author downloads the graph of the process as a PNG named after it, with no policy violation", async ({
+    page,
+  }) => {
+    await useSession(page, "author");
+    const id = await processId(page);
+
+    await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`);
+    await expect(page.getByTestId("studio-graph-node-0")).toBeVisible();
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download", exact: true }).click();
+    await page.getByRole("menuitem", { name: "PNG", exact: true }).click();
+    const saved = await download;
+
+    // The process is named PurchaseRequestApproval.
+    expect(saved.suggestedFilename()).toBe("purchase-request-approval.png");
+    const bytes = await readFile((await saved.path())!);
+    expect([...bytes.subarray(0, 8)]).toEqual([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+  });
+
   test("an author drags a type onto an edge, inserts another after it by keyboard and finds both wired in the saved file", async ({
     page,
   }) => {

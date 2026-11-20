@@ -1,19 +1,28 @@
 import type { DndContextProps } from '@dnd-kit/core'
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { colourTokens } from '../platform/designTokens'
+import { saveFile } from '../platform/exports'
 import { setAt } from '../platform/jsonPatch'
 import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { stubResizeObserver } from '../test/resizeObserver'
 import { ShellAsideHost } from '../test/shellAsideHost'
 import type { DesignerLayer } from './LayerMarkViews'
 import { paletteEntries } from './processPalette'
 import StudioProcessDesign from './StudioProcessDesign'
+
+// A download is saved through `saveFile`, which the test reads instead of clicking a link jsdom cannot follow.
+vi.mock('../platform/exports', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../platform/exports')>()),
+  saveFile: vi.fn(),
+}))
 
 // The drag library draws as it is, and the test calls the drop handler that the designer gives it, because jsdom has no
 // layout to hit-test.
@@ -63,20 +72,24 @@ beforeAll(async () => {
 })
 
 /** Applies each change to the draft, as the Studio editor does, and records the changes and the selections. */
-function renderDesign(start: number | null, layer?: DesignerLayer) {
+function renderDesign(
+  start: number | null,
+  layer?: DesignerLayer,
+  options: { draft?: Record<string, unknown>; diagnosticPaths?: string[]; initialMode?: 'light' | 'dark' } = {},
+) {
   const calls = { changes: [] as [string, unknown][], selected: [] as (number | null)[] }
   function Harness() {
-    const [draft, setDraft] = useState<Record<string, unknown>>(initial)
+    const [draft, setDraft] = useState<Record<string, unknown>>(options.draft ?? initial)
     const [selected, setSelected] = useState(start)
     return (
-      <ThemeModeProvider>
+      <ThemeModeProvider initialMode={options.initialMode}>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={names}>
             <ShellAsideHost>
               <StudioProcessDesign
                 schema={schema}
                 draft={draft}
-                diagnosticPaths={[]}
+                diagnosticPaths={options.diagnosticPaths ?? []}
                 layer={layer}
                 selected={selected}
                 onSelect={(index) => {
@@ -301,5 +314,107 @@ describe('a module process with a customization layer', () => {
 
     expect(await screen.findByRole('button', { name: 'check, decision' }, slow)).toBeInTheDocument()
     expect(screen.queryByTestId('studio-layer-mark-/steps/2')).toBeNull()
+  })
+})
+
+describe('downloading the graph', () => {
+  const slow = { timeout: 10000 }
+  const purchase = {
+    name: 'PurchaseApproval',
+    start: 'submit',
+    steps: [
+      { name: 'submit', type: 'operation', operation: 'updateRecord', set: {}, next: 'check' },
+      { name: 'check', type: 'decision', branches: [{ when: 'approved', next: 'done' }], otherwise: 'submit' },
+      { name: 'done', type: 'end' },
+    ],
+  }
+
+  beforeEach(() => {
+    vi.mocked(saveFile).mockClear()
+    stubResizeObserver()
+    // The image library tests for SVG images, which jsdom does not have.
+    vi.stubGlobal('SVGImageElement', class {})
+  })
+
+  /** Chooses `format` in the Download menu and waits for the file that is saved. */
+  async function download(format: 'SVG' | 'PNG') {
+    await userEvent.click(await screen.findByRole('button', { name: 'Download' }, slow))
+    await userEvent.click(await screen.findByRole('menuitem', { name: format }))
+    await waitFor(() => expect(saveFile).toHaveBeenCalledTimes(1), slow)
+    return vi.mocked(saveFile).mock.calls[0]!
+  }
+
+  it('saves the whole graph as an SVG named after the process, with no control', async () => {
+    renderDesign(null, undefined, { draft: purchase })
+
+    const [blob, name] = await download('SVG')
+    const svg = await blob.text()
+
+    expect(name).toBe('purchase-approval.svg')
+    expect(blob.type).toBe('image/svg+xml')
+    for (const label of ['submit', 'check', 'done', 'approved', 'otherwise']) {
+      expect(svg).toContain(label)
+    }
+    for (const left of [
+      'react-flow__minimap',
+      'react-flow__background',
+      'react-flow__attribution',
+      'react-flow__controls',
+      'Zoom in',
+      'Find a step',
+      'Download',
+    ]) {
+      expect(svg).not.toContain(left)
+    }
+  })
+
+  it('saves a PNG named after the process', async () => {
+    const draw = vi.fn()
+    vi.stubGlobal(
+      'Image',
+      class {
+        onload: (() => void) | null = null
+        set src(_: string) {
+          queueMicrotask(() => this.onload?.())
+        }
+      },
+    )
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: draw } as never)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback, type) =>
+      callback(new Blob(['png'], { type })),
+    )
+    renderDesign(null, undefined, { draft: purchase })
+
+    const [blob, name] = await download('PNG')
+
+    expect(name).toBe('purchase-approval.png')
+    expect(blob.type).toBe('image/png')
+    expect(draw).toHaveBeenCalledOnce()
+  })
+
+  it('names a module process after the text past its last slash', async () => {
+    renderDesign(null, undefined, { draft: { ...purchase, name: 'orders/ShipOrder' } })
+
+    const [, name] = await download('SVG')
+
+    expect(name).toBe('ship-order.svg')
+  })
+
+  it('draws the light theme on a white surface in dark mode, with no selection and no diagnostic mark', async () => {
+    renderDesign(0, undefined, { draft: purchase, diagnosticPaths: ['/steps/0'], initialMode: 'dark' })
+
+    const [blob] = await download('SVG')
+    const svg = await blob.text()
+
+    const rgb = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16))
+      return `rgb(${r}, ${g}, ${b})`
+    }
+    expect(svg).toContain(rgb(colourTokens.surface.light))
+    expect(svg).not.toContain(rgb(colourTokens.surface.dark))
+    expect(svg).not.toContain(rgb(colourTokens.danger.light))
+    expect(svg).not.toContain(rgb(colourTokens.danger.dark))
+    expect(svg).not.toContain(rgb(colourTokens.primary.light))
+    expect(svg).not.toContain(rgb(colourTokens.primary.dark))
   })
 })
