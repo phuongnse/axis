@@ -296,6 +296,25 @@ describe('ProcessGraphCanvas', () => {
     }
   })
 
+  it('has Download only when it is given a file name, so an instance has none', async () => {
+    const runStates = new Map<string, RunState>([['a', 'done']])
+    const { rerender } = render(
+      <Providers>
+        <ProcessGraphCanvas steps={steps} transitions={transitions} label="Process" runStates={runStates} />
+      </Providers>,
+    )
+
+    await screen.findByRole('button', { name: 'Zoom in' }, { timeout: 5000 })
+    expect(screen.queryByRole('button', { name: 'Download' })).toBeNull()
+
+    rerender(
+      <Providers>
+        <ProcessGraphCanvas steps={steps} transitions={transitions} label="Process" imageName="process" />
+      </Providers>,
+    )
+    expect(await screen.findByRole('button', { name: 'Download' })).toBeInTheDocument()
+  })
+
   it('imports nothing from @dnd-kit', () => {
     expect(source).not.toMatch(/from\s+['"]@dnd-kit/)
   })

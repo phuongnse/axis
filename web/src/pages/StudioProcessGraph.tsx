@@ -47,7 +47,8 @@ function TransitionDropTarget({ path }: { path: string }) {
  * point, relative to the graph. The graph sets no transition itself. It has no keyboard way to connect, which the step
  * panel's pickers give. With `readOnly` no step has a handle and Delete or Backspace calls nothing, so the graph only
  * shows the process. `layerMarks` names the steps, by number, that a customization layer added or changed. Such a card
- * says so in its name and in a visible line.
+ * says so in its name and in a visible line. With `imageName`, the graph has Download, see
+ * docs/reference/process-designer.md#download.
  */
 export default function StudioProcessGraph({
   graph,
@@ -59,6 +60,7 @@ export default function StudioProcessGraph({
   onConnect,
   readOnly = false,
   layerMarks,
+  imageName,
 }: {
   graph: ProcessGraph
   selected: number | null
@@ -69,6 +71,7 @@ export default function StudioProcessGraph({
   onConnect: (source: number, target: number, point: { x: number; y: number }) => void
   readOnly?: boolean
   layerMarks?: ReadonlyMap<number, 'added' | 'changed'>
+  imageName?: string
 }) {
   const t = useText()
   const edgeText = t('shell.studio.processGraph.to')
@@ -152,6 +155,7 @@ export default function StudioProcessGraph({
         onChooseTransition={chooseTransition}
         onConnect={readOnly ? undefined : connect}
         transitionExtra={transitionExtra}
+        imageName={imageName}
       />
     </div>
   )

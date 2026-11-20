@@ -854,6 +854,7 @@ describe('StudioPage', () => {
     const forbidden = await screen.findByTestId('studio-forbidden')
     expect(forbidden).toHaveTextContent('Studio is not available')
     expect(forbidden).toHaveTextContent('You need the author role to use Studio.')
+    expect(screen.queryByRole('button', { name: 'Download' })).toBeNull()
   })
 
   it('says so when there is no application', async () => {
