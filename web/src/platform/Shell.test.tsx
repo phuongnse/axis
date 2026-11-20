@@ -4,7 +4,7 @@ import { DatePicker, Table, theme } from 'antd'
 import viVN from 'antd/locale/vi_VN'
 import dayjs from 'dayjs'
 import { useEffect, type ReactNode } from 'react'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, type InitialEntry } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
@@ -48,7 +48,12 @@ function Background() {
   return <span data-testid="background">{token.colorBgContainer}</span>
 }
 
-function shellFor(navigation: typeof notesNavigation, children: ReactNode, locale = 'en', initialEntries = ['/']) {
+function shellFor(
+  navigation: typeof notesNavigation,
+  children: ReactNode,
+  locale = 'en',
+  initialEntries: InitialEntry[] = ['/'],
+) {
   return (
     <MemoryRouter initialEntries={initialEntries}>
       <ThemeModeProvider>
@@ -70,7 +75,7 @@ function shellFor(navigation: typeof notesNavigation, children: ReactNode, local
 
 function renderShell(
   locale: string,
-  initialEntries = ['/'],
+  initialEntries: InitialEntry[] = ['/'],
   navigation: typeof notesNavigation = [],
   children: ReactNode = <DatePicker />,
 ) {
@@ -155,6 +160,29 @@ describe('Shell navigation', () => {
     expect(screen.getByRole('link', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Categories' })).not.toHaveAttribute('aria-current')
     expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('marks the entry of the address a page was opened from when no entry matches the page', () => {
+    renderShell('en', [{ pathname: '/e2e/noteform/new', state: { from: '/e2e/notes?page=2' } }], notesNavigation)
+
+    expect(screen.getByRole('link', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Categories' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('marks no entry for a page that matches no entry and was opened with no address it came from', () => {
+    renderShell('en', ['/e2e/noteform/new'], notesNavigation)
+
+    for (const link of screen.getAllByRole('link')) {
+      expect(link).not.toHaveAttribute('aria-current')
+    }
+  })
+
+  it('marks the entry of the page itself rather than the address it was opened from', () => {
+    renderShell('en', [{ pathname: '/e2e/categories', state: { from: '/e2e/notes' } }], notesNavigation)
+
+    expect(screen.getByRole('link', { name: 'Categories' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Notes' })).not.toHaveAttribute('aria-current')
   })
 
   it('matches the site path ignoring letter case', () => {

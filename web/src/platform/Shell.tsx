@@ -114,9 +114,14 @@ export function Shell({
 }: ShellProps) {
   const t = useText()
   const { mode } = useThemeMode()
-  const { pathname } = useLocation()
+  const { pathname, state } = useLocation()
   const { colour, spacing } = useDesignTokens()
-  const activeKey = activeNavigationKey(navigation, pathname)
+  // A page that matches no entry, such as a form opened from a table, marks the entry of the address it was opened
+  // from, which a link passes in history state, see docs/reference/shell.md#layout.
+  const from: unknown = (state as { from?: unknown } | null)?.from
+  const activeKey =
+    activeNavigationKey(navigation, pathname) ??
+    (typeof from === 'string' ? activeNavigationKey(navigation, from.split(/[?#]/, 1)[0]) : undefined)
   const narrow = useNarrowWidth()
   // The panel is open for the path it was opened on, so following a link or leaving narrow width closes it.
   const [openOn, setOpenOn] = useState<{ pathname: string; narrow: boolean } | null>(null)
