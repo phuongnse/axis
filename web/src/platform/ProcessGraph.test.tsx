@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
+import source from './ProcessGraph.tsx?raw'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { ProcessGraphCanvas } from './ProcessGraph'
 import type { RunState } from './inspection'
@@ -164,5 +165,155 @@ describe('ProcessGraphCanvas', () => {
     await screen.findByTestId('rf__node-a', undefined, { timeout: 5000 })
     expect(container.querySelector('.react-flow__attribution')).toBeNull()
     expect(container.querySelector('.react-flow__controls')).toBeNull()
+  })
+
+  it('calls onChooseTransition with the id on a click and on Enter, and marks the chosen transition', async () => {
+    const chosen: string[] = []
+    render(
+      <Providers>
+        <ProcessGraphCanvas
+          steps={steps}
+          transitions={transitions}
+          label="Process"
+          chosenTransition="b-c"
+          onChooseTransition={(id) => chosen.push(id)}
+        />
+      </Providers>,
+    )
+
+    const edge = await screen.findByTestId('rf__edge-a-b', undefined, { timeout: 5000 })
+    fireEvent.click(edge)
+    act(() => edge.focus())
+    fireEvent.keyDown(edge, { key: 'Enter' })
+    fireEvent.keyDown(edge, { key: ' ' })
+
+    expect(chosen).toEqual(['a-b', 'a-b', 'a-b'])
+    expect(edge).toHaveAttribute('role', 'button')
+    expect(screen.getByTestId('rf__edge-b-c')).toHaveAttribute('aria-current', 'true')
+    expect(edge).not.toHaveAttribute('aria-current')
+  })
+
+  it('draws the chosen transition in primary, 2 px wide', async () => {
+    const { container } = render(
+      <Providers>
+        <ProcessGraphCanvas
+          steps={steps}
+          transitions={transitions}
+          label="Process"
+          chosenTransition="b-c"
+          onChooseTransition={() => undefined}
+        />
+      </Providers>,
+    )
+
+    await screen.findByTestId('rf__edge-b-c', undefined, { timeout: 5000 })
+    const path = (id: string) =>
+      container.querySelector<SVGPathElement>(`[data-testid="rf__edge-${id}"] .react-flow__edge-path`)!
+
+    expect(path('b-c').style.stroke).toBe('rgb(91, 63, 217)') // primary, light
+    expect(path('b-c').style.strokeWidth).toBe('2')
+    expect(path('a-b').style.stroke).not.toBe(path('b-c').style.stroke)
+  })
+
+  it('makes a transition no button and no tab stop without onChooseTransition', async () => {
+    const chosen: string[] = []
+    render(
+      <Providers>
+        <ProcessGraphCanvas steps={steps} transitions={transitions} label="Process" />
+      </Providers>,
+    )
+
+    const edge = await screen.findByTestId('rf__edge-a-b', undefined, { timeout: 5000 })
+    fireEvent.click(edge)
+    fireEvent.keyDown(edge, { key: 'Enter' })
+
+    expect(chosen).toEqual([])
+    expect(edge).not.toHaveAttribute('role', 'button')
+    expect(edge).not.toHaveAttribute('tabindex')
+  })
+
+  it('shows a connect handle on a connectable step only, and only with onConnect', async () => {
+    const connectable = [{ ...steps[0]!, connectable: true }, ...steps.slice(1)]
+    const { container, rerender } = render(
+      <Providers>
+        <ProcessGraphCanvas steps={connectable} transitions={transitions} label="Process" onConnect={() => undefined} />
+      </Providers>,
+    )
+
+    const handle = await screen.findByTestId('process-graph-handle-a', undefined, { timeout: 5000 })
+    expect(handle).toHaveClass('react-flow__handle-right')
+    expect(handle).toHaveStyle({ width: '10px', height: '10px', background: colourTokens.primary.light })
+    expect(screen.queryByTestId('process-graph-handle-b')).toBeNull()
+    expect(screen.getByTestId('rf__node-b').querySelector('.react-flow__handle-right.connectable')).toBeNull()
+    expect(container.querySelectorAll('.react-flow__handle-right.connectable')).toHaveLength(1)
+
+    rerender(
+      <Providers>
+        <ProcessGraphCanvas steps={connectable} transitions={transitions} label="Process" />
+      </Providers>,
+    )
+
+    await screen.findByTestId('rf__node-a')
+    expect(screen.queryByTestId('process-graph-handle-a')).toBeNull()
+    expect(container.querySelector('.react-flow__handle-right.connectable')).toBeNull()
+  })
+
+  it('names a card and its handle by the test id prefix', async () => {
+    render(
+      <Providers>
+        <ProcessGraphCanvas
+          steps={[{ ...steps[0]!, connectable: true }, steps[1]!]}
+          transitions={[transitions[0]!]}
+          label="Process"
+          testIdPrefix="studio-graph"
+          onConnect={() => undefined}
+        />
+      </Providers>,
+    )
+
+    expect(await screen.findByTestId('studio-graph-node-a', undefined, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.getByTestId('studio-graph-handle-a')).toBeInTheDocument()
+    expect(screen.queryByTestId('process-graph-node-a')).toBeNull()
+  })
+
+  it('renders the content of transitionExtra once for each transition, taking no pointer events', async () => {
+    render(
+      <Providers>
+        <ProcessGraphCanvas
+          steps={steps}
+          transitions={transitions}
+          label="Process"
+          transitionExtra={(id) => <span data-testid={`extra-${id}`} />}
+        />
+      </Providers>,
+    )
+
+    await screen.findByTestId('rf__edge-a-b', undefined, { timeout: 5000 })
+    for (const { id } of transitions) {
+      const extra = await screen.findAllByTestId(`extra-${id}`)
+      expect(extra).toHaveLength(1)
+      expect(extra[0]!.parentElement).toHaveStyle({ pointerEvents: 'none' })
+    }
+  })
+
+  it('imports nothing from @dnd-kit', () => {
+    expect(source).not.toMatch(/from\s+['"]@dnd-kit/)
+  })
+
+  it('names a card by name, shows its mark and diagnostic, and shows a transition label', async () => {
+    render(
+      <Providers>
+        <ProcessGraphCanvas
+          steps={[{ ...steps[0]!, name: 'Submit request, Task', mark: 'Added', marked: true }, steps[1]!]}
+          transitions={[{ ...transitions[0]!, label: 'Approved' }]}
+          label="Process"
+        />
+      </Providers>,
+    )
+
+    const card = await screen.findByRole('group', { name: 'Submit request, Task' }, { timeout: 5000 })
+    expect(card).toHaveAttribute('data-marked', 'true')
+    expect(within(card).getByText('Added')).toBeInTheDocument()
+    expect(screen.getByText('Approved')).toBeInTheDocument()
   })
 })

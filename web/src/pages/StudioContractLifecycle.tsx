@@ -3,7 +3,7 @@ import '@xyflow/react/dist/style.css'
 import { useMemo } from 'react'
 import { fillText } from '../platform/fillText'
 import { ProcessRouteEdge } from '../platform/ProcessGraph'
-import { type GraphPoint, useGraphLayout } from '../platform/processLayout'
+import { type GraphPoint, routeBetween, useGraphLayout } from '../platform/processLayout'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import type { ContractEdge, ContractState } from './contractView'
@@ -106,7 +106,7 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
             source: edge.from,
             target: edge.to,
             type: 'route',
-            data: { route: layout.routes.get(edge.id) },
+            data: { route: routeBetween(layout, edge.id, edge.from, edge.to) },
             label,
             ariaLabel: fillText(edgeNameText, { source: edge.from, target: edge.to, label }),
             style: { stroke: colour.textMuted },

@@ -13,10 +13,17 @@ export interface GraphInput {
   edges: { id: string; source: string; target: string }[]
 }
 
+/** An edge's route from its source to its target, with the ends it was laid out for. */
+export interface GraphRoute {
+  source: string
+  target: string
+  points: GraphPoint[]
+}
+
 /** Where each node's top left corner lies, and each edge's route from its source to its target. */
 export interface GraphLayout {
   positions: Map<string, GraphPoint>
-  routes: Map<string, GraphPoint[]>
+  routes: Map<string, GraphRoute>
 }
 
 /** The shortest part of a route, in px, see docs/reference/process-inspector-widget.md#process-graph. */
@@ -61,14 +68,34 @@ export async function layoutGraph(input: GraphInput): Promise<GraphLayout> {
   for (const node of laidOut.children ?? []) {
     positions.set(node.id, { x: node.x ?? 0, y: node.y ?? 0 })
   }
-  const routes = new Map<string, GraphPoint[]>()
+  const ends = new Map(edges.map((edge) => [edge.id, edge]))
+  const routes = new Map<string, GraphRoute>()
   for (const edge of (laidOut.edges ?? []) as ElkExtendedEdge[]) {
     const section = edge.sections?.[0]
-    if (section) {
-      routes.set(edge.id, [section.startPoint, ...(section.bendPoints ?? []), section.endPoint])
+    const input = ends.get(edge.id)
+    if (section && input) {
+      routes.set(edge.id, {
+        source: input.source,
+        target: input.target,
+        points: [section.startPoint, ...(section.bendPoints ?? []), section.endPoint],
+      })
     }
   }
   return { positions, routes }
+}
+
+/**
+ * The route ELK laid out for an edge, or `undefined` when the edge's ends changed since, as while a newer layout runs,
+ * see docs/reference/process-inspector-widget.md#process-graph.
+ */
+export function routeBetween(
+  layout: GraphLayout,
+  id: string,
+  source: string,
+  target: string,
+): GraphPoint[] | undefined {
+  const route = layout.routes.get(id)
+  return route?.source === source && route.target === target ? route.points : undefined
 }
 
 /**

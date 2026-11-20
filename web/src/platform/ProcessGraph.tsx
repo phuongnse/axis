@@ -11,19 +11,21 @@ import {
 import {
   BaseEdge,
   type Edge,
+  EdgeLabelRenderer,
   type EdgeProps,
   Handle,
   MarkerType,
   type Node,
   type NodeProps,
+  type OnConnectEnd,
   Position,
   ReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Tooltip } from 'antd'
-import { type ComponentType, type CSSProperties, useMemo } from 'react'
+import { type ComponentType, type CSSProperties, type KeyboardEvent, type ReactNode, useMemo, useRef } from 'react'
 import { type RunState, stepTypeText } from './inspection'
-import { type GraphPoint, roundedPath, useGraphLayout } from './processLayout'
+import { type GraphPoint, roundedPath, routeBetween, useGraphLayout } from './processLayout'
 import { StateBadge } from './StateBadge'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
@@ -45,25 +47,38 @@ const typeIcons: Record<string, ComponentType> = {
   end: StopOutlined,
 }
 
-/** A step of a process, as the canvas draws it. A marked step has a diagnostic. */
+/** The size of a card's connect handle, in px. */
+const handleSize = 10
+
+/**
+ * A step of a process, as the canvas draws it. A marked step has a diagnostic. `name` is the card's accessible name, the
+ * label by default, and `mark` is a small line under the label. A `connectable` step has a connect handle when the
+ * canvas has `onConnect`.
+ */
 export interface GraphStep {
   id: string
   label: string
   type: string
   marked?: boolean
+  name?: string
+  mark?: string
+  connectable?: boolean
 }
 
-/** A transition from one step to another. Its name is the accessible name of its route. */
+/** A transition from one step to another. Its name is the accessible name of its route, and `label` is drawn on it. */
 export interface GraphTransition {
   id: string
   source: string
   target: string
   name: string
+  label?: string
 }
 
 type StepCardData = {
   step: GraphStep
   chosen: boolean
+  connectable: boolean
+  testIdPrefix: string
   onChoose?: (id: string) => void
   /** The step's run state, in instance mode. `undefined` is a step not reached. */
   runState?: RunState
@@ -72,11 +87,11 @@ type StepCardData = {
 
 type StepNode = Node<StepCardData, 'step'>
 
-type RouteData = { route?: GraphPoint[] }
+type RouteData = { route?: GraphPoint[]; extra?: ReactNode }
 
 type RouteEdge = Edge<RouteData, 'route'>
 
-const handleStyle: CSSProperties = { display: 'none' }
+const anchorStyle: CSSProperties = { display: 'none' }
 
 /**
  * A step as a card, see docs/reference/process-inspector-widget.md#process-graph. It is a button when the graph
@@ -86,7 +101,7 @@ const handleStyle: CSSProperties = { display: 'none' }
 function StepCard({ data }: NodeProps<StepNode>) {
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
-  const { step, chosen, onChoose, runState, instance } = data
+  const { step, chosen, connectable, testIdPrefix, onChoose, runState, instance } = data
   const reached = runState !== undefined
   const muted = instance && !reached
   const Icon = typeIcons[step.type] ?? QuestionOutlined
@@ -129,31 +144,48 @@ function StepCard({ data }: NodeProps<StepNode>) {
           <Icon />
         </span>
       </Tooltip>
-      <Tooltip title={step.label}>
-        <strong
-          style={{
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            minWidth: 0,
-            overflowWrap: 'anywhere',
-          }}
-        >
-          {step.label}
-        </strong>
-      </Tooltip>
+      <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <Tooltip title={step.label}>
+          <strong
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: step.mark === undefined ? 2 : 1,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              minWidth: 0,
+              overflowWrap: 'anywhere',
+            }}
+          >
+            {step.label}
+          </strong>
+        </Tooltip>
+        {step.mark !== undefined && (
+          <span
+            style={{
+              color: colour.textMuted,
+              fontSize: 12,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {step.mark}
+          </span>
+        )}
+      </span>
     </>
   )
-  const testId = `process-graph-step-${step.id}`
+  const testId = `${testIdPrefix}-node-${step.id}`
+  const name = step.name ?? step.label
   return (
     <div style={{ position: 'relative', width: cardWidth, height: cardHeight }}>
-      <Handle type="target" position={Position.Left} isConnectable={false} style={handleStyle} aria-hidden />
+      <Handle type="target" position={Position.Left} isConnectable={false} style={anchorStyle} aria-hidden />
       {onChoose ? (
         <button
           type="button"
           data-testid={testId}
-          aria-label={step.label}
+          data-marked={step.marked ? 'true' : undefined}
+          aria-label={name}
           aria-current={chosen ? 'true' : undefined}
           onClick={() => onChoose(step.id)}
           style={{ ...style, cursor: 'pointer' }}
@@ -164,7 +196,8 @@ function StepCard({ data }: NodeProps<StepNode>) {
         <div
           role="group"
           data-testid={testId}
-          aria-label={step.label}
+          data-marked={step.marked ? 'true' : undefined}
+          aria-label={name}
           aria-current={chosen ? 'true' : undefined}
           style={style}
         >
@@ -176,7 +209,24 @@ function StepCard({ data }: NodeProps<StepNode>) {
           <StateBadge state={runState} />
         </span>
       )}
-      <Handle type="source" position={Position.Right} isConnectable={false} style={handleStyle} aria-hidden />
+      {connectable ? (
+        <Handle
+          type="source"
+          position={Position.Right}
+          isConnectable
+          data-testid={`${testIdPrefix}-handle-${step.id}`}
+          aria-hidden
+          style={{
+            width: handleSize,
+            height: handleSize,
+            background: colour.primary,
+            border: `1px solid ${colour.surface}`,
+            cursor: 'crosshair',
+          }}
+        />
+      ) : (
+        <Handle type="source" position={Position.Right} isConnectable={false} style={anchorStyle} aria-hidden />
+      )}
     </div>
   )
 }
@@ -193,8 +243,9 @@ function labelPoint(route: GraphPoint[]): GraphPoint {
 
 /**
  * A transition's route in right angles with rounded corners, from the points ELK found, see
- * docs/reference/process-inspector-widget.md#process-graph. Its label sits at the middle of the route. Without a route,
- * it is a straight line between its ends.
+ * docs/reference/process-inspector-widget.md#process-graph. Its label sits at the middle of the route, and so does the
+ * extra content of its data, which takes no pointer events, so a click still reaches the route. Without a route, it is a
+ * straight line between its ends.
  */
 export function ProcessRouteEdge({
   sourceX,
@@ -214,20 +265,31 @@ export function ProcessRouteEdge({
   ]
   const { x, y } = labelPoint(route)
   return (
-    <BaseEdge
-      path={roundedPath(route)}
-      markerEnd={markerEnd}
-      style={style}
-      label={label}
-      labelX={x}
-      labelY={y}
-      labelStyle={labelStyle}
-      labelBgStyle={labelBgStyle}
-    />
+    <>
+      <BaseEdge
+        path={roundedPath(route)}
+        markerEnd={markerEnd}
+        style={style}
+        label={label}
+        labelX={x}
+        labelY={y}
+        labelStyle={labelStyle}
+        labelBgStyle={labelBgStyle}
+      />
+      {data?.extra !== undefined && (
+        <EdgeLabelRenderer>
+          <div style={{ position: 'absolute', transform: `translate(${x}px, ${y}px)`, pointerEvents: 'none' }}>
+            {data.extra}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
   )
 }
 
 const edgeTypes = { route: ProcessRouteEdge }
+
+const edgeTestIdPrefix = 'rf__edge-'
 
 /**
  * A process drawn as cards laid out from left to right by ELK, see
@@ -235,7 +297,15 @@ const edgeTypes = { route: ProcessRouteEdge }
  * border, and `onChoose` makes each card a button that chooses its step. Given the run state of each step reached, the
  * graph is an instance's: a reached step has its state badge, the steps run and the `taken` transitions are in
  * `successText`, and the rest are muted, with dashed and thinner transitions. The graph shows while its layout is
- * computed again, with the previous one.
+ * computed again, with the previous one. A transition is drawn along its route only while its ends are those the layout
+ * was computed for, and as a straight line otherwise.
+ *
+ * An editor adds more. With `onChooseTransition`, each transition can be focused and is a button: a click, or Enter or
+ * Space on it, calls it with the transition's id, and the `chosenTransition` is drawn in `primary`, 2 px wide, with
+ * `aria-current`. With `onConnect`, a `connectable` step has a connect handle on its card's right edge, and a drag from
+ * it onto another step calls `onConnect` with the two ids and the release point, relative to the canvas. No other step
+ * has a handle. `transitionExtra` gives the content at the middle of a transition's route. A card is named by the test
+ * id `{testIdPrefix}-node-{id}` and its handle by `{testIdPrefix}-handle-{id}`.
  */
 export function ProcessGraphCanvas({
   steps,
@@ -245,6 +315,11 @@ export function ProcessGraphCanvas({
   onChoose,
   runStates,
   taken,
+  chosenTransition,
+  onChooseTransition,
+  onConnect,
+  transitionExtra,
+  testIdPrefix = 'process-graph',
 }: {
   steps: GraphStep[]
   transitions: GraphTransition[]
@@ -253,8 +328,14 @@ export function ProcessGraphCanvas({
   onChoose?: (id: string) => void
   runStates?: ReadonlyMap<string, RunState>
   taken?: ReadonlySet<string>
+  chosenTransition?: string
+  onChooseTransition?: (id: string) => void
+  onConnect?: (source: string, target: string, point: GraphPoint) => void
+  transitionExtra?: (id: string) => ReactNode
+  testIdPrefix?: string
 }) {
   const { mode } = useThemeMode()
+  const section = useRef<HTMLElement>(null)
   const { colour } = useDesignTokens()
   const layout = useGraphLayout({
     nodes: steps.map((step) => ({ id: step.id, width: cardWidth, height: cardHeight })),
@@ -267,43 +348,130 @@ export function ProcessGraphCanvas({
       return null
     }
     const placed = steps.filter((step) => layout.positions.has(step.id))
-    const nodes = placed.map((step): StepNode => ({
-      id: step.id,
-      type: 'step',
-      position: layout.positions.get(step.id)!,
-      width: cardWidth,
-      height: cardHeight,
-      handles: [
-        { type: 'target', position: Position.Left, x: 0, y: cardHeight / 2, width: 1, height: 1 },
-        { type: 'source', position: Position.Right, x: cardWidth, y: cardHeight / 2, width: 1, height: 1 },
-      ],
-      data: { step, chosen: step.id === chosen, onChoose, runState: runStates?.get(step.id), instance },
-    }))
+    const nodes = placed.map((step): StepNode => {
+      const connectable = onConnect !== undefined && step.connectable === true
+      return {
+        id: step.id,
+        type: 'step',
+        position: layout.positions.get(step.id)!,
+        width: cardWidth,
+        height: cardHeight,
+        handles: [
+          { type: 'target', position: Position.Left, x: 0, y: cardHeight / 2, width: 1, height: 1 },
+          connectable
+            ? {
+                type: 'source',
+                position: Position.Right,
+                x: cardWidth - handleSize / 2,
+                y: cardHeight / 2 - handleSize / 2,
+                width: handleSize,
+                height: handleSize,
+              }
+            : { type: 'source', position: Position.Right, x: cardWidth, y: cardHeight / 2, width: 1, height: 1 },
+        ],
+        data: {
+          step,
+          chosen: step.id === chosen,
+          connectable,
+          testIdPrefix,
+          onChoose,
+          runState: runStates?.get(step.id),
+          instance,
+        },
+      }
+    })
     const edges = transitions
       .filter((transition) => layout.positions.has(transition.source) && layout.positions.has(transition.target))
       .map((transition): RouteEdge => {
+        const current = transition.id === chosenTransition
         const dimmed = instance && !taken?.has(transition.id)
-        const stroke = instance && !dimmed ? colour.successText : colour.textMuted
+        const stroke = current ? colour.primary : instance && !dimmed ? colour.successText : colour.textMuted
         return {
           id: transition.id,
           source: transition.source,
           target: transition.target,
           type: 'route',
-          data: { route: layout.routes.get(transition.id) },
+          data: {
+            route: routeBetween(layout, transition.id, transition.source, transition.target),
+            extra: transitionExtra?.(transition.id),
+          },
           ariaLabel: transition.name,
+          ariaRole: onChooseTransition ? 'button' : undefined,
+          domAttributes: current ? { 'aria-current': 'true' } : undefined,
+          ...(transition.label !== undefined && {
+            label: transition.label,
+            labelStyle: { fill: colour.text },
+            labelBgStyle: { fill: colour.fillSubtle },
+          }),
           style: {
             stroke,
-            strokeWidth: instance ? (dimmed ? 1 : 2) : 1.5,
-            strokeDasharray: dimmed ? '4 4' : undefined,
+            strokeWidth: current ? 2 : instance ? (dimmed ? 1 : 2) : 1.5,
+            strokeDasharray: dimmed && !current ? '4 4' : undefined,
           },
           markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
         }
       })
     return { nodes, edges }
-  }, [layout, steps, transitions, chosen, onChoose, runStates, taken, instance, colour])
+  }, [
+    layout,
+    steps,
+    transitions,
+    chosen,
+    onChoose,
+    runStates,
+    taken,
+    instance,
+    colour,
+    chosenTransition,
+    onChooseTransition,
+    onConnect,
+    transitionExtra,
+    testIdPrefix,
+  ])
+
+  // A drag ends on a node when React Flow snaps to its handle, and anywhere else on the node otherwise, so the node
+  // under the pointer is the target. `onConnect` is not set on React Flow, or it would report a snapped drag twice.
+  const connectEnd: OnConnectEnd = (event, state) => {
+    const source = state.fromNode?.id
+    if (source === undefined || onConnect === undefined) {
+      return
+    }
+    const touch = 'changedTouches' in event ? event.changedTouches[0] : undefined
+    const x = touch?.clientX ?? (event as MouseEvent).clientX
+    const y = touch?.clientY ?? (event as MouseEvent).clientY
+    const target =
+      state.toNode?.id ??
+      document.elementFromPoint(x, y)?.closest('.react-flow__node')?.getAttribute('data-id') ??
+      undefined
+    if (target === undefined) {
+      return
+    }
+    const box = section.current?.getBoundingClientRect()
+    onConnect(source, target, { x: x - (box?.left ?? 0), y: y - (box?.top ?? 0) })
+  }
+
+  // React Flow does not act on a key pressed on an edge while its elements are not selectable, so Enter and Space on a
+  // focused transition choose it here.
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (onChooseTransition === undefined || (event.key !== 'Enter' && event.key !== ' ')) {
+      return
+    }
+    const element =
+      event.target instanceof Element ? event.target.closest(`[data-testid^="${edgeTestIdPrefix}"]`) : null
+    const id = element?.getAttribute('data-testid')?.slice(edgeTestIdPrefix.length)
+    if (id !== undefined && transitions.some((transition) => transition.id === id)) {
+      event.preventDefault()
+      onChooseTransition(id)
+    }
+  }
 
   return (
-    <section aria-label={label} style={{ width: '100%', height: '100%' }}>
+    <section
+      ref={section}
+      aria-label={label}
+      style={{ width: '100%', height: '100%', position: 'relative' }}
+      onKeyDown={onKeyDown}
+    >
       {flow && (
         <ReactFlow
           nodes={flow.nodes}
@@ -313,15 +481,18 @@ export function ProcessGraphCanvas({
           colorMode={mode}
           fitView
           fitViewOptions={{ maxZoom: 1 }}
+          minZoom={0.1}
           maxZoom={1}
           proOptions={{ hideAttribution: true }}
           style={{ background: colour.fillSubtle }}
           nodesDraggable={false}
-          nodesConnectable={false}
+          nodesConnectable={onConnect !== undefined}
           nodesFocusable={false}
           elementsSelectable={false}
-          edgesFocusable={false}
+          edgesFocusable={onChooseTransition !== undefined}
           zoomOnScroll={false}
+          onConnectEnd={onConnect ? connectEnd : undefined}
+          onEdgeClick={onChooseTransition ? (_, edge) => onChooseTransition(edge.id) : undefined}
         />
       )}
     </section>
