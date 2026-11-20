@@ -44,7 +44,7 @@ async function waitingParent(page: Page): Promise<{ parentId: string; childId: s
 test('an operator opens the child sub-process from its parent, and the child links back', async ({ page }) => {
   const { parentId, childId } = await waitingParent(page)
 
-  await page.goto(`/subprocess/parents/${parentId}`)
+  await page.goto(`/subprocess/parents/${parentId}?tab=history`)
   await expect(page.getByTestId('inspector-instance')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Sub-processes', exact: true })).toBeVisible()
   await page.getByTestId(`inspector-subprocess-${childId}`).click()

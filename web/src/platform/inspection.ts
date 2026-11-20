@@ -211,17 +211,30 @@ export interface InstancePage {
   totalCount: number
 }
 
-/** A transition to the step `next`. `on` is a decision branch or a task outcome, `null` for an operation. */
+/**
+ * A transition to the step `next`. `on` is a decision branch's index, `otherwise` for the fallback, a task outcome or
+ * `timeout`, and `null` for an operation. `branch` is a decision branch's name. `labelKey` is the key of the label of a
+ * branch or an outcome. `after` is a timeout's duration as the process file writes it, such as `PT1H`. Each is `null`
+ * where it does not apply, see docs/reference/process-inspection.md#instance-detail.
+ */
 export interface GraphTransition {
   next: string
   on: string | null
+  branch: string | null
+  labelKey: string | null
+  after: string | null
 }
 
-/** A step of the graph. `labelKey` is set only for a task step. */
+/**
+ * A step of the graph. `labelKey` is the key of the step's label, or `null` when it has none. `event` is a `waitEvent`
+ * step's event name, and `eventLabelKey` the key of the event's label, which is always `null` today.
+ */
 export interface GraphStep {
   name: string
   type: string
   labelKey: string | null
+  event: string | null
+  eventLabelKey: string | null
   transitions: GraphTransition[]
 }
 
@@ -299,6 +312,13 @@ export interface InstanceCall {
   outputs?: CallOutput[]
 }
 
+/** A named value of an instance's input or result. `value` is source text for a number, and `hidden` marks a value the reader may not read. */
+export interface InstanceValue {
+  name: string
+  value: unknown
+  hidden: boolean
+}
+
 /** The instance that started this one, with the sub-process step of the parent that did so. */
 export interface InstanceParent {
   id: string
@@ -355,6 +375,10 @@ export interface InstanceDetail {
   endedAt: string | null
   /** Who started the instance, or `null` for an instance started before Axis recorded its starter. */
   startedBy: InstanceStartedBy | null
+  /** The parameters the instance started with, or `null` for a process with a subject. */
+  input: InstanceValue[] | null
+  /** The end step and the values the instance ended with once it is completed, else `null`. `values` is `null` for an instance that completed before the engine kept them. */
+  result: { step: string; values: InstanceValue[] | null } | null
   studio: { app: string; resource: string } | null
   graph: { start: string; steps: GraphStep[] }
   path: PathEntry[]
@@ -364,6 +388,111 @@ export interface InstanceDetail {
   subProcesses: SubProcess[]
   /** The operator commands the signed-in user may take on the instance now, such as `cancel` and `retry`. */
   commands: string[]
+}
+
+/** One run of a step: the rows of the path that belong together, numbered among the runs of the same step. */
+export interface StepRun {
+  step: string
+  /** The run's number among the runs of its step, from 1. */
+  number: number
+  state: RunState
+  entries: PathEntry[]
+  startedAt: string | null
+  /** When the run ended, or `null` while it runs or waits. */
+  finishedAt: string | null
+}
+
+/** The runs of an instance, the state of each step's latest run and the ids of the transitions taken. */
+export interface InstanceRuns {
+  runs: StepRun[]
+  runStates: Map<string, RunState>
+  taken: Set<string>
+}
+
+/** The id of a step's transition on the graph, from the step's name and the transition's place among its transitions. */
+export function transitionId(step: string, index: number): string {
+  return `${step}|${index}`
+}
+
+/**
+ * The runs of an instance, worked out from its path, see docs/reference/process-inspector-widget.md#process-graph. A run
+ * starts at a path row whose step differs from the row before, or that follows a failed row of the same step, so a
+ * task's created row and its completion row are one run. A run is failed when its last row has an error. The run at the
+ * instance's current step takes the instance's state and has no end, and every other run is done. A current step with no
+ * row yet has an open run of its own. A transition is taken when a run of its step is followed by a run of its target:
+ * the only one to that target, else the one whose `on` is the run's last `decision`, else the first.
+ */
+export function stepRuns(instance: InstanceDetail): InstanceRuns {
+  const grouped: PathEntry[][] = []
+  for (const entry of instance.path) {
+    const last = grouped.at(-1)
+    const before = last?.at(-1)
+    if (last && before && before.step === entry.step && !before.error) {
+      last.push(entry)
+    } else {
+      grouped.push([entry])
+    }
+  }
+  const types = new Map(instance.graph.steps.map((step) => [step.name, step.type]))
+  const open = (step: string): RunState => {
+    switch (instance.state) {
+      case 'running':
+        return 'running'
+      case 'waiting':
+        return types.get(step) === 'task' ? 'waitingForPerson' : 'waitingForEvent'
+      case 'failed':
+        return 'failed'
+      case 'cancelled':
+        return 'cancelled'
+      default:
+        return 'done'
+    }
+  }
+  const counts = new Map<string, number>()
+  const runs = grouped.map((entries, index): StepRun => {
+    const step = entries[0]!.step
+    const number = (counts.get(step) ?? 0) + 1
+    counts.set(step, number)
+    const last = entries.at(-1)!
+    const current = index === grouped.length - 1 && step === instance.step
+    const state: RunState = current ? open(step) : last.error ? 'failed' : 'done'
+    const waiting = state === 'running' || state === 'waitingForEvent' || state === 'waitingForPerson'
+    return {
+      step,
+      number,
+      state,
+      entries,
+      startedAt: entries[0]!.startedAt,
+      finishedAt: waiting ? null : last.finishedAt,
+    }
+  })
+  if (runs.at(-1)?.step !== instance.step) {
+    runs.push({
+      step: instance.step,
+      number: (counts.get(instance.step) ?? 0) + 1,
+      state: open(instance.step),
+      entries: [],
+      startedAt: null,
+      finishedAt: null,
+    })
+  }
+
+  const runStates = new Map(runs.map((run) => [run.step, run.state]))
+  const taken = new Set<string>()
+  runs.slice(1).forEach((run, index) => {
+    const from = runs[index]!
+    const transitions = instance.graph.steps.find((step) => step.name === from.step)?.transitions ?? []
+    const leading = transitions.flatMap((transition, place) => (transition.next === run.step ? [place] : []))
+    const decision = from.entries.at(-1)?.decision
+    const place =
+      leading.length === 1
+        ? leading[0]
+        : (leading.find((candidate) => transitions[candidate]!.on === decision) ?? leading[0])
+    if (place !== undefined) {
+      taken.add(transitionId(from.step, place))
+    }
+  })
+  return { runs, runStates, taken }
 }
 
 /** The operator commands the instance page offers. */

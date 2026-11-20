@@ -102,10 +102,15 @@ test('the operator opens an instance waiting for the manager and sees the path a
       await chooseTheme(page, 'Dark')
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
-    await expect(shell.getByTestId('inspector-step-submit')).toContainText('Taken')
-    const approval = shell.getByTestId('inspector-step-managerApproval')
-    await expect(approval).toContainText('Manager approval')
-    await expect(approval).toContainText('Current')
+    await shell.getByRole('tab', { name: 'Diagram', exact: true }).click()
+    await expect(shell.getByTestId('rf__node-submit').getByRole('img', { name: 'Done', exact: true })).toBeVisible()
+    const approval = shell.getByTestId('rf__node-managerApproval')
+    await expect(approval.getByRole('button', { name: 'Manager approval', exact: true })).toHaveAttribute(
+      'aria-current',
+      'true',
+    )
+    await expect(approval.getByRole('img', { name: 'Waiting for a person', exact: true })).toBeVisible()
+    await shell.getByRole('tab', { name: 'History', exact: true }).click()
     await expect(shell.getByRole('row', { name: /Manager approval.*user: Manager 2 User.*open/ })).toBeVisible()
   }
 })
@@ -227,7 +232,7 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
   expect(orders).toHaveLength(1)
   const orderNumber = orders[0].orderNumber
 
-  await page.goto(`/purchasing/approvals/${instanceId}`)
+  await page.goto(`/purchasing/approvals/${instanceId}?tab=history`)
   await page.getByTestId(`inspector-resolve-${callId}`).click()
   const dialog = await waitForDialog(page)
   await dialog.getByLabel(fieldLabel('Reason')).fill('The order exists in the purchasing system')

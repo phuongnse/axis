@@ -12,7 +12,11 @@ import {
   startKindText,
   stateText,
   stateTone,
+  stepRuns,
   stepTypeText,
+  transitionId,
+  type InstanceDetail,
+  type PathEntry,
 } from './inspection'
 
 describe('processTitle', () => {
@@ -142,5 +146,187 @@ describe('the tones and words of a process state', () => {
   it('does not take an inherited property for a known state', () => {
     expect(stateTone('toString')).toBe('neutral')
     expect(callStateTone('constructor')).toBe('neutral')
+  })
+})
+
+describe('stepRuns', () => {
+  const move = (next: string, on: string | null = null) => ({ next, on, branch: null, labelKey: null, after: null })
+  const step = (name: string, type: string, transitions: ReturnType<typeof move>[]) => ({
+    name,
+    type,
+    labelKey: null,
+    event: null,
+    eventLabelKey: null,
+    transitions,
+  })
+  const row = (stepName: string, second: number, extra: Partial<PathEntry> = {}): PathEntry => ({
+    step: stepName,
+    startedAt: `2026-10-10T02:05:${String(second).padStart(2, '0')}Z`,
+    finishedAt: `2026-10-10T02:05:${String(second + 1).padStart(2, '0')}Z`,
+    decision: null,
+    output: null,
+    error: null,
+    problem: null,
+    traceId: null,
+    ...extra,
+  })
+  function instance(patch: Partial<InstanceDetail>): InstanceDetail {
+    return {
+      id: 'i',
+      process: 'P',
+      processTitleKey: 'p.title',
+      subjectId: null,
+      subjectEntity: null,
+      subjectLabel: null,
+      releaseId: 'r',
+      releaseNumber: 1,
+      state: 'completed',
+      step: 'done',
+      createdAt: '2026-10-10T02:05:00Z',
+      endedAt: null,
+      startedBy: null,
+      input: null,
+      result: null,
+      studio: null,
+      graph: {
+        start: 'approve',
+        steps: [
+          step('approve', 'task', [move('register', 'approve'), move('done', 'reject')]),
+          step('register', 'operation', [move('done')]),
+          step('done', 'end', []),
+        ],
+      },
+      path: [],
+      tasks: [],
+      calls: [],
+      parent: null,
+      subProcesses: [],
+      commands: [],
+      ...patch,
+    }
+  }
+
+  it("makes a task's created row and its completion row one run", () => {
+    const { runs } = stepRuns(
+      instance({
+        path: [
+          row('approve', 0, { output: { state: 'waiting' } }),
+          row('approve', 5, { decision: 'approve' }),
+          row('register', 6),
+          row('done', 7),
+        ],
+      }),
+    )
+
+    expect(runs.map((run) => [run.step, run.number])).toEqual([
+      ['approve', 1],
+      ['register', 1],
+      ['done', 1],
+    ])
+    expect(runs[0]).toMatchObject({ startedAt: '2026-10-10T02:05:00Z', finishedAt: '2026-10-10T02:05:06Z' })
+    expect(runs[0].entries).toHaveLength(2)
+  })
+
+  it('numbers the runs of a step that a decision loops back to', () => {
+    const loop = instance({
+      graph: {
+        start: 'a',
+        steps: [
+          step('a', 'operation', [move('b')]),
+          step('b', 'decision', [move('a', '0'), move('done', 'otherwise')]),
+          step('done', 'end', []),
+        ],
+      },
+      path: [
+        row('a', 0),
+        row('b', 2, { decision: '0' }),
+        row('a', 4),
+        row('b', 6, { decision: 'otherwise' }),
+        row('done', 8),
+      ],
+    })
+
+    const { runs } = stepRuns(loop)
+
+    expect(runs.map((run) => `${run.step}${run.number}`)).toEqual(['a1', 'b1', 'a2', 'b2', 'done1'])
+  })
+
+  it('counts a failed row and the retried row after it as two runs, the first failed and the second the instance state', () => {
+    const { runs, runStates } = stepRuns(
+      instance({
+        state: 'running',
+        step: 'register',
+        path: [
+          row('approve', 0, { decision: 'approve' }),
+          row('register', 1, { error: 'It failed' }),
+          row('register', 5),
+        ],
+      }),
+    )
+
+    expect(runs.filter((run) => run.step === 'register').map((run) => [run.number, run.state])).toEqual([
+      [1, 'failed'],
+      [2, 'running'],
+    ])
+    expect(runStates.get('register')).toBe('running')
+    expect(runStates.get('approve')).toBe('done')
+  })
+
+  it('gives the run at the current step the state of the instance, and leaves it open', () => {
+    const waitingAtTask = stepRuns(
+      instance({ state: 'waiting', step: 'approve', path: [row('approve', 0, { output: { state: 'waiting' } })] }),
+    )
+    expect(waitingAtTask.runs[0]).toMatchObject({ state: 'waitingForPerson', finishedAt: null })
+
+    const waitingAtTimer = stepRuns(instance({ state: 'waiting', step: 'register', path: [row('register', 0)] }))
+    expect(waitingAtTimer.runStates.get('register')).toBe('waitingForEvent')
+
+    const failed = stepRuns(instance({ state: 'failed', step: 'register', path: [row('register', 0, { error: 'x' })] }))
+    expect(failed.runStates.get('register')).toBe('failed')
+
+    const cancelled = stepRuns(instance({ state: 'cancelled', step: 'approve', path: [row('approve', 0)] }))
+    expect(cancelled.runStates.get('approve')).toBe('cancelled')
+  })
+
+  it('gives a current step with no row an open run of its own, and leaves a step not reached out', () => {
+    const { runs, runStates } = stepRuns(
+      instance({ state: 'waiting', step: 'register', path: [row('approve', 0, { decision: 'approve' })] }),
+    )
+
+    expect(runs.map((run) => [run.step, run.number, run.state, run.startedAt, run.finishedAt])).toEqual([
+      ['approve', 1, 'done', '2026-10-10T02:05:00Z', '2026-10-10T02:05:01Z'],
+      ['register', 1, 'waitingForEvent', null, null],
+    ])
+    expect(runStates.has('done')).toBe(false)
+  })
+
+  it("marks the transition that a run's decision took when two lead to the same step", () => {
+    const { taken } = stepRuns(
+      instance({
+        graph: {
+          start: 'check',
+          steps: [step('check', 'decision', [move('done', '0'), move('done', 'otherwise')]), step('done', 'end', [])],
+        },
+        path: [row('check', 0, { decision: 'otherwise' }), row('done', 2)],
+      }),
+    )
+
+    expect([...taken]).toEqual([transitionId('check', 1)])
+  })
+
+  it('marks the only transition to the next run, and none between two runs of the same step', () => {
+    const { taken } = stepRuns(
+      instance({
+        state: 'completed',
+        path: [
+          row('approve', 0, { decision: 'reject', error: 'x' }),
+          row('approve', 2, { decision: 'approve' }),
+          row('register', 4),
+          row('done', 6),
+        ],
+      }),
+    )
+
+    expect([...taken].sort()).toEqual([transitionId('approve', 0), transitionId('register', 0)])
   })
 })

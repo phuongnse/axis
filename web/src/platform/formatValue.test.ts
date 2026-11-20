@@ -3,6 +3,7 @@ import {
   booleanText,
   datePattern,
   formatDuration,
+  isoDurationMs,
   formatTimeAgo,
   formatValue,
   referencesLabels,
@@ -291,5 +292,24 @@ describe('formatDuration', () => {
     expect(formatDuration(125_000, 'en', text)).toBe('2 min 5 sec')
     expect(formatDuration(120_000, 'en', text)).toBe('2 min')
     expect(formatDuration(3_900_000, 'en', text)).toBe('1 hr 5 min')
+    expect(formatDuration(148_320_000, 'en', text)).toBe('1 day 17 hr')
+    expect(formatDuration(86_400_000, 'en', text)).toBe('1 day')
+  })
+})
+
+describe('isoDurationMs', () => {
+  it('reads the days, hours, minutes and seconds of an ISO 8601 duration', () => {
+    expect(isoDurationMs('PT1H')).toBe(3_600_000)
+    expect(isoDurationMs('PT90S')).toBe(90_000)
+    expect(isoDurationMs('P1DT2H30M')).toBe(95_400_000)
+    expect(isoDurationMs('PT1.5S')).toBe(1500)
+    expect(isoDurationMs('P2D')).toBe(172_800_000)
+  })
+
+  it('gives null for text that is not such a duration', () => {
+    expect(isoDurationMs('an hour')).toBeNull()
+    expect(isoDurationMs('P')).toBeNull()
+    expect(isoDurationMs('PT')).toBeNull()
+    expect(isoDurationMs('P1M')).toBeNull()
   })
 })

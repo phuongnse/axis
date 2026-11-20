@@ -427,7 +427,8 @@ function flowElements(layout: GraphLayout, options: FlowOptions, colour: DesignT
  * id `{testIdPrefix}-node-{id}` and its handle by `{testIdPrefix}-handle-{id}`.
  *
  * `ProcessGraphControls` draws the graph's controls, Find a step and overview, see its own doc. `current` is the step an
- * instance is at, which Go to the current step moves to, so that button shows only with `runStates` and `current`.
+ * instance is at, which the view opens on and Go to the current step moves to, so that button shows only with `runStates`
+ * and `current`. A graph without `current` opens on the whole process.
  * While the focus is inside the graph, + and - zoom, 0 shows the whole process and F goes full screen, unless the focus
  * is in a text field. The graph takes the focus when clicked, and is no Tab stop.
  *
@@ -621,6 +622,14 @@ function Canvas({
     edges: transitions.map(({ id, source, target }) => ({ id, source, target })),
   })
   const moves = useGraphMoves()
+  // An instance's graph opens on the step the instance is at, and any other graph opens whole.
+  const fitViewOptions = useMemo(
+    () => ({
+      maxZoom: 1,
+      ...(current !== undefined && steps.some((step) => step.id === current) && { nodes: [{ id: current }] }),
+    }),
+    [current, steps],
+  )
   const [fullScreen, setFullScreen] = useState(false)
   const [imaging, setImaging] = useState<'svg' | 'png' | null>(null)
   const [failed, setFailed] = useState(false)
@@ -767,7 +776,7 @@ function Canvas({
             edgeTypes={edgeTypes}
             colorMode={mode}
             fitView
-            fitViewOptions={{ maxZoom: 1 }}
+            fitViewOptions={fitViewOptions}
             minZoom={0.1}
             maxZoom={1}
             proOptions={{ hideAttribution: true }}

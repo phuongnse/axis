@@ -26,6 +26,21 @@ export interface ValueRow {
 /** What the server writes in place of a secret value, see docs/reference/actions-and-controls.md#text. */
 const secretPlaceholder = '[secret]'
 
+/** A value the reader may not read, which a row shows as the word Hidden. {@link namedValues} puts it in place of the value. */
+export const hiddenValue = Symbol('hidden')
+
+/**
+ * The API's `[{ name, value, hidden }]` as one value for {@link valueRows}, a member for each name. A value marked
+ * `hidden` is {@link hiddenValue}, so it reads Hidden whatever the API sent in its place, see
+ * docs/reference/process-inspection.md#values-and-masking. The parameter is typed by its shape to leave `inspection.ts` out of
+ * this module's imports.
+ */
+export function namedValues(
+  values: readonly { name: string; value: unknown; hidden: boolean }[],
+): Record<string, unknown> {
+  return Object.fromEntries(values.map(({ name, value, hidden }) => [name, hidden ? hiddenValue : value]))
+}
+
 /**
  * The rows of a value, depth first. A member of an object is named `parent.key` and one of a list `parent[0]`. An object
  * or a list that is not empty has a row of its own with its size, then its members. An empty one reads Empty.
@@ -45,7 +60,7 @@ export function valueRows(value: unknown): ValueRow[] {
       entries.forEach(([key, item]) => add(name === '' ? key : `${name}.${key}`, item))
     } else if (member === null) {
       rows.push({ id, name, word: 'null' })
-    } else if (member === secretPlaceholder) {
+    } else if (member === secretPlaceholder || member === hiddenValue) {
       rows.push({ id, name, word: 'hidden' })
     } else {
       rows.push({ id, name, text: member instanceof JsonNumber ? member.source : String(member) })
