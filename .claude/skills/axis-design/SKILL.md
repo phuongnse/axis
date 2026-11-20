@@ -7,9 +7,8 @@ description: Runbook for the owner's local agent session that keeps the Axis Des
 
 The rules are in [Design changes](../../../docs/delivery.md#design-changes) and
 [D57](../../../docs/decisions/d57-a-design-system-published-from-the-repository.md).
-This runbook gives the steps and commands.
 
-- **The artifact's link** is in Design changes. Look it up there.
+- **The artifact's link** is in Design changes.
 - **The artifact's file layout and how to publish** are in the Design System
   type's own instructions in Claude. Follow them.
 - **Token names and the widget list** are in the
@@ -62,8 +61,8 @@ another. The rules are under "Several changes are a design review" in Design cha
 
 Take one change at a time. Start the next only after the owner has seen this
 one. What the build must do beyond the docs goes in the design
-issue's body, with `gh issue edit`. Anything a step reaches outside the subject,
-not only a new screen or platform concept, becomes its own design issue, held,
+issue's body, with `gh issue edit`. Anything a step reaches outside the subject
+becomes its own design issue, held,
 and blocked by this one only when it builds on what this one agrees:
 `gh issue create ... --label design,on-hold`, with the blocked-by mark as
 [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) step 4 says. The step
@@ -77,21 +76,23 @@ goes on without it.
    [which widget](../../../docs/reference/shared-widgets.md#which-widget). Mark
    **new** each part no widget draws, with the shared place it goes to. Merge
    any two mechanisms the list shows for one job, and tell the owner.
-3. Make it in the real code under `web/src/platform/` and
+3. Keep one look: before you change a part, check it on the whole page and the same control elsewhere, as [changing-a-part.md](changing-a-part.md#one-look-for-a-control) says.
+4. Before you change a shared widget's behaviour, check each place that uses it, and take a change to another screen to the owner first, as [changing-a-part.md](changing-a-part.md#a-shared-widgets-users) says.
+5. Make it in the real code under `web/src/platform/` and
    `web/src/designSystem/`, so the artifact shows the real widgets. Mark each
    new behaviour with a `Proposed:` comment for its issue to find.
-4. Add each look-changing state and each needed fixture to the widget's preview
+6. Add each look-changing state and each needed fixture to the widget's preview
    in this step. Check each added or changed fixture against the API's reference
    page and the server code that answers it, such as
    `src/Axis.Server/Processes/ProcessInspectionEndpoints.cs`. A value no API gives
    is a field marked `Proposed:`, named in the build notes. Open no issue for other
    missing fixtures.
-5. Run `scripts/design-system.sh`, which writes
+7. Run `scripts/design-system.sh`, which writes
    `artifacts/design-system/axis-design-system.js` and checks it.
-6. Check every changed card as [checking-a-card.md](checking-a-card.md) says,
+8. Check every changed card as [checking-a-card.md](checking-a-card.md) says,
    including the rules for every screen.
-7. Commit with a message that says what it shows, and push the branch.
-8. Tell the owner what changed and which preview to open, and ask for a
+9. Commit with a message that says what it shows, and push the branch.
+10. Tell the owner what changed and which preview to open, and ask for a
    verdict: keep, change or drop it. Write the rules agreed in this step as one
    comment, as [Design changes](../../../docs/delivery.md#design-changes) says.
    Post it, or edit the screen's rule comment if it has one, with the commands

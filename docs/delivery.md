@@ -430,6 +430,13 @@ change, a design review and a sync are in the
   the code, named in the design issue's build notes. It never looks like a real value. The session also
   checks the step on the whole page it draws, against the rules for every screen that
   [checking a card](../.claude/skills/axis-design/checking-a-card.md#the-rules-for-every-screen) lists.
+  Before it changes a part, the session checks the part on the whole page and the same control elsewhere.
+  It keeps one look for each control. It never trims a shared control, such as a tab row, a button's size
+  or a rule, to suit one place. Before it changes a shared widget's behaviour, the session lists each place
+  that uses it and checks each one. The widget is one mechanism for all of them, as
+  [shared widgets](reference/shared-widgets.md#the-rule) says. A change that alters another screen goes to
+  the owner before it is built. If the owner accepts it, it becomes its own design issue, as a step that
+  reaches outside its subject does.
 - **A step stays one step.** When a step reaches anything outside the subject, not only a new screen or a
   new concept of the platform, the session proposes it to the owner as its own design issue. The issue
   has the `design` and `on-hold` labels and no milestone. It is *blocked by* the review's design issue
