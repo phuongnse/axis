@@ -10,6 +10,7 @@ export function CodeBlock({
   text,
   testId,
   plain = false,
+  wrap = false,
 }: {
   text: string | null
   testId?: string
@@ -18,6 +19,8 @@ export function CodeBlock({
    * border and no padding of its own.
    */
   plain?: boolean
+  /** Proposed, see #3978: long lines wrap at the block's width, so a log reads without scrolling sideways. */
+  wrap?: boolean
 }) {
   const { colour, radius, spacing, type } = useDesignTokens()
   return (
@@ -27,6 +30,8 @@ export function CodeBlock({
         margin: 0,
         padding: plain ? 0 : spacing.sm,
         overflowX: 'auto',
+        whiteSpace: wrap ? 'pre-wrap' : undefined,
+        overflowWrap: wrap ? 'anywhere' : undefined,
         fontFamily: type.codeFontFamily,
         background: colour.surface,
         border: plain ? 'none' : `1px solid ${colour.borderSubtle}`,
