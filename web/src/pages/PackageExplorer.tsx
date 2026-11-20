@@ -46,11 +46,17 @@ function folderKeys(nodes: readonly TreeDataNode[]): string[] {
 
 /** The height of a row of the tree: compact, as a code editor's file tree is, and a small icon button's height and more. */
 const rowHeight = 28
+/** The chevron's place, and the step each level moves in, so a child's icon sits a little right of its folder's. */
+const switcherWidth = 16
+const indentWidth = 12
+/** The space between two rows, so they step by 34 px. */
+const rowGap = 6
 
 /**
  * Proposed, see #3978: a package's explorer, a tree of folders and files as a code editor's. A folder has its chevron
  * on its left, which turns down when it is open, and a folder icon, open or closed; a file has a file icon, so the two
- * read apart at a glance. A file keeps the chevron's place empty, so its icon lines up with a folder's, only when the
+ * read apart at a glance. A chosen or hovered row is marked across its whole width, the chevron and indent included, as
+ * in a code editor, and each level steps in by 12 px. A file keeps the chevron's place empty, so its icon lines up with a folder's, only when the
  * tree has a folder: without one, the files start at the explorer's edge. A chosen file is marked as the navigation marks its entry, with the same tint, text colour and
  * corners, read through `navigationItemLook`. The title row, as high as the editor's tab row so their rules meet, holds
  * New, which offers New file and New folder, and Refresh. A node's actions are on a right click, or Shift+F10 or the
@@ -187,8 +193,20 @@ export function PackageExplorer({
       data-testid="package-explorer"
       style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}
     >
-      {/* A chosen row is marked as the navigation marks its entry, and a row under the pointer as its entry is. */}
-      <style>{`.axis-file-tree .ant-tree-node-content-wrapper { border-radius: ${look.radius}px; min-height: ${rowHeight}px; line-height: ${rowHeight}px; padding-inline: ${spacing.xs}px; } .axis-file-tree .ant-tree-node-content-wrapper:hover { background: ${look.hover}; } .axis-file-tree .ant-tree-node-content-wrapper.ant-tree-node-selected, .axis-file-tree .ant-tree-node-content-wrapper.ant-tree-node-selected:hover { background: ${look.selected}; color: ${colour.primaryText}; } .axis-file-tree .ant-tree-node-selected .anticon { color: ${colour.primaryText} !important; } .axis-file-tree .ant-tree-switcher { width: ${rowHeight - 8}px; line-height: ${rowHeight}px; height: ${rowHeight}px; } .axis-file-tree .ant-tree-treenode { padding-block: 0 2px; } .axis-file-tree-flat .ant-tree-switcher-noop { display: none; }`}</style>
+      {/* A chosen row is marked as the navigation marks its entry, and a row under the pointer as its entry is, across the row. */}
+      <style>
+        {[
+          `.axis-file-tree .ant-tree-treenode { border-radius: ${look.radius}px; padding: 0 ${spacing.xs}px; margin-bottom: ${rowGap}px; }`,
+          `.axis-file-tree .ant-tree-treenode:hover, .axis-file-tree .ant-tree-treenode-active { background: ${look.hover}; }`,
+          `.axis-file-tree .ant-tree-treenode-selected, .axis-file-tree .ant-tree-treenode-selected:hover { background: ${look.selected}; color: ${colour.primaryText}; }`,
+          `.axis-file-tree .ant-tree-treenode-selected .anticon { color: ${colour.primaryText} !important; }`,
+          `.axis-file-tree .ant-tree-node-content-wrapper, .axis-file-tree .ant-tree-node-content-wrapper:hover, .axis-file-tree .ant-tree-node-content-wrapper.ant-tree-node-selected { background: transparent; color: inherit; min-height: ${rowHeight}px; line-height: ${rowHeight}px; padding-inline: 0; }`,
+          `.axis-file-tree .ant-tree-switcher { width: ${switcherWidth}px; line-height: ${rowHeight}px; height: ${rowHeight}px; margin-inline-end: ${spacing.xs}px; }`,
+          `.axis-file-tree .ant-tree-switcher:hover, .axis-file-tree .ant-tree-switcher:not(.ant-tree-switcher-noop):hover:before { background: transparent; }`,
+          `.axis-file-tree .ant-tree-indent-unit { width: ${indentWidth}px; }`,
+          `.axis-file-tree-flat .ant-tree-switcher-noop { display: none; }`,
+        ].join(' ')}
+      </style>
       <Flex
         align="center"
         justify="space-between"
