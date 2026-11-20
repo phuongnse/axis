@@ -178,7 +178,9 @@ function StepCard({ data }: NodeProps<StepNode>) {
   const testId = `${testIdPrefix}-node-${step.id}`
   const name = step.name ?? step.label
   return (
-    <div style={{ position: 'relative', width: cardWidth, height: cardHeight }}>
+    // React Flow gives a node no pointer events when it has no click handler of its own, and the card is the target of a
+    // click and of the end of a drag from a handle, so it takes them itself.
+    <div style={{ position: 'relative', width: cardWidth, height: cardHeight, pointerEvents: 'all' }}>
       <Handle type="target" position={Position.Left} isConnectable={false} style={anchorStyle} aria-hidden />
       {onChoose ? (
         <button
