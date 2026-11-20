@@ -122,7 +122,7 @@ comes after them.
   cell's 7-day grace the tenant is suspended, and only the operator can export it or cancel the
   deletion.
 - **Read-only, not suspended.** A tenant whose trial ended or whose grace passed becomes read-only,
-  not suspended. Read-only protects Axis as well, with no new work and no growth, while the business
+  not suspended. Read-only protects the operator's cell as well, with no new work and no growth, while the business
   can still see and take its data. A full suspension stays for the operator, for abuse or a security
   incident.
 

@@ -1,9 +1,9 @@
 # Cells
 
-A cell is an installation of Axis that Axis runs as a SaaS for many tenants. This page covers the
+A cell is an installation of Axis that an operator runs as a SaaS for many tenants. This page covers the
 regions and cells, the hosts of a cell's tenants and their certificates, how a cell reaches up to
 1,000 tenant databases, and how many tenants a cell holds. The choice of cells and the reasons for
-it are in [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
+it are in [D167](../decisions/d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
 
 A cell is the same software as a self-hosted installation, and a host runs as a cell when `Cell:Id`
@@ -17,10 +17,10 @@ is set, see [cell settings](host-settings.md#cell-settings). A cell adds the per
 A region is where customer data is kept, and a cell is one installation in a region. Every tenant
 lives in exactly one cell.
 
-- **Region.** A region is named by a short code such as `vn`, and the first region is `vn`. Every
+- **Region.** A region is named by a short code such as `vn` or `sg`. Every
   part of a cell, its backups and its object storage included, runs in the cell's region, so a
-  tenant's data never leaves its region. Another region, such as `sg`, opens when its first customer
-  needs it, with no change to the platform.
+  tenant's data never leaves its region. The operator opens a region, such as `sg`, when that
+  region's first customer needs it, with no change to the platform.
 - **What a region needs.** Its cloud provider offers managed Kubernetes, managed PostgreSQL,
   S3-compatible object storage, and backups kept in a second data centre in the same country.
 - **Cell.** A cell is one full installation in one region: the server replicas, the worker, the

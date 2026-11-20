@@ -1,6 +1,6 @@
 # Axis product brief
 
-This page explains what Axis is for, who it serves, how it runs and which goals it holds itself to.
+This page explains what Axis is for, who it is designed for, how it runs and which goals it holds itself to.
 It ends with four sample business applications that prove the platform. Milestones and their status
 are in the [roadmap](roadmap.md), and the vocabulary is in [concepts](domain/concepts.md).
 
@@ -63,19 +63,19 @@ The reasons are in [D46](decisions/d46-an-enterprise-application-platform-for-an
 [D5](decisions/d5-configuration-is-authored-as-files-first.md) and
 [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
 
-## Who Axis serves first
+## Who Axis is designed for
 
-Axis serves individuals and small and medium businesses first, and large organizations, banks and
-government later. The roadmap's phases follow this order.
+Axis is designed first for individuals and small and medium businesses, and later for large
+organizations, banks and government. The roadmap's phases follow this order.
 
-The first customers are an individual, or a small or medium business, that runs its internal work on
-Axis, such as approvals, requests and registers. They have no IT team and no operations team: a
-business analyst, an office manager or the owner of the business sets the application up in Studio.
-They need:
+The people Axis is designed for first are an individual, or a small or medium business, that runs its
+internal work on Axis, such as approvals, requests and registers. They have no IT team and no
+operations team: a business analyst, an office manager or the owner of the business sets the
+application up in Studio. They need:
 
 - **A built-in application to start from,** changed to fit in Studio, that keeps its upgrades.
 - **Vietnamese and English.**
-- **Axis as a service**, with nothing to install.
+- **Axis as a service that an operator runs**, with nothing to install.
 - **Sign-up and a trial** _(planned for M33)_, so they try Axis before they pay.
 - **Paying online** _(planned for M34)_.
 - **Their data kept safe** as Vietnam's personal data rules ask.
@@ -89,23 +89,25 @@ and its core rules still hold on every write.
 - **What large organizations, banks and government ask for** _(planned for M32)_. Conformance runs,
   signed images and alert rules for their own operations teams.
 
-The reasons are in [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md),
+The reasons are in [D166](decisions/d166-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md),
 [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
 [D150](decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 
 ## Ways to run Axis
 
-The same software runs in three ways.
+The same software runs in three ways. An **operator** is a hosting company or an organization's IT team
+that runs Axis as a SaaS for its own customers, with its own plans, prices and payments.
 
 - **SaaS, shared**. Many customers share a cell, which is one full installation of
-  Axis in a region that Axis runs. Each tenant, one customer's own space in the cell, keeps its own
-  database, sign-in realm, files, Studio applications and quotas. Quotas are its limits on storage,
-  users and applications. This is how small businesses and individuals use Axis.
-- **SaaS, dedicated**. One customer has a cell of its own that Axis runs.
+  Axis in a region that the operator runs. Each tenant, one of the operator's customers with its own
+  space in the cell, keeps its own database, sign-in realm, files, Studio applications and quotas.
+  Quotas are its limits on storage, users and applications. This is how small businesses and
+  individuals use Axis.
+- **SaaS, dedicated**. One of the operator's customers has a cell of its own that the operator runs.
 - **Self-hosted.** The customer installs Axis on premises or in its own cloud, see
   [installation](reference/installation.md). This serves large organizations, banks and government.
 
-The reasons are in [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md).
+The reasons are in [D167](decisions/d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md).
 
 ## Who uses it
 

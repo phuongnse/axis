@@ -234,8 +234,8 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| C16 | A tampered e-invoice goes out under Axis's tax code with a wrong buyer, lines or amount. | E-invoice provider | Tampering | High | **Gap** | [#2486](https://github.com/phuongnse/axis/issues/2486) takes the amounts from the ledger and the buyer from the billing details. [#2495](https://github.com/phuongnse/axis/issues/2495) allows a correction only through the operator's command, with a reason. |
-| C17 | Leaked e-invoice credentials let someone issue, adjust or replace invoices in Axis's name. | E-invoice provider | Spoofing | High | **Gap** | [#2486](https://github.com/phuongnse/axis/issues/2486) keeps the provider's credentials in Kubernetes Secrets. |
+| C16 | A tampered e-invoice goes out under the operator's tax code with a wrong buyer, lines or amount. | E-invoice provider | Tampering | High | **Gap** | [#2486](https://github.com/phuongnse/axis/issues/2486) takes the amounts from the ledger and the buyer from the billing details. [#2495](https://github.com/phuongnse/axis/issues/2495) allows a correction only through the operator's command, with a reason. |
+| C17 | Leaked e-invoice credentials let someone issue, adjust or replace invoices in the operator's name. | E-invoice provider | Spoofing | High | **Gap** | [#2486](https://github.com/phuongnse/axis/issues/2486) keeps the provider's credentials in Kubernetes Secrets. |
 
 Repudiation does not need a row for the e-invoices: each correction writes an audit record, see
 [after it is issued](e-invoices.md#after-it-is-issued).

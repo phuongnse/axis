@@ -24,8 +24,8 @@ platform that suits one shape, or one domain such as ERP, is not general.
 - **Hardening follows the model.** The FAPI 2.0 profile, ASVS verification and the load tests come
   once the model is stable, because their results mean something only then.
 - **Migrating live business data between installations is out of scope.** Hosted operations are in
-  scope as [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) and
-  [D118](d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) agree.
+  scope as [D166](d166-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md) and
+  [D167](d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) agree.
 - **One format, changed in place, until the first production release.** Each resource kind has one
   format. A change edits it in place, with no second version of the kind, no compatibility code and
   no `formatVersion` bump, and the same pull request updates the schema, the compiler, the samples,
@@ -41,7 +41,7 @@ platform that suits one shape, or one domain such as ERP, is not general.
   They need no platform code. The extensibility milestones extend purchase requests instead, see
   [D94](d94-purchase-requests-prove-the-extensibility-milestone.md), and phase 1 proves its work on
   the built-in modules wherever it can, see
-  [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md).
+  [D166](d166-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md).
 
 ## Consequences
 
