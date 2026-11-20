@@ -29,6 +29,8 @@ describe('sizes', () => {
       const found = messages(options)
       assert.equal(found.length, 1)
       assert.match(found[0], /^docs\/reference\/guide\.md:1001: 1001 lines, over the limit of 1000/)
+      assert.match(found[0], /move the whole ## sections of one topic/)
+      assert.match(found[0], /do not shorten, rewrap or delete existing text to fit$/)
     }
   })
 
@@ -37,7 +39,8 @@ describe('sizes', () => {
 
     const found = messages({ baseLineCount: () => 880 })
     assert.equal(found.length, 1)
-    assert.match(found[0], /^docs\/reference\/guide\.md:901: 910 lines, up from 880.*move whole ## sections/)
+    assert.match(found[0], /^docs\/reference\/guide\.md:901: 910 lines, up from 880.*move the whole ## sections of one topic/)
+    assert.match(found[0], /do not shorten, rewrap or delete existing text to fit$/)
   })
 
   test('passes a doc over 900 lines that a change does not grow', () => {
