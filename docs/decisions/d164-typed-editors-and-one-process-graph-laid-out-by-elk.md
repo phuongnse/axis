@@ -28,7 +28,7 @@ it needs a layout that routes every transition round the steps it passes.
   round the steps. Both load in chunks of their own, only on a page that draws
   a process. One graph serves the process designer and an instance's page, with no attribution drawn.
 
-What each editor shows is in [Studio](../reference/studio.md), the
+What each editor shows is in [Studio editors by kind](../reference/studio-editors-by-kind.md), the
 [process designer](../reference/process-designer.md) and the
 [process graph](../reference/process-inspector-widget.md#process-graph).
 

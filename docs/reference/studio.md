@@ -1,7 +1,8 @@
 # Studio
 
 This page describes what Studio's editors, designers and buttons do: creating applications and
-resources, editing a resource, its references and checks, publishing, releases and tests. How Studio is laid out, with its sidebar, band, Overview and Releases, is in
+resources, editing a resource, its references and checks, publishing, releases and tests. How Studio
+is laid out, with its sidebar, band, Overview and Releases, is in
 [Studio workspace](studio-workspace.md), and the form that edits one resource is in
 [Studio resource form](studio-resource-form.md). The seed grid, the endpoint rows and the form steps are in
 [Studio form editors](studio-form-editors.md). The [entity designer](entity-designer.md), the

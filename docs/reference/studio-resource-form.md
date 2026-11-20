@@ -5,7 +5,7 @@ lists, the controls that choose what Axis knows, what uses the resource, its sav
 application, role, policy, rule, event, trigger, sequence, data source, migration and webhook. The
 schema part of the editors that have a designer follows it too. How Studio is laid out around the form
 is in [Studio workspace](studio-workspace.md), and what each editor and designer does is in
-[Studio](studio.md).
+[Studio](studio.md) and [Studio editors by kind](studio-editors-by-kind.md).
 
 ## Sections
 

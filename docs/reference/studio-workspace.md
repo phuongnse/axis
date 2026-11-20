@@ -4,7 +4,7 @@ This page describes how Studio is laid out around the work: the list of applicat
 that an open application takes, and the band, headings, Overview, Releases and History that every
 application shares. The form that edits one resource is in
 [Studio resource form](studio-resource-form.md), and what each editor and designer does is in
-[Studio](studio.md). Shared controls, such as buttons and tables, follow
+[Studio](studio.md) and [Studio editors by kind](studio-editors-by-kind.md). Shared controls, such as buttons and tables, follow
 [actions and controls](actions-and-controls.md).
 
 ## Applications
