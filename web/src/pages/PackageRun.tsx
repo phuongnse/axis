@@ -220,9 +220,10 @@ export function PackageRun({
   const pad = `${spacing.sm}px ${spacing.md}px`
 
   // Proposed, see #3978: two panes side by side, parted by a rule that runs the panel's height, as the explorer and the
-  // editor are. The input pane has what runs and Run, the saved input under it, then the Input title row and its fields;
-  // the result pane has the Result title row with the outcome and times, the output, then the Log title row and its
-  // lines. Each title row's rule runs its pane's width, and no region has a box of its own, as the workspace draws them.
+  // editor are. The input pane follows what a person does: the operation, then the Input title row with a saved input
+  // and the fields, then Run right after them, as Google Cloud puts its Test under the event; the result pane has the Output title row with the
+  // outcome and duration, the output, then the Log title row and its lines. Each rule runs its pane's width, and no
+  // region has a box of its own, as the workspace draws them.
   return (
     <div data-testid="package-run" style={{ display: 'flex', height: '100%', minHeight: 0 }}>
       <div
@@ -232,142 +233,152 @@ export function PackageRun({
           display: 'flex',
           flexDirection: 'column',
           minHeight: 0,
-          overflowY: 'auto',
-          overscrollBehavior: 'contain',
           borderInlineEnd: rule,
         }}
       >
-        {/* One scroll for the whole input pane, as for the result pane, so no region scrolls inside another. */}
-        <div style={{ flex: 'none', padding: pad, borderBottom: rule }}>
-          <Flex vertical gap={spacing.sm}>
-            <Flex gap="small" align="end">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <AxisField label={t('shell.studio.package.run.operation')} help="">
-                  <Select
-                    data-testid="package-run-operation"
-                    value={operation}
-                    onChange={(next: string) => setOperation(next)}
-                    options={operations.map((candidate) => ({ value: candidate.name, label: candidate.name }))}
-                    style={{ width: '100%' }}
-                  />
-                </AxisField>
-              </div>
-              {runButton}
-            </Flex>
-            <Flex gap="small" align="end">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <AxisField label={t('shell.studio.package.run.savedInput')} help="">
-                  <Select
-                    placeholder={t('shell.studio.package.run.newInput')}
-                    value={chosen ?? undefined}
-                    onChange={(next: string) => choose(next)}
-                    allowClear
-                    onClear={() => choose(null)}
-                    options={saved.items
-                      .filter((item) => item.operation === operation)
-                      .map((item) => ({ value: item.name, label: item.name }))}
-                    style={{ width: '100%' }}
-                  />
-                </AxisField>
-              </div>
-              {developer && (
-                // Proposed, see #3978: three actions of the saved input are one split button, Save with the others in its menu.
-                <AxisSplitButton
-                  data-testid="package-run-save"
-                  disabled={input === null}
-                  onClick={() =>
-                    chosen === null
-                      ? setSaveAsOpen(true)
-                      : void store(
-                          saved.items.map((item) =>
-                            item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
-                          ),
-                        )
-                  }
-                  menuNameKey="shell.studio.package.run.inputActions"
-                  items={[
-                    {
-                      key: 'saveAs',
-                      label: t('shell.studio.package.run.saveInputAs'),
-                      disabled: input === null,
-                      onClick: () => setSaveAsOpen(true),
-                    },
-                    {
-                      key: 'delete',
-                      label: t('shell.studio.package.run.deleteInput'),
-                      destructive: true,
-                      disabled: chosen === null,
-                      onClick: () =>
-                        void store(saved.items.filter((item) => item.name !== chosen)).then(
-                          (done) => done && choose(null),
-                        ),
-                    },
-                  ]}
-                >
-                  {t('shell.studio.package.run.saveInput')}
-                </AxisSplitButton>
-              )}
-            </Flex>
-            {saveError !== null && <AxisAlert kind="error" message={saveError} />}
-          </Flex>
-        </div>
-        <PaneHeader
-          title={t('shell.studio.package.run.input')}
-          height={rowHeight}
-          actions={
-            <Segmented<'form' | 'json'>
-              aria-label={t('shell.studio.package.run.inputAs')}
-              size="small"
-              value={shown}
-              onChange={switchTo}
-              options={[
-                { value: 'form', label: t('shell.studio.package.run.form') },
-                { value: 'json', label: t('shell.value.json') },
-              ]}
-            />
-          }
-        />
-        {jsonError && <AxisAlert kind="error" message={t('shell.studio.package.run.jsonInvalid')} />}
-        {shown === 'form' ? (
+        {/* One scroll for the whole pane, so no region scrolls inside another. */}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+          }}
+        >
+          <div style={{ flex: 'none', padding: pad, borderBottom: rule }}>
+            <AxisField label={t('shell.studio.package.run.operation')} help="">
+              <Select
+                data-testid="package-run-operation"
+                value={operation}
+                onChange={(next: string) => setOperation(next)}
+                options={operations.map((candidate) => ({ value: candidate.name, label: candidate.name }))}
+                style={{ width: '100%' }}
+              />
+            </AxisField>
+          </div>
+          <PaneHeader
+            title={t('shell.studio.package.run.input')}
+            height={rowHeight}
+            actions={
+              <Segmented<'form' | 'json'>
+                aria-label={t('shell.studio.package.run.inputAs')}
+                size="small"
+                value={shown}
+                onChange={switchTo}
+                options={[
+                  { value: 'form', label: t('shell.studio.package.run.form') },
+                  { value: 'json', label: t('shell.value.json') },
+                ]}
+              />
+            }
+          />
           <div style={{ flex: 'none', padding: pad }}>
-            {fields.length === 0 ? (
-              <Typography.Text type="secondary">{t('shell.studio.package.run.noInput')}</Typography.Text>
-            ) : (
-              <Flex vertical gap={spacing.sm}>
-                {fields.map((field) => (
-                  <AxisField
-                    key={field.name}
-                    label={field.name}
-                    help={t(`shell.studio.package.run.type.${field.type}`)}
-                    required={field.required}
-                  >
-                    <FieldInput
-                      field={inputField(field)}
-                      value={(values[field.name] ?? null) as RecordValue}
-                      onChange={(next) => setValues((all) => ({ ...all, [field.name]: next }))}
-                      locale={locale}
+            <Flex vertical gap={spacing.sm}>
+              <Flex gap="small" align="end">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <AxisField label={t('shell.studio.package.run.savedInput')} help="">
+                    <Select
+                      placeholder={t('shell.studio.package.run.newInput')}
+                      value={chosen ?? undefined}
+                      onChange={(next: string) => choose(next)}
+                      allowClear
+                      onClear={() => choose(null)}
+                      options={saved.items
+                        .filter((item) => item.operation === operation)
+                        .map((item) => ({ value: item.name, label: item.name }))}
+                      style={{ width: '100%' }}
                     />
                   </AxisField>
-                ))}
+                </div>
+                {developer && (
+                  // Proposed, see #3978: three actions of the saved input are one split button, Save with the others in its menu.
+                  <AxisSplitButton
+                    data-testid="package-run-save"
+                    disabled={input === null}
+                    onClick={() =>
+                      chosen === null
+                        ? setSaveAsOpen(true)
+                        : void store(
+                            saved.items.map((item) =>
+                              item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
+                            ),
+                          )
+                    }
+                    menuNameKey="shell.studio.package.run.inputActions"
+                    items={[
+                      {
+                        key: 'saveAs',
+                        label: t('shell.studio.package.run.saveInputAs'),
+                        disabled: input === null,
+                        onClick: () => setSaveAsOpen(true),
+                      },
+                      {
+                        key: 'delete',
+                        label: t('shell.studio.package.run.deleteInput'),
+                        destructive: true,
+                        disabled: chosen === null,
+                        onClick: () =>
+                          void store(saved.items.filter((item) => item.name !== chosen)).then(
+                            (done) => done && choose(null),
+                          ),
+                      },
+                    ]}
+                  >
+                    {t('shell.studio.package.run.saveInput')}
+                  </AxisSplitButton>
+                )}
               </Flex>
-            )}
+              {saveError !== null && <AxisAlert kind="error" message={saveError} />}
+              {jsonError && <AxisAlert kind="error" message={t('shell.studio.package.run.jsonInvalid')} />}
+              {shown === 'form' &&
+                (fields.length === 0 ? (
+                  <Typography.Text type="secondary">{t('shell.studio.package.run.noInput')}</Typography.Text>
+                ) : (
+                  <Flex vertical gap={spacing.sm}>
+                    {fields.map((field) => (
+                      <AxisField
+                        key={field.name}
+                        label={field.name}
+                        help={t(`shell.studio.package.run.type.${field.type}`)}
+                        required={field.required}
+                      >
+                        <FieldInput
+                          field={inputField(field)}
+                          value={(values[field.name] ?? null) as RecordValue}
+                          onChange={(next) => setValues((all) => ({ ...all, [field.name]: next }))}
+                          locale={locale}
+                        />
+                      </AxisField>
+                    ))}
+                  </Flex>
+                ))}
+            </Flex>
           </div>
-        ) : (
-          <div style={{ flex: 1, minHeight: 160 }}>
-            <CodeEditor
-              label={t('shell.studio.package.run.inputJson')}
-              value={jsonText}
-              onChange={setJsonText}
-              language={jsonLanguage}
-              fill
-              findTexts={{
-                field: t('shell.studio.package.findField'),
-                count: t('shell.studio.json.findCount'),
-                none: t('shell.studio.json.findNone'),
-              }}
-            />
-          </div>
-        )}
+          {shown === 'json' && (
+            <div style={{ flex: '1 0 160px', borderTop: rule }}>
+              <CodeEditor
+                label={t('shell.studio.package.run.inputJson')}
+                value={jsonText}
+                onChange={setJsonText}
+                language={jsonLanguage}
+                fill
+                findTexts={{
+                  field: t('shell.studio.package.findField'),
+                  count: t('shell.studio.json.findCount'),
+                  none: t('shell.studio.json.findNone'),
+                }}
+              />
+            </div>
+          )}
+          <Flex
+            justify="flex-end"
+            style={{ flex: 'none', padding: pad, borderTop: shown === 'json' ? rule : undefined }}
+          >
+            {runButton}
+          </Flex>
+        </div>
       </div>
       <div
         data-testid="package-run-result"
