@@ -11,7 +11,8 @@ import { filterTexts } from '../test/tableFilter'
 import { designTokensFor } from './designTokens'
 import { FormWidget } from './FormWidget'
 import { RecordList, type RecordListValue } from './recordList'
-import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
+import { RecordPagesContext } from './recordPages'
+import type { EntityWidgetMetadata, FieldMetadata, FieldType, WidgetAccess } from './site'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 import { NarrowWidthOverride } from './useNarrowWidth'
@@ -350,6 +351,7 @@ const texts = {
   'shell.form.loadFailed': 'The record could not be loaded.',
   'shell.form.choose': 'Choose…',
   'shell.form.clear': 'Clear',
+  'shell.form.openRecord': 'Open',
   'shell.form.addRow': 'Add row',
   'shell.form.removeRow': 'Delete row',
   'shell.form.removeReference': 'Remove',
@@ -497,6 +499,7 @@ function renderForm(
   mode?: ThemeMode,
   narrow?: boolean,
   list: RecordListValue | null = null,
+  recordPages?: Record<string, string>,
 ) {
   const path = `/e2e/noteform/${recordId ?? 'new'}`
   const form = (
@@ -505,16 +508,18 @@ function renderForm(
         {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
         <ConfigProvider theme={{ token: { motion: false } }}>
           <TextProvider catalogs={catalogs} development={false}>
-            <RecordList value={list}>
-              <FormWidget
-                widget={widget}
-                sitePath="e2e"
-                pages={['Notes', 'NoteForm']}
-                recordId={recordId}
-                returnTo="/e2e/notes?pageSize=10"
-                locale="en"
-              />
-            </RecordList>
+            <RecordPagesContext value={recordPages ? { sitePath: 'e2e', recordPages } : null}>
+              <RecordList value={list}>
+                <FormWidget
+                  widget={widget}
+                  sitePath="e2e"
+                  pages={['Notes', 'NoteForm']}
+                  recordId={recordId}
+                  returnTo="/e2e/notes?pageSize=10"
+                  locale="en"
+                />
+              </RecordList>
+            </RecordPagesContext>
           </TextProvider>
         </ConfigProvider>
         <CurrentLocation />
@@ -1213,6 +1218,109 @@ describe('FormWidget', () => {
 
     expect(await screen.findByText(wordId)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: `Remove ${wordId}` })).toBeInTheDocument()
+  })
+
+  describe('record pages', () => {
+    const recordPages = { Category: '/e2e/records/category', Software: '/e2e/software' }
+    const readOnlyAccess: WidgetAccess = { actions: ['read', 'update'], createFields: [], updateFields: [] }
+
+    it('opens a chosen reference between Choose and Clear, as a link that passes the page it leaves', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, noteWidget, undefined, undefined, null, recordPages)
+
+      const group = await screen.findByTestId('reference-category')
+      const names = Array.from(group.querySelectorAll('button, a')).map((control) => control.getAttribute('aria-label'))
+      expect(names).toEqual(['Choose…', 'Open Office', 'Clear'])
+      const open = within(group).getByRole('link', { name: 'Open Office' })
+      expect(open).toHaveAttribute('href', `/e2e/records/category/${categoryId}`)
+      expect(open.querySelector('.anticon-export')).not.toBeNull()
+      expect(open).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item')
+
+      await userEvent.click(open)
+
+      expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/records/category/${categoryId}`)
+      expect(screen.getByTestId('from')).toHaveTextContent(`/e2e/noteform/${noteId}`)
+    })
+
+    it('draws the reference as plain text with no Open button when its entity has no record page', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, noteWidget, undefined, undefined, null, { Software: '/e2e/software' })
+
+      await screen.findByLabelText('Category')
+
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Choose…' })).toBeInTheDocument()
+    })
+
+    it('draws no Open button for a reference whose label the person may not read', async () => {
+      stubFetch({
+        status: 200,
+        body: noteJson('Buy paper', 1).replace('"labels":{"category":"Office"}', '"labels":{}'),
+      })
+      renderForm(noteId, noteWidget, undefined, undefined, null, recordPages)
+
+      await screen.findByLabelText('Category')
+
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    })
+
+    it('draws no Open button outside a site', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId)
+
+      await screen.findByLabelText('Category')
+
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    })
+
+    it('shows a read-only reference as a link to its record page, and as text without one', async () => {
+      const readOnly: EntityWidgetMetadata = { ...noteWidget, access: readOnlyAccess }
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, readOnly, undefined, undefined, null, recordPages)
+
+      const link = await within(await screen.findByTestId('field-value-category')).findByRole('link', {
+        name: 'Office',
+      })
+      expect(link).toHaveAttribute('href', `/e2e/records/category/${categoryId}`)
+      cleanup()
+
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, readOnly)
+
+      expect(await screen.findByTestId('field-value-category')).toHaveTextContent('Office')
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    })
+
+    it('shows each entry of a set of references as a link, read-only or editable', async () => {
+      stubFetch({ status: 200, body: softwareJson(1) })
+      renderForm(noteId, { ...softwareWidget, access: readOnlyAccess }, undefined, undefined, null, recordPages)
+
+      const value = await screen.findByTestId('field-value-software')
+      expect(within(value).getByRole('link', { name: 'Word' })).toHaveAttribute('href', `/e2e/software/${wordId}`)
+      expect(within(value).getByRole('link', { name: 'Excel' })).toHaveAttribute('href', `/e2e/software/${excelId}`)
+      expect(value).toHaveTextContent('Word, Excel')
+      cleanup()
+
+      stubFetch({ status: 200, body: softwareJson(1) })
+      renderForm(noteId, softwareWidget, undefined, undefined, null, recordPages)
+
+      const list = await screen.findByRole('list', { name: 'Software' })
+      expect(within(list).getByRole('link', { name: 'Word' })).toHaveAttribute('href', `/e2e/software/${wordId}`)
+      expect(within(list).getByRole('button', { name: 'Remove Word' })).toBeInTheDocument()
+    })
+
+    it('shows an entry of a set of references as text when its label is missing', async () => {
+      stubFetch({
+        status: 200,
+        body: softwareJson(1).replace('"labels":{"software":["Word","Excel"]}', '"labels":{"software":["Word",null]}'),
+      })
+      renderForm(noteId, { ...softwareWidget, access: readOnlyAccess }, undefined, undefined, null, recordPages)
+
+      const value = await screen.findByTestId('field-value-software')
+
+      expect(within(value).getAllByRole('link')).toHaveLength(1)
+      expect(value).toHaveTextContent(`Word, ${excelId}`)
+    })
   })
 
   it('shows a read-only references field as its labels without Add or Remove buttons', async () => {

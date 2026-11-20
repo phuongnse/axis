@@ -786,6 +786,8 @@ export const applicationSite: ApplicationSite = {
     { page: 'Dashboard', labelKey: 'nav.dashboard', icon: 'dashboard' },
   ],
   notificationsPath,
+  // Request has a form page. Category has none, so it opens on the default record page.
+  recordPages: { Request: `/${sitePath}/request`, Category: `/${sitePath}/records/category` },
 }
 
 const requestsPage: PageMetadata = {

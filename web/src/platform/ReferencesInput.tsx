@@ -2,6 +2,7 @@ import { Flex } from 'antd'
 import { useRef, useState } from 'react'
 import { Announcement } from './Announcement'
 import { AxisButton } from './AxisButton'
+import { RecordLink } from './RecordLink'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { RecordItem } from './records'
 import type { FieldMetadata } from './site'
@@ -62,7 +63,7 @@ export function ReferencesInput({ field, title, ids, labels, onChange, ariaDescr
           {ids.map((id, index) => (
             <li key={id} style={{ marginBottom: 4 }}>
               <Flex align="center" gap="small">
-                <span>{labelAt(index)}</span>
+                <RecordLink entity={field.target?.entity ?? ''} id={id} label={labels[index] ?? null} />
                 <AxisButton
                   role="destructive"
                   size="small"

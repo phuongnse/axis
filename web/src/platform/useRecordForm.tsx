@@ -10,7 +10,7 @@ import { FieldInput } from './FieldInput'
 import { FileInput, FileLink } from './FileInput'
 import { FormCanvasContext } from './formCanvas'
 import { fetchFormState, type FormStateAnswer } from './formState'
-import { formatValue, moneyCurrency, referencesLabels } from './formatValue'
+import { formatValue, moneyCurrency } from './formatValue'
 import { placeProblemErrors } from './problemErrors'
 import { buildFormStateBody } from './recordBody'
 import {
@@ -24,6 +24,7 @@ import {
   type RowLabels,
 } from './records'
 import { ReadOnlyValue } from './ReadOnlyValue'
+import { OpenRecordButton, RecordLink } from './RecordLink'
 import { ReferenceLookup } from './ReferenceLookup'
 import { ReferencesInput } from './ReferencesInput'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
@@ -434,8 +435,35 @@ export function useRecordForm(
     const id = field.name
     if (asText(field, readOnly)) {
       if (field.type === 'references') {
-        const joined = referencesLabels(value, labels[field.name]).join(', ')
-        return <ReadOnlyValue field={id}>{joined || <NotSet />}</ReadOnlyValue>
+        const entity = field.target?.entity ?? ''
+        const raw = Array.isArray(labels[field.name]) ? (labels[field.name] as (string | null)[]) : []
+        const ids = Array.isArray(value) ? (value as string[]) : []
+        return (
+          <ReadOnlyValue field={id}>
+            {ids.length > 0 ? (
+              ids.map((target, index) => (
+                <Fragment key={target}>
+                  {index > 0 && ', '}
+                  <RecordLink entity={entity} id={target} label={raw[index] ?? null} />
+                </Fragment>
+              ))
+            ) : (
+              <NotSet />
+            )}
+          </ReadOnlyValue>
+        )
+      }
+      if (field.type === 'reference' && typeof value === 'string') {
+        const label = labels[field.name]
+        return (
+          <ReadOnlyValue field={id}>
+            <RecordLink
+              entity={field.target?.entity ?? ''}
+              id={value}
+              label={typeof label === 'string' ? label : null}
+            />
+          </ReadOnlyValue>
+        )
       }
       if (field.type === 'file') {
         return (
@@ -478,6 +506,11 @@ export function useRecordForm(
               nameKey="shell.form.choose"
               icon={<SearchOutlined />}
               onClick={() => setLookup(field.name)}
+            />
+            <OpenRecordButton
+              entity={field.target?.entity ?? ''}
+              id={value as string | null}
+              label={typeof label === 'string' ? label : null}
             />
             {!field.required && value !== null && (
               <AxisButton

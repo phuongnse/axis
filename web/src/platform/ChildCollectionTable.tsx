@@ -15,6 +15,7 @@ import {
   type RecordValue,
   type RowLabels,
 } from './records'
+import { OpenRecordButton, RecordLink } from './RecordLink'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
@@ -164,6 +165,12 @@ export function ChildCollectionTable({
                     ) : (
                       <EmptyDash />
                     )
+                  ) : child.type === 'reference' && typeof row[child.name] === 'string' ? (
+                    <RecordLink
+                      entity={child.target?.entity ?? ''}
+                      id={row[child.name] as string}
+                      label={aligned[index]?.[child.name] ?? null}
+                    />
                   ) : shown ? (
                     shown
                   ) : (
@@ -181,6 +188,11 @@ export function ChildCollectionTable({
                     nameSuffix={`${label} ${index + 1}`}
                     icon={<SearchOutlined />}
                     onClick={() => setLookup({ index, field: child })}
+                  />
+                  <OpenRecordButton
+                    entity={child.target?.entity ?? ''}
+                    id={(row[child.name] as string | null | undefined) ?? null}
+                    label={aligned[index]?.[child.name] ?? null}
                   />
                   {!child.required && row[child.name] != null && (
                     <AxisButton
