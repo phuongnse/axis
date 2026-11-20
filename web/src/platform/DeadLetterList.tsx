@@ -1,5 +1,4 @@
 import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
-import { Flex, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
@@ -14,6 +13,7 @@ import {
   type DeadLetterPage,
 } from './inspection'
 import { ReasonDialog } from './ReasonDialog'
+import { SectionPart } from './SectionParts'
 import { recordPageSize, recordQuery } from './tableQuery'
 import { useText } from './texts'
 import { useTableView } from './useTableView'
@@ -147,9 +147,8 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
   )
 
   return (
-    <section>
-      <Flex vertical gap="small">
-        <Typography.Title level={5}>{t('shell.inspector.deadLetters.title')}</Typography.Title>
+    <>
+      <SectionPart testId="inspector-dead-letters" heading={{ title: t('shell.inspector.deadLetters.title') }}>
         {load.failed && !loading ? (
           <AxisAlert
             data-testid="inspector-dead-letters-error"
@@ -180,7 +179,7 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
             }}
           />
         )}
-      </Flex>
+      </SectionPart>
       {open && (
         <ReasonDialog
           title={t(`shell.inspector.commands.${open.command}`)}
@@ -189,6 +188,6 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
           onChanged={() => setReload((count) => count + 1)}
         />
       )}
-    </section>
+    </>
   )
 }

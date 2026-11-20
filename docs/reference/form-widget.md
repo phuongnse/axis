@@ -81,7 +81,7 @@ when left out. So `{ "field": "quantity", "width": 4 }` takes a third of the row
 - Fields fill a row from left to right, and the next field that does not fit starts a new row.
 - A row is as tall as its tallest field and its fields line up at the top, so a message under one
   field never shifts the rows below.
-- Fields of a row are `spacing-md` apart across. Rows and sections are `spacing-lg` apart.
+- Fields of a row are `spacing-md` apart across, and rows are `spacing-lg` apart. Groups are parts a rule apart, see [groups as parts](#form-widget).
 - At narrow width every field takes the whole row, in file order.
 - A detail lays out the same sections with the same widths, and Studio's
   [form designer](form-designer.md) edits them.
@@ -113,7 +113,7 @@ validates.
   read-only child collection shows its rows with every cell read-only, and has no add or remove
   buttons. The widget sends only the editable fields it shows, and a server error on a field the form
   does not show appears above the form.
-- **Groups as parts** _(planned)_. A titled group of fields is a part of the page, as
+- **Groups as parts.** A titled group of fields is a part of the page, as
   [parts a rule apart](shell.md#layout) says. Its title is drawn by `SectionPart` as a level-2 heading at the
   `heading5` size, with the part's spacing and no heading margin of its own. A `borderSubtle` rule sits above a
   group drawn after another, and none above the first. A form with one untitled group, such as an `entity`
@@ -401,10 +401,10 @@ answer shows a generic platform error.
 ## History
 
 The form page of a saved record shows the record's history from the
-[history endpoint](record-audit.md#audit-records-and-history) in a panel below the form, newest first.
-A new record has no history panel.
+[history endpoint](record-audit.md#audit-records-and-history) as the page's last part, below the form, newest first.
+A new record has no history.
 
-- **The form's last part** _(planned)_. The history is the last part of the form's page, titled History
+- **The form's last part.** The history is the last part of the form's page, titled History
   ("Lịch sử"), drawn by `SectionPart` with a `borderSubtle` rule above it and no card. Its loading, empty, error
   and paging states stay.
 - **Entry.** Each entry shows its action, who did it, its time and a short summary. The action is a

@@ -282,7 +282,7 @@ call that is not resolvable has none, because the server decides what may be res
 
 ## Dead letters
 
-Under the instance list, a Dead letters section lists the process's open dead letters from
+Under the instance list, a Dead letters part lists the process's open dead letters from
 `{deadLettersPath}?state=open`, newest first, with the kind, the attempts, the last error and the time
 it was dead-lettered.
 

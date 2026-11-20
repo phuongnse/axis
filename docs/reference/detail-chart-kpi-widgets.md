@@ -41,7 +41,7 @@ A `detail` widget shows one record read-only, read through the record API, and w
   `steps`.
 - **Reference links**. A `reference` value is a link to its record page, and so is each entry of a
   `references` field, see [opening things](actions-and-controls.md#opening-things).
-- **Sections as parts** _(planned)_. With a `form`, each titled section is a part, as a form's sections are: its
+- **Sections as parts.** With a `form`, each titled section is a part, as a form's sections are: its
   title is drawn by `SectionPart`, and a `borderSubtle` rule sits above a section drawn after another.
 - **Layout.** The fields are a description list (`dl`, `dt`, `dd`). Each label sits above its value, as a read-only
   form field reads, with `spacing-md` between fields, and values are in `text`. The labels and the values follow the

@@ -88,11 +88,11 @@ their own controls where they expect them.
   page. The page declares its colour scheme, so every scrollbar, the page's and the sidebar's, follows the mode.
 - **Flush page area.** Pages draw on `surface`, flush with the frame, with `spacing-lg` padding. A wide table
   scrolls inside its widget, so the page never scrolls sideways.
-- **Flush page area for sites** _(planned)_. An application site's pages draw on the same flush page area, with no
+- **Flush page area for sites.** An application site's pages draw on the same flush page area, with no
   `canvas` under or between the header, the sidebar and the page. A list page's table sits straight under the heading.
   A small block that stands for one thing, such as a home page tile or a dashboard's KPI or chart, keeps its own
   `borderSubtle` border and `radius-base` corners.
-- **Parts a rule apart** _(planned)_. A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
+- **Parts a rule apart.** A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
   drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer.
 - **The bar slot** _(planned)_. The save bar draws in the shell's bar slot, `ShellBarSlot`, in the content column

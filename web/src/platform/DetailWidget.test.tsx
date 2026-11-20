@@ -300,6 +300,19 @@ describe('DetailWidget', () => {
     expect(requests()).toEqual([{ url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined }])
   })
 
+  it('draws the titled sections as parts with level-2 headings and a rule before every one but the first', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper') })
+
+    renderDetail(sectionsWidget)
+
+    const main = await screen.findByRole('region', { name: 'Main' })
+    const details = screen.getByRole('region', { name: 'Details' })
+    expect(within(main).getByRole('heading', { level: 2 })).toHaveTextContent('Main')
+    expect(within(details).getByRole('heading', { level: 2 })).toHaveTextContent('Details')
+    expect(main.previousElementSibling).toBeNull()
+    expect(details.previousElementSibling).toHaveAttribute('role', 'separator')
+  })
+
   it('shows each section as a description list with its fields in the sections column widths', async () => {
     stubFetch({ status: 200, body: noteJson('Buy paper') })
 

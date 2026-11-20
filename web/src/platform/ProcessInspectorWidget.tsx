@@ -1,4 +1,3 @@
-import { Flex } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -15,6 +14,7 @@ import {
   type InstancePage,
 } from './inspection'
 import type { WidgetMetadata } from './site'
+import { SectionParts } from './SectionParts'
 import { StatusTag } from './StatusTag'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useSiteTableKey } from './tableChoices'
@@ -199,7 +199,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
     return <AxisAlert data-testid="inspector-forbidden" kind="warning" message={t('shell.inspector.forbidden')} />
   }
   return (
-    <Flex vertical gap="middle">
+    <SectionParts>
       <AxisTable<InstanceListItem>
         rowKey={(instance) => instance.id}
         columns={columns}
@@ -223,6 +223,6 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
         }
       />
       <DeadLetterList deadLettersPath={widget.deadLettersPath!} locale={locale} />
-    </Flex>
+    </SectionParts>
   )
 }

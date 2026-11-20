@@ -420,6 +420,16 @@ describe('ProcessInspectorWidget', () => {
     expect(screen.getAllByTestId(/^inspector-dead-letter-/)).toHaveLength(2)
   })
 
+  it('draws the dead letters as a part under the instance list, headed by a level-2 heading with a rule above it', async () => {
+    stubInstances()
+
+    renderWidget()
+
+    const part = await screen.findByRole('region', { name: 'Dead letters' })
+    expect(within(part).getByRole('heading', { level: 2, name: 'Dead letters' })).toBeInTheDocument()
+    expect(part.previousElementSibling).toHaveAttribute('role', 'separator')
+  })
+
   it('shows the name of each dead letter button as a tooltip and opens its reason dialog', async () => {
     stubInstances()
     const user = userEvent.setup()
