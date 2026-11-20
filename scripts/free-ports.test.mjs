@@ -67,6 +67,11 @@ describe('freePort', () => {
     assert.equal(new Set(ports).size, ports.length)
   })
 
+  // 10080 is free on the runner and is the only bad port above 10000, so without the skip the call returns it.
+  test('never returns a port that fetch refuses', async () => {
+    await assert.rejects(freePort({ from: 10080, to: 10080 }))
+  })
+
   // Reads the range itself, not through ephemeralRange, so the check does not depend on the code it checks.
   test('never returns a port the system hands out for outgoing connections', { skip: !fs.existsSync(RANGE_FILE) }, async () => {
     const [first, last] = fs.readFileSync(RANGE_FILE, 'utf8').trim().split(/\s+/).map(Number)
