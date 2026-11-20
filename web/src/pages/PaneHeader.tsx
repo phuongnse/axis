@@ -8,7 +8,7 @@ import { useDesignTokens } from '../platform/themeMode'
  * on the right and a rule under it that runs the pane's whole width, so the workspace stays parted by rules, not boxes.
  */
 export function PaneHeader({ title, actions, height }: { title: ReactNode; actions?: ReactNode; height: number }) {
-  const { colour, size, spacing, type } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   return (
     <Flex
       align="center"
@@ -22,13 +22,7 @@ export function PaneHeader({ title, actions, height }: { title: ReactNode; actio
       }}
     >
       {typeof title === 'string' ? <Typography.Text strong>{title}</Typography.Text> : title}
-      {/* A title row's actions are small, and the last one's icon reaches the row's inset, so it lines up with the fields
-          below: the row pulls in the space a small icon button keeps round its icon. */}
-      {actions && (
-        <Flex align="center" gap="small" style={{ marginInlineEnd: -(size.smallControl - type.fontSize) / 2 }}>
-          {actions}
-        </Flex>
-      )}
+      {actions}
     </Flex>
   )
 }

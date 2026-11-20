@@ -332,7 +332,7 @@ export interface SplitButtonItem {
 
 /**
  * Proposed, see #3978: the main of three or more actions that manage one thing as a button, with the others in a menu on
- * a joined caret button, or in a region's title row as a text button with a "…" menu, such as a saved input's Save with Save as… and Delete, see
+ * a joined caret button, or in a region's title row as a borderless text button and caret, such as a saved input's Save with Save as… and Delete, see
  * docs/reference/actions-and-controls.md#buttons. `menuNameKey` names the caret button.
  */
 export function AxisSplitButton({
@@ -354,8 +354,7 @@ export function AxisSplitButton({
   items: readonly SplitButtonItem[]
   /**
    * Proposed, see #3978: the button sits in a region's title row, so the main action is a borderless text button and the
-   * others are the entries of a "…" menu beside it. A group of actions is all text or all icons, and the "…" that opens
-   * a menu is no action, so it stays an icon beside either.
+   * others are the entries of a menu on a borderless caret beside it, both at their usual size.
    */
   titleRow?: boolean
   'data-testid'?: string
@@ -371,13 +370,14 @@ export function AxisSplitButton({
   }
   if (titleRow) {
     return (
-      // The action and its menu are one pair, small as a title row's actions are, with no gap between them.
+      // The action and the caret of its menu are one pair, with no gap of their own between them, each button at its
+      // usual size.
       <Flex data-testid={testId} align="center">
-        <AxisButton role="plain" size="small" disabled={disabled} onClick={onClick}>
+        <AxisButton role="plain" disabled={disabled} onClick={onClick}>
           {children}
         </AxisButton>
         <Dropdown trigger={['click']} menu={menu}>
-          <AxisButton role="icon" size="small" nameKey={menuNameKey} icon={<EllipsisOutlined />} />
+          <AxisButton role="icon" nameKey={menuNameKey} icon={<Chevron />} />
         </Dropdown>
       </Flex>
     )
