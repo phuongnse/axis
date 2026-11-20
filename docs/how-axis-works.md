@@ -90,7 +90,7 @@ it. A release is pinned: work that starts on a release keeps that release until 
 new work uses the active release.
 
 The detail is in [the configuration pipeline](reference/configuration.md),
-[publishing in the authoring API](reference/authoring.md#publishing) and
+[publishing in the authoring API](reference/authoring-publishing.md#publishing) and
 [publishing in Studio](reference/studio.md#publishing). The choices are
 [D47](decisions/d47-publishing-from-studio.md) and
 [D29](decisions/d29-release-pinning-and-text-resources.md).

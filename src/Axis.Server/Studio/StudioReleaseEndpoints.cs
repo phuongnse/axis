@@ -23,7 +23,7 @@ namespace Axis.Server.Studio;
 /// A module's label is the one in the <c>module.json</c> that the release stores and a package's label is the one of the
 /// installed package of that version, else the id stands in. It reads the tenant database and changes nothing.
 /// <c>GET /api/studio/apps/{application}/release-list</c> answers one page of the application's releases as
-/// <c>{ items, page, pageSize, totalCount }</c>, see <c>docs/reference/authoring.md#release-list</c>. Each release is one item, with
+/// <c>{ items, page, pageSize, totalCount }</c>, see <c>docs/reference/authoring-publishing.md#release-list</c>. Each release is one item, with
 /// the data of its first activation and its Live and Off-standard flags. It takes the record API's <c>page</c>, <c>pageSize</c>,
 /// <c>sort</c>, <c>search</c> and <c>filter</c> through <see cref="ListQuery{T}"/>, checks the session (401), the author
 /// role (403) and the application (404), and answers 400 for a sort or a filter on a column it does not hold. It does not

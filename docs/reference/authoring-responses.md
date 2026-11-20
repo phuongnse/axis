@@ -63,5 +63,5 @@ Some answers have titles of their own:
 
 `400` is a bad body, `415` a body of the wrong content type, `428` a missing `If-Match` and `503` a
 write lock that cannot be taken, as [Order of checks](authoring.md#order-of-checks) says. A successful `validate`,
-`publish`, `preview`, `test` or `activate` answers `202`, see [Publishing](authoring.md#publishing).
+`publish`, `preview`, `test` or `activate` answers `202`, see [Publishing](authoring-publishing.md#publishing).
 

@@ -136,7 +136,7 @@ builds on, see [contracts](extension-packages.md#contracts).
 
 ## Designer palette
 
-The [page designer](studio.md#page-designer) offers custom widgets in its palette beside the standard ones, with a
+The [page designer](studio-editors-by-kind.md#page-designer) offers custom widgets in its palette beside the standard ones, with a
 property panel built from the manifest.
 
 - **Listing.** An authoring route lists the widgets of the packages that the application declares and that are

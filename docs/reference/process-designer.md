@@ -3,7 +3,7 @@
 The process designer is the Design tab of a `process` resource in Studio, where an author builds a
 process as a graph of its steps and transitions. It sits next to the Form and JSON tabs, a process opens
 on it, and the three tabs edit one draft. It reuses the property panel, the undo and the drag and drop
-of the [page designer](studio.md#page-designer).
+of the [page designer](studio-editors-by-kind.md#page-designer).
 
 ## Canvas
 
@@ -333,7 +333,7 @@ Every step but `end` has an Error paths list, which writes `onError`, see [error
 ## Undo
 
 The page designer's undo and redo cover every edit of a process on all three tabs, with 100 steps,
-cleared by a reload, see [undo](studio.md#page-designer). They do not apply to a module process.
+cleared by a reload, see [undo](studio-editors-by-kind.md#page-designer). They do not apply to a module process.
 
 ## Keyboard and screen readers
 

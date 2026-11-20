@@ -227,7 +227,7 @@ release routes are in [release page](studio-workspace.md#release-page).
   `{ url, secret, storage }`, sorted by name. It never answers a value, because a release names bindings
   and never holds them, and an author needs only their names.
 - `GET /api/studio/apps/{application}/relaxed` answers `{ items }`, the relax entries of the
-  application's folder, each as in the [release history](authoring.md#release-history), with the id of
+  application's folder, each as in the [release history](authoring-publishing.md#release-history), with the id of
   its contract, `contractId`. Its words come from the installed module version that the folder pins.
 
 ### Resource activity
