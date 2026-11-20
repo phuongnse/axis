@@ -19,7 +19,7 @@ One word, activate, names making a release the live one:
 - **The route.** `POST /api/studio/apps/{application}/releases/{id}/activate` replaces
   `POST .../releases/{id}/rollback`, with the same request, rules and answer, and the publish
   request's kind `rollback` becomes `activate`, see
-  [publishing](../reference/authoring.md#publishing).
+  [publishing](../reference/authoring-publishing.md#publishing).
 - **The words.** Studio, the console and the docs say activate and activated, never roll back.
 
 ## Consequences

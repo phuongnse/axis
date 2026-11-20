@@ -325,7 +325,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Decide a task on its own page | [Task page](reference/task-inbox-widget.md#task-page) |
 | Follow a process's instances on a page | [Instance list](reference/process-inspector-widget.md#instance-list) |
 | Add a widget written as code | _(planned for M22)_ |
-| Build pages and forms by drag and drop | [Page designer](reference/studio.md#page-designer) |
+| Build pages and forms by drag and drop | [Page designer](reference/studio-editors-by-kind.md#page-designer) |
 
 ### Navigation and personal settings
 
@@ -582,7 +582,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | --- | --- |
 | Audit of sign-in, sign-out and refused sign-in | [Sign-in audit](reference/security.md#sign-in-audit) |
 | Audit of user and role changes | [Audit](reference/user-administration.md#audit) |
-| Audit of publishing and activation | [Audit](reference/authoring.md#audit) |
+| Audit of publishing and activation | [Audit](reference/authoring-publishing.md#audit) |
 | Audit of the operator's commands on a tenant | [Platform audit records](reference/tenant-setting-commands.md#platform-audit-records) |
 | Audit records that nobody can change or delete | [Business](reference/keys-and-data-protection.md#business) |
 | Security events in the logs | [Security events](reference/log-inventory.md#security-events) |
@@ -623,7 +623,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | An agent's change made on a draft and accepted all at once | [Drafts](reference/revisions-and-drafts.md#drafts) |
 | Drafts for every author, merged on accept | _(planned for M51)_ |
 | Compare two releases | _(planned for M51)_ |
-| Try a change on a preview tenant before publishing | [Preview](reference/authoring.md#preview) |
+| Try a change on a preview tenant before publishing | [Preview](reference/authoring-publishing.md#preview) |
 | Development, test and production environments | _(planned for M51)_ |
 | Move an application between tenants or installations | _(planned for M51)_ |
 | A separate role to publish | [Settings](reference/authoring.md#settings) |
@@ -631,8 +631,8 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Run an application's test scenarios | [Running the scenarios](reference/test-scenarios.md#running-the-scenarios) |
 | A module's rules checked by its scenarios on every publish | [Contract scenarios](reference/module-contracts.md#contract-scenarios) |
 | Run an application's tests in the organization's own build pipeline | _(planned for M51)_ |
-| Release history | [Release history](reference/authoring.md#release-history) |
-| Go back to an earlier release | [Activating a release](reference/authoring.md#activating-a-release) |
+| Release history | [Release history](reference/authoring-publishing.md#release-history) |
+| Go back to an earlier release | [Activating a release](reference/authoring-publishing.md#activating-a-release) |
 | Activate a release at a set time | _(planned for M51)_ |
 | Turn a feature on for some people first | _(planned for M51)_ |
 | A test copy of production data with personal data masked | _(planned for M51)_ |

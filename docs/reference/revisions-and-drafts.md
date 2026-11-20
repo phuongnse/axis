@@ -120,7 +120,7 @@ lock from the first step to the last, so Studio writes to that folder wait.
 5. It applies the draft's changes to the folder's files in memory and runs the steps of a validate on
    the result: the compiler, the contract scenarios and every activation check, rolled back. After the
    validate passes, the application's own test scenarios run on the result as for a
-   [test](authoring.md#test), with its time limit, and a failing one fails the request. With a scenario to
+   [test](authoring-publishing.md#test), with its time limit, and a failing one fails the request. With a scenario to
    run and no scenario server, the request fails with `AXC0217`.
 6. On success it writes the changed files to the folder, as the authoring API writes them, and commits
    them as one revision. It then deletes the draft. The request's final status, the move of the

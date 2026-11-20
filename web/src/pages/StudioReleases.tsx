@@ -176,7 +176,7 @@ export function StudioActivateDialog({
   )
 }
 
-/** The columns the view's search, filter and sort can name, see docs/reference/authoring.md#release-list. */
+/** The columns the view's search, filter and sort can name, see docs/reference/authoring-publishing.md#release-list. */
 const releaseFields = [
   { name: 'number', type: 'integer' },
   { name: 'label', type: 'text' },
@@ -195,7 +195,7 @@ const noParameters: readonly string[] = []
  * from the release's first activation. An empty label or note shows the em dash, and Published by is a name, never an
  * id. The table has Search, Filter, Columns, Refresh, a sort on Release, Label, Published and Published by, and a pager
  * with a page size, all kept in the address, see docs/reference/actions-and-controls.md#tables and
- * docs/reference/authoring.md#release-list. `history` gives the live number and reloads the page when it reloads. When
+ * docs/reference/authoring-publishing.md#release-list. `history` gives the live number and reloads the page when it reloads. When
  * `canActivate`, every row but the live one has an Activate… icon button, off while `busy`. The button opens a dialog
  * that says which release replaces the live one, or why it cannot, and its confirmation calls `onActivate`.
  */

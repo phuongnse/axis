@@ -402,6 +402,7 @@ activation builds a missing index again.
 **Exit codes.** `0` when every tenant succeeded, also when none is `active`. `1` when at least one
 tenant failed. `2` for a folder that does not exist, an unknown `--tenant`, a `--tenant` that is
 `provisioning`, a bad option or a missing or bad setting.
+
 ## What else to back up
 
 A tenant archive is not a backup of the installation. The operator also keeps these safe:

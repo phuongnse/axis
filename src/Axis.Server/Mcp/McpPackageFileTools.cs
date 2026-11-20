@@ -17,7 +17,7 @@ namespace Axis.Server.Mcp;
 /// <c>mcp.toolCalled</c> audit record that holds ids only, with no package, path or content, see
 /// <c>docs/reference/storage.md#audit-actions</c>. <c>test_package</c> changes no draft. It stores a package <c>test</c> request of
 /// the draft's files, or reads one back, and writes no audit record, as a <c>test</c> writes none, see
-/// <c>docs/reference/authoring.md#test</c>.
+/// <c>docs/reference/authoring-publishing.md#test</c>.
 /// </summary>
 internal static class McpPackageFileTools
 {

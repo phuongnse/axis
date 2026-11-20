@@ -140,7 +140,7 @@ Axis encrypts only the secrets, the values of `sensitive` fields and tenant back
 - **Retention.** The database rejects any change to the release history, so no Axis command removes it. Logs and telemetry last as long as the operator's collector keeps them. Test: `ReleaseHistoryTests`.
 - **Logging.** Logs and telemetry name things and hold no values, see [what telemetry never holds](telemetry.md#what-telemetry-never-holds). Test: `TraceCorrelationTests`.
 - **Access to logs.** The operator protects the logs and telemetry. Their content needs no data grant. Test: none.
-- **Access control.** Studio edits an application only for users with `Studio:AuthorRole`, and publishes only with `Studio:PublisherRole`, see [publishing](authoring.md#publishing). Test: `StudioTextWriteTests`.
+- **Access control.** Studio edits an application only for users with `Studio:AuthorRole`, and publishes only with `Studio:PublisherRole`, see [publishing](authoring-publishing.md#publishing). Test: `StudioTextWriteTests`.
 - **Privacy.** Names reach logs and telemetry, so a name must not hold personal data. Test: none.
 
 ### Public

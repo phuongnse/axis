@@ -149,7 +149,7 @@ allows in the authoring API, and the Studio fields of `GET /api/me` that follow 
   folders sit on the same volume, at the same path, as on the servers, because the lock is keyed by
   the full path.
 - **Tests.** `Studio:Tests` grants no right: a `test` request needs the author role only, and the
-  publisher runs it, see [test](authoring.md#test). Turn it on together with the publisher's
+  publisher runs it, see [test](authoring-publishing.md#test). Turn it on together with the publisher's
   `Scenarios:ServerConnectionString`, because the server cannot see the publisher's settings.
 - **Development.** The Development settings list every sample under `samples/apps/` in
   `Studio:Folders`, set the author role to `author` and the publisher role to `publisher`, and turn

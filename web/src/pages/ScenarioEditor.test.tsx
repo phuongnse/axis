@@ -29,7 +29,7 @@ const vietnamese: Record<string, string> = platformVietnamese
 const labelOf = (path: string) => english[`shell.studio.field.scenario.${path}`]
 const helpOf = (path: string) => english[`shell.studio.field.scenario.${path}.help`]
 
-/** Every path of the scenario file that the editor draws a field or a group for, see docs/reference/studio.md#scenario-editor. */
+/** Every path of the scenario file that the editor draws a field or a group for, see docs/reference/studio-editors-by-kind.md#scenario-editor. */
 const drawnPaths = [
   'name',
   'description',

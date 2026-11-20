@@ -59,7 +59,7 @@ sign-in. Tenants share nothing in it, as they share no database. `tenant create`
 ## Identity provider resource
 
 An `identityProvider` resource declares one way for the application's people to sign in. It is part
-of the release, so Studio edits it, with the identity provider editor of [Studio](studio.md), and test
+of the release, so Studio edits it, with the [identity provider editor](studio-editors-by-kind.md#identity-provider-editor) of Studio, and test
 scenarios check it.
 
 ```json

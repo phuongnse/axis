@@ -4,7 +4,8 @@ The form designer is the Design tab of a `form` resource in Studio, where an aut
 drag and drop. It sits next to the Form and JSON tabs, a form opens on it, and the three tabs edit one
 draft. It reuses the canvas, the property panel, the undo and the `@dnd-kit` drag and drop of the page
 designer, whose undo covers every edit of the form on all three tabs, with 100 steps, cleared by a
-reload. The [page designer](studio.md#page-designer) and the rest of Studio are in [Studio](studio.md).
+reload. The [page designer](studio-editors-by-kind.md#page-designer) is in [Studio editors by kind](studio-editors-by-kind.md),
+and the rest of Studio is in [Studio](studio.md).
 
 ## Canvas
 
@@ -38,7 +39,7 @@ The canvas has no record, so it evaluates no condition and shows every field and
 with `visibleWhen`, `requiredWhen` or `readOnlyWhen` carries a mark that names each condition and shows
 its text from the draft, such as "Visible when: status == 'resolved'".
 
-A section or field that a diagnostic of the form names is marked as in the [page designer](studio.md#page-designer):
+A section or field that a diagnostic of the form names is marked as in the [page designer](studio-editors-by-kind.md#page-designer):
 a frame with an error-coloured border, its text label, and `data-marked`.
 
 ## Field palette

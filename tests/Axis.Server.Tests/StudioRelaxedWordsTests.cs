@@ -6,7 +6,7 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// The words of a relaxed point come from the module files that a release stores, and a part without a label shows its
-/// name. The kinds of point that <c>docs/reference/authoring.md</c> lists are the ones the code answers.
+/// name. The kinds of point that <c>docs/reference/authoring-publishing.md</c> lists are the ones the code answers.
 /// </summary>
 public sealed partial class StudioRelaxedWordsTests
 {
@@ -155,7 +155,7 @@ public sealed partial class StudioRelaxedWordsTests
     [Fact]
     public void The_kinds_of_point_in_the_doc_are_the_kinds_in_the_code()
     {
-        var bullet = File.ReadAllLines(Path.Combine(RepositoryRoot(), "docs", "reference", "authoring.md"))
+        var bullet = File.ReadAllLines(Path.Combine(RepositoryRoot(), "docs", "reference", "authoring-publishing.md"))
             .SkipWhile(line => !line.StartsWith("- **Words for relaxed points", StringComparison.Ordinal))
             .TakeWhile((line, index) => index == 0 || line.StartsWith("  ", StringComparison.Ordinal))
             .ToList();

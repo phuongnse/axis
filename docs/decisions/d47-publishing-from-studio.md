@@ -29,7 +29,7 @@ problems can still fail activation.
   refusal of activation. It leaves the folder unchanged.
 - **Publishing and activating a release are audited,** whether they succeed or fail.
 
-The detail is in [publishing](../reference/authoring.md#publishing), the
+The detail is in [publishing](../reference/authoring-publishing.md#publishing), the
 [publisher](../reference/publisher.md#publisher),
 [publish requests and release history](../reference/publish-request-storage.md#publish-requests-and-release-history)
 and the [Studio settings](../reference/host-settings.md#studio-settings).
