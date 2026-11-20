@@ -1,5 +1,5 @@
 import { CloseOutlined, FileOutlined, FolderOutlined } from '@ant-design/icons'
-import { ConfigProvider, Flex, Modal, Tabs, Tree, type TreeDataNode } from 'antd'
+import { Flex, Modal, Tabs, Tree, type TreeDataNode } from 'antd'
 import { lazy, Suspense, useContext, useMemo, useRef, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
@@ -9,9 +9,8 @@ import { sortByName } from '../platform/listOrder'
 import { PageLayout } from '../platform/PageLayout'
 import { PaneHeader } from '../platform/PaneHeader'
 import { fetchStudioPackageFile } from '../platform/studio'
-import { selectedItemTint } from '../platform/antTheme'
 import { useText } from '../platform/texts'
-import { useDesignTokens, useThemeMode } from '../platform/themeMode'
+import { useDesignTokens } from '../platform/themeMode'
 import { useUnsavedChanges } from '../platform/unsavedChanges'
 import { workspaceTabRow } from '../platform/workspaceTabRow'
 import type { CodeCursor } from './CodeEditor'
@@ -149,7 +148,6 @@ function Workspace({ application, row, canDevelop }: { application: string; row:
   const t = useText()
   const tokens = useDesignTokens()
   const { colour, spacing, size } = tokens
-  const { mode } = useThemeMode()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const editorColumn = useRef<HTMLDivElement>(null)
   const requested = useRef(new Set<string>())
@@ -255,43 +253,31 @@ function Workspace({ application, row, canDevelop }: { application: string; row:
               data-testid="studio-package-tree"
               style={{ position: 'absolute', inset: 0, overflow: 'auto', overscrollBehavior: 'contain' }}
             >
-              <ConfigProvider
-                theme={{
-                  components: {
-                    Tree: {
-                      indentSize: 12,
-                      directoryNodeSelectedBg: selectedItemTint(mode),
-                      directoryNodeSelectedColor: colour.primaryText,
-                    },
-                  },
+              <Tree.DirectoryTree
+                treeData={tree}
+                titleRender={(node) => (
+                  <span>
+                    {String(node.title)}
+                    {node.isLeaf && isUnsaved(String(node.key)) && (
+                      <>
+                        {' '}
+                        <UnsavedDot />
+                      </>
+                    )}
+                  </span>
+                )}
+                expandAction="click"
+                multiple={false}
+                defaultExpandAll
+                selectedKeys={active === null ? [] : [active]}
+                switcherIcon={({ expanded }) => <Chevron point={expanded ? 'down' : 'right'} />}
+                icon={({ isLeaf }) => (isLeaf ? <FileOutlined /> : <FolderOutlined />)}
+                onSelect={(_keys, { node }) => {
+                  if (node.isLeaf) {
+                    openFile(String(node.key))
+                  }
                 }}
-              >
-                <Tree.DirectoryTree
-                  treeData={tree}
-                  titleRender={(node) => (
-                    <span>
-                      {String(node.title)}
-                      {node.isLeaf && isUnsaved(String(node.key)) && (
-                        <>
-                          {' '}
-                          <UnsavedDot />
-                        </>
-                      )}
-                    </span>
-                  )}
-                  expandAction="click"
-                  multiple={false}
-                  defaultExpandAll
-                  selectedKeys={active === null ? [] : [active]}
-                  switcherIcon={({ expanded }) => <Chevron point={expanded ? 'down' : 'right'} />}
-                  icon={({ isLeaf }) => (isLeaf ? <FileOutlined /> : <FolderOutlined />)}
-                  onSelect={(_keys, { node }) => {
-                    if (node.isLeaf) {
-                      openFile(String(node.key))
-                    }
-                  }}
-                />
-              </ConfigProvider>
+              />
             </div>
           </div>
         </section>
