@@ -108,7 +108,6 @@ Built with C# on .NET 10 and ASP.NET Core, React with TypeScript and Ant Design,
 ## Licence
 
 Axis is under the [GNU Affero General Public License, version 3 only](LICENSE). The extension
-contract in `src/Axis.Extensions` and everything under `samples/` are under the MIT licence. A
-commercial licence is available for those who cannot use the AGPL. A company that wants it can
-contact the owner of Axis on [LinkedIn](https://www.linkedin.com/in/phuongnse). The reasons are in
-[D120](docs/decisions/d120-axis-is-agpl-licensed-with-a-commercial-licence.md).
+contract in `src/Axis.Extensions` and everything under `samples/` are under the MIT licence. The
+reasons are in
+[D165](docs/decisions/d165-axis-is-under-the-agpl-and-mit-licences-only-with-no-commercial-licence.md).
