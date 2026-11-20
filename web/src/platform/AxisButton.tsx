@@ -13,6 +13,7 @@ import {
 } from 'react'
 import type { ButtonRole } from './buttonRoles'
 import { Chevron } from './Chevron'
+import { menuOf, type MenuAction } from './menuActions'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { focusFollowsTab } from './tabFocus'
@@ -320,16 +321,6 @@ export function AxisButton(props: AxisButtonProps) {
   }
 }
 
-/** One entry of a split button's menu. */
-export interface SplitButtonItem {
-  key: string
-  label: string
-  /** Draws the entry in `dangerText`, as a menu draws a destructive entry. */
-  destructive?: boolean
-  disabled?: boolean
-  onClick: () => void
-}
-
 /**
  * Proposed, see #3978: one button with two parts, the main of three or more actions that manage one thing and a caret
  * that opens a menu of the others, joined in one shape as Ant Design joins a split button with Space.Compact, such as a
@@ -352,20 +343,12 @@ export function AxisSplitButton({
   disabled?: boolean
   onClick: () => void
   menuNameKey: string
-  items: readonly SplitButtonItem[]
+  items: readonly MenuAction[]
   /** Appended to both parts' accessible names, such as the name of the item they act on, as an icon button's is. */
   nameSuffix?: string
   'data-testid'?: string
 }) {
-  const menu = {
-    items: items.map((item) => ({
-      key: item.key,
-      label: item.label,
-      danger: item.destructive,
-      disabled: item.disabled,
-    })),
-    onClick: ({ key }: { key: string }) => items.find((item) => item.key === key)?.onClick(),
-  }
+  const menu = menuOf(items)
   return (
     <Space.Compact data-testid={testId}>
       <AxisButton

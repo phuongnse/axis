@@ -39,3 +39,22 @@ export function codeLanguage(path: string): Extension {
   const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
   return languages[byExtension[extension] ?? ''] ?? plainText
 }
+
+/** The name of each language the editor highlights, as the status line says it. */
+const languageNames: Record<string, string> = {
+  csharp: 'C#',
+  typescript: 'TypeScript',
+  tsx: 'TypeScript',
+  javascript: 'JavaScript',
+  python: 'Python',
+  json: 'JSON',
+}
+
+/**
+ * Proposed, see #3978: the name of the language a file's path says, from the same table that picks its highlighting,
+ * or `null` for plain text.
+ */
+export function fileLanguageName(path: string): string | null {
+  const language = byExtension[path.slice(path.lastIndexOf('.') + 1).toLowerCase()]
+  return language === undefined ? null : (languageNames[language] ?? null)
+}

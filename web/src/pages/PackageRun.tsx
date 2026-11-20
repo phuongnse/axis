@@ -21,6 +21,7 @@ import {
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import CodeEditor from './CodeEditor'
+import { workspaceFindTexts } from './jsonFindPanel'
 import { codeLanguage } from './codeLanguage'
 import { PaneHeader } from './PaneHeader'
 
@@ -365,11 +366,7 @@ export function PackageRun({
                 onChange={setJsonText}
                 language={jsonLanguage}
                 grow
-                findTexts={{
-                  field: t('shell.studio.package.findField'),
-                  count: t('shell.studio.json.findCount'),
-                  none: t('shell.studio.json.findNone'),
-                }}
+                findTexts={workspaceFindTexts(t)}
               />
             </div>
           )}
@@ -425,11 +422,7 @@ export function PackageRun({
                     readOnly
                     language={jsonLanguage}
                     grow
-                    findTexts={{
-                      field: t('shell.studio.package.findField'),
-                      count: t('shell.studio.json.findCount'),
-                      none: t('shell.studio.json.findNone'),
-                    }}
+                    findTexts={workspaceFindTexts(t)}
                   />
                 </div>
               )

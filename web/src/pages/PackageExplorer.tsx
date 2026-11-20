@@ -8,6 +8,7 @@ import { useText } from '../platform/texts'
 import { ThemeModeContext, useDesignTokens } from '../platform/themeMode'
 import { fileTree } from './packageTree'
 import { PaneHeader } from './PaneHeader'
+import { UnsavedDot } from './UnsavedDot'
 
 /** A node of the explorer: a file by its path, or a folder by its path with a trailing slash. */
 export type ExplorerTarget = { kind: 'file'; path: string } | { kind: 'folder'; path: string }
@@ -170,13 +171,7 @@ export function PackageExplorer({
           >
             {String(data.title)}
           </span>
-          {dirty.includes(key) && (
-            <span
-              role="img"
-              aria-label={t('shell.studio.package.unsaved')}
-              style={{ width: 6, height: 6, borderRadius: '50%', background: colour.primary, flex: 'none' }}
-            />
-          )}
+          {dirty.includes(key) && <UnsavedDot />}
         </Flex>
       </Dropdown>
     )

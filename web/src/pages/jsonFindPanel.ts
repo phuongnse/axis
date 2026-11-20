@@ -19,6 +19,15 @@ export interface FindTexts {
   none: string
 }
 
+/** Proposed, see #3978: the find bar's texts in a package's workspace, its files and its run's JSON alike. */
+export function workspaceFindTexts(t: (key: string) => string): FindTexts {
+  return {
+    field: t('shell.studio.package.findField'),
+    count: t('shell.studio.json.findCount'),
+    none: t('shell.studio.json.findNone'),
+  }
+}
+
 interface Match {
   from: number
   to: number

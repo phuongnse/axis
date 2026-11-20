@@ -37,7 +37,10 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFollowJob } from '../platform/useFollowJob'
 import CodeEditor, { type CodeEditorHandle } from './CodeEditor'
-import { codeLanguage } from './codeLanguage'
+import { workspaceFindTexts } from './jsonFindPanel'
+import { codeLanguage, fileLanguageName } from './codeLanguage'
+import { PaneHeader } from './PaneHeader'
+import { UnsavedDot } from './UnsavedDot'
 import { PlatformContext } from './context'
 import { jsonViewHeight } from './jsonViewHeight'
 import { PackageExplorer, type ExplorerTarget } from './PackageExplorer'
@@ -725,21 +728,7 @@ export default function StudioPackage({
                 label: (
                   <span title={path} data-testid={`package-tab-${path}`}>
                     {nameOf(path)}
-                    {dirty.includes(path) && (
-                      <span
-                        role="img"
-                        aria-label={t('shell.studio.package.unsaved')}
-                        style={{
-                          display: 'inline-block',
-                          width: 6,
-                          height: 6,
-                          marginInlineStart: spacing.xs,
-                          borderRadius: '50%',
-                          background: colour.primary,
-                          verticalAlign: 'middle',
-                        }}
-                      />
-                    )}
+                    {dirty.includes(path) && <UnsavedDot inline />}
                   </span>
                 ),
               }))}
@@ -771,11 +760,7 @@ export default function StudioPackage({
                       checks={checks.get(path)}
                       readOnly={!developer}
                       fill
-                      findTexts={{
-                        field: t('shell.studio.package.findField'),
-                        count: t('shell.studio.json.findCount'),
-                        none: t('shell.studio.json.findNone'),
-                      }}
+                      findTexts={workspaceFindTexts(t)}
                       onHistory={(next) => setSteps((all) => ({ ...all, [path]: next }))}
                       onCursor={(next) => path === file && setCursor(next)}
                     />
@@ -802,7 +787,7 @@ export default function StudioPackage({
                   .replace('{line}', String(cursor.line))
                   .replace('{column}', String(cursor.column))}
               </span>
-              <span>{languageLabel(file, t)}</span>
+              <span>{fileLanguageName(file) ?? t('shell.studio.package.plainText')}</span>
               <span style={{ marginInlineStart: 'auto' }}>
                 {dirty.length === 0
                   ? t('shell.studio.package.allSaved')
@@ -877,23 +862,34 @@ export default function StudioPackage({
                   {
                     key: 'output',
                     label: t('shell.studio.package.panel.output'),
-                    children: panelOpen && (
-                      <PanelBody>
-                        {lastRequest === undefined ? (
+                    children:
+                      panelOpen &&
+                      (lastRequest === undefined ? (
+                        <PanelBody>
                           <EmptyState text={t('shell.studio.package.panel.outputNone')} />
-                        ) : (
-                          <Flex vertical gap="small" data-testid="package-output">
-                            <Flex gap="small" align="center">
-                              <Typography.Text strong>{t(`shell.studio.package.job.${lastJob}`)}</Typography.Text>
-                              <StatusTag tone={requestTone(lastRequest)}>
-                                {t(`shell.studio.package.jobState.${lastRequest.status}`)}
-                              </StatusTag>
-                            </Flex>
+                        </PanelBody>
+                      ) : (
+                        // The last request's output is a block under its title row, as a run's Output and Log are.
+                        <div
+                          data-testid="package-output"
+                          style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' }}
+                        >
+                          <PaneHeader
+                            height={rowHeight}
+                            title={
+                              <Flex gap="small" align="center">
+                                <Typography.Text strong>{t(`shell.studio.package.job.${lastJob}`)}</Typography.Text>
+                                <StatusTag tone={requestTone(lastRequest)}>
+                                  {t(`shell.studio.package.jobState.${lastRequest.status}`)}
+                                </StatusTag>
+                              </Flex>
+                            }
+                          />
+                          <div style={{ padding: `${spacing.sm}px ${spacing.md}px` }}>
                             <CodeBlock plain text={(lastRequest.output ?? []).join('\n') || null} />
-                          </Flex>
-                        )}
-                      </PanelBody>
-                    ),
+                          </div>
+                        </div>
+                      )),
                   },
                   {
                     key: 'tests',
@@ -1124,22 +1120,6 @@ function PanelBody({ children }: { children: React.ReactNode }) {
 /** What a request's state asks of the reader, as its tag's tone. */
 function requestTone(request: StudioRequest): 'neutral' | 'success' | 'danger' {
   return request.status === 'succeeded' ? 'success' : request.status === 'failed' ? 'danger' : 'neutral'
-}
-
-/** The language a file's name says, in words, for the status line. */
-function languageLabel(path: string, t: (key: string) => string): string {
-  const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
-  const known: Record<string, string> = {
-    cs: 'C#',
-    csproj: 'XML',
-    ts: 'TypeScript',
-    js: 'JavaScript',
-    mjs: 'JavaScript',
-    py: 'Python',
-    json: 'JSON',
-    txt: t('shell.studio.package.plainText'),
-  }
-  return known[extension] ?? t('shell.studio.package.plainText')
 }
 
 /** Loads a package file with its text. A file that is gone throws, as any other failure does. */

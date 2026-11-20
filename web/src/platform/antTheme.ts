@@ -221,7 +221,7 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
  */
 export function navigationItemLook(mode: ThemeMode): { selected: string; hover: string; radius: number } {
   const token = theme.getDesignToken(antThemeFor(mode))
-  return { selected: token.controlItemBgActive, hover: token.colorBgTextHover, radius: token.borderRadiusLG }
+  return { selected: selectedItemTint(mode), hover: token.colorBgTextHover, radius: token.borderRadiusLG }
 }
 
 /** The tint Ant Design gives a selected item. Dropdown menus draw their selected item on it, so Axis reads it here. */
