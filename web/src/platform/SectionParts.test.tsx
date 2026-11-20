@@ -1,5 +1,7 @@
 import { ConfigProvider } from 'antd'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { describe, expect, it } from 'vitest'
 import { designTokensFor } from './designTokens'
@@ -7,7 +9,7 @@ import { SectionPart, SectionParts } from './SectionParts'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 
-const texts = {}
+const texts = { 'shell.section.show': 'Show section {title}', 'shell.section.hide': 'Hide section {title}' }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
 function renderSections(sections: React.ReactNode) {
@@ -89,6 +91,42 @@ describe('SectionPart', () => {
     expect(within(screen.getByRole('region', { name: 'Items' })).getByRole('button', { name: 'Add' })).toBeVisible()
   })
 
+  it('folds when given a fold: a button before the heading opens a body that is drawn only while open', async () => {
+    function Folding() {
+      const [open, setOpen] = useState(false)
+      return (
+        <SectionPart
+          testName="totals"
+          heading={{ title: 'Totals' }}
+          fold={{ open, onToggle: () => setOpen(!open), title: 'Totals' }}
+        >
+          <span>Fields</span>
+        </SectionPart>
+      )
+    }
+    renderSections(<Folding />)
+
+    const section = screen.getByRole('region', { name: 'Totals' })
+    const show = within(section).getByRole('button', { name: 'Show section Totals' })
+    expect(show).toHaveAttribute('aria-expanded', 'false')
+    expect(within(section).queryByText('Fields')).not.toBeInTheDocument()
+    expect(show.compareDocumentPosition(within(section).getByRole('heading', { name: 'Totals' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+
+    await userEvent.click(show)
+
+    const hide = within(section).getByRole('button', { name: 'Hide section Totals' })
+    expect(hide).toHaveAttribute('aria-expanded', 'true')
+    expect(section.querySelector(`#${hide.getAttribute('aria-controls')}`)).toContainElement(
+      within(section).getByText('Fields'),
+    )
+
+    await userEvent.click(hide)
+
+    expect(within(section).queryByText('Fields')).not.toBeInTheDocument()
+  })
+
   it('gives a function child a slot in the heading to draw into', () => {
     renderSections(
       <SectionPart testName="items" heading={{ title: 'Items', line: 'The list.' }}>
@@ -106,7 +144,7 @@ describe('SectionPart', () => {
     expect(within(section).getByText('Fields')).toBeVisible()
   })
 
-  it('puts a divider rule before every part but the first', () => {
+  it('puts a borderSubtle rule before every part but the first', () => {
     renderSections(
       ['one', 'two', 'three'].map((name) => (
         <SectionPart key={name} testName={name} heading={{ title: name }}>
@@ -115,7 +153,7 @@ describe('SectionPart', () => {
       )),
     )
 
-    const rule = { borderTop: `1px solid ${designTokensFor('light').colour.divider}` }
+    const rule = { borderTop: `1px solid ${designTokensFor('light').colour.borderSubtle}` }
     const rules = screen.getAllByRole('separator')
     expect(rules).toHaveLength(2)
     expect(screen.getByTestId('studio-section-one').previousElementSibling).toBeNull()

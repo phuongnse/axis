@@ -1,6 +1,5 @@
-import { Collapse, Flex, Tabs } from 'antd'
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router'
+import { Tabs } from 'antd'
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { ColumnGrid, ColumnGridCell } from './ColumnGrid'
 import {
   isPlaceholder,
@@ -11,7 +10,9 @@ import {
   type TabsWidgetMetadata,
   type WidgetMetadata,
 } from './site'
+import { PartBoundary, SectionPart, SectionParts } from './SectionParts'
 import { useText } from './texts'
+import { useAddressTab } from './useAddressTab'
 import { tabParameters } from './widgetTree'
 
 type RenderLeaf = (widget: WidgetMetadata) => ReactNode
@@ -77,11 +78,14 @@ function WidgetList({
 }) {
   const frameList = useContext(ListFrame)
   const drawn = (
-    <Flex vertical gap="middle">
-      {widgets.map((widget, index) => (
-        <Node key={index} widget={widget} renderLeaf={renderLeaf} />
-      ))}
-    </Flex>
+    // A boundary, so a section that comes first in this list draws no rule, even when the list follows another widget.
+    <PartBoundary>
+      <SectionParts>
+        {widgets.map((widget, index) => (
+          <Node key={index} widget={widget} renderLeaf={renderLeaf} />
+        ))}
+      </SectionParts>
+    </PartBoundary>
   )
   return frameList && pointer !== undefined ? frameList(pointer, drawn) : drawn
 }
@@ -141,26 +145,13 @@ function Columns({ widget, renderLeaf }: { widget: ColumnsWidgetMetadata; render
 function TabsNode({ widget, renderLeaf }: { widget: TabsWidgetMetadata; renderLeaf: RenderLeaf }) {
   const t = useText()
   const parameters = useContext(TabParameters)
-  const [searchParams, setSearchParams] = useSearchParams()
   const name = parameters.get(widget) ?? 'tab'
-  // A value that is not a position of a tab selects the first tab and leaves the address as it is.
-  const raw = searchParams.get(name)
-  const position = raw !== null && /^\d+$/.test(raw) ? Number(raw) : 0
-  const selected = position >= 1 && position <= widget.tabs.length ? position : 1
-
-  function select(key: string) {
-    const next = new URLSearchParams(searchParams)
-    if (key === '1') {
-      next.delete(name)
-    } else {
-      next.set(name, key)
-    }
-    setSearchParams(next, { preventScrollReset: true })
-  }
+  const keys = useMemo(() => widget.tabs.map((_, index) => String(index + 1)), [widget.tabs])
+  const [selected, select] = useAddressTab(name, keys)
 
   return (
     <Tabs
-      activeKey={String(selected)}
+      activeKey={selected}
       onChange={select}
       items={widget.tabs.map((tab, index) => ({
         key: String(index + 1),
@@ -179,21 +170,15 @@ function TabsNode({ widget, renderLeaf }: { widget: TabsWidgetMetadata; renderLe
 
 function Section({ widget, renderLeaf }: { widget: SectionWidgetMetadata; renderLeaf: RenderLeaf }) {
   const t = useText()
+  const [open, setOpen] = useState(!widget.collapsed)
   const title = t(widget.titleKey)
   return (
-    <div role="region" aria-label={title}>
-      <Collapse
-        defaultActiveKey={widget.collapsed ? [] : ['section']}
-        items={[
-          {
-            key: 'section',
-            label: title,
-            children: (
-              <WidgetList widgets={widget.widgets} renderLeaf={renderLeaf} pointer={listPointer(widget, 'widgets')} />
-            ),
-          },
-        ]}
-      />
-    </div>
+    <SectionPart
+      testId="section-widget"
+      heading={{ title }}
+      fold={widget.collapsed ? { open, onToggle: () => setOpen((current) => !current), title } : undefined}
+    >
+      <WidgetList widgets={widget.widgets} renderLeaf={renderLeaf} pointer={listPointer(widget, 'widgets')} />
+    </SectionPart>
   )
 }

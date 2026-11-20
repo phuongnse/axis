@@ -57,7 +57,7 @@ import {
   locale,
   processInspectorWidget,
   requestId,
-  sectionWidget,
+  sectionWidgets,
   signUpApplications,
   signUpDocuments,
   signUpRegion,
@@ -240,7 +240,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
   ),
   columns: typical(() => <WidgetTree widgets={[columnsWidget]} renderLeaf={renderLeaf} />),
   tabs: typical(() => <WidgetTree widgets={[tabsWidget]} renderLeaf={renderLeaf} />),
-  section: typical(() => <WidgetTree widgets={[sectionWidget]} renderLeaf={renderLeaf} />),
+  section: typical(() => <WidgetTree widgets={sectionWidgets} renderLeaf={renderLeaf} />),
   // Loading and the load error look the same in every widget, so they are drawn once, in the table.
   states: [
     { caption: 'Loading', draw: () => requestTable(loadingTableWidget), routes: loadingRoutes },

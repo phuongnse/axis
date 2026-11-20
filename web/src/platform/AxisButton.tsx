@@ -12,6 +12,7 @@ import {
   type Ref,
 } from 'react'
 import type { ButtonRole } from './buttonRoles'
+import { fillText } from './fillText'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { focusFollowsTab } from './tabFocus'
@@ -32,6 +33,8 @@ export type AxisButtonProps =
       icon: ReactNode
       /** The text key of the button's name, which is its tooltip and its accessible name. */
       nameKey: string
+      /** The values of the `{name}` placeholders in the text of `nameKey`, which fill the tooltip and the accessible name. */
+      nameValues?: Record<string, string>
       /** Draws the icon in `dangerText`. */
       destructive?: boolean
       /** Appended to the accessible name only, such as a row number. The tooltip stays the name. */
@@ -57,6 +60,7 @@ function IconButton(props: IconButtonProps) {
   const {
     role: _role,
     nameKey,
+    nameValues,
     destructive,
     nameSuffix,
     joined,
@@ -80,7 +84,7 @@ function IconButton(props: IconButtonProps) {
   }
   const pointerOver = useRef(false)
   const hushed = useRef(false)
-  const name = t(nameKey)
+  const name = nameValues ? fillText(t(nameKey), nameValues) : t(nameKey)
   const tint: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
   return (
     <Tooltip

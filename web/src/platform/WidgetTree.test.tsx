@@ -1,8 +1,9 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import type { PageWidgetMetadata, WidgetMetadata } from './site'
+import { designTokensFor } from './designTokens'
+import type { PageWidgetMetadata, SectionWidgetMetadata, WidgetMetadata } from './site'
 import { TableWidget } from './TableWidget'
 import { TaskInboxWidget } from './TaskInboxWidget'
 import { TextProvider } from './TextProvider'
@@ -83,6 +84,8 @@ const texts = {
   'tab.more': 'More',
   'section.totals': 'Totals',
   'section.inner': 'Inner',
+  'shell.section.show': 'Show section {title}',
+  'shell.section.hide': 'Hide section {title}',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -260,29 +263,68 @@ describe('WidgetTree', () => {
   })
 
   describe('sections', () => {
-    it('starts open unless the section is collapsed', () => {
-      renderTree([{ type: 'section', titleKey: 'section.totals', collapsed: false, widgets: [named('body')] }])
-
-      expect(screen.getByRole('button', { name: 'Totals' })).toHaveAttribute('aria-expanded', 'true')
-      expect(screen.getByTestId('leaf')).toBeVisible()
+    const totals = (extra: Partial<SectionWidgetMetadata> = {}): SectionWidgetMetadata => ({
+      type: 'section',
+      titleKey: 'section.totals',
+      collapsed: false,
+      widgets: [named('body')],
+      ...extra,
     })
 
-    it('starts closed with its title when collapsed, draws nothing, and opens on a click', async () => {
-      renderTree([{ type: 'section', titleKey: 'section.totals', collapsed: true, widgets: [named('body')] }])
+    it('is a region with a level-two heading, a borderSubtle rule above it and no fold when it follows a widget', () => {
+      renderTree([named('one'), totals()])
 
-      const header = screen.getByRole('button', { name: 'Totals' })
-      expect(screen.getByRole('region', { name: 'Totals' })).toBeInTheDocument()
-      expect(header).toHaveAttribute('aria-expanded', 'false')
+      const section = screen.getByRole('region', { name: 'Totals' })
+      expect(within(section).getByRole('heading', { level: 2, name: 'Totals' })).toBeVisible()
+      expect(within(section).getByTestId('leaf')).toBeVisible()
+      expect(screen.queryByRole('button', { name: /section/ })).not.toBeInTheDocument()
+      const rule = section.previousElementSibling
+      expect(rule).toHaveAttribute('role', 'separator')
+      expect(rule).toHaveStyle({ borderTop: `1px solid ${designTokensFor('light').colour.borderSubtle}` })
+    })
+
+    it('draws no rule above the first part of its list, nor above the first section of a column after a widget', () => {
+      renderTree([
+        totals(),
+        { type: 'columns', columns: [{ width: 12, widgets: [named('one'), totals({ titleKey: 'section.inner' })] }] },
+      ])
+
+      expect(screen.getByRole('region', { name: 'Totals' }).previousElementSibling).toBeNull()
+      expect(screen.getByRole('region', { name: 'Inner' }).previousElementSibling).toHaveAttribute('role', 'separator')
+      // A columns widget has no heading, so it is not a part and no rule sits above it.
+      expect(screen.getAllByRole('separator')).toHaveLength(1)
+    })
+
+    it('draws no rule above the first section of a column, even when the columns follow a widget', () => {
+      renderTree([
+        named('one'),
+        { type: 'columns', columns: [{ width: 12, widgets: [totals({ titleKey: 'section.inner' })] }] },
+      ])
+
+      expect(screen.getByRole('region', { name: 'Inner' }).previousElementSibling).toBeNull()
+    })
+
+    it('draws none of its widgets while collapsed, until its fold button opens it', async () => {
+      renderTree([totals({ collapsed: true })])
+
+      const section = screen.getByRole('region', { name: 'Totals' })
+      const show = within(section).getByRole('button', { name: 'Show section Totals' })
+      expect(show).toHaveAttribute('aria-expanded', 'false')
       expect(screen.queryByTestId('leaf')).not.toBeInTheDocument()
 
-      await userEvent.click(header)
+      await userEvent.click(show)
 
-      expect(header).toHaveAttribute('aria-expanded', 'true')
-      await waitFor(() => expect(screen.getByTestId('leaf')).toBeVisible())
+      const hide = within(section).getByRole('button', { name: 'Hide section Totals' })
+      expect(hide).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByTestId('leaf')).toBeVisible()
+      expect(section.querySelector(`#${hide.getAttribute('aria-controls')}`)).toContainElement(
+        screen.getByTestId('leaf'),
+      )
 
-      await userEvent.click(header)
+      await userEvent.click(hide)
 
-      expect(header).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.getByRole('button', { name: 'Show section Totals' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByTestId('leaf')).not.toBeInTheDocument()
     })
   })
 

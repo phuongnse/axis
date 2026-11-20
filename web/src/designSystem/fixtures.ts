@@ -550,13 +550,11 @@ export const tabsWidget: PageWidgetMetadata = {
   ],
 }
 
-/** A section widget around the task inbox. */
-export const sectionWidget: PageWidgetMetadata = {
-  type: 'section',
-  titleKey: 'preview.tasks',
-  collapsed: false,
-  widgets: [taskInboxWidget],
-}
+/** A section that does not fold, around the task inbox, then one marked `collapsed`, around the request table. */
+export const sectionWidgets: PageWidgetMetadata[] = [
+  { type: 'section', titleKey: 'preview.tasks', collapsed: false, widgets: [taskInboxWidget] },
+  { type: 'section', titleKey: 'preview.requests', collapsed: true, widgets: [tableWidget] },
+]
 
 const savedRequest = (id: string, title: string, status: string): RecordItem => ({
   id,
