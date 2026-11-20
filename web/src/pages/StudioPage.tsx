@@ -166,7 +166,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * as `&view=policies`. The matrix shows in place of the content under a Policy matrix heading, and
  * its Open policy link opens the policy in the Resources view. The band and the Problems panel show in every view.
  * The sidebar's Packages entry, `&view=packages`, shows `StudioPackages` under a Packages heading, and `&package=<id>` shows that
- * package's `StudioPackageWorkspace` in place of the list, under the same entry, read-only without `studioDeveloper`. New package… sits on the heading's right and shows only
+ * package's `StudioPackageWorkspace` in place of the list, under the same entry, read-only without `studioDeveloper`. With it, the workspace saves the package's files and tells Studio's folder state through `onWritten`. New package… sits on the heading's right and shows only
  * when `GET /api/me` answers `studioDeveloper: true`, see docs/reference/studio-packages.md#the-packages-entry.
  * `&view=releases` shows only the Releases heading and the release list. `&view=release&release=<number>` shows that
  * release's `StudioReleasePage` in place of the list, under the Releases entry, and its Activate… sends the same request as the list's.
@@ -660,6 +660,7 @@ function StudioWorkspace() {
                       packageId={packageId}
                       folderRevision={folderRevision}
                       canDevelop={canDevelop}
+                      onWritten={onWritten}
                     />
                   ) : (
                     <PageLayout title={t('shell.studio.nav.packages')}>

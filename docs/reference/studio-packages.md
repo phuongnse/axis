@@ -36,8 +36,9 @@ package's workspace as `&view=packages&package=<id>`.
 
 ## A package's files
 
-An open package is a workspace that shows its files in a code editor. Saving, building, testing and running them, so
-that a package can be written in the browser, are planned, see the marked bullets below.
+An open package is a workspace that shows its files in a code editor, and a developer saves them there. Building,
+testing and running them, so that a package can be built and run in the browser, are planned, see the marked bullets
+below.
 
 - **The workspace.** An open package is one workspace. It fills the window down to the footer: the explorer on the
   left, the open files as tabs with the code editor under them, the status line at the editor's foot, and the output
@@ -71,10 +72,12 @@ that a package can be written in the browser, are planned, see the marked bullet
   language without a syntax tree, such as C#, folds by indentation.
 - **The editor's marks and keys** _(planned for M37)_. A build problem is marked at its line. The editor's fold column
   sits `spacing-sm` from the line numbers and from the gutter's rule, and shows an open fold's chevron while the
-  pointer is over the gutter and a folded one always, as VS Code does. Ctrl+S saves every changed file, Ctrl+P opens a
-  file by its name and Ctrl+Shift+B builds.
-- **Saving** _(planned for M37)_. A save uses the version check of [versions](authoring.md#versions), and a save over a
-  stale version answers `409`, as it does for a resource. One save bar saves every changed file.
+  pointer is over the gutter and a folded one always, as VS Code does. Ctrl+P opens a file by its name and
+  Ctrl+Shift+B builds.
+- **Saving.** One save bar, or Ctrl+S (Cmd+S on macOS), saves every changed file, one after another. Each save uses
+  the version check of [versions](authoring.md#versions), and a save over a stale version answers `409`, as it does for
+  a resource. That file keeps its text and its dot, and its tab shows the notice with Reload, while the other files
+  still save. A quota refusal shows as it does for a resource.
 - **The status line.** At the editor's foot, right above the output panel, it tells of the open
   file: the cursor's line and column, the file's language and what is unsaved.
 - **Save before a run** _(planned for M37)_. Build, Run tests and Run… save every changed file first, as a code
@@ -99,9 +102,10 @@ that a package can be written in the browser, are planned, see the marked bullet
 - **Saved inputs** _(planned for M37)_. A run's named inputs are kept with the application and shared by its
   developers, as AWS Lambda's shareable test events are, so a team runs the same cases. Saved input's list ends with
   Manage saved inputs…, which opens the [dialog that keeps saved items](actions-and-controls.md#fields).
-- **Without the developer role.** The editor is read-only, with an info alert.
-- **Without the developer role, saving and the explorer** _(planned for M37)_. The file shows no save action. The
-  explorer offers only the files, Copy path and Refresh.
+- **Without the developer role.** The editor is read-only, with an info alert. The workspace shows no save bar, and
+  Ctrl+S saves nothing.
+- **Without the developer role, the explorer** _(planned for M37)_. The explorer offers only the files, Copy path and
+  Refresh.
 
 ## Diffs
 

@@ -25,24 +25,39 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** Stubs a package `tools` with five files, and answers a file's read from `contents`. */
-function stubPackage() {
+/**
+ * Stubs a package `tools` with five files, and answers a file's read from `contents`. A write answers
+ * `{ version: 'new-<path>' }` unless `writes` has a response for its path. The writes are recorded in `puts`.
+ */
+function stubPackage(writes: Record<string, () => Response> = {}) {
+  const puts: { path: string; ifMatch: string | null; body: { content: string } }[] = []
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (input: string): Promise<Response> => {
+    vi.fn(async (input: string, init?: RequestInit): Promise<Response> => {
       if (input === files) {
         return json({ items: Object.keys(contents).map((path) => ({ package: 'tools', path, version: `v-${path}` })) })
       }
       const path = Object.keys(contents).find((candidate) => input === fileRoute(candidate))
-      return path === undefined
-        ? new Response(null, { status: 404 })
-        : json({ package: 'tools', path, version: `v-${path}`, content: contents[path] })
+      if (path === undefined) {
+        return new Response(null, { status: 404 })
+      }
+      if (init?.method === 'PUT') {
+        puts.push({
+          path,
+          ifMatch: new Headers(init.headers).get('If-Match'),
+          body: JSON.parse(init.body as string) as { content: string },
+        })
+        return writes[path]?.() ?? json({ version: `new-${path}`, diagnostics: [] })
+      }
+      return json({ package: 'tools', path, version: `v-${path}`, content: contents[path] })
     }),
   )
+  return puts
 }
 
 function renderWorkspace(canDevelop: boolean, packageId = 'tools') {
-  return render(
+  const onWritten = vi.fn()
+  render(
     // Without motion a closed dialog leaves the document at once, as jsdom runs no animations.
     <ConfigProvider theme={{ token: { motion: false } }}>
       <MemoryRouter>
@@ -54,12 +69,14 @@ function renderWorkspace(canDevelop: boolean, packageId = 'tools') {
               packageId={packageId}
               folderRevision={0}
               canDevelop={canDevelop}
+              onWritten={onWritten}
             />
           </TextProvider>
         </ThemeModeProvider>
       </MemoryRouter>
     </ConfigProvider>,
   )
+  return onWritten
 }
 
 const treeNames = () =>
@@ -186,5 +203,148 @@ describe('StudioPackageWorkspace', () => {
     expect(view.state.readOnly).toBe(false)
     expect(view.state.doc.toString()).toBe('xconst b = 1')
     expect(screen.queryByTestId('studio-package-read-only')).not.toBeInTheDocument()
+  })
+
+  /** Opens `src/b.ts` and `adapter.py` and types at the start of both, so both are unsaved. */
+  async function editTwoFiles() {
+    await screen.findByTestId('studio-package-tree')
+    const b = await openFile('b.ts', 'src/b.ts')
+    const adapter = await openFile('adapter.py', 'adapter.py')
+    typeAtStart(b)
+    typeAtStart(adapter)
+    await waitFor(() => expect(screen.getAllByTestId('studio-package-unsaved')).toHaveLength(4))
+    return { b, adapter }
+  }
+
+  describe('saving', () => {
+    it('saves every changed file with the version it was read at on Ctrl+S, and clears each dot', async () => {
+      const puts = stubPackage()
+      const onWritten = renderWorkspace(true)
+      await editTwoFiles()
+      expect(screen.getByTestId('studio-package-save-bar')).toBeInTheDocument()
+
+      await userEvent.keyboard('{Control>}s{/Control}')
+
+      await waitFor(() => expect(screen.queryByTestId('studio-package-unsaved')).not.toBeInTheDocument())
+      expect(puts).toEqual([
+        { path: 'src/b.ts', ifMatch: '"v-src/b.ts"', body: { content: 'xconst b = 1' } },
+        { path: 'adapter.py', ifMatch: '"v-adapter.py"', body: { content: 'xprint(1)' } },
+      ])
+      expect(onWritten).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('studio-package-status')).toHaveTextContent('No unsaved files')
+      await waitFor(() => expect(screen.queryByTestId('studio-package-save-bar')).not.toBeInTheDocument())
+    })
+
+    it('saves with the next version, so a second edit is sent with the version of the first save', async () => {
+      const puts = stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+      const view = await openFile('b.ts', 'src/b.ts')
+      typeAtStart(view)
+      await userEvent.keyboard('{Control>}s{/Control}')
+      await waitFor(() => expect(screen.queryByTestId('studio-package-unsaved')).not.toBeInTheDocument())
+
+      typeAtStart(view)
+      await userEvent.keyboard('{Control>}s{/Control}')
+
+      await waitFor(() => expect(puts).toHaveLength(2))
+      expect(puts[1].ifMatch).toBe('"new-src/b.ts"')
+    })
+
+    it('saves the same files from Save on the save bar', async () => {
+      const puts = stubPackage()
+      renderWorkspace(true)
+      await editTwoFiles()
+
+      await userEvent.click(screen.getByTestId('studio-package-save'))
+
+      await waitFor(() => expect(screen.queryByTestId('studio-package-unsaved')).not.toBeInTheDocument())
+      expect(puts.map((put) => put.path)).toEqual(['src/b.ts', 'adapter.py'])
+    })
+
+    it('keeps the text and the dot of a file that changed elsewhere, shows its notice, and saves the other file', async () => {
+      const puts = stubPackage({ 'src/b.ts': () => json({ title: 'Changed.' }, 409) })
+      const onWritten = renderWorkspace(true)
+      const { b } = await editTwoFiles()
+
+      await userEvent.keyboard('{Control>}s{/Control}')
+
+      expect(await screen.findByTestId('studio-package-conflict')).toHaveTextContent('Someone else changed this file.')
+      expect(puts.map((put) => put.path)).toEqual(['src/b.ts', 'adapter.py'])
+      expect(b.state.doc.toString()).toBe('xconst b = 1')
+      await waitFor(() => expect(screen.getAllByTestId('studio-package-unsaved')).toHaveLength(2))
+      expect(
+        within(screen.getByRole('tab', { name: /b\.ts/ })).getByTestId('studio-package-unsaved'),
+      ).toBeInTheDocument()
+      expect(
+        within(screen.getByRole('tab', { name: /adapter\.py/ })).queryByTestId('studio-package-unsaved'),
+      ).toBeNull()
+      expect(onWritten).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('tab', { name: /b\.ts/ })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByTestId('studio-package-save')).toBeDisabled()
+    })
+
+    it('reads a conflicting file again on Reload and drops the notice and the unsaved text', async () => {
+      stubPackage({ 'src/b.ts': () => json({ title: 'Changed.' }, 409) })
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+      const view = await openFile('b.ts', 'src/b.ts')
+      typeAtStart(view)
+      await userEvent.keyboard('{Control>}s{/Control}')
+
+      await userEvent.click(
+        within(await screen.findByTestId('studio-package-conflict')).getByRole('button', { name: 'Reload' }),
+      )
+
+      await waitFor(() => expect(screen.queryByTestId('studio-package-conflict')).not.toBeInTheDocument())
+      await waitFor(() => expect(screen.queryByTestId('studio-package-unsaved')).not.toBeInTheDocument())
+      expect(EditorView.findFromDOM(screen.getByRole('textbox', { name: 'src/b.ts' }))!.state.doc.toString()).toBe(
+        'const b = 1',
+      )
+    })
+
+    it('shows the quota refusal under the heading and keeps the dot of a file it did not save', async () => {
+      const puts = stubPackage({
+        'src/b.ts': () => json({ reason: 'quota-exceeded', title: 'Storage is full.' }, 403),
+      })
+      const onWritten = renderWorkspace(true)
+      await editTwoFiles()
+
+      await userEvent.keyboard('{Control>}s{/Control}')
+
+      expect(await screen.findByTestId('studio-package-save-error')).toHaveTextContent('Storage is full.')
+      expect(puts.map((put) => put.path)).toEqual(['src/b.ts'])
+      expect(screen.getAllByTestId('studio-package-unsaved')).toHaveLength(4)
+      expect(onWritten).not.toHaveBeenCalled()
+    })
+
+    it('puts every unsaved file back to its saved text on Discard, after it asks', async () => {
+      const puts = stubPackage()
+      renderWorkspace(true)
+      const { b, adapter } = await editTwoFiles()
+
+      await userEvent.click(
+        within(screen.getByTestId('studio-package-save-bar')).getByRole('button', { name: 'Discard' }),
+      )
+      await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Discard' }))
+
+      await waitFor(() => expect(screen.queryByTestId('studio-package-unsaved')).not.toBeInTheDocument())
+      expect(b.state.doc.toString()).toBe('const b = 1')
+      expect(adapter.state.doc.toString()).toBe('print(1)')
+      expect(puts).toEqual([])
+    })
+
+    it('shows no save bar and sends nothing on Ctrl+S without the developer role', async () => {
+      const puts = stubPackage()
+      renderWorkspace(false)
+      await screen.findByTestId('studio-package-tree')
+      const view = await openFile('b.ts', 'src/b.ts')
+      typeAtStart(view)
+
+      await userEvent.keyboard('{Control>}s{/Control}')
+
+      expect(screen.queryByTestId('studio-package-save-bar')).not.toBeInTheDocument()
+      expect(puts).toEqual([])
+    })
   })
 })
