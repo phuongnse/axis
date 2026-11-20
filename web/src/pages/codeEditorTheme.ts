@@ -13,6 +13,9 @@ export function codeHighlightStyle(colour: DesignTokens['colour']): HighlightSty
     { tag: tags.number, color: colour.infoText },
     { tag: [tags.bool, tags.null, tags.keyword], color: colour.warningText },
     { tag: [tags.punctuation, tags.operator], color: colour.textMuted },
+    // Italics keep a comment apart from punctuation, which is also `textMuted`.
+    { tag: tags.comment, color: colour.textMuted, fontStyle: 'italic' },
+    { tag: tags.typeName, color: colour.successText },
   ])
 }
 

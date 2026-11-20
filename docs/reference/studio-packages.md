@@ -67,9 +67,13 @@ package can be written in the browser, is planned, see the marked bullets below.
   row.
   The editor is one CodeMirror 6 editor, the one the [JSON view](studio-resource-form.md#json-view) is, in
   `codeEditorTheme.ts`'s colours and with the highlighting of the file's language, so no editor draws in
-  CodeMirror's own. It folds, matches and closes brackets, indents on input, completes the words of the text and
-  marks the current line. A build problem is marked at its line. Its fold column sits `spacing-sm` from the line
-  numbers and from the gutter's rule, and shows an open fold's chevron while the pointer is over the gutter and a
+  CodeMirror's own. It highlights C# (`.cs`), TypeScript (`.ts`), JavaScript (`.js`, `.mjs`, `.cjs`), Python (`.py`)
+  and JSON (`.json`), and any other file shows as plain text. Comments are `textMuted` in italics and type names
+  `successText`. It folds, matches and closes brackets, indents on input, completes the words of the text and
+  marks the current line, in `fillSubtle`, and a matching bracket has the thin `border` outline of a search match. A
+  language without a syntax tree, such as C#, folds by indentation. A build problem is marked at its line. Its fold
+  column sits `spacing-sm` from the line numbers and from the gutter's rule, and shows an open fold's chevron while
+  the pointer is over the gutter and a
   folded one always, as VS Code does. Ctrl+S saves every changed file, Ctrl+P opens a file by its name and
   Ctrl+Shift+B builds.
 - **Saving** _(planned for M37)_. A save uses the version check of [versions](authoring.md#versions), and a save over a
