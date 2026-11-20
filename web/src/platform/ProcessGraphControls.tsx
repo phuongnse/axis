@@ -1,5 +1,6 @@
 import {
   AimOutlined,
+  DownloadOutlined,
   ExpandOutlined,
   FullscreenExitOutlined,
   FullscreenOutlined,
@@ -7,7 +8,7 @@ import {
   ZoomOutOutlined,
 } from '@ant-design/icons'
 import { MiniMap, Panel } from '@xyflow/react'
-import { Flex } from 'antd'
+import { Dropdown, Flex } from 'antd'
 import { type ReactNode, useMemo } from 'react'
 import { ReferencePicker } from '../pages/ReferencePicker'
 import { AxisButton } from './AxisButton'
@@ -23,7 +24,8 @@ import { useGraphMoves } from './useGraphMoves'
  * docs/reference/process-inspector-widget.md#process-graph. At the top left, Find a step lists the `steps` in the order
  * given, as wide as a card. Choosing one moves the view to it and calls `onChoose` with its id. At the bottom left, icon
  * buttons zoom in and out, show the whole process, go to the `current` step, on an instance only, and go full screen.
- * Each but Go to the current step names its key in `aria-keyshortcuts`. The overview draws each step in the tone of its run state, and the muted
+ * Each but Go to the current step names its key in `aria-keyshortcuts`. With `onDownload`, the last button is Download, a
+ * menu of SVG and PNG with no key, see docs/reference/process-designer.md#download. The overview draws each step in the tone of its run state, and the muted
  * colour for a step not reached. The graph handles the keys.
  */
 export function ProcessGraphControls({
@@ -35,6 +37,8 @@ export function ProcessGraphControls({
   runStates,
   fullScreen,
   onFullScreen,
+  onDownload,
+  downloading,
 }: {
   steps: readonly GraphStep[]
   /** The width of a card, in px, which Find a step is as wide as. */
@@ -45,6 +49,8 @@ export function ProcessGraphControls({
   runStates?: ReadonlyMap<string, RunState>
   fullScreen: boolean
   onFullScreen: () => void
+  onDownload?: (format: 'svg' | 'png') => void
+  downloading?: boolean
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
@@ -92,6 +98,26 @@ export function ProcessGraphControls({
             fullScreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />,
             'F',
             onFullScreen,
+          )}
+          {onDownload && (
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  { key: 'svg', label: t('shell.inspector.graph.downloadSvg') },
+                  { key: 'png', label: t('shell.inspector.graph.downloadPng') },
+                ],
+                onClick: ({ key }) => onDownload(key as 'svg' | 'png'),
+                'aria-label': t('shell.inspector.graph.download'),
+              }}
+            >
+              <AxisButton
+                role="icon"
+                nameKey="shell.inspector.graph.download"
+                icon={<DownloadOutlined />}
+                loading={downloading}
+              />
+            </Dropdown>
           )}
         </Flex>
       </Panel>

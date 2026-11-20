@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
-import { PageLayout, type BreadcrumbStep } from '../platform/PageLayout'
+import { PageLayout } from '../platform/PageLayout'
 import { PageLeaf, type PageLeafProps } from '../platform/PageLeaf'
 import { detailRecordId, readPageParameters } from '../platform/pageParameters'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
@@ -86,7 +86,7 @@ export function RecordPageRoute() {
   )
 }
 
-/** What a site page takes from where the person came from: the address to return to, the breadcrumb's trail and the site's pages. */
+/** What a site page takes from where the person came from: the address to return to, the record list's trail and the site's pages. */
 function useOrigin(site: ApplicationSite) {
   const location = useLocation()
   // The table that opened the form passes its address, with paging and sorting, in history state.
@@ -98,7 +98,7 @@ function useOrigin(site: ApplicationSite) {
   return { returnTo, pages, trail: { site, from: typeof from === 'string' ? from : null } }
 }
 
-/** The site and the address of the navigation page that opened this page, which the breadcrumb is built from. */
+/** The site and the address of the navigation page that opened this page, which the record list's link is built from. */
 interface Trail {
   site: ApplicationSite
   from: string | null
@@ -116,22 +116,6 @@ function navigationOrigin(trail: Trail, pageName: string) {
       entry.page.toLowerCase() !== pageName.toLowerCase() &&
       pathname === siteAddress(site.path, entry.page).toLowerCase(),
   )
-}
-
-/**
- * The breadcrumb of a page: the site, then the navigation page the person came from when that is
- * another page of the site, then the page itself. The `from` address keeps the paging and sorting of
- * a table, so its link returns to the table as it was.
- */
-function breadcrumbFor(trail: Trail, pageName: string, titleKey: string, t: (key: string) => string): BreadcrumbStep[] {
-  const { site, from } = trail
-  const steps: BreadcrumbStep[] = [{ label: t(site.titleKey), to: siteAddress(site.path) }]
-  const origin = navigationOrigin(trail, pageName)
-  if (origin && from) {
-    steps.push({ label: t(origin.labelKey), to: from })
-  }
-  steps.push({ label: t(titleKey) })
-  return steps
 }
 
 /**
@@ -229,8 +213,6 @@ function SitePage({
     return <NotFoundPage />
   }
 
-  const breadcrumb = breadcrumbFor(trail, page.name, page.titleKey, t)
-
   const taskInbox = leaves.find((widget) => widget.type === 'taskInbox')
   const processInspector = leaves.find((widget) => widget.type === 'processInspector')
   const details = leaves.filter((widget) => widget.type === 'detail')
@@ -240,7 +222,7 @@ function SitePage({
       return <NotFoundPage />
     }
     return (
-      <PageLayout title={t(page.titleKey)} breadcrumb={breadcrumb}>
+      <PageLayout title={t(page.titleKey)}>
         <TaskPage
           sitePath={sitePath}
           pageName={page.name}
@@ -258,7 +240,7 @@ function SitePage({
       return <NotFoundPage />
     }
     return (
-      <PageLayout title={t(page.titleKey)} breadcrumb={breadcrumb}>
+      <PageLayout title={t(page.titleKey)}>
         <ProcessInstancePage
           sitePath={sitePath}
           pages={pages}
@@ -296,7 +278,7 @@ function SitePage({
   }
 
   return (
-    <PageLayout title={t(page.titleKey)} breadcrumb={breadcrumb}>
+    <PageLayout title={t(page.titleKey)}>
       <RecordList value={recordListFor(trail, page.name)}>
         <WidgetTree widgets={page.widgets} renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} />} />
       </RecordList>

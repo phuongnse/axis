@@ -47,7 +47,7 @@ describe('the design-system shell states', () => {
     expect(await screen.findByDisplayValue('Standing desks for the new office', {}, { timeout: 15000 })).toBeVisible()
   }, 30000)
 
-  it('opens a category on the default record page, with a breadcrumb back to Requests', async () => {
+  it('opens a category on the default record page, with Requests marked in the sidebar', async () => {
     const recordPage = {
       caption: 'Default record page',
       draw: () => <ShellPreview />,
@@ -58,8 +58,8 @@ describe('the design-system shell states', () => {
     render(<Preview states={[recordPage]} />)
 
     expect(await screen.findByDisplayValue('Office furniture', {}, { timeout: 15000 })).toBeVisible()
-    const breadcrumb = within(screen.getByRole('navigation', { name: 'Breadcrumb' }))
-    expect(breadcrumb.getByRole('link', { name: 'Requests' })).toHaveAttribute('href', '/sample/requests')
+    expect(screen.getByRole('link', { name: 'Requests' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   }, 30000)
 
   it("opens a saved request's Category on the default record page, not the not-found page", async () => {

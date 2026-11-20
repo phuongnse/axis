@@ -704,7 +704,7 @@ for (const mode of modes) {
 }
 
 for (const mode of modes) {
-  test(`the shell preview's Form page breadcrumb links back to Requests in ${mode} mode`, async ({
+  test(`the shell preview's Form page marks Requests in the sidebar in ${mode} mode`, async ({
     page,
   }) => {
     const recording = await openHarness(page, `?preview=shell&mode=${mode}`, {
@@ -712,17 +712,14 @@ for (const mode of modes) {
       frameWidth: 992,
     });
     await pickState(page.frameLocator("iframe"), "Form page");
-    const breadcrumb = figure(
-      page.frameLocator("iframe"),
-      "Form page",
-    ).getByRole("navigation", {
-      name: "Breadcrumb",
-      exact: true,
-    });
+    const formPage = figure(page.frameLocator("iframe"), "Form page");
 
     await expect(
-      breadcrumb.getByRole("link", { name: "Requests", exact: true }),
-    ).toHaveAttribute("href", "/sample/requests");
+      formPage.getByRole("link", { name: "Requests", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      formPage.getByRole("navigation", { name: "Breadcrumb", exact: true }),
+    ).toHaveCount(0);
     expect(recording.errors).toEqual([]);
   });
 }

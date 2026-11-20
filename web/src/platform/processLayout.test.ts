@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { layoutGraph, roundedPath, routeBetween } from './processLayout'
+import { layoutBounds, layoutGraph, roundedPath, routeBetween } from './processLayout'
 
 describe('roundedPath', () => {
   it('is a straight line for two points', () => {
@@ -84,5 +84,42 @@ describe('routeBetween', () => {
     expect(routeBetween(layout, 'a-b', 'a', 'c')).toBeUndefined()
     expect(routeBetween(layout, 'a-b', 'c', 'b')).toBeUndefined()
     expect(routeBetween(layout, 'unknown', 'a', 'b')).toBeUndefined()
+  })
+})
+
+describe('layoutBounds', () => {
+  it('covers the cards and a route that lies outside them', () => {
+    const layout = {
+      positions: new Map([
+        ['a', { x: 10, y: 20 }],
+        ['b', { x: 300, y: 20 }],
+      ]),
+      routes: new Map([
+        [
+          'back',
+          {
+            source: 'b',
+            target: 'a',
+            points: [
+              { x: 300, y: 50 },
+              { x: 280, y: 130 },
+              { x: -6, y: 130 },
+              { x: 10, y: 50 },
+            ],
+          },
+        ],
+      ]),
+    }
+
+    expect(layoutBounds(layout, 200, 64)).toEqual({ x: -6, y: 20, width: 506, height: 110 })
+  })
+
+  it('is empty for no nodes', () => {
+    expect(layoutBounds({ positions: new Map(), routes: new Map() }, 200, 64)).toEqual({
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+    })
   })
 })

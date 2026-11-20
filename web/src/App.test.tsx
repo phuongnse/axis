@@ -1266,8 +1266,7 @@ describe('App', () => {
     expect(navigation.getByRole('link', { name: 'Categories' })).toHaveAttribute('href', '/categories')
     await userEvent.click(screen.getByRole('button', { name: 'New' }))
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/noteform\/new$/)
-    const breadcrumb = within(await screen.findByRole('navigation', { name: 'Breadcrumb' }))
-    expect(breadcrumb.getByRole('link', { name: 'E2E notes' })).toHaveAttribute('href', '/')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Note' })).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/pages/notes', expect.anything())
   })
 
@@ -1324,29 +1323,30 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Note' })).toBeInTheDocument()
   })
 
-  it('shows a breadcrumb from the site through the table that opened a form page, with the last step as the current page', async () => {
+  it('shows the title of a form page as its level-one heading, with no breadcrumb and the table that opened it marked', async () => {
     stubServer()
     renderApp('/e2e/notes?pageSize=100')
     expect(await screen.findByText('No records yet.')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'New' }))
 
-    const breadcrumb = within(await screen.findByRole('navigation', { name: 'Breadcrumb' }))
-    expect(breadcrumb.getByRole('link', { name: 'E2E notes' })).toHaveAttribute('href', '/e2e')
-    expect(breadcrumb.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/e2e/notes?pageSize=100')
-    expect(breadcrumb.getByText('Note')).toHaveAttribute('aria-current', 'page')
-    expect(breadcrumb.queryByRole('link', { name: 'Note' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Note' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Note' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
+    const navigation = within(screen.getByRole('navigation', { name: 'shell.navigation.menu' }))
+    expect(navigation.getByRole('link', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('shows a breadcrumb of the site and the page when the page was not opened from a table', async () => {
+  it('shows the title of a form page as its level-one heading, with no breadcrumb, when the page was not opened from a table', async () => {
     stubServer()
 
     renderApp('/e2e/noteform/new')
 
-    const breadcrumb = within(await screen.findByRole('navigation', { name: 'Breadcrumb' }))
-    expect(breadcrumb.getAllByRole('link').map((link) => link.textContent)).toEqual(['E2E notes'])
-    expect(breadcrumb.getByText('Note')).toHaveAttribute('aria-current', 'page')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Note' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
+    const navigation = within(screen.getByRole('navigation', { name: 'shell.navigation.menu' }))
+    for (const link of navigation.getAllByRole('link')) {
+      expect(link).not.toHaveAttribute('aria-current')
+    }
   })
 
   it('shows no breadcrumb on the platform home page', async () => {
@@ -1378,15 +1378,15 @@ describe('App', () => {
     )
   })
 
-  it('opens the default record page of an entity on its form, filled with the record, under the heading and the breadcrumb', async () => {
+  it('opens the default record page of an entity on its form, filled with the record, under the heading', async () => {
     stubServer()
 
     renderApp({ pathname: `/e2e/records/note/${knownNoteId}`, state: { from: '/e2e/notes' } })
 
     expect(await screen.findByRole('heading', { name: 'Note' })).toBeInTheDocument()
     expect(await screen.findByRole('textbox', { name: 'title' })).toHaveValue('First note')
-    const breadcrumb = within(screen.getByRole('navigation', { name: 'Breadcrumb' }))
-    expect(breadcrumb.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/e2e/notes')
+    const navigation = within(screen.getByRole('navigation', { name: 'shell.navigation.menu' }))
+    expect(navigation.getByRole('link', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
     expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/records/note', expect.anything())
     expect(fetch).toHaveBeenCalledWith(`${noteEntity.recordsPath}/${knownNoteId}`, expect.anything())
   })

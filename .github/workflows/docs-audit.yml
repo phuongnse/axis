@@ -55,9 +55,6 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
-    outputs:
-      findings: ${{ steps.read.outputs.findings }}
-      homes: ${{ steps.homes.outputs.homes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -71,7 +68,6 @@ jobs:
           curl -fsSL https://claude.ai/install.sh | bash -s -- 2.1.285
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Read this run's pages
-        id: read
         # The fallback subscription, which NexKit uses only when the main one is at its limit, so
         # the audit does not take the main one's usage from NexKit's rounds.
         env:
@@ -80,13 +76,7 @@ jobs:
           mkdir -p artifacts/docs-audit
           node scripts/docs-audit.mjs pages "$GITHUB_RUN_NUMBER" > artifacts/docs-audit/pages.txt
           node scripts/docs-audit.mjs read "$GITHUB_RUN_NUMBER" > artifacts/docs-audit/findings.json
-          {
-            echo 'findings<<DOCS_AUDIT_END'
-            cat artifacts/docs-audit/findings.json
-            echo 'DOCS_AUDIT_END'
-          } >> "$GITHUB_OUTPUT"
       - name: Choose the new home of each broken link
-        id: homes
         # A failure leaves every link as it is and still files the findings.
         continue-on-error: true
         env:
@@ -95,11 +85,24 @@ jobs:
         run: |
           printf '%s' "$LINKS" > artifacts/docs-audit/links.json
           node scripts/docs-audit.mjs homes artifacts/docs-audit/links.json > artifacts/docs-audit/homes.json
-          {
-            echo 'homes<<DOCS_AUDIT_END'
-            cat artifacts/docs-audit/homes.json
-            echo 'DOCS_AUDIT_END'
-          } >> "$GITHUB_OUTPUT"
+      # The file job opens public issues from this artifact, so no file of it may carry the Claude token
+      # (threat B6 in docs/reference/threat-model-build.md). A job output is not used: GitHub drops one whole
+      # when any registered mask matches a part of it, and on 2026-11-20 that dropped findings that held no
+      # token at all.
+      - name: Refuse a file that holds the Claude token
+        if: ${{ !cancelled() }}
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_FALLBACK_OAUTH_TOKEN }}
+        run: |
+          leaked=0
+          for f in artifacts/docs-audit/*; do
+            if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] && grep -qF -- "$CLAUDE_CODE_OAUTH_TOKEN" "$f"; then
+              rm -f "$f"
+              echo "::error::$f held the Claude token, so it was deleted and nothing is filed."
+              leaked=1
+            fi
+          done
+          exit "$leaked"
       - name: Upload the pages and findings
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -122,20 +125,19 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: docs-audit
+          path: artifacts/docs-audit
       - name: Open an issue for each new group of findings
         env:
           GH_TOKEN: ${{ github.token }}
-          FINDINGS: ${{ needs.audit.outputs.findings }}
-        run: |
-          printf '%s' "$FINDINGS" > findings.json
-          node scripts/docs-audit.mjs file findings.json "$GITHUB_RUN_ID"
+        run: node scripts/docs-audit.mjs file artifacts/docs-audit/findings.json "$GITHUB_RUN_ID"
       - name: Point each broken link at its checked home
         if: ${{ needs.links.result == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           LINKS: ${{ needs.links.outputs.links }}
-          HOMES: ${{ needs.audit.outputs.homes }}
         run: |
           printf '%s' "$LINKS" > links.json
-          printf '%s' "$HOMES" > homes.json
-          node scripts/check-issue-links.mjs relink links.json homes.json
+          node scripts/check-issue-links.mjs relink links.json artifacts/docs-audit/homes.json

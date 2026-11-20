@@ -43,10 +43,10 @@ their own controls where they expect them.
   `borderSubtle` rule on its right. An open entry shows its label alone, and a collapsed entry its icon
   alone, see [navigation icons](#navigation-icons). No entry shows a count. The entry of the current
   page is drawn in `primaryText` on a `primary` tint and marked `aria-current`.
-- **Where a page is opened from** _(planned)_. The entry whose path is the page's path or a parent of it is marked, as
-  before. A page that matches no entry, such as a form at `/<site>/request/new` opened from a table, marks the entry of
-  the address it was opened from, its `from`, which a table or a record link passes in history state. A page opened with no `from`,
-  such as in a new tab, marks no entry.
+- **Where a page is opened from**. The entry whose path is the page's path or a parent of it is marked. A page that
+  matches no entry, such as a form at `/<site>/request/new` opened from a table, marks the entry of the address it was
+  opened from, its `from`, which a table or a record link passes in history state. A page opened with no `from`, such as
+  in a new tab, marks no entry.
 - **Parent entries** _(planned for M35)_. A `ShellNavigation` entry that holds entries is a parent entry, drawn as Ant
   Design's inline submenu.
 - **Menu groups** _(planned for M42)_. A site's navigation entry with `entries` is a parent entry, as
@@ -149,7 +149,7 @@ below it. It says where the person is and what the page is.
   page, and the browser goes back, as **No link back** in [layout](#layout) says. The user page and the console instance
   page have no step back to their list, because the browser leads back to it. `PageLayout` takes no breadcrumb, and no
   text names one.
-- **Site pages** _(planned)_. A page of an application site starts with its title in `heading4` as the page's
+- **Site pages**. A page of an application site starts with its title in `heading4` as the page's
   level-one heading, with no breadcrumb and no band of its own. The sidebar marks where the person is, and the browser
   goes back, with a table's search, sort and page kept in the address.
 - **Compact band.** A workspace page, such as every page of Studio, draws its band as one row of the
@@ -299,11 +299,11 @@ the shell's header and footer have them. The card is on `surface` with a
 button there, and nothing starts sign-in until the person clicks the card's button. A signed-in person
 who opens any of these addresses sees the launcher.
 
-| Address             | When                                                                                                                                                             | The card shows                                                                                                                  |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `/?signIn=failed`   | Every failed sign-in but declined terms                                                                                                                          | "Sign in", the warning "Sign-in did not finish. Try again." with no reason, and a full-width Sign in button                     |
-| `/?signIn=declined` | The person declined the terms step, see [accepting the terms](legal.md#accepting-the-terms): an `access_denied` answer whose sign-in state the server could read | The same card, with the warning "You need to accept the terms to sign in. Sign in again to accept them."                        |
-| `/?signedOut`       | After sign-out: the server sends the browser there itself, once it has ended the identity provider's session                                                     | "You have signed out", "You can close this page, or sign in again." in `textMuted`, and a full-width "Sign in again" button     |
+| Address             | When                                                                                                                                                             | The card shows                                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `/?signIn=failed`   | Every failed sign-in but declined terms                                                                                                                          | "Sign in", the warning "Sign-in did not finish. Try again." with no reason, and a full-width Sign in button                 |
+| `/?signIn=declined` | The person declined the terms step, see [accepting the terms](legal.md#accepting-the-terms): an `access_denied` answer whose sign-in state the server could read | The same card, with the warning "You need to accept the terms to sign in. Sign in again to accept them."                    |
+| `/?signedOut`       | After sign-out: the server sends the browser there itself, once it has ended the identity provider's session                                                     | "You have signed out", "You can close this page, or sign in again." in `textMuted`, and a full-width "Sign in again" button |
 
 Starting sign-in at once after a failure would loop, as the identity provider's session is still open.
 The warning is an alert that screen readers announce, with the platform text `shell.home.signInFailed` or
@@ -403,7 +403,7 @@ to the frame shows in every state. How previews work is in
 
   | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                                                                                                                                   |
+  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                                                                                                   |
   | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
   | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 

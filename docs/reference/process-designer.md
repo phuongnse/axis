@@ -28,6 +28,26 @@ panel, the Form tab or the JSON view redraws the graph at once.
 - **No invented parts.** A transition to a step that does not exist draws no edge, and the graph never
   invents a node.
 
+## Download
+
+An author saves the process's graph as an image, for the documents an audit or a quality system asks for.
+
+- **Where.** Download is an icon button at the end of the graph's own controls, under Full screen, and it has no key.
+  It opens a menu of SVG and PNG. Only the process designer's graph has it: an instance's Diagram and a module
+  contract's lifecycle draw the same graph without it. It needs only the right to open the process in Studio.
+- **What it saves.** Each choice saves the whole graph as one image at its full size, whatever part is in view and
+  however far it is zoomed. The image is laid out from left to right, with every transition routed as the designer draws
+  it, and it holds every step and transition with their labels.
+- **Surface.** The image is always drawn in the light theme on `surface`, so it prints the same in dark mode.
+- **What it leaves out.** It has no controls, no Find a step, no overview, no grid, no selection, no diagnostic mark and
+  no customization layer's mark, because it documents the process and not the editing session.
+- **File.** The file is named after the process in kebab case, such as `purchase-approval.svg` or
+  `purchase-approval.png`. A module process is named by the text after the last `/` of its name, and a process with no
+  name is `process`. The PNG is drawn from the SVG at twice its size, or at less where a browser's canvas would not
+  hold it.
+- **Failure.** When the image cannot be made, a message at the graph's top right says so and nothing is saved.
+- **Loading.** The image library loads only when a download starts.
+
 ## Frames
 
 _(planned for M38)_
