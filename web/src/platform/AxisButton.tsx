@@ -331,9 +331,10 @@ export interface SplitButtonItem {
 }
 
 /**
- * Proposed, see #3978: the main of three or more actions that manage one thing as a button, with the others in a menu on
- * a joined caret button, or in a region's title row as a borderless text button and caret, such as a saved input's Save with Save as… and Delete, see
- * docs/reference/actions-and-controls.md#buttons. `menuNameKey` names the caret button.
+ * Proposed, see #3978: one button with two parts, the main of three or more actions that manage one thing and a caret
+ * that opens a menu of the others, joined in one shape as Ant Design joins a split button with Space.Compact, such as a
+ * saved input's Save with Save as… and Delete, see docs/reference/actions-and-controls.md#buttons. `menuNameKey` names
+ * the caret.
  */
 export function AxisSplitButton({
   role = 'secondary',
@@ -342,7 +343,6 @@ export function AxisSplitButton({
   onClick,
   menuNameKey,
   items,
-  titleRow,
   'data-testid': testId,
 }: {
   role?: 'secondary' | 'main'
@@ -352,11 +352,6 @@ export function AxisSplitButton({
   onClick: () => void
   menuNameKey: string
   items: readonly SplitButtonItem[]
-  /**
-   * Proposed, see #3978: the button sits in a region's title row, so the main action is a borderless text button and the
-   * others are the entries of a menu on a borderless caret beside it, both at their usual size.
-   */
-  titleRow?: boolean
   'data-testid'?: string
 }) {
   const menu = {
@@ -367,20 +362,6 @@ export function AxisSplitButton({
       disabled: item.disabled,
     })),
     onClick: ({ key }: { key: string }) => items.find((item) => item.key === key)?.onClick(),
-  }
-  if (titleRow) {
-    return (
-      // The action and the caret of its menu are one pair, with no gap of their own between them, each button at its
-      // usual size.
-      <Flex data-testid={testId} align="center">
-        <AxisButton role="plain" disabled={disabled} onClick={onClick}>
-          {children}
-        </AxisButton>
-        <Dropdown trigger={['click']} menu={menu}>
-          <AxisButton role="icon" nameKey={menuNameKey} icon={<Chevron />} />
-        </Dropdown>
-      </Flex>
-    )
   }
   return (
     <Space.Compact data-testid={testId}>
