@@ -2,7 +2,8 @@ import { Flex, Select, Tabs, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisButton, AxisSplitButton } from '../platform/AxisButton'
+import { AxisButton } from '../platform/AxisButton'
+import { ChoiceActions } from '../platform/ChoiceActions'
 import { AxisField } from '../platform/AxisField'
 import { CodeBlock } from '../platform/CodeBlock'
 import { EmptyState } from '../platform/EmptyState'
@@ -114,6 +115,7 @@ export function PackageRun({
   const [jsonText, setJsonText] = useState('{}')
   const [jsonError, setJsonError] = useState(false)
   const [saveAsOpen, setSaveAsOpen] = useState(false)
+  const [savedOpen, setSavedOpen] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -259,62 +261,66 @@ export function PackageRun({
               />
             </AxisField>
           </div>
-          {/* Proposed, see #3978: the title row holds the input's own actions, Save and its menu, and the Form and JSON
-              tabs sit right above the values they show, as a tool apart from the actions that manage the saved input. */}
-          <PaneHeader
-            title={t('shell.studio.package.run.input')}
-            height={rowHeight}
-            actions={
-              developer && (
-                <AxisSplitButton
-                  data-testid="package-run-save"
-                  disabled={input === null}
-                  onClick={() =>
-                    chosen === null
-                      ? setSaveAsOpen(true)
-                      : void store(
-                          saved.items.map((item) =>
-                            item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
-                          ),
-                        )
-                  }
-                  menuNameKey="shell.studio.package.run.inputActions"
-                  items={[
-                    {
-                      key: 'saveAs',
-                      label: t('shell.studio.package.run.saveInputAs'),
-                      disabled: input === null,
-                      onClick: () => setSaveAsOpen(true),
-                    },
-                    {
-                      key: 'delete',
-                      label: t('shell.studio.package.run.deleteInput'),
-                      destructive: true,
-                      disabled: chosen === null,
-                      onClick: () =>
-                        void store(saved.items.filter((item) => item.name !== chosen)).then(
-                          (done) => done && choose(null),
-                        ),
-                    },
-                  ]}
-                >
-                  {t('shell.studio.package.run.saveInput')}
-                </AxisSplitButton>
-              )
-            }
-          />
+          <PaneHeader title={t('shell.studio.package.run.input')} height={rowHeight} />
           <div style={{ flex: 'none', padding: pad }}>
             <Flex vertical gap={spacing.sm}>
               <AxisField label={t('shell.studio.package.run.savedInput')} help="">
+                {/* Proposed, see #3978: Save, Save as… and Delete act on the saved inputs, the select's choices, so they are
+                    in its list after the choices, and the select keeps the field's width. */}
                 <Select
+                  data-testid="package-run-saved-input"
                   placeholder={t('shell.studio.package.run.newInput')}
                   value={chosen ?? undefined}
                   onChange={(next: string) => choose(next)}
                   allowClear
                   onClear={() => choose(null)}
+                  open={savedOpen}
+                  onOpenChange={setSavedOpen}
+                  notFoundContent={null}
                   options={saved.items
                     .filter((item) => item.operation === operation)
                     .map((item) => ({ value: item.name, label: item.name }))}
+                  popupRender={(list) => (
+                    <>
+                      {list}
+                      {developer && (
+                        <ChoiceActions
+                          onDone={() => setSavedOpen(false)}
+                          actions={[
+                            {
+                              key: 'save',
+                              label: t('shell.studio.package.run.saveInput'),
+                              disabled: input === null,
+                              onClick: () =>
+                                chosen === null
+                                  ? setSaveAsOpen(true)
+                                  : void store(
+                                      saved.items.map((item) =>
+                                        item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
+                                      ),
+                                    ),
+                            },
+                            {
+                              key: 'saveAs',
+                              label: t('shell.studio.package.run.saveInputAs'),
+                              disabled: input === null,
+                              onClick: () => setSaveAsOpen(true),
+                            },
+                            {
+                              key: 'delete',
+                              label: t('shell.studio.package.run.deleteInput'),
+                              destructive: true,
+                              disabled: chosen === null,
+                              onClick: () =>
+                                void store(saved.items.filter((item) => item.name !== chosen)).then(
+                                  (done) => done && choose(null),
+                                ),
+                            },
+                          ]}
+                        />
+                      )}
+                    </>
+                  )}
                   style={{ width: '100%' }}
                 />
               </AxisField>

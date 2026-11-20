@@ -1017,7 +1017,6 @@
   "shell.studio.package.unsavedMany": "{count} tệp chưa lưu",
   "shell.studio.package.run.operation": "Thao tác",
   "shell.studio.package.run.savedInput": "Đầu vào đã lưu",
-  "shell.studio.package.run.inputActions": "Thao tác khác với đầu vào",
   "shell.studio.package.run.output": "Đầu ra",
   "shell.studio.package.run.input": "Đầu vào",
   "shell.studio.package.run.newInput": "Đầu vào mới",

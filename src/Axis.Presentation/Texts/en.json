@@ -1017,7 +1017,6 @@
   "shell.studio.package.unsavedMany": "{count} unsaved files",
   "shell.studio.package.run.operation": "Operation",
   "shell.studio.package.run.savedInput": "Saved input",
-  "shell.studio.package.run.inputActions": "More actions for the input",
   "shell.studio.package.run.output": "Output",
   "shell.studio.package.run.input": "Input",
   "shell.studio.package.run.newInput": "New input",
