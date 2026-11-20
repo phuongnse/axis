@@ -20,7 +20,6 @@ import {
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { ValueTable } from '../platform/ValueTable'
 import CodeEditor from './CodeEditor'
 import { codeLanguage } from './codeLanguage'
 import { PaneHeader } from './PaneHeader'
@@ -267,10 +266,9 @@ export function PackageRun({
             overscrollBehavior: 'contain',
           }}
         >
-          {/* Proposed, see #3978: one block, Input, from what runs to its values, with no rule inside it, as a rule parts
-              two blocks; its title row lines up with Output's. */}
-          <style>{`.axis-inline-tabs > .ant-tabs-nav { margin: 0 !important; } .axis-inline-tabs > .ant-tabs-nav::before { display: none; } .axis-inline-tabs .ant-tabs-tab { padding: ${spacing.xs}px 0 !important; } .axis-inline-tabs .ant-tabs-tab + .ant-tabs-tab { margin-inline-start: ${spacing.md}px !important; } .axis-inline-tabs > .ant-tabs-content-holder { display: none; }`}</style>
-          <PaneHeader title={t('shell.studio.package.run.input')} height={rowHeight} />
+          {/* Proposed, see #3978: one block, Input, from what runs to its values: its title and its content with no rule
+              between them, and the Form and JSON tabs with the rule all workspace tabs have, run the pane's width. */}
+          <PaneHeader title={t('shell.studio.package.run.input')} height={rowHeight} rule={false} />
           <div style={{ flex: 'none', padding: pad }}>
             <Flex vertical gap={spacing.sm}>
               <AxisField label={t('shell.studio.package.run.operation')} help="">
@@ -318,20 +316,20 @@ export function PackageRun({
                   style={{ width: '100%' }}
                 />
               </AxisField>
-              <Tabs
-                className="axis-inline-tabs"
-                aria-label={t('shell.studio.package.run.inputAs')}
-                activeKey={shown}
-                onChange={(key) => switchTo(key as 'form' | 'json')}
-                items={[
-                  { key: 'form', label: t('shell.studio.package.run.form') },
-                  { key: 'json', label: t('shell.value.json') },
-                ]}
-              />
             </Flex>
           </div>
+          <Tabs
+            className="axis-workspace-tabs axis-file-tabs"
+            aria-label={t('shell.studio.package.run.inputAs')}
+            activeKey={shown}
+            onChange={(key) => switchTo(key as 'form' | 'json')}
+            items={[
+              { key: 'form', label: t('shell.studio.package.run.form') },
+              { key: 'json', label: t('shell.value.json') },
+            ]}
+          />
           {(jsonError || shown === 'form') && (
-            <div style={{ flex: 'none', padding: `0 ${spacing.md}px ${spacing.sm}px` }}>
+            <div style={{ flex: 'none', padding: pad }}>
               <Flex vertical gap={spacing.sm}>
                 {jsonError && <AxisAlert kind="error" message={t('shell.studio.package.run.jsonInvalid')} />}
                 {shown === 'form' &&
@@ -390,6 +388,7 @@ export function PackageRun({
           <>
             <PaneHeader
               height={rowHeight}
+              rule={false}
               title={
                 <Flex gap="small" align="center" wrap>
                   <Typography.Text strong>{t('shell.studio.package.run.output')}</Typography.Text>
@@ -402,25 +401,48 @@ export function PackageRun({
                 </Flex>
               }
             />
-            {/* One scroll for the output and the log, so no region scrolls inside another. The output's rows run the
-                pane's width, and its last row's rule parts it from the log. */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
-              {run.error !== null ? (
-                <div style={{ padding: pad, borderBottom: rule }}>
-                  <AxisAlert kind="error" message={`${run.error.code}: ${run.error.message}`} />
+            {/* Proposed, see #3978: the output as read-only JSON in the code editor the input's JSON uses, filling its
+                block, and the log as a block of its own under a rule, its title and lines with no rule between them. */}
+            {run.error !== null ? (
+              <div style={{ flex: 'none', padding: pad }}>
+                <AxisAlert kind="error" message={`${run.error.code}: ${run.error.message}`} />
+              </div>
+            ) : (
+              run.output !== null && (
+                <div style={{ flex: 1, minHeight: 120 }} data-testid="package-run-output">
+                  <CodeEditor
+                    label={t('shell.studio.package.run.output')}
+                    value={JSON.stringify(run.output, null, 2)}
+                    onChange={() => {}}
+                    readOnly
+                    language={jsonLanguage}
+                    fill
+                    findTexts={{
+                      field: t('shell.studio.package.findField'),
+                      count: t('shell.studio.json.findCount'),
+                      none: t('shell.studio.json.findNone'),
+                    }}
+                  />
                 </div>
-              ) : (
-                run.output !== null && <ValueTable value={run.output} testId="package-run-output" />
-              )}
-              {output.length > 0 && (
-                <>
-                  <PaneHeader title={t('shell.studio.package.run.log')} height={rowHeight} />
-                  <div style={{ padding: pad }}>
-                    <CodeBlock text={output.join('\n')} plain wrap />
-                  </div>
-                </>
-              )}
-            </div>
+              )
+            )}
+            {output.length > 0 && (
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', borderTop: rule }}>
+                <PaneHeader title={t('shell.studio.package.run.log')} height={rowHeight} rule={false} />
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: 'auto',
+                    overscrollBehavior: 'contain',
+                    padding: pad,
+                    paddingTop: 0,
+                  }}
+                >
+                  <CodeBlock text={output.join('\n')} plain wrap />
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
