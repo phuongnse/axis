@@ -369,6 +369,7 @@ public sealed class ApplicationPackageCompilerTests
             .With("application.json", $$"""
                 { "id": "{{ApplicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1 }
                 """)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("entities/order.json", $$"""
                 { "id": "{{OrderId}}", "kind": "entity", "name": "Order", "formatVersion": 1,
                   "fields": [ { "name": "amount", "type": "integer" } ] }
@@ -379,7 +380,7 @@ public sealed class ApplicationPackageCompilerTests
         return step is null
             ? folder
             : folder.With("processes/order-review.json", $$"""
-                { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+                { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "title": { "textKey": "process.title" }, "formatVersion": 1,
                   "entity": "Order", "start": "add",
                   "steps": [ {{step}}, { "name": "done", "type": "end" } ] }
                 """);

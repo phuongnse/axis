@@ -345,7 +345,7 @@ public sealed class ReferenceIndexTests
     {
         using var folder = SalesFolder("IsLarge(quantity)")
             .With("processes/order-review.json", """
-                { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+                { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "title": { "textKey": "orderForm.title" }, "formatVersion": 1,
                   "entity": "Order", "start": "review",
                   "steps": [
                     { "name": "review", "type": "task", "label": { "textKey": "task.review" }, "assignee": { "user": "'requester'" }, "form": "Missing",
@@ -634,7 +634,7 @@ public sealed class ReferenceIndexTests
               "sections": [ { "name": "main", "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number" }, { "field": "quantity" } ] } ] }
             """)
         .With("processes/order-review.json", """
-            { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+            { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "title": { "textKey": "orderForm.title" }, "formatVersion": 1,
               "entity": "Order", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
             """)
         .With("pages/orders.json", PresentationCompilerTests.Page(
@@ -758,7 +758,7 @@ public sealed class ReferenceIndexTests
                 """)
             .With("data-sources/large-orders.json", DataSource("LargeOrders", "IsLarge(quantity)"))
             .With("processes/order-review.json", """
-                { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+                { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "title": { "textKey": "orderForm.title" }, "formatVersion": 1,
                   "entity": "Order", "start": "check",
                   "startCondition": { "expression": "IsLarge(quantity)", "message": { "textKey": "order.quantityLarge" } },
                   "steps": [

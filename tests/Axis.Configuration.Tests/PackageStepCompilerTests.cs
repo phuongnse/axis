@@ -334,7 +334,7 @@ public sealed class PackageStepCompilerTests
 
     private static string Process(string step) =>
         $$"""
-        { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+        { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "title": { "textKey": "process.title" }, "formatVersion": 1,
           "entity": "Order", "start": "add",
           "steps": [ {{step}}, { "name": "done", "type": "end" } ] }
         """;
@@ -353,5 +353,6 @@ public sealed class PackageStepCompilerTests
                     { "name": "status", "type": "text" }
                   ] }
                 """)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("processes/order-review.json", process);
 }

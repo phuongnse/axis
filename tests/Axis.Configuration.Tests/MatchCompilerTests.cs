@@ -92,7 +92,7 @@ public sealed class MatchCompilerTests
     {
         using var folder = Folder(null)
             .With("processes/review.json", """
-                { "id": "66666666-6666-4666-8666-666666666666", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Order", "start": "set",
+                { "id": "66666666-6666-4666-8666-666666666666", "kind": "process", "name": "Review", "title": { "textKey": "process.title" }, "formatVersion": 1, "entity": "Order", "start": "set",
                   "steps": [
                     { "name": "set", "type": "operation", "operation": "updateRecord", "set": { "other": "null" }, "next": "done" },
                     { "name": "done", "type": "end" }
@@ -118,6 +118,7 @@ public sealed class MatchCompilerTests
     private static TemporaryFolder Folder(string? orderField, string? lineField = null) =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("entities/employee.json", $$"""
                 { "id": "{{EmployeeId}}", "kind": "entity", "name": "Employee", "formatVersion": 1, "displayField": "fullName",
                   "fields": [

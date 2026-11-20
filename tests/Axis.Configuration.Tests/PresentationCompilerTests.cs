@@ -11,6 +11,12 @@ public sealed class PresentationCompilerTests
         { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }
         """;
 
+    /// <summary>An English text resource with the process title key <c>process.title</c>, for a test application that has no texts.</summary>
+    internal const string ProcessTitleTexts = """
+        { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e10", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+          "texts": { "process.title": "Process" } }
+        """;
+
     internal const string AccountsProvider = """
         { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e02", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }
         """;

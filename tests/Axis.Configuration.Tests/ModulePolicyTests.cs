@@ -242,7 +242,7 @@ public sealed class ModulePolicyTests
                   "entity": "Approval", "fields": [ { "name": "title", "path": "title" } ] }
                 """)
             .With("approvals/1.0.0/Approve.json", $$"""
-                { "id": "{{ApproveProcessId}}", "kind": "process", "name": "Approve", "formatVersion": 1,
+                { "id": "{{ApproveProcessId}}", "kind": "process", "name": "Approve", "title": { "textKey": "approvals.approver" }, "formatVersion": 1,
                   "entity": "Approval", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
                 """)
             .With("approvals/1.0.0/policies/ApproverAccess.json", $$"""
@@ -282,7 +282,7 @@ public sealed class ModulePolicyTests
                   "entity": "Invoice", "fields": [ { "name": "number", "path": "number" } ] }
                 """)
             .With("processes/Archive.json", """
-                { "id": "44444444-4444-4444-8444-444444444414", "kind": "process", "name": "Archive", "formatVersion": 1,
+                { "id": "44444444-4444-4444-8444-444444444414", "kind": "process", "name": "Archive", "title": { "textKey": "role.manager" }, "formatVersion": 1,
                   "entity": "Invoice", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
                 """)
             .With("rules/IsSecret.json", """

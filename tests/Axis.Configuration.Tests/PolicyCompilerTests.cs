@@ -744,7 +744,7 @@ public sealed class PolicyCompilerTests
         """;
 
     private static string RequestReview(string? startCondition = null) => $$"""
-        { "id": "{{ProcessId}}", "kind": "process", "name": "RequestReview", "formatVersion": 1, "entity": "Request",
+        { "id": "{{ProcessId}}", "kind": "process", "name": "RequestReview", "title": { "textKey": "role.manager" }, "formatVersion": 1, "entity": "Request",
           {{(startCondition is null ? "" : $"\"startCondition\": {{ \"expression\": \"{startCondition}\", \"message\": {{ \"textKey\": \"request.cannotStart\" }} }},")}}
           "start": "done", "steps": [{ "name": "done", "type": "end" }] }
         """;

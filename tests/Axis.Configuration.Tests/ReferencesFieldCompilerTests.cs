@@ -183,7 +183,7 @@ public sealed class ReferencesFieldCompilerTests
     {
         using var folder = Folder(Software)
             .With("processes/review.json", $$"""
-                { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Request", "start": "set",
+                { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "title": { "textKey": "request.rule" }, "formatVersion": 1, "entity": "Request", "start": "set",
                   "steps": [
                     { "name": "set", "type": "operation", "operation": "updateRecord", "set": { "software": "null" }, "next": "done" },
                     { "name": "done", "type": "end" }
@@ -239,7 +239,7 @@ public sealed class ReferencesFieldCompilerTests
 
     private static string Process(string? startCondition) =>
         $$"""
-        { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Request",
+        { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "title": { "textKey": "request.rule" }, "formatVersion": 1, "entity": "Request",
           {{(startCondition is null ? "" : $$""" "startCondition": { "expression": "{{startCondition}}", "message": { "textKey": "request.rule" } }, """)}}
           "start": "done", "steps": [{ "name": "done", "type": "end" }] }
         """;

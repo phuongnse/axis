@@ -44,7 +44,7 @@ public sealed class ProcessInspectorCompilerTests
     public void Process_inspector_naming_a_process_that_failed_to_load_is_not_reported_again()
     {
         using var folder = Folder(Inspector("OrderReview"))
-            .With("processes/order-review.json", $$"""{ "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1 }""");
+            .With("processes/order-review.json", $$"""{ "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "title": { "textKey": "orderForm.title" }, "formatVersion": 1 }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -91,7 +91,7 @@ public sealed class ProcessInspectorCompilerTests
                   "fields": [ { "name": "number", "path": "number" } ] }
                 """)
             .With("processes/order-review.json", $$"""
-                { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+                { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "title": { "textKey": "orderForm.title" }, "formatVersion": 1,
                   "entity": "Order", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
                 """)
             .With(PageFile, Page("Orders", widget));

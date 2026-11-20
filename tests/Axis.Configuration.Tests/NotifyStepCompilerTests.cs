@@ -375,7 +375,7 @@ public sealed class NotifyStepCompilerTests
         string viBody = "Giải pháp: {resolution}")
     {
         var process = $$"""
-            { "id": "{{ProcessId}}", "kind": "process", "name": "TicketNotice", "formatVersion": 1,
+            { "id": "{{ProcessId}}", "kind": "process", "name": "TicketNotice", "title": { "textKey": "ticket.title" }, "formatVersion": 1,
               "entity": "Ticket", "start": "tell", "steps": [
                 { "name": "tell", "type": "operation", "operation": "{{operation}}", "to": {{to}}, "channels": {{channels}},
                   "message": { "subject": { "textKey": "{{subjectKey}}" }, "body": { "textKey": "notice.body" }, "values": {{values}} },

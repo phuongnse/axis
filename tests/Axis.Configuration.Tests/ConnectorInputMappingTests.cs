@@ -134,6 +134,7 @@ public sealed class ConnectorInputMappingTests
             new ResourceContent("application.json", """
                 { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }
                 """),
+            new ResourceContent("texts/en.json", PresentationCompilerTests.ProcessTitleTexts),
             new ResourceContent("entities/request.json", """
                 { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Request", "formatVersion": 1,
                   "fields": [
@@ -165,7 +166,7 @@ public sealed class ConnectorInputMappingTests
                   ] }
                 """),
             new ResourceContent("processes/order.json", $$"""
-                { "id": "77777777-7777-4777-8777-777777777777", "kind": "process", "name": "Order", "formatVersion": 1,
+                { "id": "77777777-7777-4777-8777-777777777777", "kind": "process", "name": "Order", "title": { "textKey": "process.title" }, "formatVersion": 1,
                   "entity": "Request", "start": "call",
                   "steps": [
                     { "name": "call", "type": "operation", "operation": "callConnector",

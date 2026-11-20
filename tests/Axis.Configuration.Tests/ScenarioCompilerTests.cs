@@ -162,7 +162,7 @@ public sealed class ScenarioCompilerTests
     {
         using var folder = SampleCopy()
             .With("processes/nightly-job.json", """
-                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "NightlyJob", "formatVersion": 1,
+                { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "NightlyJob", "title": { "textKey": "purchaseRequest.label" }, "formatVersion": 1,
                   "parameters": [{ "name": "days", "type": "integer" }],
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """)

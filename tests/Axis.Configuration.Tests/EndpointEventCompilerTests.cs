@@ -224,6 +224,7 @@ public sealed class EndpointEventCompilerTests
     private static TemporaryFolder Folder() =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("entities/ticket.json", $$"""
                 { "id": "{{TicketId}}", "kind": "entity", "name": "Ticket", "formatVersion": 1, "displayField": "title",
                   "fields": [
@@ -249,7 +250,7 @@ public sealed class EndpointEventCompilerTests
                   "parameters": [{ "name": "total", "type": "decimal" }], "resultType": "boolean", "expression": "total >= 10000" }
                 """)
             .With("processes/ticket-close.json", $$"""
-                { "id": "{{ProcessId}}", "kind": "process", "name": "TicketClose", "formatVersion": 1, "entity": "Ticket",
+                { "id": "{{ProcessId}}", "kind": "process", "name": "TicketClose", "title": { "textKey": "process.title" }, "formatVersion": 1, "entity": "Ticket",
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """);
 }

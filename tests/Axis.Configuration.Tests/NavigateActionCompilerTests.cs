@@ -431,7 +431,7 @@ public sealed class NavigateActionCompilerTests
         const string Action = """{ "name": "navigate", "type": "navigate", "page": "CustomerForm", "label": { "textKey": "order.open" } }""";
         using var folder = Folder(widget.Replace("ACTION", Action, StringComparison.Ordinal))
             .With("processes/order-review.json", """
-                { "id": "99999999-9999-4999-8999-999999999991", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+                { "id": "99999999-9999-4999-8999-999999999991", "kind": "process", "name": "OrderReview", "title": { "textKey": "orderForm.title" }, "formatVersion": 1,
                   "entity": "Order", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
                 """);
 

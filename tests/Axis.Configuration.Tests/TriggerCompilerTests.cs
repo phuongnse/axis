@@ -244,7 +244,7 @@ public sealed class TriggerCompilerTests
     {
         using var folder = Folder()
             .With("processes/broken.json", """
-                { "id": "77777777-7777-4777-8777-777777777709", "kind": "process", "name": "BrokenReview", "formatVersion": 1 }
+                { "id": "77777777-7777-4777-8777-777777777709", "kind": "process", "name": "BrokenReview", "title": { "textKey": "process.title" }, "formatVersion": 1 }
                 """)
             .With("events/broken.json", """
                 { "id": "f86ca48b-4afc-4060-9e40-c423522ea719", "kind": "event", "name": "BrokenEvent", "formatVersion": 1 }
@@ -847,7 +847,7 @@ public sealed class TriggerCompilerTests
     /// <summary>Adds the process <c>NightlyJob</c>, which has the integer parameter <c>days</c> and no subject.</summary>
     private static TemporaryFolder WithSubjectlessProcess(TemporaryFolder folder) =>
         folder.With("processes/nightly-job.json", """
-            { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "NightlyJob", "formatVersion": 1,
+            { "id": "77777777-7777-4777-8777-777777777703", "kind": "process", "name": "NightlyJob", "title": { "textKey": "process.title" }, "formatVersion": 1,
               "parameters": [{ "name": "days", "type": "integer" }],
               "start": "done", "steps": [{ "name": "done", "type": "end" }] }
             """);
@@ -861,6 +861,7 @@ public sealed class TriggerCompilerTests
     private static TemporaryFolder Folder() =>
         new TemporaryFolder()
             .With("application.json", PresentationCompilerTests.Manifest)
+            .With("texts/en.json", PresentationCompilerTests.ProcessTitleTexts)
             .With("entities/note.json", Note)
             .With("entities/person.json", Person)
             .With("events/note-closed.json", $$"""
@@ -875,11 +876,11 @@ public sealed class TriggerCompilerTests
                   "fields": [] }
                 """)
             .With("processes/note-review.json", $$"""
-                { "id": "{{NoteReviewId}}", "kind": "process", "name": "NoteReview", "formatVersion": 1, "entity": "Note",
+                { "id": "{{NoteReviewId}}", "kind": "process", "name": "NoteReview", "title": { "textKey": "process.title" }, "formatVersion": 1, "entity": "Note",
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """)
             .With("processes/person-review.json", """
-                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "PersonReview", "formatVersion": 1, "entity": "Person",
+                { "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "PersonReview", "title": { "textKey": "process.title" }, "formatVersion": 1, "entity": "Person",
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """);
 }

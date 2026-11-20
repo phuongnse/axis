@@ -194,7 +194,7 @@ public sealed class ModuleScenarioTests
                   "sections": [ { "name": "approval", "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" } ] } ] }
                 """)
             .With("approvals/1.0.0/processes/Review.json", """
-                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c41", "kind": "process", "name": "Review", "formatVersion": 1,
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c41", "kind": "process", "name": "Review", "title": { "textKey": "approvals.approval" }, "formatVersion": 1,
                   "entity": "Approval", "start": "review", "steps": [
                     { "name": "review", "type": "task", "label": { "textKey": "approvals.review" }, "assignee": { "user": "'u1'" }, "form": "ApprovalForm",
                       "outcomes": [ { "name": "approve", "label": { "textKey": "approvals.approve" }, "next": "done" } ] },

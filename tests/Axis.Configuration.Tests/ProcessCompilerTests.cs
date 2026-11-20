@@ -101,7 +101,7 @@ public sealed class ProcessCompilerTests
         Assert.Equal(
             (Guid.Parse(ProcessId), "OrderReview", "processes/order-review.json", new EntityReference(Guid.Parse(OrderId), "Order"), "check"),
             (process.Id, process.Name, process.File, process.Entity, process.Start));
-        Assert.Null(process.Title);
+        Assert.Equal(new TextReference("order.title"), process.Title);
         Assert.NotNull(process.StartCondition);
         Assert.Equal("status is null", process.StartCondition.Expression.Expression);
         Assert.Equal(new TextReference("order.cannotStart"), process.StartCondition.Message);
@@ -184,7 +184,7 @@ public sealed class ProcessCompilerTests
     public void A_process_with_both_an_entity_and_parameters_is_reported_at_the_parameters()
     {
         using var folder = Folder($$"""
-            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "title": { "textKey": "order.title" }, "formatVersion": 1,
               "entity": "Order", "parameters": [{ "name": "limit", "type": "decimal" }], "start": "check", "steps": {{ReviewSteps}} }
             """);
 
@@ -198,7 +198,7 @@ public sealed class ProcessCompilerTests
     public void A_process_with_neither_an_entity_nor_parameters_is_reported_once_at_the_root()
     {
         using var folder = Folder($$"""
-            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "title": { "textKey": "order.title" }, "formatVersion": 1,
               "start": "check", "steps": {{ReviewSteps}} }
             """);
 
@@ -2307,7 +2307,7 @@ public sealed class ProcessCompilerTests
     public void A_sub_process_whose_file_was_not_loaded_is_not_reported_again_at_the_step()
     {
         using var folder = Folder(Process("Order", SubProcessSteps("""" "process": "OrderApproval", "parameters": { "x": "1" } """"), start: "run"))
-            .With("processes/order-approval.json", """{ "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "OrderApproval", "formatVersion": 1 }""");
+            .With("processes/order-approval.json", """{ "id": "77777777-7777-4777-8777-777777777702", "kind": "process", "name": "OrderApproval", "title": { "textKey": "order.title" }, "formatVersion": 1 }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -2363,12 +2363,15 @@ public sealed class ProcessCompilerTests
 
     private const string EndOnly = """[{ "name": "done", "type": "end" }]""";
 
-    /// <summary>A process named <paramref name="name"/> with the file's subject <paramref name="subject"/>, either <c>"entity"</c> or <c>"parameters"</c>.</summary>
+    /// <summary>
+    /// A process named <paramref name="name"/> with the title <c>order.title</c> and the file's subject
+    /// <paramref name="subject"/>, either <c>"entity"</c> or <c>"parameters"</c>.
+    /// </summary>
     private static string ChildProcess(string name, string id, string subject, string steps)
     {
         var start = steps == EndOnly ? "done" : "run";
         return $$"""
-            { "id": "{{id}}", "kind": "process", "name": "{{name}}", "formatVersion": 1,
+            { "id": "{{id}}", "kind": "process", "name": "{{name}}", "title": { "textKey": "order.title" }, "formatVersion": 1,
               {{subject}}, "start": "{{start}}", "steps": {{steps}} }
             """;
     }
@@ -2425,10 +2428,13 @@ public sealed class ProcessCompilerTests
                   "fields": [ { "name": "size", "type": "integer" } ] }
                 """);
 
-    /// <summary>The process <c>OrderReview</c> over <paramref name="entity"/>, with an optional start condition.</summary>
+    /// <summary>
+    /// The process <c>OrderReview</c> over <paramref name="entity"/>, with an optional start condition. Its title is
+    /// <c>order.title</c> unless <paramref name="title"/> is given, and <c>null</c> writes no title.
+    /// </summary>
     private static string Process(
         string entity, string steps, string start = "check", string? startCondition = null, string textKey = "order.cannotStart",
-        string? title = null)
+        string? title = "order.title")
     {
         var condition = startCondition is null
             ? ""
@@ -2440,14 +2446,17 @@ public sealed class ProcessCompilerTests
             """;
     }
 
-    /// <summary>The process <c>OrderReview</c> with no entity and the given <paramref name="parameters"/> array, with an optional start condition.</summary>
+    /// <summary>
+    /// The process <c>OrderReview</c> with the title <c>order.title</c>, no entity and the given <paramref name="parameters"/>
+    /// array, with an optional start condition.
+    /// </summary>
     private static string SubjectlessProcess(string parameters, string steps, string start = "check", string? startCondition = null)
     {
         var condition = startCondition is null
             ? ""
             : $$""" "startCondition": { "expression": "{{startCondition}}", "message": { "textKey": "order.cannotStart" } }, """;
         return $$"""
-            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "title": { "textKey": "order.title" }, "formatVersion": 1,
               "parameters": {{parameters}}, {{condition}} "start": "{{start}}", "steps": {{steps}} }
             """;
     }

@@ -115,7 +115,7 @@ public sealed class ModuleProcessTests
     {
         using var modules = Modules();
         using var folder = Application().With("processes/Audit.json", """
-            { "id": "44444444-4444-4444-8444-444444444431", "kind": "process", "name": "Audit", "formatVersion": 1,
+            { "id": "44444444-4444-4444-8444-444444444431", "kind": "process", "name": "Audit", "title": { "textKey": "invoice.title" }, "formatVersion": 1,
               "entity": "Invoice", "start": "check", "steps": [
                 { "name": "check", "type": "task", "label": { "textKey": "audit.check" }, "assignee": { "user": "'u1'" }, "form": "departments/DepartmentForm",
                   "outcomes": [ { "name": "close", "label": { "textKey": "audit.close" }, "next": "done" } ] },
@@ -159,7 +159,7 @@ public sealed class ModuleProcessTests
     {
         using var modules = Modules();
         modules.With("departments/1.0.0/processes/Onboard.json", """
-            { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c34", "kind": "process", "name": "Onboard", "formatVersion": 1,
+            { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c34", "kind": "process", "name": "Onboard", "title": { "textKey": "departments.department" }, "formatVersion": 1,
               "entity": "Department", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
             """);
         using var folder = WithProcessReferences(Application(), name, dataSource: false);
@@ -199,7 +199,7 @@ public sealed class ModuleProcessTests
     {
         using var modules = Modules();
         modules.With("departments/1.0.0/processes/Onboard.json", """
-            { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c34", "kind": "process", "name": "Onboard", "formatVersion": 1,
+            { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c34", "kind": "process", "name": "Onboard", "title": { "textKey": "departments.department" }, "formatVersion": 1,
               "entity": "Department", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
             """);
         using var folder = Application().With("endpoints/Import.json", Endpoint($"{module}/Department", $"{module}/Onboard"));
@@ -281,7 +281,7 @@ public sealed class ModuleProcessTests
                     "rowActions": [ { "name": "startProcess", "type": "startProcess", "process": "{{name}}", "label": { "textKey": "reviews.start" } } ] } ] }
                 """)
             .With("processes/Parent.json", $$"""
-                { "id": "44444444-4444-4444-8444-444444444451", "kind": "process", "name": "Parent", "formatVersion": 1,
+                { "id": "44444444-4444-4444-8444-444444444451", "kind": "process", "name": "Parent", "title": { "textKey": "invoice.title" }, "formatVersion": 1,
                   "entity": "approvals/Approval", "start": "run", "steps": [
                     { "name": "run", "type": "subProcess", "process": "{{name}}", "next": "done" },
                     { "name": "done", "type": "end" }
@@ -296,7 +296,7 @@ public sealed class ModuleProcessTests
         """;
 
     private static string Process(string form = "ApprovalForm", string extraStep = "", string start = "review") => $$"""
-        { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "formatVersion": 1,
+        { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "title": { "textKey": "approvals.approval" }, "formatVersion": 1,
           "entity": "Approval", "start": "{{start}}", "steps": [
             {{extraStep}}
             { "name": "review", "type": "task", "label": { "textKey": "approvals.review" }, "assignee": { "user": "'u1'" }, "form": "{{form}}",

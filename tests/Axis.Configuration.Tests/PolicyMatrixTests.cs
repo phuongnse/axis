@@ -338,7 +338,7 @@ public sealed class PolicyMatrixTests
                   "fields": [{ "name": "owner", "path": "owner" }] }
                 """)
             .With("processes/request-review.json", $$"""
-                { "id": "{{ProcessId}}", "kind": "process", "name": "RequestReview", "formatVersion": 1, "entity": "Request",
+                { "id": "{{ProcessId}}", "kind": "process", "name": "RequestReview", "title": { "textKey": "role.manager" }, "formatVersion": 1, "entity": "Request",
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """)
             .With("endpoints/submit-request.json", $$"""
