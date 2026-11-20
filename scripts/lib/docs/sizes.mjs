@@ -1,4 +1,5 @@
 // - A doc under docs/ has at most 1,000 lines, and a change that grows a doc past 900 lines fails.
+//   A split moves one topic's sections and never shrinks text.
 //   The base for "grows" is NEXKIT_BASE_SHA, else the merge base with origin/main. With neither,
 //   only the 1,000 limit applies. A SKILL.md under .claude/skills/ holds at most 1,000 words, counted as AGENTS.md's are, so
 //   every run reads little. See docs/writing-docs.md#structure.
@@ -10,20 +11,23 @@ export const maxDocLines = 1000
 export const maxGrownDocLines = 900
 export const maxSkillWords = 1000
 
+const splitAdvice =
+  'move the whole ## sections of one topic to a new file, leaving each page at or under 700 lines, and do not shorten, rewrap or delete existing text to fit'
+
 /** Checks the size of the docs and the skills under root. A change that grows a doc is checked against its base. */
 export function checkSizes(root, report, { baseLineCount } = {}) {
   const docs = path.join(root, 'docs')
   for (const file of markdownFiles(docs).sort()) {
     const count = lines(file).length
     if (count > maxDocLines) {
-      report(file, maxDocLines + 1, `${count} lines, over the limit of ${maxDocLines}: move whole ## sections to a new file`)
+      report(file, maxDocLines + 1, `${count} lines, over the limit of ${maxDocLines}: ${splitAdvice}`)
     } else if (baseLineCount && count > maxGrownDocLines) {
       const before = baseLineCount(relativePath(root, file))
       if (count > before) {
         report(
           file,
           maxGrownDocLines + 1,
-          `${count} lines, up from ${before}, over ${maxGrownDocLines} for a change that grows a doc: move whole ## sections to a new file`,
+          `${count} lines, up from ${before}, over ${maxGrownDocLines} for a change that grows a doc: ${splitAdvice}`,
         )
       }
     }
