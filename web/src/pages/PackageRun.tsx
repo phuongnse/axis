@@ -267,20 +267,21 @@ export function PackageRun({
             overscrollBehavior: 'contain',
           }}
         >
-          <div style={{ flex: 'none', padding: pad, borderBottom: rule }}>
-            <AxisField label={t('shell.studio.package.run.operation')} help="">
-              <Select
-                data-testid="package-run-operation"
-                value={operation}
-                onChange={(next: string) => setOperation(next)}
-                options={operations.map((candidate) => ({ value: candidate.name, label: candidate.name }))}
-                style={{ width: '100%' }}
-              />
-            </AxisField>
-          </div>
+          {/* Proposed, see #3978: one block, Input, from what runs to its values, with no rule inside it, as a rule parts
+              two blocks; its title row lines up with Output's. */}
+          <style>{`.axis-inline-tabs > .ant-tabs-nav { margin: 0 !important; } .axis-inline-tabs > .ant-tabs-nav::before { display: none; } .axis-inline-tabs .ant-tabs-tab { padding: ${spacing.xs}px 0 !important; } .axis-inline-tabs .ant-tabs-tab + .ant-tabs-tab { margin-inline-start: ${spacing.md}px !important; } .axis-inline-tabs > .ant-tabs-content-holder { display: none; }`}</style>
           <PaneHeader title={t('shell.studio.package.run.input')} height={rowHeight} />
           <div style={{ flex: 'none', padding: pad }}>
             <Flex vertical gap={spacing.sm}>
+              <AxisField label={t('shell.studio.package.run.operation')} help="">
+                <Select
+                  data-testid="package-run-operation"
+                  value={operation}
+                  onChange={(next: string) => setOperation(next)}
+                  options={operations.map((candidate) => ({ value: candidate.name, label: candidate.name }))}
+                  style={{ width: '100%' }}
+                />
+              </AxisField>
               <AxisField label={t('shell.studio.package.run.savedInput')} help="">
                 {/* Proposed, see #3978: managing the saved inputs, the select's choices, is the last item of its list, and it
                     opens the dialog that keeps saved items, as a table's Views does, so the select keeps the field's width. */}
@@ -317,20 +318,20 @@ export function PackageRun({
                   style={{ width: '100%' }}
                 />
               </AxisField>
+              <Tabs
+                className="axis-inline-tabs"
+                aria-label={t('shell.studio.package.run.inputAs')}
+                activeKey={shown}
+                onChange={(key) => switchTo(key as 'form' | 'json')}
+                items={[
+                  { key: 'form', label: t('shell.studio.package.run.form') },
+                  { key: 'json', label: t('shell.value.json') },
+                ]}
+              />
             </Flex>
           </div>
-          <Tabs
-            className="axis-workspace-tabs axis-file-tabs"
-            aria-label={t('shell.studio.package.run.inputAs')}
-            activeKey={shown}
-            onChange={(key) => switchTo(key as 'form' | 'json')}
-            items={[
-              { key: 'form', label: t('shell.studio.package.run.form') },
-              { key: 'json', label: t('shell.value.json') },
-            ]}
-          />
           {(jsonError || shown === 'form') && (
-            <div style={{ flex: 'none', padding: pad }}>
+            <div style={{ flex: 'none', padding: `0 ${spacing.md}px ${spacing.sm}px` }}>
               <Flex vertical gap={spacing.sm}>
                 {jsonError && <AxisAlert kind="error" message={t('shell.studio.package.run.jsonInvalid')} />}
                 {shown === 'form' &&
