@@ -4,8 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { consoleInstancesPath } from '../platform/console'
 import { fetchInstance, forbidden, type InstanceDetail } from '../platform/inspection'
-import { PageLayout } from '../platform/PageLayout'
-import { InstanceDetailView } from '../platform/ProcessInstancePage'
+import { InstanceDetailView, InstanceLayout } from '../platform/ProcessInstancePage'
 import { useText } from '../platform/texts'
 import { usePlatform } from './context'
 
@@ -16,8 +15,9 @@ type InstanceState = InstanceDetail | null | typeof forbidden | 'failed'
  * One instance of the operator console, opened from an entry of Failed work. It shows the same steps, history, tasks
  * and calls as the process inspector, from `GET /api/console/instances/{id}`. The page is outside every site, so it has
  * no release texts and shows the names of the steps. The detail offers the commands the server lists, which the
- * operator sends to the console routes. It is headed by its process's name, with Instance as its line, see
- * docs/reference/shell.md#page-header. A user without the operator role sees the forbidden page.
+ * operator sends to the console routes. It is headed by its process's name, with its state as a tag and Process as its
+ * line, through the same heading as a site's instance page, see docs/reference/operator-console.md#views. A user
+ * without the operator role sees the forbidden page.
  */
 export function ConsoleInstancePage() {
   const t = useText()
@@ -45,9 +45,9 @@ export function ConsoleInstancePage() {
   }, [load])
 
   return (
-    <PageLayout
-      title={typeof instance === 'object' && instance !== null ? instance.process : id}
-      line={t('shell.console.instance.kind')}
+    <InstanceLayout
+      instance={typeof instance === 'object' && instance !== null ? instance : undefined}
+      title={id}
       breadcrumb={[
         { label: t(platform.site.titleKey), to: '/' },
         { label: t('shell.console.title'), to: '/console' },
@@ -81,6 +81,6 @@ export function ConsoleInstancePage() {
           stepNames
         />
       )}
-    </PageLayout>
+    </InstanceLayout>
   )
 }

@@ -43,12 +43,18 @@ const inspectorWidget: WidgetMetadata = {
 const detailText = `{
   "id": "${instanceId}",
   "process": "PurchaseRequestApproval",
+  "processTitleKey": "processes.purchaseRequestApproval.title",
   "subjectId": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
+  "subjectEntity": "request",
+  "subjectLabel": "PR-1001",
   "releaseId": "${releaseId}",
+  "releaseNumber": 3,
   "state": "waiting",
   "step": "registerPurchase",
   "createdAt": "2026-10-10T02:05:00.123456Z",
   "endedAt": null,
+  "startedBy": { "kind": "person", "name": "Ada Lovelace", "id": "ada", "via": "purchaseRequest.submit" },
+  "studio": null,
   "graph": {
     "start": "managerApproval",
     "steps": [
@@ -143,7 +149,17 @@ const detailText = `{
 const texts = {
   ...platformEnglish,
   'purchaseRequest.managerApproval': 'Manager approval',
+  'purchaseRequest.submit': 'Submit for approval',
 }
+
+/** The texts of the instance's release, which give the process its title. */
+const releaseTextsBody = JSON.stringify({
+  locale: 'en',
+  texts: {
+    'processes.purchaseRequestApproval.title': 'Purchase request approval',
+    'purchaseRequest.submit': 'Submit for approval',
+  },
+})
 const catalogs = [{ texts, fallbackTexts: texts }]
 
 interface Answer {
@@ -168,19 +184,33 @@ function detailWith(commands: string[], failed?: 'package' | 'connector') {
   return JSON.stringify(detail)
 }
 
+/** The detail text as a failed instance at `registerPurchase`, whose entry for that step holds `problem` and `error`. */
+function detailFailedAt(problem: { code: string; values: Record<string, number> } | null, error: string | null = null) {
+  const detail = JSON.parse(detailText) as { state: string; path: Record<string, unknown>[] }
+  detail.state = 'failed'
+  detail.path.push({
+    step: 'registerPurchase',
+    startedAt: '2026-10-10T04:00:00.000000Z',
+    finishedAt: '2026-10-10T04:00:03.000000Z',
+    decision: null,
+    output: null,
+    error,
+    problem,
+    traceId: null,
+  })
+  return JSON.stringify(detail)
+}
+
+const studioResourceId = '0192f6d1-7b2e-7c40-8a9f-6e7d8c9b0a1f'
+
+/** The detail text with the application and the resource that open the process in Studio. */
+function detailWithStudio() {
+  const detail = JSON.parse(detailText) as Record<string, unknown>
+  return JSON.stringify({ ...detail, studio: { app: 'PurchasingApp', resource: studioResourceId } })
+}
+
 const parentId = '0192f4c0-1a2b-7c3d-8e4f-5a6b7c8d9e01'
 const childId = '0192f4c0-1a2b-7c3d-8e4f-5a6b7c8d9e02'
-
-const dueAt = '2026-10-11T02:05:00Z'
-
-// The page shows a date-time in the browser's time zone, in English, to the minute.
-function shownTime(iso: string): string {
-  const at = new Date(iso)
-  const two = (n: number) => String(n).padStart(2, '0')
-  const hours = at.getHours()
-  const period = hours < 12 ? 'AM' : 'PM'
-  return `${two(at.getMonth() + 1)}/${two(at.getDate())}/${at.getFullYear()} ${hours % 12 || 12}:${two(at.getMinutes())} ${period}`
-}
 
 /** A detail without a subject, waiting at the timer `wait`, with a parent and one child. */
 function detailWithRelatives() {
@@ -188,6 +218,9 @@ function detailWithRelatives() {
   return JSON.stringify({
     ...detail,
     subjectId: null,
+    subjectEntity: null,
+    subjectLabel: null,
+    startedBy: { kind: 'parent', name: 'PurchaseRequestApproval', id: parentId, via: null },
     step: 'wait',
     graph: {
       start: 'wait',
@@ -202,7 +235,7 @@ function detailWithRelatives() {
         startedAt: '2026-10-10T02:05:00Z',
         finishedAt: '2026-10-10T02:05:00Z',
         decision: null,
-        output: { state: 'waiting', dueAt },
+        output: { state: 'waiting', dueAt: '2026-10-11T02:05:00Z' },
         error: null,
         problem: null,
         traceId: null,
@@ -210,11 +243,17 @@ function detailWithRelatives() {
     ],
     tasks: [],
     calls: [],
-    parent: { id: parentId, process: 'PurchaseRequestApproval', step: 'runChild' },
+    parent: {
+      id: parentId,
+      process: 'PurchaseRequestApproval',
+      processTitleKey: 'processes.purchaseRequestApproval.title',
+      step: 'runChild',
+    },
     subProcesses: [
       {
         id: childId,
         process: 'ChildJob',
+        processTitleKey: 'processes.childJob.title',
         step: 'wait',
         state: 'running',
         createdAt: '2026-10-10T02:05:00Z',
@@ -255,8 +294,17 @@ function stubApi({
   command = { status: 200, body: '{}' },
   resolve = { status: 200, body: '{}' },
   reloaded,
-  releaseTexts = { status: 200, body: JSON.stringify({ locale: 'en', texts: {} }) },
-}: { detail?: Answer; command?: Answer; resolve?: Answer; reloaded?: Answer; releaseTexts?: Answer } = {}) {
+  releaseTexts = { status: 200, body: releaseTextsBody },
+  me = { id: 'ada', displayName: 'Ada Lovelace', roles: [], users: false },
+}: {
+  detail?: Answer
+  command?: Answer
+  resolve?: Answer
+  reloaded?: Answer
+  releaseTexts?: Answer
+  /** The signed-in user, which `GET /api/me` answers. */
+  me?: object
+} = {}) {
   let reads = 0
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === `${instancesPath}/${instanceId}`) {
@@ -276,6 +324,9 @@ function stubApi({
     if (url === '/api/sites/e2e/pages/Children') {
       return new Response(inspectorPage('Children', 'ChildJob'), { status: 200 })
     }
+    if (url === '/api/me') {
+      return new Response(JSON.stringify(me), { status: 200 })
+    }
     if (url === `/api/sites/e2e/texts/en?release=${releaseId}`) {
       return new Response(releaseTexts.body ?? '', { status: releaseTexts.status })
     }
@@ -294,6 +345,7 @@ function renderPage(search = '') {
           pages={['Inspector', 'Children']}
           widget={inspectorWidget}
           instanceId={instanceId}
+          title="Approvals"
           locale="en"
           fallbackLocale="en"
         />
@@ -316,29 +368,28 @@ function detailWithTasks(second: Record<string, unknown>) {
 }
 
 describe('ProcessInstancePage', () => {
-  it('shows no subject, the due time of a waiting timer, the sub-processes and the parent', async () => {
+  it('shows no record fact, the parent in Started by, and the sub-processes by their process title', async () => {
     stubApi({ detail: { status: 200, body: detailWithRelatives() } })
 
     renderPage()
 
-    const page = await screen.findByTestId('inspector-instance')
-    expect(within(page).getByText('No subject')).toBeInTheDocument()
-    const due = within(page).getByText('Due').closest('.ant-descriptions-item')
-    expect(due).toHaveTextContent(shownTime(dueAt))
+    const facts = await screen.findByTestId('studio-section-inspector-facts')
+    expect(within(facts).queryByText('Record')).not.toBeInTheDocument()
+    const parentLink = within(facts).getByTestId('inspector-parent-link')
+    expect(parentLink).toHaveTextContent('Purchase request approval')
+    expect(parentLink).toHaveAttribute('href', `/e2e/inspector/${parentId}`)
     const childLink = await screen.findByTestId(`inspector-subprocess-${childId}`)
     expect(childLink).toHaveAttribute('href', `/e2e/children/${childId}`)
     expect(within(childLink.closest('tr')!).getByText('ChildJob')).toBeInTheDocument()
-    expect(await screen.findByTestId('inspector-parent-link')).toHaveAttribute('href', `/e2e/inspector/${parentId}`)
   })
 
-  it('shows the empty text, no due time and no parent for an instance without relatives', async () => {
+  it('shows the empty text and no parent for an instance without relatives', async () => {
     stubApi()
 
     renderPage()
 
     await screen.findByTestId('inspector-instance')
     expect(screen.getByText('No sub-processes.')).toBeInTheDocument()
-    expect(screen.queryByText('Due')).not.toBeInTheDocument()
     expect(screen.queryByTestId('inspector-parent-link')).not.toBeInTheDocument()
   })
 
@@ -549,14 +600,15 @@ describe('ProcessInstancePage', () => {
     expect(within(screen.getByTestId('inspector-step-done')).getByText('done')).toBeInTheDocument()
   })
 
-  it('shows the no-such-instance message on a 404', async () => {
+  it('keeps the heading and shows the not-found line with no command on a 404', async () => {
     stubApi({ detail: { status: 404 } })
 
     renderPage()
 
-    expect(await screen.findByTestId('inspector-not-found')).toHaveTextContent(
-      'No instance of this process exists with this id.',
-    )
+    const line = await screen.findByTestId('record-not-found')
+    expect(line).toHaveTextContent('This process instance does not exist, or you cannot open it.')
+    expect(screen.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+    expect(within(screen.getByTestId('page-actions')).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByTestId('inspector-instance')).not.toBeInTheDocument()
   })
 
@@ -594,18 +646,95 @@ describe('ProcessInstancePage', () => {
     expect(assignLocation).not.toHaveBeenCalled()
   })
 
-  it('shows each section as a part, with the commands and the state in Details', async () => {
+  it('shows each section as a part, with the commands on the heading', async () => {
     stubApi({ detail: { status: 200, body: detailWith(['cancel']) } })
 
     renderPage()
 
     await screen.findByTestId('inspector-instance')
-    const details = screen.getByRole('region', { name: 'Details' })
-    expect(within(details).getByText('State')).toBeInTheDocument()
-    expect(within(details).getByTestId('inspector-command-cancel')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-actions')).getByTestId('inspector-command-cancel')).toBeInTheDocument()
     for (const title of ['Steps', 'History', 'Tasks', 'Calls', 'Sub-processes']) {
       expect(screen.getByRole('region', { name: title })).toBeInTheDocument()
     }
+    expect(screen.queryByRole('region', { name: 'Details' })).not.toBeInTheDocument()
+  })
+
+  it('is headed by the process title from the release texts, with the state as its tag and Process as its line', async () => {
+    stubApi()
+
+    renderPage()
+
+    const heading = within(await screen.findByTestId('page-heading'))
+    expect(await heading.findByRole('heading', { level: 1, name: 'Purchase request approval' })).toBeVisible()
+    expect(heading.getByText('Waiting').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
+    expect(heading.getByText('Process')).toBeVisible()
+  })
+
+  it('shows Open in Studio on the heading only when the detail names a studio', async () => {
+    stubApi({ detail: { status: 200, body: detailWithStudio() } })
+    const { unmount } = renderPage()
+
+    const open = await screen.findByTestId('inspector-open-studio')
+    expect(open).toHaveTextContent('Open in Studio')
+    expect(open).toHaveAttribute('href', `/studio?app=PurchasingApp&resource=${studioResourceId}`)
+    expect(within(screen.getByTestId('page-actions')).getByTestId('inspector-open-studio')).toBeInTheDocument()
+    unmount()
+
+    stubApi()
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.queryByTestId('inspector-open-studio')).not.toBeInTheDocument()
+  })
+
+  it('shows a failure banner under the heading that names the step and the problem, and none while waiting', async () => {
+    stubApi({ detail: { status: 200, body: detailFailedAt({ code: 'serverError', values: {} }) } })
+    const { unmount } = renderPage()
+
+    const banner = await screen.findByRole('alert')
+    expect(banner).toHaveTextContent('Stopped at registerPurchase. The outside system answered with a server error.')
+    unmount()
+
+    stubApi()
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('words the banner from the stored error when the step has no problem code', async () => {
+    stubApi({ detail: { status: 200, body: detailFailedAt(null, 'System.InvalidOperationException') } })
+
+    renderPage()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Stopped at registerPurchase. System.InvalidOperationException',
+    )
+  })
+
+  it('names the person who started the instance, with "(you)" for the signed-in person', async () => {
+    stubApi()
+
+    renderPage()
+
+    const facts = await screen.findByTestId('studio-section-inspector-facts')
+    expect(within(facts).getByText('Started by')).toBeVisible()
+    // The signed-in person's name follows `GET /api/me`, which answers after the page.
+    await waitFor(() => expect(within(facts).getByText('Ada Lovelace')).toHaveTextContent('Ada Lovelace (you)'))
+  })
+
+  it('shows the first 8 characters of the instance ID with a copy button that copies all of it', async () => {
+    stubApi()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    renderPage()
+
+    const facts = await screen.findByTestId('studio-section-inspector-facts')
+    expect(within(facts).getByText(instanceId.slice(0, 8))).toBeVisible()
+
+    await userEvent.click(within(facts).getByRole('button', { name: 'Copy' }))
+
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(instanceId)
   })
 
   it('shows only the command buttons the detail allows', async () => {
@@ -676,7 +805,7 @@ describe('ProcessInstancePage', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(screen.queryByTestId('inspector-command-cancel')).not.toBeInTheDocument())
-    expect(within(screen.getByTestId('inspector-instance')).getByText('Cancelled')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-heading')).getByText('Cancelled')).toBeInTheDocument()
     const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
     expect(post[0]).toBe(`${instancesPath}/${instanceId}/cancel`)
     expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'Requested by finance' })

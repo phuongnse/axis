@@ -239,17 +239,19 @@ function SitePage({
     if (recordId === null || !recordIdPattern.test(recordId)) {
       return <NotFoundPage />
     }
+    // The instance page draws its own heading. It takes the page's title, and the list its not-found line links back to.
     return (
-      <PageLayout title={t(page.titleKey)}>
+      <RecordList value={recordListFor(trail, page.name)}>
         <ProcessInstancePage
           sitePath={sitePath}
           pages={pages}
           widget={processInspector}
           instanceId={recordId}
+          title={t(page.titleKey)}
           locale={locale}
           fallbackLocale={fallbackLocale}
         />
-      </PageLayout>
+      </RecordList>
     )
   }
   // A detail shows the record its page parameter names. A value that is no record id names no record, so none is requested.

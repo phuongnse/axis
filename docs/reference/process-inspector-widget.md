@@ -63,7 +63,7 @@ step, release and times.
 A row opens `/{site}/{page}/{instanceId}`, with the page name in lower case. `new` and an id in the
 wrong form show the not-found page, and the instance is not requested.
 
-- **Heading** _(planned)_. The heading is the process's title, through `processTitle`, which gives the process's name
+- **Heading**. The heading is the process's title, through `processTitle`, which gives the process's name
   where its release gives no title. Its state is a `StatusTag` beside the title, and Process ("Quy trình") is the
   line under it, see [page header](shell.md#page-header). The commands sit on the heading's right, through
   `PageActions`: Open in Studio ("Mở trong Studio"), a secondary button, then Cancel instance and Retry, see
@@ -71,12 +71,12 @@ wrong form show the not-found page, and the instance is not requested.
   see [opening things](actions-and-controls.md#opening-things). It shows only when the detail's `studio` is not
   `null`, which is for a person who may author the application.
 
-- **Failure banner** _(planned)_. Only a failed instance has a banner. It is an `AxisAlert` with `role="alert"`
+- **Failure banner**. Only a failed instance has a banner. It is an `AxisAlert` with `role="alert"`
   under the heading, in one line that says the step where the instance stopped and why, worded from `problem`,
-  see [step errors](process-inspection.md#step-errors-in-inspection). A waiting or running instance has none, as
-  its state tag says what it is.
+  see [step errors](process-inspection.md#step-errors-in-inspection). A step whose entry has no `problem` code shows
+  its stored error instead. A waiting or running instance has none, as its state tag says what it is.
 
-- **Facts** _(planned)_. Under the heading and above the tabs, a strip of facts through `TermList`'s `row`, in view
+- **Facts**. Under the heading and above the tabs, a strip of facts through `TermList`'s `row`, in view
   whichever tab is open. Each fact sits at its own width, `spacing-xl` apart, wraps when the line is full, and each
   value stays on one line. The facts are, in order, Record, Started by, Started via, Started, Ended, Duration,
   Release and Instance ID. Record is a `RecordLink`, named as the instance list's Record column names it, and is
@@ -244,7 +244,7 @@ The instance page runs the operator's commands on the instance and its calls, ea
 - **Buttons.** The page has a Cancel instance and a Retry button for each of those commands that the
   instance detail's `commands` lists. With none listed, it has no button, and a command name the SPA
   does not know is left out.
-- **On the heading** _(planned)_. Cancel instance and Retry are secondary `AxisButton`s on the heading's right, after
+- **On the heading**. Cancel instance and Retry are secondary `AxisButton`s on the heading's right, after
   Open in Studio, through `PageActions`.
 - **Reason.** A button opens a dialog that asks for a reason. The reason is required, must not be
   blank and has at most 500 characters, and Send is blocked until it is valid.
@@ -317,14 +317,14 @@ The widget shows a failure where it happens, and its words come from the platfor
   any other call. A `403` shows a message that the user may not inspect the process. Any other failure
   shows a generic load error. On the instance list, that error sits under the toolbar in place of the rows,
   so the person can clear the search or filter that caused it.
-- **A missing instance** _(planned)_. A well-formed id that the inspection API answers `404` for keeps the page's
+- **A missing instance**. A well-formed id that the inspection API answers `404` for keeps the page's
   heading. Under it, one line of body text says "This process instance does not exist, or you cannot open it."
   ("Lượt chạy quy trình này không tồn tại hoặc bạn không có quyền mở.", `shell.inspector.notFound`). On the same line,
   one link, "Go to {page}" ("Đi tới {page}", `shell.record.goToList`), as a missing record's line does, see
   [routing](frontend.md#routing). No save bar and no action shows.
 - **Texts.** The platform texts `shell.inspector.*` hold the column headers, the section titles, the
   instance states, the call states (`shell.inspector.callStates.*`), the run states (`shell.inspector.runStates.*`), the attempt
-  outcomes (`shell.inspector.attemptOutcomes.*`), the step types (`shell.inspector.stepTypes.*`), the "hidden" text, the "No subject" text, the Due, Parent, Process and Sub-processes
+  outcomes (`shell.inspector.attemptOutcomes.*`), the step types (`shell.inspector.stepTypes.*`), the "hidden" text, the "No subject" text, the Process and Sub-processes
   labels, the empty texts and the messages. `shell.inspector.deadLetters.*` hold the dead letter
   section's title, column headers, empty text and load error. `shell.inspector.commands.*` hold the
   command buttons, the dialog's labels, the reason errors, the retry warning and the resolve labels and

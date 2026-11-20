@@ -26,12 +26,18 @@ const platform: Platform = {
 const detail = {
   id: instanceId,
   process: 'PurchaseRequestApproval',
+  processTitleKey: 'processes.purchaseRequestApproval.title',
   subjectId: null,
+  subjectEntity: null,
+  subjectLabel: null,
   releaseId: '0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01',
+  releaseNumber: 3,
   state: 'failed',
   step: 'managerApproval',
   createdAt: '2026-10-10T02:05:00.123456Z',
   endedAt: '2026-10-10T02:06:00.000000Z',
+  startedBy: { kind: 'person', name: 'Ada Lovelace', id: 'ada', via: 'purchaseRequest.submit' },
+  studio: null,
   timerDueAt: null,
   parent: null,
   subProcesses: [],
@@ -121,7 +127,7 @@ describe('ConsoleInstancePage', () => {
     expect(screen.getByRole('link', { name: 'Operator console' })).toHaveAttribute('href', '/console')
   })
 
-  it('is headed by the name of its process, with Instance as its line', async () => {
+  it('is headed by the name of its process, with its state as a tag and Process as its line', async () => {
     stubServer(
       () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
     )
@@ -129,27 +135,28 @@ describe('ConsoleInstancePage', () => {
 
     const heading = within(screen.getByTestId('page-heading'))
     expect(await heading.findByRole('heading', { level: 1, name: 'PurchaseRequestApproval' })).toBeVisible()
-    expect(heading.getByText('Instance')).toBeVisible()
+    expect(heading.getByText('Process')).toBeVisible()
+    expect(heading.getByText('Failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
   })
 
-  it('shows the instance in parts: details, then each section, with a rule before every part but the first', async () => {
+  it('shows the instance in parts: its facts, then each section, with a rule before every part but the first', async () => {
     stubServer(
       () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
     )
     renderPage()
 
     const page = await screen.findByTestId('inspector-instance')
-    const parts = within(page).getAllByRole('region')
-    expect(parts.map((part) => within(part).getByRole('heading', { level: 2 }).textContent)).toEqual([
-      'Details',
+    const sections = within(page).getAllByRole('region')
+    expect(sections.map((part) => within(part).getByRole('heading', { level: 2 }).textContent)).toEqual([
       'Steps',
       'History',
       'Tasks',
       'Calls',
       'Sub-processes',
     ])
+    expect(within(page).getByTestId('studio-section-inspector-facts')).toBeVisible()
     expect(within(page).getAllByRole('separator')).toHaveLength(5)
-    for (const part of parts.slice(1)) {
+    for (const part of sections) {
       expect(part.previousElementSibling).toHaveAttribute('role', 'separator')
     }
   })
