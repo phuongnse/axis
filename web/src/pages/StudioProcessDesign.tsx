@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Announcement } from '../platform/Announcement'
 import { SidePanel } from '../platform/SidePanel'
 import { fillText } from '../platform/fillText'
+import { graphImageName } from '../platform/graphImage'
 import { markOf } from '../platform/layerMarks'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
@@ -285,6 +286,7 @@ export default function StudioProcessDesign({
               onRemove={removeSelection}
               onConnect={connect}
               layerMarks={layerMarks}
+              imageName={graphImageName(draft.name)}
             />
             {pending ? (
               <div

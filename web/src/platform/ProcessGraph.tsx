@@ -18,9 +18,11 @@ import {
   type Node,
   type NodeProps,
   type OnConnectEnd,
+  Panel,
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useNodesInitialized,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { ConfigProvider, Tooltip } from 'antd'
@@ -29,17 +31,30 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
+import { AxisAlert } from './AxisAlert'
+import { designTokensFor, type DesignTokens } from './designTokens'
+import { saveFile } from './exports'
+import { graphSvg, svgToPng } from './graphImage'
 import { type RunState, stepTypeText } from './inspection'
 import { ProcessGraphControls } from './ProcessGraphControls'
-import { type GraphPoint, roundedPath, routeBetween, useGraphLayout } from './processLayout'
+import {
+  type GraphBounds,
+  type GraphLayout,
+  type GraphPoint,
+  layoutBounds,
+  roundedPath,
+  routeBetween,
+  useGraphLayout,
+} from './processLayout'
 import { StateBadge } from './StateBadge'
 import { useText } from './texts'
-import { useDesignTokens, useThemeMode } from './themeMode'
+import { ThemeModeContext, useDesignTokens, useThemeMode } from './themeMode'
 import { useGraphMoves } from './useGraphMoves'
 
 /** The width of every card, in px. */
@@ -305,6 +320,96 @@ const edgeTypes = { route: ProcessRouteEdge }
 
 const edgeTestIdPrefix = 'rf__edge-'
 
+/** What `flowElements` draws: the props of the canvas that decide its cards and routes. */
+interface FlowOptions {
+  steps: GraphStep[]
+  transitions: GraphTransition[]
+  chosen?: string
+  onChoose?: (id: string) => void
+  runStates?: ReadonlyMap<string, RunState>
+  taken?: ReadonlySet<string>
+  chosenTransition?: string
+  onChooseTransition?: (id: string) => void
+  onConnect?: (source: string, target: string, point: GraphPoint) => void
+  transitionExtra?: (id: string) => ReactNode
+  testIdPrefix: string
+}
+
+/**
+ * The cards and routes of a laid-out process, in `colour`. The live canvas and the image of it both draw from these, so
+ * a card and a route are drawn one way.
+ */
+function flowElements(layout: GraphLayout, options: FlowOptions, colour: DesignTokens['colour']) {
+  const { steps, transitions, chosen, onChoose, runStates, taken, chosenTransition, onChooseTransition } = options
+  const { onConnect, transitionExtra, testIdPrefix } = options
+  const instance = runStates !== undefined
+  const placed = steps.filter((step) => layout.positions.has(step.id))
+  const nodes = placed.map((step): StepNode => {
+    const connectable = onConnect !== undefined && step.connectable === true
+    return {
+      id: step.id,
+      type: 'step',
+      position: layout.positions.get(step.id)!,
+      width: cardWidth,
+      height: cardHeight,
+      handles: [
+        { type: 'target', position: Position.Left, x: 0, y: cardHeight / 2, width: 1, height: 1 },
+        connectable
+          ? {
+              type: 'source',
+              position: Position.Right,
+              x: cardWidth - handleSize / 2,
+              y: cardHeight / 2 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+            }
+          : { type: 'source', position: Position.Right, x: cardWidth, y: cardHeight / 2, width: 1, height: 1 },
+      ],
+      data: {
+        step,
+        chosen: step.id === chosen,
+        connectable,
+        testIdPrefix,
+        onChoose,
+        runState: runStates?.get(step.id),
+        instance,
+      },
+    }
+  })
+  const edges = transitions
+    .filter((transition) => layout.positions.has(transition.source) && layout.positions.has(transition.target))
+    .map((transition): RouteEdge => {
+      const current = transition.id === chosenTransition
+      const dimmed = instance && !taken?.has(transition.id)
+      const stroke = current ? colour.primary : instance && !dimmed ? colour.successText : colour.textMuted
+      return {
+        id: transition.id,
+        source: transition.source,
+        target: transition.target,
+        type: 'route',
+        data: {
+          route: routeBetween(layout, transition.id, transition.source, transition.target),
+          extra: transitionExtra?.(transition.id),
+        },
+        ariaLabel: transition.name,
+        ariaRole: onChooseTransition ? 'button' : undefined,
+        domAttributes: current ? { 'aria-current': 'true' } : undefined,
+        ...(transition.label !== undefined && {
+          label: transition.label,
+          labelStyle: { fill: colour.text },
+          labelBgStyle: { fill: colour.fillSubtle },
+        }),
+        style: {
+          stroke,
+          strokeWidth: current ? 2 : instance ? (dimmed ? 1 : 2) : 1.5,
+          strokeDasharray: dimmed && !current ? '4 4' : undefined,
+        },
+        markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
+      }
+    })
+  return { nodes, edges }
+}
+
 /**
  * A process drawn as cards laid out from left to right by ELK, see
  * docs/reference/process-inspector-widget.md#process-graph. `label` names the graph. A chosen step has a `primary`
@@ -325,6 +430,11 @@ const edgeTestIdPrefix = 'rf__edge-'
  * instance is at, which Go to the current step moves to, so that button shows only with `runStates` and `current`.
  * While the focus is inside the graph, + and - zoom, 0 shows the whole process and F goes full screen, unless the focus
  * is in a text field. The graph takes the focus when clicked, and is no Tab stop.
+ *
+ * With `imageName`, the controls also hold Download, a menu of SVG and PNG, see
+ * docs/reference/process-designer.md#download. Each saves the whole graph as one image, `{imageName}.svg` or
+ * `{imageName}.png`, drawn from a hidden copy in the light theme with no selection and no marks. A graph without
+ * `imageName` has no Download.
  */
 export function ProcessGraphCanvas(props: ProcessGraphProps) {
   return (
@@ -348,6 +458,7 @@ interface ProcessGraphProps {
   onConnect?: (source: string, target: string, point: GraphPoint) => void
   transitionExtra?: (id: string) => ReactNode
   testIdPrefix?: string
+  imageName?: string
 }
 
 /** The text field a key is typed into, where the graph's keys do nothing. */
@@ -376,6 +487,115 @@ function keyMove(key: string): KeyMove | undefined {
   }
 }
 
+/** Calls `onReady` once, a frame after React Flow holds every card, so what it draws is whole. */
+function ImageReady({ container, onReady }: { container: RefObject<HTMLDivElement | null>; onReady: () => void }) {
+  const initialized = useNodesInitialized()
+  const ready = useRef(onReady)
+  const called = useRef(false)
+  useEffect(() => {
+    ready.current = onReady
+  })
+  useEffect(() => {
+    if (!initialized || called.current) {
+      return
+    }
+    const frame = requestAnimationFrame(() => {
+      if (container.current && !called.current) {
+        called.current = true
+        ready.current()
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [initialized, container])
+  return null
+}
+
+/**
+ * A copy of the graph that is drawn off screen only to be saved as an image, see
+ * docs/reference/process-designer.md#download. It is in the light theme on `surface`, with nothing chosen and no marks,
+ * no controls, overview or grid, and it reuses the layout of the live canvas. It calls `onDrawn` once with React Flow's
+ * viewport element and the box of the whole graph, padded by `spacing.lg`.
+ */
+function GraphImage({
+  layout,
+  steps,
+  transitions,
+  testIdPrefix,
+  onDrawn,
+}: {
+  layout: GraphLayout
+  steps: GraphStep[]
+  transitions: GraphTransition[]
+  testIdPrefix: string
+  onDrawn: (viewport: HTMLElement, box: GraphBounds) => void
+}) {
+  const container = useRef<HTMLDivElement>(null)
+  const theme = useThemeMode()
+  const light = useMemo(() => ({ ...theme, mode: 'light' as const, tokens: undefined }), [theme])
+  const { colour, spacing } = designTokensFor('light')
+  const box = useMemo(() => {
+    const bounds = layoutBounds(layout, cardWidth, cardHeight)
+    return {
+      x: bounds.x - spacing.lg,
+      y: bounds.y - spacing.lg,
+      width: bounds.width + 2 * spacing.lg,
+      height: bounds.height + 2 * spacing.lg,
+    }
+  }, [layout, spacing.lg])
+  const plain = useMemo(
+    () => steps.map((step): GraphStep => ({ ...step, marked: false, mark: undefined, name: undefined })),
+    [steps],
+  )
+  // The cards have the size the layout gave them, so the nodes count as measured as soon as React Flow has them, in a
+  // browser as in jsdom, which measures nothing.
+  const flow = useMemo(() => {
+    const { nodes, edges } = flowElements(
+      layout,
+      { steps: plain, transitions, testIdPrefix: `${testIdPrefix}-image` },
+      colour,
+    )
+    return { nodes: nodes.map((node) => ({ ...node, measured: { width: cardWidth, height: cardHeight } })), edges }
+  }, [layout, plain, transitions, testIdPrefix, colour])
+  return (
+    <ThemeModeContext.Provider value={light}>
+      <ReactFlowProvider>
+        <div
+          ref={container}
+          aria-hidden
+          inert
+          style={{ position: 'fixed', left: -100000, top: 0, width: box.width, height: box.height }}
+        >
+          <ReactFlow
+            nodes={flow.nodes}
+            edges={flow.edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            colorMode="light"
+            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+            proOptions={{ hideAttribution: true }}
+            style={{ background: colour.surface }}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            nodesFocusable={false}
+            edgesFocusable={false}
+            elementsSelectable={false}
+          >
+            <ImageReady
+              container={container}
+              onReady={() => {
+                const viewport = container.current?.querySelector<HTMLElement>('.react-flow__viewport')
+                if (viewport) {
+                  onDrawn(viewport, box)
+                }
+              }}
+            />
+          </ReactFlow>
+        </div>
+      </ReactFlowProvider>
+    </ThemeModeContext.Provider>
+  )
+}
+
 function Canvas({
   steps,
   transitions,
@@ -390,7 +610,9 @@ function Canvas({
   onConnect,
   transitionExtra,
   testIdPrefix = 'process-graph',
+  imageName,
 }: ProcessGraphProps) {
+  const t = useText()
   const { mode } = useThemeMode()
   const section = useRef<HTMLElement>(null)
   const { colour } = useDesignTokens()
@@ -398,9 +620,10 @@ function Canvas({
     nodes: steps.map((step) => ({ id: step.id, width: cardWidth, height: cardHeight })),
     edges: transitions.map(({ id, source, target }) => ({ id, source, target })),
   })
-  const instance = runStates !== undefined
   const moves = useGraphMoves()
   const [fullScreen, setFullScreen] = useState(false)
+  const [imaging, setImaging] = useState<'svg' | 'png' | null>(null)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     const sync = () => setFullScreen(document.fullscreenElement === section.current)
@@ -417,91 +640,66 @@ function Canvas({
     Promise.resolve(request).catch(() => {})
   }
 
-  const flow = useMemo(() => {
-    if (layout === null) {
-      return null
+  const download = (format: 'svg' | 'png') => {
+    if (imaging === null && layout !== null) {
+      setFailed(false)
+      setImaging(format)
     }
-    const placed = steps.filter((step) => layout.positions.has(step.id))
-    const nodes = placed.map((step): StepNode => {
-      const connectable = onConnect !== undefined && step.connectable === true
-      return {
-        id: step.id,
-        type: 'step',
-        position: layout.positions.get(step.id)!,
-        width: cardWidth,
-        height: cardHeight,
-        handles: [
-          { type: 'target', position: Position.Left, x: 0, y: cardHeight / 2, width: 1, height: 1 },
-          connectable
-            ? {
-                type: 'source',
-                position: Position.Right,
-                x: cardWidth - handleSize / 2,
-                y: cardHeight / 2 - handleSize / 2,
-                width: handleSize,
-                height: handleSize,
-              }
-            : { type: 'source', position: Position.Right, x: cardWidth, y: cardHeight / 2, width: 1, height: 1 },
-        ],
-        data: {
-          step,
-          chosen: step.id === chosen,
-          connectable,
-          testIdPrefix,
-          onChoose,
-          runState: runStates?.get(step.id),
-          instance,
-        },
+  }
+
+  const saveImage = async (format: 'svg' | 'png', viewport: HTMLElement, box: GraphBounds) => {
+    try {
+      const svg = await graphSvg(viewport, box, designTokensFor('light').colour.surface)
+      if (format === 'svg') {
+        saveFile(new Blob([svg], { type: 'image/svg+xml' }), `${imageName}.svg`)
+      } else {
+        saveFile(await svgToPng(svg, box.width, box.height), `${imageName}.png`)
       }
-    })
-    const edges = transitions
-      .filter((transition) => layout.positions.has(transition.source) && layout.positions.has(transition.target))
-      .map((transition): RouteEdge => {
-        const current = transition.id === chosenTransition
-        const dimmed = instance && !taken?.has(transition.id)
-        const stroke = current ? colour.primary : instance && !dimmed ? colour.successText : colour.textMuted
-        return {
-          id: transition.id,
-          source: transition.source,
-          target: transition.target,
-          type: 'route',
-          data: {
-            route: routeBetween(layout, transition.id, transition.source, transition.target),
-            extra: transitionExtra?.(transition.id),
-          },
-          ariaLabel: transition.name,
-          ariaRole: onChooseTransition ? 'button' : undefined,
-          domAttributes: current ? { 'aria-current': 'true' } : undefined,
-          ...(transition.label !== undefined && {
-            label: transition.label,
-            labelStyle: { fill: colour.text },
-            labelBgStyle: { fill: colour.fillSubtle },
-          }),
-          style: {
-            stroke,
-            strokeWidth: current ? 2 : instance ? (dimmed ? 1 : 2) : 1.5,
-            strokeDasharray: dimmed && !current ? '4 4' : undefined,
-          },
-          markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
-        }
-      })
-    return { nodes, edges }
-  }, [
-    layout,
-    steps,
-    transitions,
-    chosen,
-    onChoose,
-    runStates,
-    taken,
-    instance,
-    colour,
-    chosenTransition,
-    onChooseTransition,
-    onConnect,
-    transitionExtra,
-    testIdPrefix,
-  ])
+    } catch (error) {
+      console.warn('The graph image could not be made.', error)
+      setFailed(true)
+    } finally {
+      setImaging(null)
+    }
+  }
+
+  const flow = useMemo(
+    () =>
+      layout === null
+        ? null
+        : flowElements(
+            layout,
+            {
+              steps,
+              transitions,
+              chosen,
+              onChoose,
+              runStates,
+              taken,
+              chosenTransition,
+              onChooseTransition,
+              onConnect,
+              transitionExtra,
+              testIdPrefix,
+            },
+            colour,
+          ),
+    [
+      layout,
+      steps,
+      transitions,
+      chosen,
+      onChoose,
+      runStates,
+      taken,
+      colour,
+      chosenTransition,
+      onChooseTransition,
+      onConnect,
+      transitionExtra,
+      testIdPrefix,
+    ],
+  )
 
   // A drag ends on a node when React Flow snaps to its handle, and anywhere else on the node otherwise, so the node
   // under the pointer is the target. `onConnect` is not set on React Flow, or it would report a snapped drag twice.
@@ -592,10 +790,26 @@ function Canvas({
               runStates={runStates}
               fullScreen={fullScreen}
               onFullScreen={toggleFullScreen}
+              onDownload={imageName === undefined ? undefined : download}
+              downloading={imaging !== null}
             />
+            {failed && (
+              <Panel position="top-right">
+                <AxisAlert kind="error" message={t('shell.inspector.graph.downloadFailed')} />
+              </Panel>
+            )}
           </ReactFlow>
         )}
       </ConfigProvider>
+      {imaging !== null && layout !== null && (
+        <GraphImage
+          layout={layout}
+          steps={steps}
+          transitions={transitions}
+          testIdPrefix={testIdPrefix}
+          onDrawn={(viewport, box) => saveImage(imaging, viewport, box)}
+        />
+      )}
     </section>
   )
 }
