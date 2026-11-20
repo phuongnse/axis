@@ -12,6 +12,7 @@ import { StudioApplicationContext, StudioNamesContext } from '../platform/studio
 import type { JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { ReferencePicker } from './ReferencePicker'
 import { SchemaForm } from './SchemaForm'
 
 const names: StudioNames = {
@@ -233,6 +234,35 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
     await userEvent.click(screen.getByRole('option', { name: 'Bill' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/entity', 'Invoice')
+  })
+
+  it('shows a choice by its ready label, finds it by that label and writes its name', async () => {
+    const onChange = vi.fn()
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <ReferencePicker
+            name="Find a step"
+            placeholder="Find a step"
+            width={200}
+            required
+            value={undefined}
+            options={[
+              { name: '0', label: 'Submit request' },
+              { name: '1', label: 'Check the amount' },
+            ]}
+            onChange={onChange}
+          />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    const picker = screen.getByRole('combobox', { name: 'Find a step' })
+    await userEvent.type(picker, 'amou')
+    expect(screen.queryByRole('option', { name: 'Submit request' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('option', { name: 'Check the amount' }))
+
+    expect(onChange).toHaveBeenLastCalledWith('1')
   })
 
   it('keeps a value that is not a name and tags it unknown', async () => {

@@ -185,13 +185,10 @@ wrong form show the not-found page, and the instance is not requested.
 
 ## Process graph
 
-_(planned)_
+A process is drawn as one graph, with the same layout, cards and controls wherever it shows.
 
-A process is drawn as one graph, on an instance's Diagram tab and in the [process designer](process-designer.md#canvas),
-with the same layout, cards and controls.
-
-- **One graph.** `ProcessGraphCanvas` draws a process on an instance's Diagram tab and in the process designer. React
-  Flow draws the graph, and ELK lays it out.
+- **One graph** _(planned)_. `ProcessGraphCanvas` draws a process on an instance's Diagram tab and in the process
+  designer. React Flow draws the graph, and ELK lays it out.
 - **Layout.** ELK's layered layout, `elkjs`, places the steps in the process's order from left to right. Every
   transition is routed in right angles with rounded corners, and no route crosses or runs through a step. A
   transition back to an earlier step goes round the other steps. No part of a route is shorter than 16 px. The graph
@@ -199,7 +196,7 @@ with the same layout, cards and controls.
 - **Surface and zoom.** The graph lies on `fillSubtle`, with no pattern. It never zooms in past its own size.
 - **What an instance took.** The steps an instance ran and the transitions it took are drawn in `successText`. The
   rest are muted, and their transitions are dashed and thinner.
-- **A step's card.** A step is a card on `surface`, and every card is one width. Its type's icon sits in a tile on
+- **A step's card** _(planned)_. A step is a card on `surface`, and every card is one width. Its type's icon sits in a tile on
   `fillSubtle`, and the type is the icon's tooltip. Its label is bold, at most two lines, then an ellipsis. The whole
   label is in a tooltip and in the card's accessible name. On an instance, the card shows the duration of the step's
   last run. A step run more than once shows its run count with that duration, such as "2 runs, last 1 day 17 hr".
@@ -212,17 +209,17 @@ with the same layout, cards and controls.
   - failed, a cross in `dangerText`;
   - cancelled, a minus in `textMuted`;
   - not reached, no icon.
-- **Border.** Every card has a `borderSubtle` border, whatever its state. The step the instance is at has a thicker
+- **Border** _(planned)_. Every card has a `borderSubtle` border, whatever its state. The step the instance is at has a thicker
   `primary` border, drawn inside the card so the card keeps its size. That step is chosen when the page opens, and
   the view opens on it. Choosing another step moves the `primary` border to it. In the designer, a step with a
   diagnostic keeps a `danger` border, see [diagnostics](process-designer.md#diagnostics). A viewer's steps show no
   handle dots.
-- **Transition labels.** A transition's label sits beside its line, on `fillSubtle`, which cuts the line. The label is
+- **Transition labels** _(planned)_. A transition's label sits beside its line, on `fillSubtle`, which cuts the line. The label is
   the author's `label` of the outcome or branch. Without one, a decision branch shows its name, and the fallback shows
   Otherwise. A wait for an event shows the event's label. A timeout shows "After {duration}" ("Sau {duration}"). A
   condition is not written in words, since a generated sentence explains a branch less well than the author's own
   words. The labels come from the [instance detail](process-inspection.md#instance-detail).
-- **Controls.** `ProcessGraphControls` gives each control a tooltip in the reader's language:
+- **Controls** _(planned)_. `ProcessGraphControls` gives each control a tooltip in the reader's language:
   - Zoom in and Zoom out.
   - Show the whole process.
   - Go to the current step ("Tới bước hiện tại"), on an instance only.
@@ -233,7 +230,7 @@ with the same layout, cards and controls.
 - **Overview.** At the graph's corner, an overview draws each step in its state's tone and marks the part in view.
   Dragging or clicking in it moves the view.
 - **Keys.** While the graph has the focus, + and − zoom, 0 shows the whole process, and F goes full screen. Each
-  button names its key in `aria-keyshortcuts`.
+  of those buttons names its key in `aria-keyshortcuts`. Go to the current step has no key.
 - **Moves.** Every move of the view is animated over 300 ms. Under [reduced motion](frontend.md#reduced-motion), a
   move happens at once.
 - **No React Flow controls.** React Flow's own controls and attribution are not drawn, as its MIT licence allows.

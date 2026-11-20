@@ -13,7 +13,8 @@ import { PlatformContext } from './context'
  * A searchable choice of the names an application defines. Each choice shows its label in the author's language, else
  * in `en`, else its name, and muted after the label when choices share one. The search finds a choice by its label or
  * its name, and the value written is the name, see [reference pickers](docs/reference/studio.md#reference-pickers). A
- * plain string is a choice with no label. A value that is not one of the choices stays visible and is tagged unknown,
+ * plain string is a choice with no label. A choice may carry a ready `label`, already in the reader's language, which
+ * shows in place of the names' label. A value that is not one of the choices stays visible and is tagged unknown,
  * so a file that names something gone still shows it. A chosen resource of the application Studio has open gets an Open
  * link joined after the select, see [reference pickers](docs/reference/studio.md#reference-pickers).
  */
@@ -26,6 +27,8 @@ export function ReferencePicker({
   required,
   options,
   onChange,
+  width,
+  placeholder,
 }: {
   name: string
   /** The id, description, and required mark and state that `AxisField` gives its input. */
@@ -36,6 +39,9 @@ export function ReferencePicker({
   required: boolean
   options: readonly (string | ReferenceOption)[]
   onChange: (next: string | undefined) => void
+  /** The select's width in px, at least 240 by default. */
+  width?: number
+  placeholder?: string
 }) {
   const t = useText()
   const { colour } = useDesignTokens()
@@ -43,9 +49,13 @@ export function ReferencePicker({
   const application = useContext(StudioApplicationContext)
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const entries = options.map((option) => {
-    const { name, labelKey, id } =
-      typeof option === 'string' ? { name: option, labelKey: undefined, id: undefined } : option
-    return { name, id, label: names === undefined ? undefined : labelText(names, labelKey, locale) }
+    const { name, labelKey, id, label } =
+      typeof option === 'string' ? { name: option, labelKey: undefined, id: undefined, label: undefined } : option
+    return {
+      name,
+      id,
+      label: label ?? (names === undefined ? undefined : labelText(names, labelKey, locale)),
+    }
   })
   const shared = new Set<string>()
   const seen = new Set<string>()
@@ -100,7 +110,8 @@ export function ReferencePicker({
       showSearch
       virtual={false}
       allowClear={!required}
-      style={{ minWidth: 240 }}
+      style={width === undefined ? { minWidth: 240 } : { width }}
+      placeholder={placeholder}
       value={match ?? current}
       options={choices}
       filterOption={(input, option) => {
