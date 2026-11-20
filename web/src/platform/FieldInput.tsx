@@ -1,6 +1,7 @@
 import { Checkbox, DatePicker, Input, Select, Space } from 'antd'
 import dayjs from 'dayjs'
 import type { CSSProperties, KeyboardEvent } from 'react'
+import { datePickerChevrons } from './datePickerChevrons'
 import { FileInput } from './FileInput'
 import { datePattern, enumLabel, timePattern } from './formatValue'
 import { isFileValue, type RecordValue } from './records'
@@ -159,6 +160,7 @@ export function FieldInput({
     case 'date':
       return (
         <DatePicker
+          {...datePickerChevrons}
           id={id}
           aria-label={ariaLabel}
           aria-required={ariaRequired || undefined}
@@ -176,6 +178,7 @@ export function FieldInput({
     case 'date-time':
       return (
         <DatePicker
+          {...datePickerChevrons}
           id={id}
           aria-label={ariaLabel}
           aria-required={ariaRequired || undefined}

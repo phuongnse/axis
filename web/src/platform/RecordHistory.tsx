@@ -6,7 +6,7 @@ import { EmptyState } from './EmptyState'
 import { historySummary } from './historySummary'
 import { inspectTarget } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
-import { markCurrentPage } from './pagination'
+import { paginationItems } from './pagination'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
 import { SectionPart } from './SectionParts'
 import type { FieldMetadata } from './site'
@@ -143,7 +143,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
                 pageSize={historyPageSize}
                 total={totalCount}
                 showSizeChanger={false}
-                itemRender={markCurrentPage(page)}
+                itemRender={paginationItems(page, t)}
                 onChange={setPage}
               />
             </Flex>

@@ -600,6 +600,8 @@
   "shell.table.filterOp.notEmpty": "is not empty",
   "shell.table.refresh": "Refresh",
   "shell.table.rowActions": "Actions",
+  "shell.pagination.previous": "Previous page",
+  "shell.pagination.next": "Next page",
   "shell.table.selected": "{count} selected",
   "shell.table.range": "{from}–{to} of {total}",
   "shell.table.selectRow": "Select row",
