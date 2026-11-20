@@ -2,6 +2,7 @@
   "id": "e1e6623a-1a42-4d43-8c4a-1eed72bbcf37",
   "kind": "process",
   "name": "Close",
+  "title": { "textKey": "processes.close.title" },
   "formatVersion": 1,
   "entity": "Note",
   "startCondition": {

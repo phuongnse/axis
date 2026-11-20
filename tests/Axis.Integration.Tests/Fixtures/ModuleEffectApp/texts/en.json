@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.approveClaim.title": "Approve a claim",
+    "processes.reviewClaim.title": "Review a claim",
     "role.clerk": "Clerk",
     "claim.main": "Claim",
     "claim.review": "Review the claim",

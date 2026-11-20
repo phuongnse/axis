@@ -4,5 +4,5 @@
   "name": "TextsEn",
   "formatVersion": 1,
   "locale": "en",
-  "texts": { "ordering.purchasing": "Purchasing" }
+  "texts": { "ordering.processes.place.title": "Place an order", "ordering.purchasing": "Purchasing" }
 }

@@ -174,14 +174,14 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
                 """)
             .With("texts/en.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "role.worker": "Worker", "setup.label": "Set up", "setup.done": "Done", "setup.main": "Workstation" } }
+                  "texts": { "processes.routing.title": "Route a request", "role.worker": "Worker", "setup.label": "Set up", "setup.done": "Done", "setup.main": "Workstation" } }
                 """)
             .With("forms/workstation-setup.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "form", "name": "WorkstationSetup", "formatVersion": 1, "entity": "Workstation",
                   "sections": [ { "name": "main", "title": { "textKey": "setup.main" }, "fields": [ { "field": "name", "readOnly": true }, { "field": "software", "readOnly": true }, { "field": "note", "visibleWhen": "count(software) > 0" } ] } ] }
                 """)
             .With("processes/setup.json", $$"""
-                { "id": "{{Guid.NewGuid()}}", "kind": "process", "name": "Setup", "formatVersion": 1, "entity": "Workstation",
+                { "id": "{{Guid.NewGuid()}}", "kind": "process", "title": { "textKey": "setup.label" }, "name": "Setup", "formatVersion": 1, "entity": "Workstation",
                   "start": "setup",
                   "steps": [
                     { "name": "setup", "type": "task", "label": { "textKey": "setup.label" }, "assignee": { "user": "'carl'" }, "form": "WorkstationSetup",
@@ -190,7 +190,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
                   ] }
                 """)
             .With("processes/routing.json", $$"""
-                { "id": "{{Guid.NewGuid()}}", "kind": "process", "name": "Routing", "formatVersion": 1, "entity": "Workstation",
+                { "id": "{{Guid.NewGuid()}}", "kind": "process", "title": { "textKey": "processes.routing.title" }, "name": "Routing", "formatVersion": 1, "entity": "Workstation",
                   "start": "route",
                   "steps": [
                     { "name": "route", "type": "decision", "branches": [

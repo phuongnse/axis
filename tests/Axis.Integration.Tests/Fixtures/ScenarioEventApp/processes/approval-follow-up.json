@@ -2,6 +2,7 @@
   "id": "d1f24d30-88b2-4254-9611-053a46cd3d3f",
   "kind": "process",
   "name": "ApprovalFollowUp",
+  "title": { "textKey": "processes.approvalFollowUp.title" },
   "formatVersion": 1,
   "entity": "PurchaseRequest",
   "start": "followUp",

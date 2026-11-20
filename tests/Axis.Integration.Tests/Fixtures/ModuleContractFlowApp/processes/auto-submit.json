@@ -2,6 +2,7 @@
   "id": "71967868-84ab-4970-aa3d-e25c400d3bee",
   "kind": "process",
   "name": "AutoSubmit",
+  "title": { "textKey": "processes.autoSubmit.title" },
   "formatVersion": 1,
   "entity": "requests/Request",
   "start": "submit",

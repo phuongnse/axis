@@ -9,6 +9,12 @@
     "note.quantityPositive": "The quantity must be at least 1.",
     "note.review": "Review the note",
     "noteReview.main": "Note",
+    "processes.ackNote.title": "Acknowledge a note",
+    "processes.close.title": "Close a request",
+    "processes.closeNow.title": "Close a request now",
+    "processes.failNote.title": "Fail a request with a note",
+    "processes.followNote.title": "Follow up a note",
+    "processes.reviewNote.title": "Review a note",
     "role.importer": "Importer",
     "role.reader": "Reader",
     "task.accept": "Accept"

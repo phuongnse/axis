@@ -2,6 +2,7 @@
   "id": "ea46dac1-866d-4135-b3a6-2d3fa13dec4a",
   "kind": "process",
   "name": "TrackedOrder",
+  "title": { "textKey": "processes.trackedOrder.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "createOrder",

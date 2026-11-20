@@ -2,6 +2,7 @@
   "id": "3e961ecb-9184-4dee-b496-9960faf2c785",
   "kind": "process",
   "name": "Revise",
+  "title": { "textKey": "processes.revise.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "review",

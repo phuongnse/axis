@@ -8,6 +8,8 @@
     "nav.orders": "Orders",
     "order.closeReview": "Close review",
     "pages.orders.title": "Orders",
+    "processes.closeReview.title": "Close a review",
+    "processes.flagReview.title": "Flag a review",
     "role.clerk": "Clerk",
     "role.manager": "Manager",
     "site.title": "Module processes"

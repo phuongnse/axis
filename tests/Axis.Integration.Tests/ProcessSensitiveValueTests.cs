@@ -179,6 +179,7 @@ public sealed class ProcessSensitiveValueTests(TaskApiFixture fixture) : IClassF
                     {
                       "id": "5f0a8d3e-7c21-4b96-a4e8-1d6c92b7f035",
                       "kind": "process",
+                      "title": { "textKey": "processes.submit.title" },
                       "name": "Reseal",
                       "formatVersion": 1,
                       "entity": "Request",

@@ -2,6 +2,7 @@
   "id": "4918f8fb-f272-42fd-9279-30336e887ce9",
   "kind": "process",
   "name": "FailNote",
+  "title": { "textKey": "processes.failNote.title" },
   "formatVersion": 1,
   "entity": "Note",
   "start": "empty",

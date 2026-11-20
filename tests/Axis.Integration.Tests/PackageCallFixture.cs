@@ -57,6 +57,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "5d1f7c52-8a3e-4b6d-9f20-1c4e8a7b3d61",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PackageSum",
           "formatVersion": 1,
           "entity": "Request",
@@ -79,6 +80,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "6e2a8d63-9b4f-4c7e-8a31-2d5f9b8c4e72",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PackageSumUnset",
           "formatVersion": 1,
           "entity": "Request",
@@ -101,6 +103,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "c8b2e9a4-3f71-4d05-a6c8-7e92b1d40f35",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PackageFail",
           "formatVersion": 1,
           "entity": "Request",
@@ -122,6 +125,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "{id}",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "{name}",
           "formatVersion": 1,
           "entity": "Request",
@@ -145,6 +149,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "e4a7d1b9-6c25-4f83-b0d6-2a9c5e8f7143",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PackageSlow",
           "formatVersion": 1,
           "entity": "Request",
@@ -166,6 +171,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "{id}",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "{name}",
           "formatVersion": 1,
           "entity": "Request",
@@ -188,6 +194,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "7e3a9c14-5b02-4d68-8f71-0a6d2c9e4b35",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PackageDescribe",
           "formatVersion": 1,
           "entity": "Request",
@@ -218,6 +225,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "3a8e5c91-d204-4b7f-86e3-9f1c7d02a5b8",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PackageNodeSum",
           "formatVersion": 1,
           "entity": "Request",
@@ -240,6 +248,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "b6d27f40-1e93-4a58-9c0b-5e8a3d7f1c26",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PackageNodeGreet",
           "formatVersion": 1,
           "entity": "Request",
@@ -262,6 +271,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "0b8e5d27-91c4-4a3f-b6e0-7d2a4c9f1e58",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PythonGreet",
           "formatVersion": 1,
           "entity": "Request",
@@ -284,6 +294,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "6f3c9a81-d5e2-4b70-8a14-c0e7b2d96a35",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PythonFlaky",
           "formatVersion": 1,
           "entity": "Request",
@@ -306,6 +317,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         {
           "id": "{id}",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "{name}",
           "formatVersion": 1,
           "entity": "Request",

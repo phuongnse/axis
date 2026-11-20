@@ -2,6 +2,7 @@
   "id": "a54620b1-9bff-477c-a325-b811adce86a6",
   "kind": "process",
   "name": "Intake",
+  "title": { "textKey": "processes.intake.title" },
   "formatVersion": 1,
   "entity": "Ticket",
   "start": "done",

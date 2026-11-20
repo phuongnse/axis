@@ -5,6 +5,9 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "reviews.processes.approve.title": "Approve a review",
+    "reviews.processes.close.title": "Close a review",
+    "reviews.processes.hold.title": "Hold a review",
     "reviews.review": "Review",
     "reviews.roles.approver": "Approver",
     "reviews.approve.decide": "Decide on the review",

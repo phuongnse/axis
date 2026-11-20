@@ -29,6 +29,7 @@ public sealed class ProcessWithoutSubjectOperatorTests(TaskApiFixture fixture) :
         {
           "id": "c1f3a0b2-7d54-4e8a-9b36-2f5d8e1a4c70",
           "kind": "process",
+          "title": { "textKey": "processes.order.title" },
           "name": "NightlyOrder",
           "formatVersion": 1,
           "parameters": [

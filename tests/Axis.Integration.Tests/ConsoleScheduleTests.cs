@@ -144,6 +144,7 @@ public sealed class ConsoleScheduleTests(ModuleTriggerFixture fixture) : IClassF
                 {
                   "id": "7e2b9c40-3d15-4a86-b1f7-5c0d8a6e2f93",
                   "kind": "process",
+                  "title": { "textKey": "processes.flagReview.title" },
                   "name": "Tally",
                   "formatVersion": 1,
                   "parameters": [{ "name": "days", "type": "integer" }],

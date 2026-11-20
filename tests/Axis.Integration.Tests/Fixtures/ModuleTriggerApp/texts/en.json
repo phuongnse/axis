@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.flagReview.title": "Flag a review",
     "role.clerk": "Clerk"
   }
 }

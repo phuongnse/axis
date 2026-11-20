@@ -2,6 +2,7 @@
   "id": "d36267c5-6c9c-409e-b1c5-7a10f32ebe18",
   "kind": "process",
   "name": "LedgerOrder",
+  "title": { "textKey": "processes.ledgerOrder.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "createOrder",

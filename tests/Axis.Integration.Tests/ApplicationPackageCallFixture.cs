@@ -52,6 +52,7 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
         {
           "id": "4c9e2a71-0b3d-4f58-9a16-7e2d8c5b1f03",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "ApplicationPid",
           "formatVersion": 1,
           "entity": "Request",
@@ -74,6 +75,7 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
         {
           "id": "8a1d6f35-2e90-4b47-a3c8-5d7b0e9f4a12",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "ApplicationProbeOwnOtherHost",
           "formatVersion": 1,
           "entity": "Request",
@@ -100,6 +102,7 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
         {
           "id": "{{id}}",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "{{name}}",
           "formatVersion": 1,
           "entity": "Request",

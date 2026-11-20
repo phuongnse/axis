@@ -15,6 +15,7 @@ public sealed class ProcessCollectionPathTests(ProcessStepFixture fixture) : ICl
         {
           "id": "a3b7d1f2-48c6-4e0b-9d15-72e6c0a8f931",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "CountLines",
           "formatVersion": 1,
           "entity": "Request",
@@ -40,6 +41,7 @@ public sealed class ProcessCollectionPathTests(ProcessStepFixture fixture) : ICl
         {
           "id": "b4c8e2a3-59d7-4f1c-8e26-83f7d1b9a042",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "CountLinesAboveDivisor",
           "formatVersion": 1,
           "entity": "Request",

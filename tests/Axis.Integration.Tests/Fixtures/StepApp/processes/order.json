@@ -2,6 +2,7 @@
   "id": "b7e4a1d9-3c5f-4a82-9e6b-2d1f0a8c7e35",
   "kind": "process",
   "name": "Order",
+  "title": { "textKey": "processes.order.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "createOrder",

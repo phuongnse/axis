@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.autoSubmit.title": "Submit a request automatically",
+    "processes.submitRequest.title": "Submit a request",
     "role.employee": "Employee",
     "role.importer": "Importer",
     "request.decide": "Decide the request",

@@ -126,7 +126,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         Assert.Equal("completed", body.RootElement.GetProperty("state").GetString());
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("input").ValueKind);
-        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("processTitleKey").ValueKind);
+        Assert.Equal("processes.submit.title", body.RootElement.GetProperty("processTitleKey").GetString());
         var result = body.RootElement.GetProperty("result");
         Assert.Equal(["step", "values"], result.EnumerateObject().Select(property => property.Name));
         Assert.Equal("done", result.GetProperty("step").GetString());
@@ -581,6 +581,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
                     {
                       "id": "5b0e7f3a-91c4-4d28-a6e5-0c8d2f4b7a19",
                       "kind": "process",
+                      "title": { "textKey": "processes.submit.title" },
                       "name": "LogDepartment",
                       "formatVersion": 1,
                       "entity": "Request",

@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.purchaseRequestApproval.title": "Approve a purchase request",
     "purchaseRequest.label": "Purchase request",
     "purchaseRequest.number": "Number",
     "purchaseRequest.title": "Title",

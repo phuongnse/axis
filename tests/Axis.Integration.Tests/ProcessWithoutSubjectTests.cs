@@ -17,6 +17,7 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
         {
           "id": "4b8d2e6a-7c1f-4a93-8e05-1f6a3c9d7b52",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "Tally",
           "formatVersion": 1,
           "parameters": [{ "name": "days", "type": "integer" }],
@@ -37,6 +38,7 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
         {
           "id": "7e3a9c1d-5b2f-4d68-a014-9c8b7a6d5e43",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "Dated",
           "formatVersion": 1,
           "parameters": [{ "name": "days", "type": "integer" }],

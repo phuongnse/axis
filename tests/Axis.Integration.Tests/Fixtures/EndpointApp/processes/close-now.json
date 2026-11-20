@@ -2,6 +2,7 @@
   "id": "854000e5-27a7-4ee8-8855-23fceaf13574",
   "kind": "process",
   "name": "CloseNow",
+  "title": { "textKey": "processes.closeNow.title" },
   "formatVersion": 1,
   "entity": "Note",
   "start": "close",

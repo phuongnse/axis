@@ -2,6 +2,7 @@
   "id": "69b96d2b-b00b-46b2-bb85-055f61b7225f",
   "kind": "process",
   "name": "Expire",
+  "title": { "textKey": "processes.expire.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "decide",

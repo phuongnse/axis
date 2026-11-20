@@ -43,6 +43,7 @@ public sealed class PackageCapabilityFixture : IAsyncLifetime
         {
           "id": "{id}",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "{name}",
           "formatVersion": 1,
           "entity": "Request",
@@ -270,6 +271,7 @@ public sealed class PackageCapabilityFixture : IAsyncLifetime
         {
           "id": "c5d1e8a3-4f27-4b69-9e02-7a3b6c0d8f91",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "PackageFlakyOnce",
           "formatVersion": 1,
           "entity": "Request",

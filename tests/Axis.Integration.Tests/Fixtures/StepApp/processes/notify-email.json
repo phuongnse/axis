@@ -2,6 +2,7 @@
   "id": "ca09464f-ec83-4677-9c43-82821444c489",
   "kind": "process",
   "name": "NotifyByEmail",
+  "title": { "textKey": "processes.notifyByEmail.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "tell",

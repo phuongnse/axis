@@ -2,6 +2,7 @@
   "id": "5d9a7c32-6e4f-4b8c-9f3a-9c3e2a7d4b03",
   "kind": "process",
   "name": "Close",
+  "title": { "textKey": "reviews.processes.close.title" },
   "formatVersion": 1,
   "entity": "Review",
   "start": "close",

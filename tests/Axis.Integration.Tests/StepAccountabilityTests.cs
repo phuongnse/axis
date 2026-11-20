@@ -15,6 +15,7 @@ public sealed class StepAccountabilityTests(ProcessStepFixture fixture) : IClass
         {
           "id": "3c9e7a52-8d14-4b6f-a1e0-72f5d0b4c8a6",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "Stamp",
           "formatVersion": 1,
           "entity": "Request",

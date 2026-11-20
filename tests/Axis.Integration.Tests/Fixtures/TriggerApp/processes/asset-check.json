@@ -2,6 +2,7 @@
   "id": "7f8bcf84-08e8-4459-b7c0-c9535aec01ad",
   "kind": "process",
   "name": "AssetCheck",
+  "title": { "textKey": "processes.assetCheck.title" },
   "formatVersion": 1,
   "entity": "Asset",
   "start": "done",

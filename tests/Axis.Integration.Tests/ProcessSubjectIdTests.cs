@@ -14,6 +14,7 @@ public sealed class ProcessSubjectIdTests(ProcessStepFixture fixture) : IClassFi
         {
           "id": "6f0a4c1e-3b52-4d7a-9a8e-5c1d2e7b9f40",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "MatchPrevious",
           "formatVersion": 1,
           "entity": "Request",

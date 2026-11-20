@@ -2,6 +2,7 @@
   "id": "e5b3a7c1-4d82-4f96-a0b7-3c8e1d9f5a27",
   "kind": "process",
   "name": "CoolDown",
+  "title": { "textKey": "processes.coolDown.title" },
   "formatVersion": 1,
   "entity": "PurchaseRequest",
   "start": "wait",

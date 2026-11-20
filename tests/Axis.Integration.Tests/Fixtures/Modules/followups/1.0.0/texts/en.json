@@ -4,5 +4,5 @@
   "name": "TextsEn",
   "formatVersion": 1,
   "locale": "en",
-  "texts": { "followups.followup": "Followup", "followups.roles.reviewer": "Reviewer" }
+  "texts": { "followups.followup": "Followup", "followups.processes.logDeletion.title": "Log a deletion", "followups.processes.noteFlagged.title": "Note a flagged item", "followups.processes.open.title": "Open a followup", "followups.processes.remind.title": "Remind the owner", "followups.roles.reviewer": "Reviewer" }
 }
