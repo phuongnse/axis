@@ -194,6 +194,13 @@ pull requests rarely edit the same lines.
   moves whole `##` sections, unchanged, to a new file in the same folder, named after its topic. The
   base for "grows" is the `NEXKIT_BASE_SHA` commit when NexKit sets it, else the merge base with
   `origin/main`.
+  - **No shrinking to fit.** A change near the limit does not shorten, rewrap into longer lines,
+    merge or delete existing text to stay under it. Text leaves a page only for its own reason, such
+    as a statement that is false or a copy of a rule whose home is another page, and the pull request
+    names that reason.
+  - **Split by topic, with room to grow.** The split moves the whole `##` sections of one topic, not
+    the fewest lines that pass. It leaves each page at or under 700 lines, so the next changes do not
+    meet the limit again.
 - **Short agent instructions.** [AGENTS.md](../AGENTS.md) holds only where to look, the working rules
   and the commands. A line belongs in it only when almost every session needs it, an agent would get
   it wrong without it, and it is a sentence that links the doc holding its detail, not a copy of that

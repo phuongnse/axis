@@ -140,6 +140,12 @@ export async function addAccount({
 
 const signInContext = (page) => page.body.match(/<script[^>]*id="axis-sign-in-context"[^>]*>([\s\S]*?)<\/script>/)
 
+// codeRefused: whether the two-step page of the Axis theme shows an error, which is how Keycloak refuses a one-time code.
+const codeRefused = (response) => {
+  const context = signInContext(response)
+  return response.status === 200 && context !== null && Boolean(JSON.parse(context[1]).error)
+}
+
 /**
  * Signs a user of `realm` in through the server and Keycloak, and returns the cookie `jar` with the `signIn` and `done`
  * responses. `startHeaders` go on the sign-in start only. The start is tried `attempts` times, `retryDelayMs` apart,
@@ -191,10 +197,16 @@ export async function signIn({
   assert.ok(codeContext, 'the Keycloak password step does not show the Axis theme')
   const codePage = JSON.parse(codeContext[1])
   assert.equal(codePage.page, 'twoStep', 'the Keycloak password step is not the two-step page')
-  const login = await identity(codePage.loginAction, keycloakJar, {
-    method: 'POST',
-    form: { otp: totpCode(secret), login: 'Sign In' },
-  })
+  // Keycloak can refuse a code for a reason the test cannot see, such as a code it has already accepted. The code of the
+  // next 30-second window is one step ahead, and Keycloak's look-ahead window accepts it. So a refused code gets one retry
+  // with that code. A wrong secret is refused again, and the sign-in still fails.
+  const submitCode = (action, now) =>
+    identity(action, keycloakJar, { method: 'POST', form: { otp: totpCode(secret, now), login: 'Sign In' } })
+  let login = await submitCode(codePage.loginAction, Date.now())
+  if (codeRefused(login)) {
+    remember(keycloakJar, login)
+    login = await submitCode(JSON.parse(signInContext(login)[1]).loginAction, Date.now() + 30_000)
+  }
   assert.equal(login.status, 302, `the Keycloak login: ${login.body}`)
   const callback = new URL(login.headers.location)
   assert.equal(`${callback.origin}${callback.pathname}`, `${callbackOrigin}/api/auth/callback`)
