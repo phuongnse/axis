@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { layoutGraph, roundedPath } from './processLayout'
+import { layoutGraph, roundedPath, routeBetween } from './processLayout'
 
 describe('roundedPath', () => {
   it('is a straight line for two points', () => {
@@ -61,9 +61,28 @@ describe('layoutGraph', () => {
     expect(positions.get('b')!.x).toBeGreaterThan(positions.get('a')!.x)
     expect(positions.get('c')!.x).toBeGreaterThan(positions.get('b')!.x)
     expect(routes.has('a-missing')).toBe(false)
-    const forward = routes.get('a-b')!
+    expect(routes.get('a-b')).toMatchObject({ source: 'a', target: 'b' })
+    expect(routes.get('c-a')).toMatchObject({ source: 'c', target: 'a' })
+    const forward = routes.get('a-b')!.points
     expect(forward[0]!.x).toBeCloseTo(positions.get('a')!.x + 200)
     expect(forward.at(-1)!.x).toBeCloseTo(positions.get('b')!.x)
-    expect(routes.get('c-a')!.length).toBeGreaterThan(2)
+    expect(routes.get('c-a')!.points.length).toBeGreaterThan(2)
+  })
+})
+
+describe('routeBetween', () => {
+  it('returns the points only while the ends are those the route was laid out for', async () => {
+    const layout = await layoutGraph({
+      nodes: [
+        { id: 'a', width: 200, height: 64 },
+        { id: 'b', width: 200, height: 64 },
+      ],
+      edges: [{ id: 'a-b', source: 'a', target: 'b' }],
+    })
+
+    expect(routeBetween(layout, 'a-b', 'a', 'b')).toBe(layout.routes.get('a-b')!.points)
+    expect(routeBetween(layout, 'a-b', 'a', 'c')).toBeUndefined()
+    expect(routeBetween(layout, 'a-b', 'c', 'b')).toBeUndefined()
+    expect(routeBetween(layout, 'unknown', 'a', 'b')).toBeUndefined()
   })
 })
