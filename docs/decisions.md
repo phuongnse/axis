@@ -131,7 +131,7 @@ the files agree, title and status included.
 | [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) | Small businesses first, and the milestones in three phases | **Agreed** |
 | [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) | Axis SaaS in cells, with sign-up, quotas and billing | **Agreed** |
 | D119 | AI authoring in Studio | Superseded by [D150](decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md), [last text](https://github.com/phuongnse/axis/blob/514687579949e77a807a36760fb4ecc7d29f90c5/docs/decisions/d119-ai-authoring-in-studio.md) |
-| [D120](decisions/d120-axis-is-agpl-licensed-with-a-commercial-licence.md) | Axis is AGPL licensed, with a commercial licence | **Agreed** |
+| D120 | Axis is AGPL licensed, with a commercial licence | Superseded by [D165](decisions/d165-axis-is-under-the-agpl-and-mit-licences-only-with-no-commercial-licence.md), [last text](https://github.com/phuongnse/axis/blob/8d4f6fd26a0b794848655fef8dfa90119e8088cd/docs/decisions/d120-axis-is-agpl-licensed-with-a-commercial-licence.md) |
 | [D121](decisions/d121-how-a-module-contract-is-declared-and-checked.md) | How a module contract is declared and checked | **Agreed** |
 | [D122](decisions/d122-how-a-customization-layer-is-written-and-applied.md) | How a customization layer is written and applied | **Agreed** |
 | [D123](decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) | How an Axis SaaS cell keeps tenants apart, measured and recoverable | **Agreed** |
@@ -176,3 +176,4 @@ the files agree, title and status included.
 | [D162](decisions/d162-each-entitys-records-open-on-one-record-page-in-each-site.md) | Each entity's records open on one record page in each site | **Agreed** |
 | [D163](decisions/d163-a-new-screen-is-designed-first-one-subject-to-each-design-issue-on-a-short-prototype-with-fixtures.md) | A new screen is designed first, one subject to each design issue, on a short prototype with fixtures | **Agreed** |
 | [D164](decisions/d164-typed-editors-and-one-process-graph-laid-out-by-elk.md) | Typed editors and one process graph laid out by ELK | **Agreed** |
+| [D165](decisions/d165-axis-is-under-the-agpl-and-mit-licences-only-with-no-commercial-licence.md) | Axis is under the AGPL and MIT licences only, with no commercial licence | **Agreed** |
