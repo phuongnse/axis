@@ -191,7 +191,7 @@ A tab bar sits `spacing-md` under what precedes it. The theme starts a tab's lab
 bar, with the underline right under the label, for every tab bar, because Ant Design's padding above
 the label reads as a gap too wide.
 
-- **One tab row look** _(planned)_. Every tab row of a workspace has the same padding and a rule the region's width,
+- **One tab row look.** Every tab row of a workspace has the same padding and a rule the region's width,
   whether it holds a file's tabs or a view switch.
 
 ## Text
