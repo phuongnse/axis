@@ -238,7 +238,7 @@ in any state. The body has these parts:
     the record, or a destructive migration since the pinned release. A command
     in the list can still be refused with `409`.
 - **Process title.** `processTitleKey` is the text key of the process's `title` on the
-  detail, on `parent` and on each `subProcesses` entry. It is `null` where the release gives no title.
+  detail, on `parent` and on each `subProcesses` entry.
 - **Record and release.** The detail has `subjectEntity`, the name of the process's subject entity, or
   `null` for a process with no subject. Its `subjectLabel` and `releaseNumber` are as the
   [instance list](#instance-list) defines them. With `subjectId`, `subjectEntity` addresses the subject record, see

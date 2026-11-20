@@ -21,8 +21,8 @@ public sealed record ProcessModel
 
     public required string Name { get; init; }
 
-    /// <summary>The text that names the process to people, or null when it has none.</summary>
-    public TextReference? Title { get; init; }
+    /// <summary>The text that names the process to people.</summary>
+    public required TextReference Title { get; init; }
 
     /// <summary>The process's file, relative to the application folder with <c>/</c> separators.</summary>
     public required string File { get; init; }

@@ -414,6 +414,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
             ["id"] = Guid.NewGuid().ToString(),
             ["kind"] = "process",
             ["name"] = "DailyReminder",
+            ["title"] = new JsonObject { ["textKey"] = "processes.leaveRequestApproval.title" },
             ["formatVersion"] = 1,
             ["parameters"] = new JsonArray(new JsonObject { ["name"] = "daysOverdue", ["type"] = "integer" }),
             ["start"] = "done",

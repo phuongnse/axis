@@ -414,7 +414,7 @@ internal static class ProcessInspectionEndpoints
         var relatives = await InstanceQueries.RelativesAsync(connection, row.ApplicationId, row.Id, cancellationToken);
         var parentProcess = relatives.Parent is { } relatedParent ? InspectableProcess(active, viewer, relatedParent.ProcessId) : null;
         var parent = relatives.Parent is { } parentRow && parentProcess is not null
-            ? new ProcessInstanceParent(parentRow.Id, parentProcess.Name, parentProcess.Title?.TextKey, parentRow.Step)
+            ? new ProcessInstanceParent(parentRow.Id, parentProcess.Name, parentProcess.Title.TextKey, parentRow.Step)
             : null;
         // A starting parent is named only under the same rule as parent, so a parent the user may not inspect keeps its name and id hidden.
         if (startedBy is { Kind: ProcessStartedBy.ParentKind } && parent is null)
@@ -429,7 +429,7 @@ internal static class ProcessInspectionEndpoints
                 subProcesses.Add(new ProcessSubProcess(
                     child.Id,
                     childProcess.Name,
-                    childProcess.Title?.TextKey,
+                    childProcess.Title.TextKey,
                     child.Step,
                     child.State,
                     child.CreatedAt.UtcDateTime,
@@ -497,7 +497,7 @@ internal static class ProcessInspectionEndpoints
         return new ProcessInstanceDetailResponse(
             row.Id,
             process.Name,
-            process.Title?.TextKey,
+            process.Title.TextKey,
             subject?.Name,
             row.SubjectId,
             labels.SubjectLabel,
@@ -1051,7 +1051,7 @@ internal sealed record ProcessInstanceListItem(
 
 /// <summary>
 /// One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.
-/// <paramref name="ProcessTitleKey"/> is the text key of the process's title in the active release, or null when the process has none, see
+/// <paramref name="ProcessTitleKey"/> is the text key of the process's title in the active release, see
 /// <see href="docs/reference/process-inspection.md#instance-detail">instance detail</see>.
 /// <paramref name="SubjectEntity"/>, <paramref name="SubjectLabel"/> and <paramref name="ReleaseNumber"/> are as the list gives them.
 /// <paramref name="Studio"/> is the address to open the process in Studio for a user who holds the author role, and null for anyone else.
@@ -1064,7 +1064,7 @@ internal sealed record ProcessInstanceListItem(
 internal sealed record ProcessInstanceDetailResponse(
     Guid Id,
     string Process,
-    string? ProcessTitleKey,
+    string ProcessTitleKey,
     string? SubjectEntity,
     Guid? SubjectId,
     string? SubjectLabel,
@@ -1110,16 +1110,16 @@ internal sealed record ProcessStudioAddress(string App, Guid Resource);
 internal sealed record ProcessInstanceStartedBy(string Kind, string? Name, string? Id, string? Via);
 
 /// <summary>
-/// The instance that started this one, with the sub-process step in the parent that did so. <paramref name="ProcessTitleKey"/> is null
-/// for a process with no title, see <c>docs/reference/process-inspection.md#instance-detail</c>.
+/// The instance that started this one, with the sub-process step in the parent that did so. <paramref name="ProcessTitleKey"/> is the text key of the
+/// process's title, see <c>docs/reference/process-inspection.md#instance-detail</c>.
 /// </summary>
-internal sealed record ProcessInstanceParent(Guid Id, string Process, string? ProcessTitleKey, string Step);
+internal sealed record ProcessInstanceParent(Guid Id, string Process, string ProcessTitleKey, string Step);
 
 /// <summary>
-/// An instance that this one started, with the sub-process step in this instance that did so. <paramref name="ProcessTitleKey"/> is null
-/// for a process with no title, see <c>docs/reference/process-inspection.md#instance-detail</c>.
+/// An instance that this one started, with the sub-process step in this instance that did so. <paramref name="ProcessTitleKey"/> is the text key of the
+/// process's title, see <c>docs/reference/process-inspection.md#instance-detail</c>.
 /// </summary>
-internal sealed record ProcessSubProcess(Guid Id, string Process, string? ProcessTitleKey, string Step, string State, DateTime CreatedAt, DateTime? EndedAt);
+internal sealed record ProcessSubProcess(Guid Id, string Process, string ProcessTitleKey, string Step, string State, DateTime CreatedAt, DateTime? EndedAt);
 
 /// <summary>The steps of a process, in declaration order, and the name of the first.</summary>
 internal sealed record ProcessGraph(string Start, IReadOnlyList<ProcessGraphStep> Steps);

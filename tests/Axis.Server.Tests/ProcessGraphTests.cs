@@ -14,6 +14,7 @@ public sealed class ProcessGraphTests
         {
             Id = Guid.Parse("77777777-7777-4777-8777-777777777701"),
             Name = "OrderReview",
+            Title = new TextReference("order.title"),
             File = "processes/order-review.json",
             Start = "fulfil",
             Steps =
@@ -42,6 +43,7 @@ public sealed class ProcessGraphTests
         {
             Id = Guid.Parse("77777777-7777-4777-8777-777777777703"),
             Name = "OrderReview",
+            Title = new TextReference("order.title"),
             File = "processes/order-review.json",
             Start = "wait",
             Steps =
@@ -77,6 +79,7 @@ public sealed class ProcessGraphTests
         {
             Id = Guid.Parse("77777777-7777-4777-8777-777777777704"),
             Name = "OrderReview",
+            Title = new TextReference("order.title"),
             File = "processes/order-review.json",
             Start = "wait",
             Steps = [new WaitEventStepModel("wait", "OrderPlaced", null, null, "done"), new EndStepModel("done")],
@@ -94,6 +97,7 @@ public sealed class ProcessGraphTests
         {
             Id = Guid.Parse("77777777-7777-4777-8777-777777777705"),
             Name = "OrderReview",
+            Title = new TextReference("order.title"),
             File = "processes/order-review.json",
             Start = "pause",
             Steps =

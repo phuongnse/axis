@@ -882,6 +882,18 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_process_without_a_title_is_one_schema_violation_in_its_file()
+    {
+        using var folder = Folder(Process("Order", ReviewSteps, title: null));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "processes/order-review.json"), (diagnostic.Code, diagnostic.File));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_missing_process_title_key_is_reported_at_its_text_key()
     {
         using var folder = Folder(Process("Order", ReviewSteps, title: "order.nope"));

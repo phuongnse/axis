@@ -7,8 +7,8 @@ namespace Axis.Configuration.Resources;
 /// </summary>
 public sealed record ProcessResource : Resource
 {
-    /// <summary>The text that names the process to people, or null when it has none, see <c>docs/reference/resource-files.md#resource-file-shape</c>.</summary>
-    public TextReference? Title { get; init; }
+    /// <summary>The text that names the process to people, see <c>docs/reference/resource-files.md#resource-file-shape</c>.</summary>
+    public required TextReference Title { get; init; }
 
     /// <summary>The subject entity, or null for a process without a subject, which declares <see cref="Parameters"/> instead.</summary>
     public string? Entity { get; init; }
