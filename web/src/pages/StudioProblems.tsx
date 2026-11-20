@@ -1,9 +1,11 @@
-import { Flex, Tag } from 'antd'
+import { Flex } from 'antd'
 import { AxisButton } from '../platform/AxisButton'
 import { EmptyState } from '../platform/EmptyState'
 import { SidePanel } from '../platform/SidePanel'
+import { StatusTag } from '../platform/StatusTag'
 import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { problemsPanelId } from './StudioBand'
 import { ResourceReference } from './ResourceReference'
 
@@ -80,7 +82,10 @@ export function StudioProblemList({
   )
 }
 
-/** One problem: severity, code and message, then its resource, or its file when it names none. */
+/**
+ * One problem: severity as a `StatusTag`, code and message, then its resource, or its file when it names none, on the
+ * same row when it fits.
+ */
 function DiagnosticRow({
   diagnostic,
   resources,
@@ -93,14 +98,17 @@ function DiagnosticRow({
   onOpenFile?: { name: (diagnostic: StudioDiagnostic) => string; open: (diagnostic: StudioDiagnostic) => void }
 }) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   const resourceId = diagnostic.resourceId
   const resource = resourceId === null ? undefined : resources?.find((item) => item.id === resourceId)
   return (
     <div style={{ padding: '4px 15px' }}>
-      <Flex vertical align="flex-start" style={{ minWidth: 0, whiteSpace: 'normal' }}>
+      {/* Proposed, see #3978: the place follows the message on its row when the row has room, and the row under it when not. */}
+      <Flex wrap align="baseline" style={{ minWidth: 0, whiteSpace: 'normal', columnGap: spacing.md }}>
         <span>
-          {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-          <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
+          <span style={{ marginInlineEnd: spacing.sm }}>
+            <StatusTag tone={diagnostic.severity === 'error' ? 'danger' : 'attention'}>{diagnostic.severity}</StatusTag>
+          </span>
           <strong>{diagnostic.code}</strong> {diagnostic.message}
         </span>
         {resourceId === null && onOpenFile ? (
