@@ -1305,7 +1305,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await useJourneySession(page, 'agent')
     await openTask(page, title, 'Resolve ticket')
-    await page.getByLabel(fieldLabel('Resolution')).fill(resolution)
+    await page.getByRole('textbox', { name: fieldLabel('Resolution') }).fill(resolution)
     await page.getByRole('button', { name: 'Resolve', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
