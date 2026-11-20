@@ -13,6 +13,7 @@ import { sizeTokens } from './designTokens'
 import { ShellFooter } from './ShellFooter'
 import { ShellNavigation } from './ShellNavigation'
 import { ShellAsideContext } from './shellAsideContext'
+import { ShellBarSlotContext } from './shellBarSlotContext'
 import { ShellSidebarContext } from './shellSidebarContext'
 import { SiteMark } from './SiteMark'
 import type { NavigationItem, SiteLegal } from './site'
@@ -92,6 +93,7 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
  * A page can claim a column on the right with `ShellAside`, as wide as the panel it holds, beside the content column, from under the header to the footer.
+ * A page draws a bar at the foot of the content column with `ShellBarSlot`, which sticks to the window's foot and rests above the footer.
  * A footer runs under the page, with the copyright at the start and the legal links at the end. Without a sidebar it
  * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
  * The page area draws on `surface`, flush with the frame, see docs/reference/shell.md#layout.
@@ -147,6 +149,9 @@ export function Shell({
     () => ({ target: asideTarget, claim: claimAside, current }),
     [asideTarget, claimAside, current],
   )
+  // A bar claims the foot of the content column by rendering ShellBarSlot, which draws it into `barTarget`.
+  const [barTarget, setBarTarget] = useState<HTMLElement | null>(null)
+  const barContext = useMemo(() => ({ target: barTarget }), [barTarget])
   const hasSidebar = claimed || navigation.length > 1
   const sidebar = hasSidebar && !narrow
   const home = navigation[0]?.path ?? '/'
@@ -293,9 +298,12 @@ export function Shell({
                   {!hasAccount && <ReadOnlyBanner />}
                   <Layout.Content style={{ background: colour.surface, padding: claimed ? spacing.md : spacing.lg }}>
                     <ShellSidebarContext.Provider value={sidebarContext}>
-                      <ShellAsideContext.Provider value={asideContext}>{children}</ShellAsideContext.Provider>
+                      <ShellAsideContext.Provider value={asideContext}>
+                        <ShellBarSlotContext.Provider value={barContext}>{children}</ShellBarSlotContext.Provider>
+                      </ShellAsideContext.Provider>
                     </ShellSidebarContext.Provider>
                   </Layout.Content>
+                  <div ref={setBarTarget} data-shell-bar-slot style={{ position: 'sticky', bottom: 0, zIndex: 10 }} />
                 </Layout>
                 {asideClaimed && (
                   <div

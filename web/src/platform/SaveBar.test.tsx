@@ -3,18 +3,35 @@ import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { TextProvider } from '../platform/TextProvider'
-import { ThemeModeProvider } from '../platform/theme'
+import { TextProvider } from './TextProvider'
+import { ThemeModeProvider } from './theme'
 import { followLink, renderGuarded } from '../test/leaveGuard'
 import { SaveBar } from './SaveBar'
 
-function renderBar(props: Partial<ComponentProps<typeof SaveBar>> = {}) {
+type BarOptions = Partial<ComponentProps<typeof SaveBar>> & { undoable?: boolean; redoable?: boolean }
+
+/** The bar's props: with Undo and Redo, which `undoable` and `redoable` set, unless `history` is given. */
+function barProps({ undoable = true, redoable = false, ...props }: BarOptions, handlers: Record<string, () => void>) {
+  return {
+    unsaved: true,
+    history: { undoable, redoable, onUndo: handlers.onUndo, onRedo: handlers.onRedo },
+    saveable: true,
+    busy: false,
+    onDiscard: handlers.onDiscard,
+    onSave: handlers.onSave,
+    'data-testid': 'studio-save-bar',
+    saveTestId: 'studio-save',
+    ...props,
+  }
+}
+
+function renderBar(options: BarOptions = {}) {
   const handlers = { onUndo: vi.fn(), onRedo: vi.fn(), onDiscard: vi.fn(), onSave: vi.fn() }
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <main>
-          <SaveBar unsaved undoable redoable={false} saveable busy={false} {...handlers} {...props} />
+          <SaveBar {...barProps(options, handlers)} />
         </main>
       </TextProvider>
     </ThemeModeProvider>,
@@ -24,22 +41,12 @@ function renderBar(props: Partial<ComponentProps<typeof SaveBar>> = {}) {
 
 describe('SaveBar', () => {
   describe('leaving unsaved changes', () => {
-    function renderGuardedBar(props: Partial<ComponentProps<typeof SaveBar>>) {
+    function renderGuardedBar(options: BarOptions) {
+      const handlers = { onUndo: vi.fn(), onRedo: vi.fn(), onDiscard: vi.fn(), onSave: vi.fn() }
       return renderGuarded(
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <main>
-            <SaveBar
-              unsaved
-              undoable
-              redoable={false}
-              saveable
-              busy={false}
-              onUndo={vi.fn()}
-              onRedo={vi.fn()}
-              onDiscard={vi.fn()}
-              onSave={vi.fn()}
-              {...props}
-            />
+            <SaveBar {...barProps(options, handlers)} />
           </main>
         </TextProvider>,
       )
@@ -88,6 +95,34 @@ describe('SaveBar', () => {
     expect(within(bar).getByRole('button', { name: 'Undo' })).toBeDisabled()
     expect(within(bar).queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument()
     expect(within(bar).getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
+  it('draws no Undo and no Redo when the editor gives none, and still shows Discard and Save', () => {
+    renderBar({ history: undefined })
+
+    const bar = screen.getByTestId('studio-save-bar')
+    expect(within(bar).queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
+    expect(within(bar).queryByRole('button', { name: 'Redo' })).not.toBeInTheDocument()
+    expect(within(bar).getByRole('button', { name: 'Discard' })).toBeEnabled()
+    expect(within(bar).getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('is not drawn without a change when the editor gives no history', () => {
+    renderBar({ history: undefined, unsaved: false, saveable: false })
+
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
+  })
+
+  it('draws in place outside a shell', () => {
+    renderBar()
+
+    expect(screen.getByRole('main')).toContainElement(screen.getByTestId('studio-save-bar'))
+  })
+
+  it('names its Save button by the given test id', () => {
+    renderBar({ saveTestId: 'site-save' })
+
+    expect(screen.getByTestId('site-save')).toHaveTextContent('Save')
   })
 
   it('turns Undo, Redo and Discard off while a save runs', () => {

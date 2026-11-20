@@ -10,6 +10,7 @@ import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { designTokensFor, sizeTokens } from './designTokens'
 import { PreferencesMenu } from './PreferencesMenu'
+import { SaveBar } from './SaveBar'
 import { Shell } from './Shell'
 import { ShellNavigation } from './ShellNavigation'
 import { ShellAside } from './shellAside'
@@ -795,6 +796,25 @@ describe('Shell account slot', () => {
     expect(await screen.findByTestId('account')).toHaveTextContent('Ada Operator')
     await waitFor(() => expect(fetch).not.toHaveBeenCalledWith('/api/me', expect.anything()))
     expect(screen.queryByRole('button', { name: 'Switch to' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Shell bar slot', () => {
+  it('draws a bar after the page and before the footer, in a slot that sticks to the window foot', async () => {
+    renderShell(
+      'en',
+      ['/'],
+      notesNavigation,
+      <SaveBar unsaved saveable busy={false} onDiscard={vi.fn()} onSave={vi.fn()} data-testid="bar" />,
+    )
+
+    const bar = await screen.findByTestId('bar')
+
+    const main = screen.getByRole('main')
+    expect(main).not.toContainElement(bar)
+    expect(main.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(bar.compareDocumentPosition(screen.getByRole('contentinfo')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(bar.closest('[data-shell-bar-slot]')).toHaveStyle({ position: 'sticky', bottom: '0px' })
   })
 })
 

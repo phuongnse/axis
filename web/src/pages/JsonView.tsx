@@ -202,7 +202,9 @@ export default function JsonView({
       footerHeight: document.querySelector('[role=contentinfo]')?.getBoundingClientRect().height ?? 0,
       below:
         (boundary?.current ? Math.max(boundary.current.getBoundingClientRect().bottom - rect.bottom, 0) : 0) +
-        (content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0),
+        (content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0) +
+        // The bar slot is under the page, so the view ends above the bar that sticks to the window's foot.
+        (document.querySelector('[data-shell-bar-slot]')?.getBoundingClientRect().height ?? 0),
       gap,
     })
     setHeight((current) => (current === next ? current : next))

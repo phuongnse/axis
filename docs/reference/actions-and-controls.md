@@ -38,8 +38,8 @@ widget names a role, never an Ant Design button type.
   keeping its disabled state. They are buttons again when the room comes back. A row without `fold` wraps.
 - **An action bar folds into More.** An `ActionBar`, a bar of actions at the foot of a page on `surface`
   with a `borderSubtle` rule above it, folds the actions it names into one More actions menu through
-  `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width. A docked bar stays at the foot of the window across the
-  content instead of at the foot of its page.
+  `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width. A bar that stays at the foot of the window as the page
+  scrolls draws in the shell's [bar slot](shell.md#layout), above the footer, instead of at the foot of its page.
 - **Actions of equal weight are one group** _(planned)_. A screen keeps one main action. Actions of equal weight that
   together are a region's main action, such as a task's outcomes, are one joined group in the `main` role, in the order
   the process gives them. Each button of the group is as wide as the widest, stays a button of its own with no selected
