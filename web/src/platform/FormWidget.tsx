@@ -1,22 +1,26 @@
 import { ConfigProvider, Flex, Form } from 'antd'
 import { AxisAlert } from './AxisAlert'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { antLocaleFor } from './antLocale'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { useCanvasActions } from './canvasActions'
+import { FormCanvasContext } from './formCanvas'
 import { formStatePath } from './formState'
 import { navigateTarget, type NavigateOpen } from './navigateAction'
 import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
+import { PageActions } from './PageLayout'
 import { newIdempotencyKey, startProcess } from './processes'
 import { requiredMark } from './requiredMark'
 import { RecordNotFound } from './RecordNotFound'
+import { SaveBar } from './SaveBar'
 import { SectionParts } from './SectionParts'
 import { fetchRecord, saveRecord, type RecordItem, type RecordProblem } from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { leaveWithoutAsking, useUnsavedChanges } from './unsavedChanges'
 import { useFormSteps } from './useFormSteps'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
@@ -28,7 +32,7 @@ interface FormWidgetProps {
   pages: readonly string[]
   /** The record to edit, or `null` to create one. */
   recordId: string | null
-  /** Where save and cancel go: the table page the user came from. */
+  /** Where a save goes: the table page the user came from. */
   returnTo: string
   /** The UI locale, for showing computed and sequence values. */
   locale: string
@@ -37,8 +41,8 @@ interface FormWidgetProps {
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
 
 /**
- * The footer of a form the user cannot save: it has no solid button, so no action is a text button, see
- * docs/reference/actions-and-controls.md#buttons.
+ * The row of a wizard's last step: Back is its only button, so there is no solid button and no action is a text button,
+ * see docs/reference/actions-and-controls.md#buttons.
  */
 function FooterRow({ children }: { children: ReactNode }) {
   return <Flex gap="small">{children}</Flex>
@@ -56,13 +60,17 @@ function FooterRow({ children }: { children: ReactNode }) {
  * server numbers it on create, a creator field, which the server sets to the creating user's id,
  * and a field the form marks read-only. A field the user's grants do not let them write, as the
  * widget's access says, is read-only too: on a new record the `create` fields, and on a saved one
- * the `update` fields. Without the `create` or `update` grant the form has no save button. A saved
- * record shows its history below the form, and a button for each of the widget's `startProcess` actions, which
- * lists only the processes the user may start. An action saves the changed fields, then starts its
- * process for the record. A saved record also shows a button for each `navigate` action, after the
+ * the `update` fields. Without the `create` or `update` grant the form has no save bar. The form has
+ * no Save or Cancel row: it saves through `SaveBar`, which shows Discard and Save while there is a change, on a
+ * wizard's last step, and never on a designer's canvas, see docs/reference/form-widget.md#saving. A saved
+ * record shows its history below the form, and an outlined button on the page heading for each of the widget's
+ * `startProcess` actions, which lists only the processes the user may start. An action saves the changed fields, then
+ * starts its process for the record. A saved record also shows a button for each `navigate` action, after the
  * start buttons. It opens the target page with the record as it was loaded, so unsaved edits are not
- * used, and it is hidden when the SPA cannot work out an expression. A new record has no action buttons. On the
- * page designer's canvas every action is a button, on any step and on a new record.
+ * used, and it is hidden when the SPA cannot work out an expression. A new record has no action buttons. Without
+ * a page heading the buttons sit at the top of the form on the right, see
+ * docs/reference/form-widget.md#start-process-actions. On a designer's canvas every action is a button, on any step
+ * and on a new record, and stays inside the form.
  *
  * A widget that names a form and lets the user save follows the server's form state endpoint as the
  * user edits: a field the answer hides is not shown or sent, a field it requires is marked required,
@@ -78,6 +86,9 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   const navigate = useNavigate()
   const location = useLocation()
   const canvas = useCanvasActions()
+  // Both Studio canvases sit inside Studio, whose own save bar uses the shell's slot.
+  const formCanvas = useContext(FormCanvasContext)
+  const inCanvas = canvas.active || formCanvas !== null
   const { entity } = widget
   const { access } = widget
   const writeAction = recordId === null ? 'create' : 'update'
@@ -104,6 +115,9 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   const form = useRecordForm(entity, sections, locale, conditions)
   const steps = useFormSteps(widget.form, sections, form)
   const { start: startForm, setFormErrors } = form
+  const unsaved = Object.keys(form.changed()).length > 0
+  // The guard asks on every step of a wizard, though the save bar shows only on the last.
+  useUnsavedChanges(canSave && !inCanvas && unsaved)
   const [load, setLoad] = useState<LoadState>(recordId === null ? 'ready' : 'loading')
   const [conflict, setConflict] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -178,6 +192,10 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     if (!canSave || saving || starting) {
       return
     }
+    // A saved record with no change has nothing to send. A new record still saves, so the server's messages show.
+    if (recordId !== null && !unsaved) {
+      return
+    }
     setStarted(false)
     const body = buildRecordBody(entity.fields, form.changed(), recordId === null ? undefined : form.version)
     setSaving(true)
@@ -186,7 +204,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     try {
       const result = await saveRecord(entity.recordsPath, recordId, body, formName)
       if (result.ok) {
-        navigate(returnTo)
+        navigate(returnTo, { state: leaveWithoutAsking })
         return
       }
       showSaveProblem(result.problem)
@@ -290,14 +308,68 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return <AxisAlert data-testid="form-load-error" kind="error" message={t('shell.form.loadFailed')} />
   }
 
-  // The footer is an action row only where it draws a solid button. Without one, a main action stays outlined.
-  // See docs/reference/actions-and-controls.md#buttons.
-  const Row = !steps.last || canSave ? AxisActionRow : FooterRow
+  // The row under the fields holds a wizard's Back and Next. It is an action row only where Next is a solid button.
+  // Without one, Back stays outlined. See docs/reference/actions-and-controls.md#buttons.
+  const Row = steps.last ? FooterRow : AxisActionRow
+  // A saved record's actions are outlined `main` buttons on the page heading, see docs/reference/form-widget.md#start-process-actions.
+  const startButtons =
+    canvas.active || (steps.last && recordId !== null)
+      ? widget.actions
+          .filter((action): action is StartProcessAction => action.type === 'startProcess')
+          .map((action) => (
+            <AxisButton
+              role="main"
+              key={action.instancesPath}
+              htmlType="button"
+              disabled={saving || starting}
+              onClick={() => void runAction(action)}
+              {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
+            >
+              {t(action.labelKey)}
+            </AxisButton>
+          ))
+      : []
+  const navigateButtons =
+    canvas.active || (recordId !== null && record?.id === recordId)
+      ? widget.actions
+          .filter((action): action is NavigateAction => action.type === 'navigate')
+          .map((action, index) => {
+            // The canvas has no record, so its button has no target.
+            const open =
+              recordId !== null && record
+                ? navigateTarget(sitePath, action, { id: recordId, values: record.values })
+                : null
+            return (
+              (canvas.active || open) && (
+                <AxisButton
+                  role="main"
+                  key={index}
+                  htmlType="button"
+                  disabled={saving || starting}
+                  onClick={() => {
+                    if (open) {
+                      void runNavigate(open)
+                    }
+                  }}
+                  {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
+                >
+                  {t(action.labelKey)}
+                </AxisButton>
+              )
+            )
+          })
+      : []
+  const actionButtons = [...startButtons, ...navigateButtons].filter(Boolean)
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
       {/* The form is the first part and a saved record's history the last, see docs/reference/form-widget.md#history. */}
       <SectionParts>
         <Flex vertical gap="middle">
+          {actionButtons.length > 0 && (
+            <PageActions inPlace={inCanvas}>
+              <Flex gap="small">{actionButtons}</Flex>
+            </PageActions>
+          )}
           {conflict && (
             <AxisAlert
               data-testid="form-conflict"
@@ -313,75 +385,26 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
           {started && <AxisAlert data-testid="form-started" kind="success" message={t('shell.form.processStarted')} />}
           {form.formError}
           {steps.progress}
-          {/* Enter acts as Next on a step before the last, and saves on the last. */}
+          {/* Enter acts as Next on a step before the last, and saves on the last. The form saves through its save bar. */}
           <Form layout="vertical" requiredMark={requiredMark} onFinish={steps.last ? save : steps.next}>
             {/* The form's layout gives the gap below the fields, see docs/reference/form-widget.md#fields-in-columns. */}
             <Flex vertical gap={spacing.lg}>
               {steps.fields}
-              <Row>
-                {!steps.first && (
-                  <AxisButton role="secondary" onClick={steps.back} disabled={steps.checking}>
-                    {t('shell.form.back')}
-                  </AxisButton>
-                )}
-                {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
-                {!steps.last && (
-                  <AxisButton role="finish" htmlType="submit" loading={steps.checking && { delay: 200 }}>
-                    {t('shell.form.next')}
-                  </AxisButton>
-                )}
-                {steps.last && canSave && (
-                  <AxisButton role="finish" htmlType="submit" loading={saving} disabled={starting}>
-                    {t('shell.form.save')}
-                  </AxisButton>
-                )}
-                <AxisButton role="secondary" onClick={() => navigate(returnTo)}>
-                  {t('shell.form.cancel')}
-                </AxisButton>
-                {(canvas.active || (steps.last && recordId !== null)) &&
-                  widget.actions
-                    .filter((action): action is StartProcessAction => action.type === 'startProcess')
-                    .map((action) => (
-                      <AxisButton
-                        role="main"
-                        key={action.instancesPath}
-                        htmlType="button"
-                        disabled={saving || starting}
-                        onClick={() => void runAction(action)}
-                        {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
-                      >
-                        {t(action.labelKey)}
-                      </AxisButton>
-                    ))}
-                {(canvas.active || (recordId !== null && record?.id === recordId)) &&
-                  widget.actions
-                    .filter((action): action is NavigateAction => action.type === 'navigate')
-                    .map((action, index) => {
-                      // The canvas has no record, so its button has no target.
-                      const open =
-                        recordId !== null && record
-                          ? navigateTarget(sitePath, action, { id: recordId, values: record.values })
-                          : null
-                      return (
-                        (canvas.active || open) && (
-                          <AxisButton
-                            role="secondary"
-                            key={index}
-                            htmlType="button"
-                            disabled={saving || starting}
-                            onClick={() => {
-                              if (open) {
-                                void runNavigate(open)
-                              }
-                            }}
-                            {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
-                          >
-                            {t(action.labelKey)}
-                          </AxisButton>
-                        )
-                      )
-                    })}
-              </Row>
+              {(!steps.first || !steps.last) && (
+                <Row>
+                  {!steps.first && (
+                    <AxisButton role="secondary" onClick={steps.back} disabled={steps.checking}>
+                      {t('shell.form.back')}
+                    </AxisButton>
+                  )}
+                  {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
+                  {!steps.last && (
+                    <AxisButton role="finish" htmlType="submit" loading={steps.checking && { delay: 200 }}>
+                      {t('shell.form.next')}
+                    </AxisButton>
+                  )}
+                </Row>
+              )}
             </Flex>
           </Form>
         </Flex>
@@ -397,6 +420,21 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
           />
         )}
       </SectionParts>
+      {canSave && steps.last && !inCanvas && (
+        <SaveBar
+          unsaved={unsaved}
+          saveable={!saving && !starting}
+          busy={saving || starting}
+          onDiscard={() => {
+            form.discard()
+            setConflict(false)
+            setStarted(false)
+          }}
+          onSave={() => void save()}
+          data-testid="form-save-bar"
+          saveTestId="form-save"
+        />
+      )}
     </ConfigProvider>
   )
 }

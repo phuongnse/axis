@@ -162,7 +162,7 @@ test('a finance reviewer cancels a waiting request in the inspector and its task
   await dialog.getByLabel(fieldLabel('Reason')).fill('The request was raised by mistake')
   await dialog.getByRole('button', { name: 'Send', exact: true }).click()
 
-  await expect(page.getByTestId('inspector-instance')).toContainText('Cancelled')
+  await expect(page.getByTestId('page-heading')).toContainText('Cancelled')
   await expect(page.getByTestId('inspector-command-cancel')).toHaveCount(0)
 
   await useSession(page, 'manager-2')

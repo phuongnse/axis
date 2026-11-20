@@ -244,6 +244,18 @@ export function useRecordForm(
     [clearErrors, asking, ask],
   )
 
+  // Puts every value back as the form started: the saved record, or a new record with its defaults filled.
+  const discard = useCallback(() => {
+    setValues(snapshot.initial)
+    setLabels(snapshot.labels)
+    clearErrors()
+    if (asking) {
+      sequence.current++
+      setTouched(new Set())
+      ask(0)
+    }
+  }, [snapshot, clearErrors, asking, ask])
+
   const stateOf = (name: string) => answer?.fields[name]
   // A field the form or the answer locks is shown but never sent.
   const lockedOf = ({ field, readOnly }: ShownField) => readOnly || stateOf(field.name)?.readOnly === true
@@ -753,6 +765,7 @@ export function useRecordForm(
     locked,
     check,
     start,
+    discard,
     changed,
     version: snapshot.version,
     showProblem,

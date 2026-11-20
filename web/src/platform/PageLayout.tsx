@@ -52,11 +52,19 @@ export function PageLayout({
 
 /**
  * The page's own actions, drawn on the right of its heading from wherever in the page they are written, so a widget
- * fills it as a page does, see docs/reference/shell.md#page-header. Outside a `PageLayout` they draw where they stand.
+ * fills it as a page does, see docs/reference/shell.md#page-header. Outside a `PageLayout`, as in a widget preview, they
+ * draw where they stand, in a row on the right. With `inPlace` they do so inside a `PageLayout` too, for a widget on a
+ * designer's canvas, whose own page heading is not theirs.
  */
-export function PageActions({ children }: { children: ReactNode }) {
+export function PageActions({ children, inPlace }: { children: ReactNode; inPlace?: boolean }) {
   const slot = useContext(ActionsSlot)
-  if (slot === undefined) return <>{children}</>
+  if (inPlace || slot === undefined) {
+    return (
+      <Flex gap="small" justify="end" wrap>
+        {children}
+      </Flex>
+    )
+  }
   return slot ? createPortal(children, slot) : null
 }
 

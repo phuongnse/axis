@@ -17,7 +17,7 @@ import type { FixtureRoute } from './fixtureFetch'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SignUpPreview } from './SignUpPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
-import { ClickOnMount, ShellPreview } from './ShellPreview'
+import { ClickOnMount, ShellPreview, TypedOnMount } from './ShellPreview'
 import {
   studioFixtures,
   typicalEntityId,
@@ -50,6 +50,7 @@ import {
   manyActionsTableWidget,
   manyStepsFormRoutes,
   manyStepsRequestForm,
+  missingRequestId,
   loadingRoutes,
   loadingTableWidget,
   noRowsPath,
@@ -58,6 +59,7 @@ import {
   processInspectorWidget,
   requestId,
   sectionWidgets,
+  shellRequestId,
   signUpApplications,
   signUpDocuments,
   signUpRegion,
@@ -279,6 +281,28 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Default record page',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/records/category/${categoryId}`, state: { from: '/sample/requests' } },
+      frameHeight: shellFrameHeight,
+    },
+    {
+      caption: 'Saved record',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/request/${shellRequestId}`, state: { from: '/sample/requests' } },
+      frameHeight: shellFrameHeight,
+    },
+    {
+      caption: 'Saved record with a change',
+      draw: () => (
+        <TypedOnMount selector="#title" text=" (revised)">
+          <ShellPreview />
+        </TypedOnMount>
+      ),
+      entry: { pathname: `/sample/request/${shellRequestId}`, state: { from: '/sample/requests' } },
+      frameHeight: shellFrameHeight,
+    },
+    {
+      caption: 'Record not found',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/request/${missingRequestId}`, state: { from: '/sample/requests' } },
       frameHeight: shellFrameHeight,
     },
     { caption: 'Dashboard', draw: () => <ShellPreview />, entry: '/sample/dashboard', frameHeight: shellFrameHeight },

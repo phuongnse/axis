@@ -99,6 +99,23 @@ export function stepTypeText(t: (key: string) => string, type: string): string {
   return textOf(t, 'shell.inspector.stepTypes.', stepTypes, type)
 }
 
+/** The kinds of a start that no person made, see docs/reference/process-inspection.md#instance-detail. */
+export const startKinds = ['trigger', 'endpoint', 'schedule', 'parent'] as const
+
+/** The platform text of a start kind that no person made. A kind this build does not know shows as sent. */
+export function startKindText(t: (key: string) => string, kind: string): string {
+  return textOf(t, 'shell.inspector.startKinds.', startKinds, kind)
+}
+
+/**
+ * The text of a process's title in the reader's language, or its name where the release gives none. The release
+ * catalog answers the key, and a catalog without it answers the key itself, see docs/reference/shared-widgets.md#which-widget.
+ */
+export function processTitle(t: (key: string) => string, titleKey: string, name: string): string {
+  const text = t(titleKey)
+  return text === titleKey ? name : text
+}
+
 /** The states of a process call, see docs/reference/process-inspection.md#instance-detail. */
 export const callStates = ['pending', 'sending', 'unknown', 'succeeded', 'failed', 'cancelled'] as const
 
@@ -286,6 +303,7 @@ export interface InstanceCall {
 export interface InstanceParent {
   id: string
   process: string
+  processTitleKey: string
   step: string
 }
 
@@ -293,6 +311,7 @@ export interface InstanceParent {
 export interface SubProcess {
   id: string
   process: string
+  processTitleKey: string
   /** The sub-process step of this instance that started the child. */
   step: string
   state: string
@@ -301,19 +320,42 @@ export interface SubProcess {
 }
 
 /**
+ * Who or what started an instance. `kind` is `person`, `trigger`, `endpoint`, `schedule` or `parent`. `name` and `id` are
+ * `null` where the detail gives none, and `via` is the text key of the action's label for a person.
+ */
+export interface InstanceStartedBy {
+  kind: string
+  name: string | null
+  id: string | null
+  via: string | null
+}
+
+/**
  * One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.
- * `parent` and `subProcesses` name only the instances whose process the user may inspect.
+ * `parent` and `subProcesses` name only the instances whose process the user may inspect. `studio` is the
+ * application and the resource that open the process in Studio, for a person who may author the application.
  */
 export interface InstanceDetail {
   id: string
   process: string
+  /** The text key of the process's title in the release the instance is pinned to. */
+  processTitleKey: string
   /** The subject the instance runs for, or `null` when its process has no subject. */
   subjectId: string | null
+  /** The entity of the subject record, or `null` without a subject. */
+  subjectEntity: string | null
+  /** The subject's display field value, or `null` without a subject or when the user may not read it. */
+  subjectLabel: string | null
   releaseId: string
+  /** The number of the instance's release in the release history, or `null` when the release has no history row. */
+  releaseNumber: number | null
   state: string
   step: string
   createdAt: string
   endedAt: string | null
+  /** Who started the instance, or `null` for an instance started before Axis recorded its starter. */
+  startedBy: InstanceStartedBy | null
+  studio: { app: string; resource: string } | null
   graph: { start: string; steps: GraphStep[] }
   path: PathEntry[]
   tasks: InstanceTask[]
@@ -322,25 +364,6 @@ export interface InstanceDetail {
   subProcesses: SubProcess[]
   /** The operator commands the signed-in user may take on the instance now, such as `cancel` and `retry`. */
   commands: string[]
-}
-
-/**
- * When the timer the instance waits at fires, or `null` when the instance is not waiting at a timer
- * step. The time is the `dueAt` of the step's latest history entry.
- */
-export function timerDueAt(instance: InstanceDetail): string | null {
-  if (
-    instance.state !== 'waiting' ||
-    instance.graph.steps.find((step) => step.name === instance.step)?.type !== 'timer'
-  ) {
-    return null
-  }
-  const entry = instance.path.findLast((candidate) => candidate.step === instance.step)
-  const output = entry?.output
-  if (typeof output !== 'object' || output === null || !('dueAt' in output)) {
-    return null
-  }
-  return typeof output.dueAt === 'string' ? output.dueAt : null
 }
 
 /** The operator commands the instance page offers. */
@@ -444,6 +467,7 @@ export async function fetchInstance(
   const detail = parseRecordJson<InstanceDetail>(await response.text())
   return {
     ...detail,
+    releaseNumber: detail.releaseNumber === null ? null : Number(detail.releaseNumber),
     calls: detail.calls.map((call) => ({
       ...call,
       attempts: call.attempts.map((attempt) => ({

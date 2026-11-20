@@ -1,11 +1,14 @@
 import { Button, Descriptions, Flex, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { AxisButton } from './AxisButton'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useLinkClickHandler } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { CopyableId } from './CopyableId'
 import { EmptyState } from './EmptyState'
-import { formatValue } from './formatValue'
+import { NotSet } from './EmptyValue'
+import { fillText } from './fillText'
+import { formatDuration, formatValue } from './formatValue'
 import {
   attemptKinds,
   attemptOutcomes,
@@ -16,11 +19,13 @@ import {
   callStateTone,
   instanceStates,
   problemText,
+  processTitle,
   retryWarns,
   sendCommand,
+  startKindText,
   stateText,
+  stateTone,
   taskStates,
-  timerDueAt,
   type CallAttempt,
   type InstanceCommand,
   type InstanceCall,
@@ -30,10 +35,16 @@ import {
   type SubProcess,
 } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
+import { PageActions, PageLayout, type BreadcrumbStep } from './PageLayout'
+import { PersonName } from './PersonName'
+import { RecordLink } from './RecordLink'
+import { RecordNotFound } from './RecordNotFound'
 import { ReasonDialog } from './ReasonDialog'
 import { ResolveDialog } from './ResolveDialog'
 import { StatusTag } from './StatusTag'
 import { SectionPart, SectionParts } from './SectionParts'
+import { studioResourceAddress } from './studioAddress'
+import { TermList, type Term } from './TermList'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
 import { localDay } from './tableFilter'
@@ -50,6 +61,8 @@ interface ProcessInstancePageProps {
   /** The process inspector widget of the page the instance's address is under. */
   widget: WidgetMetadata
   instanceId: string
+  /** The page's title. It heads the page while the instance loads and when the instance is not found. */
+  title: string
   /** The UI locale, for formatting the times. */
   locale: string
   /** The site's fallback locale, for the texts of the instance's release. */
@@ -103,9 +116,9 @@ const noParameters: readonly string[] = []
 const wordOptions = (words: readonly string[]) => words.map((word) => ({ value: word, label: word }))
 
 /**
- * Shows one instance under the page of its process inspector: its state and step, the steps of
- * the release it is pinned to with the path marked, the history, the tasks, the calls with their
- * attempts and the sub-processes. An instance that waits at a timer shows when it is due. The parent
+ * Shows one instance under the page of its process inspector: its heading with the process's title and state, its
+ * facts, the steps of the release it is pinned to with the path marked, the history, the tasks, the calls with their
+ * attempts and the sub-processes. A failed instance has a banner that names the step it stopped at. The parent
  * and each sub-process link to their instance on the first navigation page whose process inspector
  * names their process, and show without a link when there is none. A step the path holds is marked as taken, and the step the instance is at is marked as
  * current. A call whose input is hidden shows the fixed "hidden" text and no value.
@@ -115,15 +128,17 @@ const wordOptions = (words: readonly string[]) => words.map((word) => ({ value: 
  * own: `history.`, `tasks.`, `subProcesses.` and `attempts.{callId}.`, and a date filters on the local day of its time,
  * see docs/reference/process-inspector-widget.md#instance-page.
  *
- * Step labels come from the texts of the instance's release, then the site texts and the platform
+ * The heading takes the process's title from the texts of the instance's release, so it shows `title` until they load.
+ * Step labels come from the same texts, then the site texts and the platform
  * texts. A step without a label shows its name. If the release texts fail to load, the page shows
- * its load error.
+ * its load error. A missing instance keeps the heading and shows the not-found line.
  */
 export function ProcessInstancePage({
   sitePath,
   pages,
   widget,
   instanceId,
+  title,
   locale,
   fallbackLocale,
 }: ProcessInstancePageProps) {
@@ -166,34 +181,63 @@ export function ProcessInstancePage({
       })
   }, [instancesPath, instanceId])
 
-  if (instance === undefined) {
-    return null
-  }
+  // The previous release texts stay on screen while a new locale loads. The heading takes the title once they are in.
+  const detail = isInstanceDetail(instance) && releaseCatalog ? instance : undefined
+  let body: ReactNode = null
   if (instance === null) {
-    return <AxisAlert data-testid="inspector-not-found" kind="warning" message={t('shell.inspector.notFound')} />
-  }
-  if (instance === forbidden) {
-    return <AxisAlert data-testid="inspector-forbidden" kind="warning" message={t('shell.inspector.forbidden')} />
-  }
-  if (instance === 'failed' || releaseTexts.failed) {
-    return <AxisAlert data-testid="inspector-error" kind="error" message={t('shell.inspector.loadFailed')} />
-  }
-  // The previous release texts stay on screen while a new locale loads.
-  if (!releaseCatalog) {
-    return null
-  }
-
-  return (
-    <TextProvider catalogs={catalogs} development={outer.development}>
+    body = <RecordNotFound textKey="shell.inspector.notFound" />
+  } else if (instance === forbidden) {
+    body = <AxisAlert data-testid="inspector-forbidden" kind="warning" message={t('shell.inspector.forbidden')} />
+  } else if (instance === 'failed' || releaseTexts.failed) {
+    body = <AxisAlert data-testid="inspector-error" kind="error" message={t('shell.inspector.loadFailed')} />
+  } else if (detail) {
+    body = (
       <InstanceDetailView
-        instance={instance}
+        instance={detail}
         instancesPath={instancesPath}
         sitePath={sitePath}
         inspectors={inspectors}
         locale={locale}
         onChanged={reload}
       />
+    )
+  }
+
+  return (
+    <TextProvider catalogs={catalogs} development={outer.development}>
+      <InstanceLayout instance={detail} title={title}>
+        {body}
+      </InstanceLayout>
     </TextProvider>
+  )
+}
+
+interface InstanceLayoutProps {
+  /** The instance, whose process title, state and line head the page. Without it the page heads with `title`. */
+  instance?: InstanceDetail
+  /** The page's title, which heads the page without an instance. */
+  title: string
+  /** The steps above the heading, for a page that is in a site's navigation or the operator console. */
+  breadcrumb?: readonly BreadcrumbStep[]
+  children?: ReactNode
+}
+
+/**
+ * The heading of an instance's page, shared by a site's page and the operator console's page, see
+ * docs/reference/process-inspector-widget.md#instance-page: the process's title, its state as a tag beside it, and
+ * Process as its line. Without an instance the heading is the given title, with no tag.
+ */
+export function InstanceLayout({ instance, title, breadcrumb, children }: InstanceLayoutProps) {
+  const t = useText()
+  return (
+    <PageLayout
+      title={instance ? processTitle(t, instance.processTitleKey, instance.process) : title}
+      tags={instance && <StatusTag tone={stateTone(instance.state)}>{stateText(t, instance.state)}</StatusTag>}
+      line={t('shell.inspector.process')}
+      breadcrumb={breadcrumb}
+    >
+      {children}
+    </PageLayout>
   )
 }
 
@@ -260,7 +304,6 @@ export function InstanceDetailView({
   const time = (name: string, value: string | null) =>
     value === null ? null : formatValue(dateTime(name), value, {}, { locale, text: t })
 
-  const due = timerDueAt(instance)
   const parentPage = instance.parent === null ? undefined : inspectors?.get(instance.parent.process)
 
   const traceIdColumn = {
@@ -418,8 +461,8 @@ export function InstanceDetailView({
       key: 'process',
       kind: 'freeText',
       title: t('shell.inspector.process'),
-      render: (_v, row) => row.process,
-      filter: { kind: 'text', value: (row) => row.process },
+      render: (_v, row) => processTitle(t, row.processTitleKey, row.process),
+      filter: { kind: 'text', value: (row) => processTitle(t, row.processTitleKey, row.process) },
     },
     {
       key: 'step',
@@ -467,55 +510,101 @@ export function InstanceDetailView({
     },
   ]
 
+  // The starter: a person by name, the parent process that started the instance, or the name of a trigger, endpoint or
+  // schedule. A parent the person may not inspect has no name in the detail, so it is not set.
+  const startedByValue = (): ReactNode => {
+    const by = instance.startedBy
+    if (by?.kind === 'parent') {
+      if (instance.parent === null) {
+        return <NotSet />
+      }
+      const title = processTitle(t, instance.parent.processTitleKey, instance.parent.process)
+      return parentPage === undefined ? (
+        title
+      ) : (
+        <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
+          {title}
+        </Link>
+      )
+    }
+    if (by?.kind === 'person') {
+      return by.id !== null && by.name !== null ? <PersonName id={by.id} name={by.name} /> : <NotSet />
+    }
+    return by?.name ? by.name : <NotSet />
+  }
+  // How the instance started: the label of the action for a person, else the kind of the start.
+  const startedViaValue = (): ReactNode => {
+    const by = instance.startedBy
+    if (by === null) {
+      return <NotSet />
+    }
+    if (by.kind === 'person') {
+      return by.via === null ? <NotSet /> : t(by.via)
+    }
+    return startKindText(t, by.kind)
+  }
+  // The step a failed instance stopped at, and why: the latest entry of that step with a problem or an error, or else the
+  // last attempt with one of the last failed call on that step. See docs/reference/process-inspector-widget.md#instance-page.
+  const stopReason = (): string | null => {
+    const entry = instance.path.findLast((row) => row.step === instance.step && (row.problem || row.error))
+    if (entry) {
+      return problemText(t, locale, entry.problem, entry.error)
+    }
+    const call = instance.calls.findLast((row) => row.step === instance.step && row.state === 'failed')
+    const attempt = call?.attempts.findLast((row) => row.problem || row.error)
+    return attempt ? problemText(t, locale, attempt.problem, attempt.error) : null
+  }
+  const stopped = fillText(t('shell.inspector.stoppedAt'), { step: stepLabel(instance.step) })
+  const reason = instance.state === 'failed' ? stopReason() : null
+  const facts: Term[] = [
+    ...(instance.subjectId !== null && instance.subjectEntity !== null
+      ? [
+          {
+            key: 'subject',
+            term: t('shell.inspector.subject'),
+            value: (
+              <RecordLink
+                entity={instance.subjectEntity}
+                id={instance.subjectId}
+                label={instance.subjectLabel ?? t('shell.inspector.open')}
+              />
+            ),
+          },
+        ]
+      : []),
+    { key: 'startedBy', term: t('shell.inspector.startedBy'), value: startedByValue() },
+    { key: 'startedVia', term: t('shell.inspector.startedVia'), value: startedViaValue() },
+    { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt) },
+    { key: 'endedAt', term: t('shell.inspector.endedAt'), value: time('endedAt', instance.endedAt) ?? <NotSet /> },
+    {
+      key: 'duration',
+      term: t('shell.inspector.duration'),
+      value:
+        instance.endedAt === null ? (
+          <NotSet />
+        ) : (
+          formatDuration(Date.parse(instance.endedAt) - Date.parse(instance.createdAt), locale, t)
+        ),
+    },
+    { key: 'release', term: t('shell.inspector.release'), value: instance.releaseNumber ?? <NotSet /> },
+    { key: 'instanceId', term: t('shell.inspector.instanceId'), value: <CopyableId id={instance.id} /> },
+  ]
+
   const taken = new Set(instance.path.map((entry) => entry.step))
   return (
     <div data-testid="inspector-instance">
+      <PageActions>
+        <Flex gap="small" align="center">
+          {instance.studio && <OpenInStudioButton studio={instance.studio} />}
+          <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
+        </Flex>
+      </PageActions>
+      {instance.state === 'failed' && (
+        <AxisAlert data-testid="inspector-failure" kind="error" message={reason ? `${stopped} ${reason}` : stopped} />
+      )}
       <SectionParts>
-        <SectionPart testName="inspector-details" heading={{ title: t('shell.inspector.details') }}>
-          <Flex vertical gap="middle">
-            <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
-            <Descriptions
-              column={1}
-              items={[
-                { key: 'state', label: t('shell.inspector.state'), children: stateText(t, instance.state) },
-                { key: 'step', label: t('shell.inspector.step'), children: stepLabel(instance.step) },
-                {
-                  key: 'subject',
-                  label: t('shell.inspector.subject'),
-                  children: instance.subjectId ?? t('shell.inspector.noSubject'),
-                },
-                ...(instance.parent === null
-                  ? []
-                  : [
-                      {
-                        key: 'parent',
-                        label: t('shell.inspector.parent'),
-                        children:
-                          parentPage === undefined ? (
-                            instance.parent.process
-                          ) : (
-                            <Link
-                              to={inspectorPath(sitePath, parentPage, instance.parent.id)}
-                              data-testid="inspector-parent-link"
-                            >
-                              {instance.parent.process}
-                            </Link>
-                          ),
-                      },
-                    ]),
-                { key: 'release', label: t('shell.inspector.release'), children: instance.releaseId },
-                {
-                  key: 'createdAt',
-                  label: t('shell.inspector.createdAt'),
-                  children: time('createdAt', instance.createdAt),
-                },
-                { key: 'endedAt', label: t('shell.inspector.endedAt'), children: time('endedAt', instance.endedAt) },
-                ...(due === null
-                  ? []
-                  : [{ key: 'dueAt', label: t('shell.inspector.dueAt'), children: time('dueAt', due) }]),
-              ]}
-            />
-          </Flex>
+        <SectionPart testName="inspector-facts">
+          <TermList row terms={facts} />
         </SectionPart>
         <SectionPart testName="inspector-steps" heading={{ title: t('shell.inspector.steps') }}>
           <Flex vertical>
@@ -593,21 +682,22 @@ interface InstanceCommandsProps {
   onChanged: () => void
 }
 
-/** One button for each command the instance detail allows. A command this build does not know is left out. */
+/** One secondary button for each command the instance detail allows. A command this build does not know is left out. */
 function InstanceCommands({ instance, instancesPath, onChanged }: InstanceCommandsProps) {
   const t = useText()
   const [open, setOpen] = useState<InstanceCommand>()
   const allowed = instanceCommands.filter((command) => instance.commands.includes(command))
-  if (allowed.length === 0) {
-    return null
-  }
   return (
-    <Flex gap="small">
+    <>
       {allowed.map((command) => (
-        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-        <Button key={command} data-testid={`inspector-command-${command}`} onClick={() => setOpen(command)}>
+        <AxisButton
+          key={command}
+          role="secondary"
+          data-testid={`inspector-command-${command}`}
+          onClick={() => setOpen(command)}
+        >
           {t(`shell.inspector.commands.${command}`)}
-        </Button>
+        </AxisButton>
       ))}
       {open && (
         <ReasonDialog
@@ -625,7 +715,31 @@ function InstanceCommands({ instance, instancesPath, onChanged }: InstanceComman
           )}
         </ReasonDialog>
       )}
-    </Flex>
+    </>
+  )
+}
+
+interface OpenInStudioButtonProps {
+  studio: NonNullable<InstanceDetail['studio']>
+}
+
+/**
+ * The button that opens the process in Studio, a named secondary button and never a link in the data, see
+ * docs/reference/actions-and-controls.md#opening-things. It shows for a person who may author the application.
+ */
+function OpenInStudioButton({ studio }: OpenInStudioButtonProps) {
+  const t = useText()
+  const address = studioResourceAddress(studio.app, studio.resource)
+  const go = useLinkClickHandler(address)
+  return (
+    <AxisButton
+      role="secondary"
+      data-testid="inspector-open-studio"
+      href={address}
+      onClick={(event) => go(event as never)}
+    >
+      {t('shell.inspector.openInStudio')}
+    </AxisButton>
   )
 }
 

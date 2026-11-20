@@ -6,12 +6,42 @@ import {
   callStateText,
   callStateTone,
   inspectTarget,
+  processTitle,
   runStateText,
   runStateTone,
+  startKindText,
   stateText,
   stateTone,
   stepTypeText,
 } from './inspection'
+
+describe('processTitle', () => {
+  const texts = { 'processes.purchaseRequestApproval.title': 'Purchase request approval' }
+  const t = (key: string) => (Object.hasOwn(texts, key) ? texts[key as keyof typeof texts] : key)
+
+  it('gives the title of the process in its release', () => {
+    expect(processTitle(t, 'processes.purchaseRequestApproval.title', 'PurchaseRequestApproval')).toBe(
+      'Purchase request approval',
+    )
+  })
+
+  it('gives the name of the process where its release gives no title', () => {
+    expect(processTitle(t, 'processes.childJob.title', 'ChildJob')).toBe('ChildJob')
+  })
+})
+
+describe('startKindText', () => {
+  it('gives the platform text of each start kind that no person made', () => {
+    expect(startKindText((key) => platformEnglish[key as keyof typeof platformEnglish], 'parent')).toBe(
+      'Parent process',
+    )
+    expect(startKindText((key) => platformEnglish[key as keyof typeof platformEnglish], 'schedule')).toBe('Schedule')
+  })
+
+  it('shows a start kind this build does not know as the API sends it', () => {
+    expect(startKindText((key) => key, 'webhook')).toBe('webhook')
+  })
+})
 
 describe('inspectTarget', () => {
   it('reads the process and the instance of an instance detail path', () => {
