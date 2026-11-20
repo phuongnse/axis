@@ -8,7 +8,7 @@ import { AxisField } from '../platform/AxisField'
 import { CodeBlock } from '../platform/CodeBlock'
 import { EmptyState } from '../platform/EmptyState'
 import { FieldInput } from '../platform/FieldInput'
-import { ReasonDialog } from '../platform/ReasonDialog'
+import { SavedItemsDialog, type SavedItemsTexts } from '../platform/SavedItemsDialog'
 import type { RecordValue } from '../platform/records'
 import type { FieldMetadata, FieldType } from '../platform/site'
 import { StatusTag } from '../platform/StatusTag'
@@ -63,6 +63,26 @@ function inputField(field: OperationField): FieldMetadata {
 
 const jsonLanguage = codeLanguage('input.json')
 
+/** What the dialog of a package's saved run inputs says. */
+const inputTexts: SavedItemsTexts = {
+  title: 'shell.studio.package.run.inputs.title',
+  empty: 'shell.studio.package.run.inputs.empty',
+  name: 'shell.studio.package.run.inputs.name',
+  nameHelp: 'shell.studio.package.run.inputs.name.help',
+  nameRequired: 'shell.studio.package.run.inputs.nameRequired',
+  nameTaken: 'shell.studio.package.run.inputs.nameTaken',
+  save: 'shell.studio.package.run.inputs.save',
+  saveFailed: 'shell.studio.package.run.inputs.saveFailed',
+  rename: 'shell.studio.package.run.inputs.rename',
+  renameFailed: 'shell.studio.package.run.inputs.renameFailed',
+  overwrite: 'shell.studio.package.run.inputs.overwrite',
+  overwriteConfirm: 'shell.studio.package.run.inputs.overwriteConfirm',
+  overwriteFailed: 'shell.studio.package.run.inputs.overwriteFailed',
+  delete: 'shell.studio.package.run.inputs.delete',
+  deleteConfirm: 'shell.studio.package.run.inputs.deleteConfirm',
+  deleteFailed: 'shell.studio.package.run.inputs.deleteFailed',
+}
+
 /** Proposed, see #3978: the input as JSON, with each of the operation's fields that it lacks as `null`, so its shape shows. */
 function inputJson(fields: readonly OperationField[], values: Record<string, unknown>): string {
   return JSON.stringify({ ...Object.fromEntries(fields.map((field) => [field.name, null])), ...values }, null, 2)
@@ -114,9 +134,8 @@ export function PackageRun({
   const [shown, setShown] = useState<'form' | 'json'>('form')
   const [jsonText, setJsonText] = useState('{}')
   const [jsonError, setJsonError] = useState(false)
-  const [saveAsOpen, setSaveAsOpen] = useState(false)
+  const [manageOpen, setManageOpen] = useState(false)
   const [savedOpen, setSavedOpen] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -187,18 +206,16 @@ export function PackageRun({
     }
   }
 
+  /** Replaces the saved inputs, and answers whether the server kept them; the dialog says when it did not. */
   async function store(items: StudioPackageRunInput[]) {
-    setSaveError(null)
     try {
       const result = await saveStudioPackageRunInputs(application, packageId, items, saved.version)
       if (result.status === 'conflict') {
-        setSaveError(t('shell.studio.package.run.inputConflict'))
         return false
       }
       setSaved({ items, version: result.version })
       return true
     } catch {
-      setSaveError(t('shell.studio.package.run.inputSaveFailed'))
       return false
     }
   }
@@ -265,8 +282,8 @@ export function PackageRun({
           <div style={{ flex: 'none', padding: pad }}>
             <Flex vertical gap={spacing.sm}>
               <AxisField label={t('shell.studio.package.run.savedInput')} help="">
-                {/* Proposed, see #3978: Save, Save as… and Delete act on the saved inputs, the select's choices, so they are
-                    in its list after the choices, and the select keeps the field's width. */}
+                {/* Proposed, see #3978: managing the saved inputs, the select's choices, is the last item of its list, and it
+                    opens the dialog that keeps saved items, as a table's Views does, so the select keeps the field's width. */}
                 <Select
                   data-testid="package-run-saved-input"
                   placeholder={t('shell.studio.package.run.newInput')}
@@ -288,33 +305,9 @@ export function PackageRun({
                           onDone={() => setSavedOpen(false)}
                           actions={[
                             {
-                              key: 'save',
-                              label: t('shell.studio.package.run.saveInput'),
-                              disabled: input === null,
-                              onClick: () =>
-                                chosen === null
-                                  ? setSaveAsOpen(true)
-                                  : void store(
-                                      saved.items.map((item) =>
-                                        item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
-                                      ),
-                                    ),
-                            },
-                            {
-                              key: 'saveAs',
-                              label: t('shell.studio.package.run.saveInputAs'),
-                              disabled: input === null,
-                              onClick: () => setSaveAsOpen(true),
-                            },
-                            {
-                              key: 'delete',
-                              label: t('shell.studio.package.run.deleteInput'),
-                              destructive: true,
-                              disabled: chosen === null,
-                              onClick: () =>
-                                void store(saved.items.filter((item) => item.name !== chosen)).then(
-                                  (done) => done && choose(null),
-                                ),
+                              key: 'manage',
+                              label: t('shell.studio.package.run.inputs.manage'),
+                              onClick: () => setManageOpen(true),
                             },
                           ]}
                         />
@@ -324,7 +317,6 @@ export function PackageRun({
                   style={{ width: '100%' }}
                 />
               </AxisField>
-              {saveError !== null && <AxisAlert kind="error" message={saveError} />}
             </Flex>
           </div>
           <Tabs
@@ -431,36 +423,49 @@ export function PackageRun({
           </>
         )}
       </div>
-      {saveAsOpen && (
-        <ReasonDialog
-          title={t('shell.studio.package.run.saveInputAs.title')}
-          label={t('shell.studio.package.run.saveInputAs.label')}
-          help={t('shell.studio.package.run.saveInputAs.help')}
-          okText={t('shell.studio.package.run.saveInput')}
-          cancelText={t('shell.studio.cancel')}
-          requiredMessage={t('shell.studio.package.run.saveInputAs.required')}
-          failedText={t('shell.studio.package.run.inputSaveFailed')}
-          maxLength={100}
-          onClose={() => setSaveAsOpen(false)}
-          onChanged={() => {}}
-          onSend={async (name) => {
-            const trimmed = name.trim()
-            const items = [
-              ...saved.items.filter((item) => item.name !== trimmed),
-              { name: trimmed, operation: operation!, input: input! },
-            ]
-            const done = await store(items)
+      <SavedItemsDialog
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+        texts={inputTexts}
+        saved={{
+          items: saved.items.filter((item) => item.operation === operation).map((item) => ({ ...item, id: item.name })),
+          open: (item) => choose(item.name),
+          save: async (name) => {
+            if (input === null || operation === undefined) {
+              return false
+            }
+            const done = await store([...saved.items.filter((item) => item.name !== name), { name, operation, input }])
             if (done) {
-              setChosen(trimmed)
-              return { ok: true }
+              setChosen(name)
             }
-            return {
-              ok: false,
-              problem: { status: 409, title: t('shell.studio.package.run.inputConflict'), errors: {} },
+            return done
+          },
+          rename: async (item, name) => {
+            const done = await store(
+              saved.items.map((candidate) => (candidate.name === item.name ? { ...candidate, name } : candidate)),
+            )
+            if (done && chosen === item.name) {
+              setChosen(name)
             }
-          }}
-        />
-      )}
+            return done
+          },
+          overwrite: (item) =>
+            input === null || operation === undefined
+              ? Promise.resolve(false)
+              : store(
+                  saved.items.map((candidate) =>
+                    candidate.name === item.name ? { ...candidate, operation, input } : candidate,
+                  ),
+                ),
+          remove: async (item) => {
+            const done = await store(saved.items.filter((candidate) => candidate.name !== item.name))
+            if (done && chosen === item.name) {
+              choose(null)
+            }
+            return done
+          },
+        }}
+      />
     </div>
   )
 }
