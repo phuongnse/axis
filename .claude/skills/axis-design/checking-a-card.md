@@ -15,6 +15,8 @@ A check passes only when the card behaves as it will in the artifact.
     has a box of its own, as [rules, not boxes](../../../docs/reference/shell.md#layout)
     says;
   - each region's title row, content and action bar share one inset;
+  - every field of a region is as wide as the others, with no button loose
+    beside an input;
   - no region scrolls inside another region; and
   - each region's parts follow the order a person works, as
     [a region that lines up, scrolls once and follows the work](../../../docs/reference/shell.md#layout)

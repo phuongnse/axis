@@ -100,8 +100,9 @@ their own controls where they expect them.
   region, such as a log, a code editor or a table, reaches the region's rules with no box of its own.
 - **A region lines up, scrolls once and follows the work** _(planned)_. A region's title row, its content and its
   action bar start and end at one inset, `spacing-md` in a pane of a workspace and `spacing-lg` on a page, and an
-  `ActionBar` at the foot of a pane takes the pane's inset. A region scrolls as one, and no region scrolls inside
-  another. Its title row and its action bar stay in place while its content scrolls. A region's parts come in the
+  `ActionBar` at the foot of a pane takes the pane's inset. Every field of a region is as wide as the others, so
+  their edges line up, and no button stands loose beside an input. A region scrolls as one, and no region scrolls
+  inside another. Its title row and its action bar stay in place while its content scrolls. A region's parts come in the
   order a person works: what to act on, the input, the action, then the result. An action sits after what it acts
   on, at the foot of its region when the input can be long, and the result comes after the action, below it or on
   its right.
