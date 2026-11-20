@@ -95,9 +95,10 @@ their own controls where they expect them.
 - **Parts a rule apart** _(planned)_. A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
   drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer.
-- **The bar slot** _(planned)_. The save bar draws in the shell's bar slot, `ShellBarSlot`, in the content column
-  right above the footer, and it sticks to the window's foot while the page scrolls. See the
-  [save bar](studio-resource-form.md#save-bar).
+- **The bar slot.** The save bar and a Studio request's guide draw in the shell's bar slot, `ShellBarSlot`, in the
+  content column right above the footer. The slot sticks to the window's foot while the page scrolls and rests above
+  the footer at the page's end, so a bar never covers the footer. Outside a shell, as in a widget preview, a bar draws
+  in place. See the [save bar](studio-resource-form.md#save-bar).
 - **No link back** _(planned)_. A page has no link back, because the navigation and the browser lead back. A record's
   page whose record does not exist keeps one link to its list, see [routing](frontend.md#routing).
 - **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it, with `spacing-xs`

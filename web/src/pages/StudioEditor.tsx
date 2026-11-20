@@ -32,6 +32,7 @@ import {
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { SectionParts } from '../platform/SectionParts'
+import { SaveBar } from '../platform/SaveBar'
 import { QuotaRefusedError } from '../platform/quota'
 import { savedRecordIds, seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
 import {
@@ -84,7 +85,6 @@ import { PageEditor } from './PageEditor'
 import { focusFirstSeedProblem } from './focusSeedProblem'
 import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
-import { SaveBar } from './SaveBar'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
@@ -503,8 +503,11 @@ export function StudioEditor({
   // Studio takes the undo keys before the browser's own undo and CodeMirror's. They work inside the editor and when
   // nothing has focus, which is where a mouse drop leaves it.
   useEffect(() => {
+    // The save bar draws in the shell's bar slot, outside the editor's root, see docs/reference/shell.md#layout.
     const inside = (target: EventTarget | null) =>
-      target === document.body || (target instanceof Node && rootRef.current?.contains(target) === true)
+      target === document.body ||
+      (target instanceof Node && rootRef.current?.contains(target) === true) ||
+      (target instanceof Element && target.closest('[data-shell-bar-slot]') !== null)
     const onKeyDown = (event: KeyboardEvent) => {
       if (
         !(event.ctrlKey || event.metaKey) ||
@@ -1379,17 +1382,21 @@ export function StudioEditor({
             </Modal>
             <SaveBar
               unsaved={unsaved}
-              undoable={history.past.length > 0}
-              redoable={history.future.length > 0}
+              history={{
+                undoable: history.past.length > 0,
+                redoable: history.future.length > 0,
+                onUndo: undo,
+                onRedo: redo,
+              }}
               saveable={unsaved && !conflict && !saving && !reconnecting}
               busy={saving}
-              onUndo={undo}
-              onRedo={redo}
               onDiscard={() => {
                 adopt(loaded)
                 messageApi.destroy('studio-removed')
               }}
               onSave={checkAndSave}
+              data-testid="studio-save-bar"
+              saveTestId="studio-save"
             />
           </Flex>
         </StudioBindingsContext.Provider>

@@ -8,6 +8,7 @@ import { PersonName } from '../platform/PersonName'
 import { formatValue } from '../platform/formatValue'
 import { PageLayout } from '../platform/PageLayout'
 import { ReasonDialog } from '../platform/ReasonDialog'
+import { ShellBarSlot } from '../platform/shellBarSlot'
 import { StatusTag } from '../platform/StatusTag'
 import { useStudioConnection } from '../platform/studioConnection'
 import {
@@ -284,38 +285,39 @@ export function StudioAuthoringRequestPage({
             <StudioRequestStatus request={followed} releaseNumber={null} />
           ))}
         {words !== null && (
-          <ActionBar
-            docked
-            data-testid="studio-ai-request-guide"
-            start={<span>{t(words)}</span>}
-            fold={fold}
-            end={
-              isAuthor && request.state === 'awaitingApproval' ? (
-                <AxisButton
-                  role="finish"
-                  data-testid="studio-ai-request-approve"
-                  disabled={acting}
-                  onClick={() => void act(() => approveAuthoringRequest(application, requestId), adopt)}
-                >
-                  {t('shell.studio.aiRequest.approve')}
-                </AxisButton>
-              ) : isAuthor && request.state === 'ready' && !accepting && !conflicted ? (
-                <AxisButton
-                  role="finish"
-                  data-testid="studio-ai-request-accept"
-                  disabled={acting}
-                  onClick={() =>
-                    void act(
-                      () => acceptAuthoringRequest(application, requestId),
-                      (sent) => setAccept({ requestId, value: sent }),
-                    )
-                  }
-                >
-                  {t('shell.studio.aiRequest.accept')}
-                </AxisButton>
-              ) : undefined
-            }
-          />
+          <ShellBarSlot>
+            <ActionBar
+              data-testid="studio-ai-request-guide"
+              start={<span>{t(words)}</span>}
+              fold={fold}
+              end={
+                isAuthor && request.state === 'awaitingApproval' ? (
+                  <AxisButton
+                    role="finish"
+                    data-testid="studio-ai-request-approve"
+                    disabled={acting}
+                    onClick={() => void act(() => approveAuthoringRequest(application, requestId), adopt)}
+                  >
+                    {t('shell.studio.aiRequest.approve')}
+                  </AxisButton>
+                ) : isAuthor && request.state === 'ready' && !accepting && !conflicted ? (
+                  <AxisButton
+                    role="finish"
+                    data-testid="studio-ai-request-accept"
+                    disabled={acting}
+                    onClick={() =>
+                      void act(
+                        () => acceptAuthoringRequest(application, requestId),
+                        (sent) => setAccept({ requestId, value: sent }),
+                      )
+                    }
+                  >
+                    {t('shell.studio.aiRequest.accept')}
+                  </AxisButton>
+                ) : undefined
+              }
+            />
+          </ShellBarSlot>
         )}
         {changePlanOpen && (
           <ReasonDialog
