@@ -857,7 +857,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
                 connectorCallId: call.Id);
         }
 
-        // A customer-hosted runner takes the call, so no item is queued, see docs/reference/process-execution.md#staging-a-package-call.
+        // A customer-hosted runner takes the call, so no item is queued, see docs/reference/connector-and-package-calls.md#staging-a-package-call.
         if (packageCall is not null && packageCallQueued)
         {
             await WorkItemQueue.EnqueueAsync(

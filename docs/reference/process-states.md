@@ -19,8 +19,8 @@ An instance is `running` or `waiting` while it has work left, and ends in one of
 A `waiting` instance waits for one of these:
 
 - a human task to be completed, see [Task API](task-api.md#completing-a-task)
-- a connector call to settle, see [Connector calls](process-execution.md#connector-calls)
-- a package operation call to settle, see [Package operations](process-execution.md#package-operations)
+- a connector call to settle, see [Connector calls](connector-and-package-calls.md#connector-calls)
+- a package operation call to settle, see [Package operations](connector-and-package-calls.md#package-operations)
 - a timer, see [Timer step](process-flow.md#timer-step)
 - an event, see [Wait for event step](process-flow.md#wait-for-event-step)
 - the child of a sub-process step, see [Sub-process step](process-flow.md#sub-process-step)

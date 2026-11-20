@@ -571,7 +571,7 @@ A connector call keeps its input after it settles, whether it succeeded or
 failed. The kept input lets inspection show what was sent. It is never copied
 to history, audit records or logs, and inspection
 shows it only under the [masking rule](#values-and-masking). A package call's input is cleared when
-the call settles, see [Staging a package call](process-execution.md#staging-a-package-call).
+the call settles, see [Staging a package call](connector-and-package-calls.md#staging-a-package-call).
 
 **Request and responses.** A connector call also keeps its request and each attempt's response. The body is
 kept as text, unchanged, up to 64 KiB, which is 65,536 bytes of UTF-8. A longer body is cut at the last whole
@@ -598,9 +598,9 @@ earlier ones.
 
 - **Attempt.** One send of a connector call, or one run of a package
   operation. Its outcome is `succeeded`, `retryable`, `unknown` or `failed`,
-  the classes of [Call outcomes](process-execution.md#call-outcomes) and
-  [Package call outcomes](process-execution.md#package-call-outcomes).
-- **Lookup.** One lookup of [reconciliation](process-execution.md#reconciliation). Its outcome is
+  the classes of [Call outcomes](connector-and-package-calls.md#call-outcomes) and
+  [Package call outcomes](connector-and-package-calls.md#package-call-outcomes).
+- **Lookup.** One lookup of [reconciliation](connector-and-package-calls.md#reconciliation). Its outcome is
   `found`, `notFound` or `failed`. Package calls have none.
 - **Numbers.** `number` counts attempts and lookups apart, each from 1. An
   attempt's number is the highest attempt number of the call plus one, as a

@@ -128,7 +128,7 @@ record's data can succeed after the record is fixed.
 
 A `callConnector` step or a package operation step whose
 call row is `failed` stages the call again under the **same operation identity**, see
-[Staging and the call](process-execution.md#staging-and-the-call). The input is evaluated again
+[Staging and the call](connector-and-package-calls.md#staging-and-the-call). The input is evaluated again
 on purpose, so the retry sends the current data. A failed connector call keeps
 its stored input, but the retry still evaluates it again. A failed package
 call's stored input is cleared when it settles. The attempts count from zero,
@@ -141,7 +141,7 @@ can fail the same way. The [process inspector widget](process-inspector-widget.m
 retry only when the failed call is a package call whose operation is not `idempotent: true`, because
 such an operation may have acted before it failed, and a retry runs it again. A connector call needs
 no warning, because every unknown outcome of one was sent again under the idempotency key or
-[reconciled](process-execution.md#reconciliation), or was [resolved](#resolve) by an operator.
+[reconciled](connector-and-package-calls.md#reconciliation), or was [resolved](#resolve) by an operator.
 
 ### Cancel
 
@@ -223,7 +223,7 @@ One transaction does this:
    worker that settled the call first makes this a `409`.
 3. For `succeeded`, it checks `output` against the operation's declared
    outputs, as a response body would be checked, see
-   [Call outcomes](process-execution.md#call-outcomes). That is the connector operation's outputs,
+   [Call outcomes](connector-and-package-calls.md#call-outcomes). That is the connector operation's outputs,
    or the manifest's for a package call. Then it writes the step's output
    fields to the subject record with the record update rules, as a successful
    outcome does. An `output` that does not fit, or a write that the record

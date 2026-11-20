@@ -6,7 +6,7 @@ record, the process step and the page download that make it, a report as a PDF, 
 documents, and how an e-signature goes through a connector, as
 [D157](../decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md)
 agrees. The files that a document is written to are in [file fields](file-fields.md), and how a call or an
-email carries one is in [files in calls](process-execution.md#files-in-calls) and
+email carries one is in [files in calls](connector-and-package-calls.md#files-in-calls) and
 [notifications](notifications.md#email).
 
 ## Document template resource
@@ -86,7 +86,7 @@ field of that record. It looks like this:
 - **`output`** is optional. `file` names a `file` field of the subject entity that the step writes, and that
   an `updateRecord` `set` may name. Without it, the document is made for the `attachments` of a later
   [`notify`](notifications.md#notify-operation) step, which can make it again for one email.
-- **How it runs.** The step runs like a [package operation](process-execution.md#package-operations): it stages
+- **How it runs.** The step runs like a [package operation](connector-and-package-calls.md#package-operations): it stages
   the call, the worker has [the document runner](#the-document-runner) make the file outside any transaction,
   and a separate transaction attaches the file to the subject's field and takes `next`. A step that is run
   again makes the document again, and the file it replaced is cleaned up as
@@ -182,7 +182,7 @@ contract is signed by asking the service, not by waiting for its call.
 
 1. A [`makeDocument`](#document-step) step makes the contract and writes it to a `file` field.
 2. A `callConnector` step sends that file to the signing service. The connector's operation has an input of the
-   type `file`, see [files in calls](process-execution.md#files-in-calls), and the service answers with the id
+   type `file`, see [files in calls](connector-and-package-calls.md#files-in-calls), and the service answers with the id
    of its signing request, which the step writes to a field.
 3. A `timer` step waits, then a second `callConnector` step asks the service for the status of the request and
    writes it to a field.

@@ -489,7 +489,7 @@ sends them.
 | `POST /test/unknown-request/{requestNumber}` | Makes the purchase order call for that `requestNumber` end `unknown` and stay so: the first create stores its order but answers `201` without an `orderNumber`, and every lookup for the request answers `503`. An operator then [resolves](reference/process-operator-commands.md#resolve) the call. The switch has no off route, since each spec uses its own request number. |
 
 A dropped create stores the order, then closes the connection without answering, so the retry gets
-the stored order back, as in the [lost response](reference/process-execution.md#lost-response) flow.
+the stored order back, as in the [lost response](reference/connector-and-package-calls.md#lost-response) flow.
 A dropped response cannot make a call `unknown`, because the connector declares `idempotency`, so
 the worker sends the call again under the same key and it succeeds. Only a `2xx` body that does not
 fit the output goes straight to reconciliation, which is why `unknown-request` answers one.

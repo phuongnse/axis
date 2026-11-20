@@ -17,7 +17,8 @@ The rest of the process reference is on these pages:
 | [Process flow](process-flow.md)               | Timer, wait for event and sub-process steps, loops, `createRecord`, processes without a subject |
 | [Process blocks](process-blocks.md)           | _(planned for M38)_ Parallel and repeat steps, their structure, limits and compile checks        |
 | [Notifications](notifications.md)             | The `notify` operation, in-app notifications and email                                           |
-| [Process execution](process-execution.md)     | How the worker runs steps, connector calls, package operations and the worker settings          |
+| [Process execution](process-execution.md)     | How the worker runs steps, paths, worker settings and metrics                                   |
+| [Connector and package calls](connector-and-package-calls.md)| Connector calls, package operations, their staging, outcomes and reconciliation, files in calls |
 | [Process events](process-events.md)           | Raised events, triggers and schedules                                                            |
 | [Process inspection](process-inspection.md)   | Inspecting instances, their paths and variables                                                  |
 | [Process operator commands](process-operator-commands.md) | The operator commands retry, cancel and resolve, and cancelling one path or one task   |
@@ -57,9 +58,9 @@ reviewer at or above the threshold, and ends approved, returned or rejected. Aft
 see [Raise event step](process-events.md#raise-event-step), and the sample's
 `PurchaseRequestApprovedWebhook` delivers the event to the purchasing system, see
 [Webhook resource](outbound-webhooks.md#webhook-resource). An approved request then gets its purchase
-order from the purchasing system, see [Connector calls](process-execution.md#connector-calls), and a
+order from the purchasing system, see [Connector calls](connector-and-package-calls.md#connector-calls), and a
 payment reference from the sample extension package, see
-[Package steps](process-execution.md#package-step-shape):
+[Package steps](connector-and-package-calls.md#package-step-shape):
 
 ```json
 {
@@ -207,8 +208,8 @@ and operations, and where each is described:
 | `decision`                                              | Takes the first branch whose condition is true                       | Below                                                            |
 | `task`                                                  | Waits for a person to decide                                         | Below                                                            |
 | `operation` with `updateRecord`                         | Sets fields of the subject record                                    | Below                                                            |
-| `operation` with `callConnector`                        | Calls an external system outside the step's transaction             | [Connector calls](process-execution.md#connector-calls)          |
-| `operation` with `<package>/<operation>`                | Runs an extension package's operation outside the step's transaction | [Package operations](process-execution.md#package-operations)    |
+| `operation` with `callConnector`                        | Calls an external system outside the step's transaction             | [Connector calls](connector-and-package-calls.md#connector-calls)          |
+| `operation` with `<package>/<operation>`                | Runs an extension package's operation outside the step's transaction | [Package operations](connector-and-package-calls.md#package-operations)    |
 | `operation` with `raiseEvent`                           | Raises an event about the subject record                             | [Raise event step](process-events.md#raise-event-step)           |
 | `operation` with `createRecord`                         | Creates a record of another entity                                   | [Create record operation](process-flow.md#create-record-operation) |
 | `operation` with `notify`                               | Notifies users, roles or addresses in the site or by email           | [Notify operation](notifications.md#notify-operation)            |
@@ -332,7 +333,7 @@ system that cannot take an order is one case.
   - `limit`: a limit was reached, such as the `maxPasses` of a repeat.
   - `any`: any failure that the other entries of the step do not name.
 - **Retries first.** An error path is taken only after the step's own retry policy runs out. See
-  [connector calls](process-execution.md#connector-calls).
+  [connector calls](connector-and-package-calls.md#connector-calls).
 - **Next step.** `next` names a step of the same list, see [structure](process-blocks.md#structure). The
   history keeps the error that was taken.
 - **No error path.** When no entry matches, the path fails. Its block then fails, and the instance fails.
@@ -390,9 +391,9 @@ codes that a process reports are on the page of their topic.
   type.
 - The checks of the other operations and step types are with each of them: a `createRecord` step's in
   [Create record operation](process-flow.md#create-record-operation), a `callConnector` step's
-  (`AXC0102` to `AXC0109`) in [Connector calls](process-execution.md#connector-calls), a package
+  (`AXC0102` to `AXC0109`) in [Connector calls](connector-and-package-calls.md#connector-calls), a package
   operation step's (`AXC0150` and `AXC0151`) in
-  [Package step shape](process-execution.md#package-step-shape), a `raiseEvent` step's (`AXC0125` to
+  [Package step shape](connector-and-package-calls.md#package-step-shape), a `raiseEvent` step's (`AXC0125` to
   `AXC0128`) in [Raise event step](process-events.md#raise-event-step), a `notify` step's (`AXC0266`
   to `AXC0273`) in [Notify operation](notifications.md#notify-operation), a `timer` step's in
   [Timer step](process-flow.md#timer-step), a `waitEvent` step's in
