@@ -1,16 +1,17 @@
-// - docs/reference/asvs.md, when it exists, has one row for each requirement of the committed ASVS list
-//   (docs/reference/asvs-5.0.0.json), with no unknown or repeated id, a status from the list and some
-//   evidence. A Met row names only test classes that exist. A Gap row is refused: the check runs offline,
-//   so it cannot tell whether the issue a Gap links is still open.
+// - Every ASVS table under docs/, found by its header line, such as the ones in docs/reference/asvs-*.md, has
+//   one row for each requirement of the committed ASVS list (docs/reference/asvs-5.0.0.json) across all of them,
+//   with no unknown or repeated id, a status from the list and some evidence. A Met row names only test classes
+//   that exist. A Gap row is refused: the check runs offline, so it cannot tell whether the issue a Gap links is still open.
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { cellSeparator, lines, testClassLookup, testClassPattern } from './helpers.mjs'
+import { lines, markdownFiles, relativePath, tableRows, testClassLookup, testClassPattern } from './helpers.mjs'
 
 export const asvsListFile = 'docs/reference/asvs-5.0.0.json'
 export const asvsStatuses = ['Met', 'Delegated', 'Not applicable']
 const asvsFile = 'docs/reference/asvs.md'
+const asvsHeader = '| Id | Requirement | Status | Evidence |'
 
-/** Checks the requirements table of the ASVS page against the committed list of ASVS ids. */
+/** Checks the requirements tables of the ASVS pages under docs/ against the committed list of ASVS ids. */
 export function checkAsvs(root, report) {
   const asvs = path.join(root, asvsFile)
   if (!existsSync(asvs)) return
@@ -22,35 +23,36 @@ export function checkAsvs(root, report) {
   const list = JSON.parse(readFileSync(listPath, 'utf8')).requirements
   const known = new Set(list.map((requirement) => requirement.id))
   const testClasses = testClassLookup(root)
-
-  const text = lines(asvs)
-  const heading = text.findIndex((line) => line === '## Requirements') + 1
   const seen = new Map()
 
-  for (let i = Math.max(heading, 0); i < text.length; i++) {
-    const cells = text[i].split(cellSeparator)
-    if (cells.length < 6 || cells[0].trim() !== '') continue
-    const [id, , status, evidence] = cells.slice(1, 5).map((cell) => cell.trim().replace(/^`(.*)`$/, '$1'))
-    if (id === 'Id' || /^-+$/.test(id)) continue
-    const line = i + 1
-    if (!known.has(id)) report(asvs, line, `${id} is not a Level 1 or Level 2 id in ${asvsListFile}`)
-    else if (seen.has(id)) report(asvs, line, `${id} has a row already, on line ${seen.get(id)}`)
-    else seen.set(id, line)
-    const statusName = /^\*\*(.+)\*\*$/.exec(status)?.[1]
-    if (statusName === 'Gap') report(asvs, line, `${id} is a Gap: meet it in this change, or wait for the issue that closes it`)
-    else if (!asvsStatuses.includes(statusName)) {
-      report(asvs, line, `${id} status '${status}' is not one of ${asvsStatuses.map((name) => `**${name}**`).join(', ')}`)
-    }
-    const rawEvidence = text[i].split(cellSeparator)[4]
-    if (evidence === '') report(asvs, line, `${id} has no evidence`)
-    else if (statusName === 'Met') {
-      for (const match of rawEvidence.matchAll(testClassPattern)) {
-        if (!testClasses().has(match[1])) report(asvs, line, `${id} names the test class ${match[1]}, which no .cs file under tests/, controlplane/tests/ or samples/ declares`)
+  for (const file of markdownFiles(path.join(root, 'docs')).sort()) {
+    for (const { index, raw } of tableRows(lines(file), asvsHeader)) {
+      if (raw.length < 6) continue
+      const [id, , status, evidence] = raw.slice(1, 5).map((cell) => cell.trim().replace(/^`(.*)`$/, '$1'))
+      const line = index + 1
+      if (!known.has(id)) report(file, line, `${id} is not a Level 1 or Level 2 id in ${asvsListFile}`)
+      else if (!seen.has(id)) seen.set(id, { file, line })
+      else {
+        const first = seen.get(id)
+        if (first.file === file) report(file, line, `${id} has a row already, on line ${first.line}`)
+        else report(file, line, `${id} has a row already, in ${relativePath(root, first.file)} on line ${first.line}`)
+      }
+      const statusName = /^\*\*(.+)\*\*$/.exec(status)?.[1]
+      if (statusName === 'Gap') report(file, line, `${id} is a Gap: meet it in this change, or wait for the issue that closes it`)
+      else if (!asvsStatuses.includes(statusName)) {
+        report(file, line, `${id} status '${status}' is not one of ${asvsStatuses.map((name) => `**${name}**`).join(', ')}`)
+      }
+      if (evidence === '') report(file, line, `${id} has no evidence`)
+      else if (statusName === 'Met') {
+        for (const match of raw[4].matchAll(testClassPattern)) {
+          if (!testClasses().has(match[1])) report(file, line, `${id} names the test class ${match[1]}, which no .cs file under tests/, controlplane/tests/ or samples/ declares`)
+        }
       }
     }
   }
 
+  const heading = Math.max(lines(asvs).findIndex((line) => line === '## Requirements') + 1, 1)
   for (const { id, level } of list) {
-    if (!seen.has(id)) report(asvs, Math.max(heading, 1), `${id} (Level ${level}) has no row in the requirements table`)
+    if (!seen.has(id)) report(asvs, heading, `${id} (Level ${level}) has no row in any ASVS table`)
   }
 }

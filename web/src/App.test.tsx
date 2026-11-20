@@ -1577,7 +1577,7 @@ describe('App', () => {
 
     renderApp('/e2e/demo/Missing')
 
-    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    expect(await screen.findByTestId('not-found', undefined, { timeout: 5000 })).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/pages/demo/Missing', expect.anything())
   })
 

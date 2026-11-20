@@ -4,6 +4,7 @@ import path from 'node:path'
 import { beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { asvsListFile, checkAsvs } from './asvs.mjs'
+import { lines, markdownFiles } from './helpers.mjs'
 import { useTempRoot } from './testing.mjs'
 
 const repositoryRoot = fileURLToPath(new URL('../../..', import.meta.url))
@@ -15,6 +16,7 @@ describe('ASVS table', () => {
   const header = ['## Requirements', '', '| Id | Requirement | Status | Evidence |', '| --- | --- | --- | --- |']
   const row = (id, status = '**Delegated**', evidence = 'The identity provider.') => `| \`${id}\` | Text \\| more. | ${status} | ${evidence} |`
   const table = (...rows) => ['# ASVS', '', ...header, ...rows].join('\n') + '\n'
+  const page = (...rows) => ['# ASVS: a page', '', ...header.slice(2), ...rows].join('\n') + '\n'
 
   beforeEach(() => {
     write(
@@ -76,15 +78,43 @@ describe('ASVS table', () => {
     write('docs/reference/asvs.md', table(row('V1.1.1')))
 
     assert.deepEqual(messages(), [
-      'docs/reference/asvs.md:3: V1.2.1 (Level 1) has no row in the requirements table',
-      'docs/reference/asvs.md:3: V9.1.1 (Level 1) has no row in the requirements table',
+      'docs/reference/asvs.md:3: V1.2.1 (Level 1) has no row in any ASVS table',
+      'docs/reference/asvs.md:3: V9.1.1 (Level 1) has no row in any ASVS table',
     ])
   })
 
   test('reports a listed id of chapter V9 or later that has no row', () => {
     write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1')))
 
-    assert.deepEqual(messages(), ['docs/reference/asvs.md:3: V9.1.1 (Level 1) has no row in the requirements table'])
+    assert.deepEqual(messages(), ['docs/reference/asvs.md:3: V9.1.1 (Level 1) has no row in any ASVS table'])
+  })
+
+  test('passes when the rows are split over two pages', () => {
+    write('docs/reference/asvs.md', table(row('V1.1.1')))
+    write('docs/reference/asvs-b.md', page(row('V1.2.1'), row('V9.1.1')))
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('reports an id that has no row on any page at the requirements heading of asvs.md', () => {
+    write('docs/reference/asvs.md', table(row('V1.1.1')))
+    write('docs/reference/asvs-b.md', page(row('V1.2.1')))
+
+    assert.deepEqual(messages(), ['docs/reference/asvs.md:3: V9.1.1 (Level 1) has no row in any ASVS table'])
+  })
+
+  test('reports an id with rows on two pages on the later page, naming the earlier one', () => {
+    write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1'), row('V9.1.1')))
+    write('docs/reference/asvs-b.md', page(row('V1.2.1')))
+
+    assert.deepEqual(messages(), ['docs/reference/asvs.md:8: V1.2.1 has a row already, in docs/reference/asvs-b.md on line 5'])
+  })
+
+  test('ignores a table under another header, so its rows do not count', () => {
+    write('docs/reference/asvs.md', table(row('V1.1.1'), row('V1.2.1')))
+    write('docs/reference/other.md', ['# Other', '', '| Id | Requirement | Status |', '| --- | --- | --- |', '| `V9.1.1` | Text. | **Met** |'].join('\n') + '\n')
+
+    assert.deepEqual(messages(), ['docs/reference/asvs.md:3: V9.1.1 (Level 1) has no row in any ASVS table'])
   })
 
   test('passes when every listed id has a row', () => {
@@ -134,10 +164,14 @@ describe('ASVS table', () => {
 
 describe('the repository ASVS table', () => {
   const list = JSON.parse(readFileSync(path.join(repositoryRoot, asvsListFile), 'utf8'))
-  const rowIds = readFileSync(path.join(repositoryRoot, 'docs/reference/asvs.md'), 'utf8')
-    .split('\n')
-    .map((line) => /^\| `(V\d+\.\d+\.\d+)` \|/.exec(line)?.[1])
-    .filter(Boolean)
+  const pages = markdownFiles(path.join(repositoryRoot, 'docs'))
+    .sort()
+    .filter((file) => lines(file).includes('| Id | Requirement | Status | Evidence |'))
+  const rowIds = pages.flatMap((file) =>
+    lines(file)
+      .map((line) => /^\| `(V\d+\.\d+\.\d+)` \|/.exec(line)?.[1])
+      .filter(Boolean),
+  )
 
   test('names its source and holds only Level 1 and Level 2 ids', () => {
     assert.match(list.source, /^https:\/\/raw\.githubusercontent\.com\/OWASP\/ASVS\/v5\.0\.0\//)
@@ -153,7 +187,14 @@ describe('the repository ASVS table', () => {
     for (const { id } of list.requirements) assert.equal(rowIds.filter((rowId) => rowId === id).length, 1, `${id} has one row`)
   })
 
-  test('finds no problem in the ASVS table', () => {
+  test('links from asvs.md every page that holds ASVS rows', () => {
+    const asvsText = readFileSync(path.join(repositoryRoot, 'docs/reference/asvs.md'), 'utf8')
+
+    assert.ok(pages.length > 0)
+    for (const file of pages) assert.ok(asvsText.includes(`](${path.basename(file)})`), `asvs.md links ${path.basename(file)}`)
+  })
+
+  test('finds no problem in the ASVS tables', () => {
     const found = []
     checkAsvs(repositoryRoot, (file, line, message) => found.push(`${file}:${line}: ${message}`))
 

@@ -699,7 +699,8 @@ The compiler reports a problem in an expression as a diagnostic, in one of three
 
 Each diagnostic points at the JSON Pointer of the expression string, and its message gives the
 character position inside the expression. Every expression code is on the
-[expression diagnostic codes](diagnostic-codes-expressions.md) page.
+[expression diagnostic codes](diagnostic-codes-expressions.md) page, except `AXC0207`. An undeclared
+module is on the [package and module diagnostic codes](diagnostic-codes-packages.md) page.
 
 - **`AXC0035`.** Every syntax error: an unknown character, a bad token, a literal that cannot be
   held exactly, or text the grammar does not allow. An integer above the signed 64-bit maximum and
