@@ -332,7 +332,7 @@ export interface SplitButtonItem {
 
 /**
  * Proposed, see #3978: the main of three or more actions that manage one thing as a button, with the others in a menu on
- * a joined caret button, or in a region's title row as an icon with a "…" menu, such as a saved input's Save with Save as… and Delete, see
+ * a joined caret button, or in a region's title row as a text button with a More actions text menu, such as a saved input's Save with Save as… and Delete, see
  * docs/reference/actions-and-controls.md#buttons. `menuNameKey` names the caret button.
  */
 export function AxisSplitButton({
@@ -346,20 +346,21 @@ export function AxisSplitButton({
   'data-testid': testId,
 }: {
   role?: 'secondary' | 'main'
-  /** The main action's text. A title row's split button shows its icon instead. */
+  /** The main action's text. */
   children: ReactNode
   disabled?: boolean
   onClick: () => void
   menuNameKey: string
   items: readonly SplitButtonItem[]
   /**
-   * Proposed, see #3978: the button sits in a region's title row, so the main action is an icon button named by
-   * `nameKey` and the others are the entries of a "…" icon menu beside it, as light as the row's other icon actions and
-   * as a code editor's panel titles draw them.
+   * Proposed, see #3978: the button sits in a region's title row, so the main action is a borderless text button and the
+   * others are the entries of a borderless More actions text menu beside it, ending in a caret. A group of actions is
+   * all text or all icons, never both.
    */
-  titleRow?: { icon: ReactNode; nameKey: string }
+  titleRow?: boolean
   'data-testid'?: string
 }) {
+  const t = useText()
   const menu = {
     items: items.map((item) => ({
       key: item.key,
@@ -372,9 +373,13 @@ export function AxisSplitButton({
   if (titleRow) {
     return (
       <Flex data-testid={testId} align="center" gap="small">
-        <AxisButton role="icon" nameKey={titleRow.nameKey} icon={titleRow.icon} disabled={disabled} onClick={onClick} />
+        <AxisButton role="plain" disabled={disabled} onClick={onClick}>
+          {children}
+        </AxisButton>
         <Dropdown trigger={['click']} menu={menu}>
-          <AxisButton role="icon" nameKey={menuNameKey} icon={<EllipsisOutlined />} />
+          <AxisButton role="plain" caret aria-label={t(menuNameKey)}>
+            {t('shell.actionRow.more')}
+          </AxisButton>
         </Dropdown>
       </Flex>
     )

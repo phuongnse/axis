@@ -1,4 +1,3 @@
-import { SaveOutlined } from '@ant-design/icons'
 import { Flex, Select, Tabs, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { ActionBar } from '../platform/ActionBar'
@@ -269,7 +268,7 @@ export function PackageRun({
               developer && (
                 <AxisSplitButton
                   data-testid="package-run-save"
-                  titleRow={{ icon: <SaveOutlined />, nameKey: 'shell.studio.package.run.saveInput' }}
+                  titleRow
                   disabled={input === null}
                   onClick={() =>
                     chosen === null
