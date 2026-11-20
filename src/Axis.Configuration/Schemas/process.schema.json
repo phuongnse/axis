@@ -3,7 +3,7 @@
   "title": "Axis process",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "kind", "name", "formatVersion", "start", "steps"],
+  "required": ["id", "kind", "name", "title", "formatVersion", "start", "steps"],
   "properties": {
     "id": { "$ref": "#/$defs/id" },
     "kind": { "const": "process" },

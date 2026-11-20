@@ -37,7 +37,7 @@ depend on its kind. An entity looks like this:
   release on, each resource kind has a format version, and Axis ships converters that rewrite older
   module, application and layer files, so the engines hold no compatibility code.
 - **Labels** always come from text resources.
-- **A process's `title`.** _(planned)_ A `process` has a required `title`, a text resource like a site's
+- **A process's `title`.** A `process` has a required `title`, a text resource like a site's
   and a page's, which names the process to people everywhere. Its key joins the `AXC0028` check, and a
   missing `title` is `AXC0004`.
 - **`description`.** Every kind but `text` and `layer` may have an optional `description`,

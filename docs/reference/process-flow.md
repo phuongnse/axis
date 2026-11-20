@@ -256,6 +256,7 @@ values they started with.
   "id": "0c7a4c1e-9f1e-4f43-9b1a-6a3d0b5e2f11",
   "kind": "process",
   "name": "DailyOverdueReminder",
+  "title": { "textKey": "processes.dailyOverdueReminder.title" },
   "formatVersion": 1,
   "parameters": [{ "name": "daysOverdue", "type": "integer" }],
   "start": "remind",

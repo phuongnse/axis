@@ -195,7 +195,7 @@ payment reference from the sample extension package, see
   and an `onError` entry's `next` are transitions too. See [Process blocks](process-blocks.md#structure)
   and [Error paths](#error-paths).
 - `kind` is the resource kind. Steps use `type`, as fields and widgets do.
-- **`title`.** _(planned)_ A required text resource that names the process, as [resource files](resource-files.md#resource-file-shape) says.
+- **`title`.** A required text resource that names the process, as [resource files](resource-files.md#resource-file-shape) says.
 
 ## Steps
 
