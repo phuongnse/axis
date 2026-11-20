@@ -97,7 +97,7 @@ test('a manager adds a department and an employee with a manager, and an employe
   await page.getByRole('row', { name: new RegExp(member) }).getByRole('link', { name: member, exact: true }).click()
   await expect(page).toHaveURL(/\/organization\/organization\/employeeform\/[0-9a-f-]{36}$/)
   await expect(accountSelect(page)).toContainText('Employee User')
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.goBack()
   await expect(page).toHaveURL(/\/organization\/organization\/employees$/)
   await chooseTheme(page, 'Light')
 

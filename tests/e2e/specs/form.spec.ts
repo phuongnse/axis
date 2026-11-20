@@ -93,7 +93,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await edited.getByRole('link', { name: `${title} edited`, exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
   await expect(dark.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`${title} edited`)
-  await dark.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.goBack()
   await expect(page).toHaveURL(tablePath)
 })
 
@@ -212,7 +212,7 @@ test('after a signed-in user edits a note, its history shows the update first, i
     }
     await expect(entries.nth(1)).toContainText('Created')
     await expect(entries.nth(1)).toContainText('Manager User')
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.goBack()
     await expect(page).toHaveURL(tablePath)
   }
 })
@@ -220,6 +220,9 @@ test('after a signed-in user edits a note, its history shows the update first, i
 test('an empty form shows the server error under the title', async ({ page }) => {
   await page.goto('/e2e/noteform/new')
 
+  // With no change the form draws no save bar, so a field other than the title is filled first.
+  await expect(page.getByTestId('form-save-bar')).toHaveCount(0)
+  await page.getByLabel(fieldLabel('Priority')).fill('3')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page.getByTestId('field-error-title')).toHaveText('Required.')
@@ -414,6 +417,9 @@ test('a wizard is filled with the keyboard only: Next checks the step, Back keep
 
   await page.keyboard.press('Tab')
   await expect(back).toBeFocused()
+  // The change shows the save bar after the form, where Discard comes before Save.
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Discard', exact: true })).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(save).toBeFocused()
   const created = page.waitForResponse(

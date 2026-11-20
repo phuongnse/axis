@@ -310,17 +310,20 @@ The form sends only what changed, and shows the server's answer where it belongs
 - **Conflicts.** A `409` on edit that names no field is a stale version. The form shows a conflict
   message with a reload button, which loads the current values and version and drops the user's
   changes. A duplicate unique value is a `409` keyed `/values/<field>`, so it shows under its field.
-- **Return address.** Save and Cancel return to the table page that opened the form, with its paging
-  and sorting, which the table passes in history state. Without it, such as in a new tab, they go to
-  `/{site}`, which opens the site's first page. Only an address inside the same site is used.
+- **Return address.** Save returns to the table page that opened the form, with its paging
+  and sorting, which the table passes in history state, without asking [Leave without saving?](studio.md#editor).
+  Without it, such as in a new tab, it goes to `/{site}`, which opens the site's first page. Only an address inside
+  the same site is used.
 - **Keys.** Enter in a date or date-time picker only confirms the picked value and never sends the
-  form. Enter in a text input sends the form, as in any form.
-- **The save bar** _(planned)_. A site's form has no Save or Cancel row of its own. While the form has a change to
+  form. Enter in a text input acts as Next on a step before the last. A form saves through its
+  [save bar](#saving), and a saved record with no change sends nothing.
+- **The save bar.** A site's form has no Save or Cancel row of its own. While the form has a change to
   save, the [save bar](studio-resource-form.md#save-bar) shows Discard and Save. With no change it is not drawn, so a
   new record's form shows it once the person types. Discard asks first, then puts every value back as the form
   started. A form without the grant to save shows no bar. A person who leaves by the sidebar, a reference's link or the
   browser is asked first, by [Leave without saving?](studio.md#editor), while there is a change. A wizard's Back and Next stay under
-  the step's fields, and the bar shows on its last step.
+  the step's fields, and the bar shows on its last step. On the page designer's and the form designer's canvas the form
+  draws no bar, because Studio's own save bar sits at the foot of the page.
 
 ### Form drafts
 
@@ -344,8 +347,8 @@ checks are in [form drafts](record-form-state.md#form-drafts). A form draft is n
   draft was restored and when it was saved, and offers Discard.
 - **Dropping.** A successful create removes the draft on the server. Discard asks first, by
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm), because a discarded
-  draft cannot be brought back. It then deletes the draft and opens the form as new. Cancel keeps the
-  draft.
+  draft cannot be brought back. It then deletes the draft and opens the form as new. Leaving the form
+  keeps the draft.
 - **Storage.** The draft is on the server only. Nothing goes in the URL or in browser storage.
 
 ## Start process actions
@@ -368,15 +371,15 @@ A `form` widget can declare `startProcess` actions, which save the record and st
 }
 ```
 
-- **Buttons.** On a saved record, each action is a button next to Save and Cancel, with its label.
-  Save is the solid finish button, and beside it the action is a text button, see
-  [buttons](actions-and-controls.md#buttons). For a signed-in user, page metadata lists only the
-  actions whose process the user holds a `start` grant on. A new record shows no action buttons, so a
+- **Buttons.** On a saved record, each action is a button with its label, outlined as a page's own action, see
+  [buttons](actions-and-controls.md#buttons) and [on the page heading](#start-process-actions). For a signed-in user,
+  page metadata lists only the actions whose process the user holds a `start` grant on. A new record shows no action buttons, so a
   failed start never leaves a record behind on a form that still says new.
-- **On the page heading** _(planned)_. Each action on a saved record is the page's own: an outlined `main`
+- **On the page heading.** Each action on a saved record is the page's own: an outlined `main`
   button on the right of the page's heading, on its row, through `PageActions`, with the `navigate` buttons
   after the `startProcess` ones. A form drawn with no page heading, such as in a widget's preview, puts them at
-  its top, on the right.
+  its top, on the right. On a designer's canvas the actions stay at the form's top, because the canvas's page heading is
+  not the form's.
 - **Compile checks.** The process must name the form's entity as its subject. An unknown process is
   `AXC0087`, and a process over another entity is `AXC0088`, both at
   `/widgets/{i}/actions/{j}/process`. `actions` on another widget type is `AXC0060`. The label joins

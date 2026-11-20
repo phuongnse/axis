@@ -6,10 +6,13 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { followLink, renderGuarded } from '../test/leaveGuard'
 import { chooseOption, formItem, hasFieldError, isRequiredLabel, tabTo } from '../test/antd'
 import { filterTexts } from '../test/tableFilter'
+import { CanvasActionsContext } from './canvasActions'
 import { designTokensFor } from './designTokens'
 import { FormWidget } from './FormWidget'
+import { PageLayout } from './PageLayout'
 import { RecordList, type RecordListValue } from './recordList'
 import { RecordPagesContext } from './recordPages'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType, WidgetAccess } from './site'
@@ -341,8 +344,12 @@ function noteJson(title: string, version: number) {
 const categoryPageJson = `{"items":[{"id":"${categoryId}","version":1,"values":{"name":"Office"},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`
 
 const texts = {
-  'shell.form.save': 'Save',
-  'shell.form.cancel': 'Cancel',
+  'shell.studio.save': 'Save',
+  'shell.studio.discard': 'Discard',
+  'shell.studio.discardConfirm': 'Discard all unsaved changes?',
+  'shell.studio.cancel': 'Cancel',
+  'shell.studio.saveBar.unsaved': 'Unsaved changes',
+  'shell.studio.saveBar.noUnsaved': 'No unsaved changes',
   'shell.form.next': 'Next',
   'shell.form.back': 'Back',
   'shell.form.reload': 'Reload',
@@ -500,8 +507,20 @@ function renderForm(
   narrow?: boolean,
   list: RecordListValue | null = null,
   recordPages?: Record<string, string>,
+  onCanvas?: boolean,
+  titled?: boolean,
 ) {
   const path = `/e2e/noteform/${recordId ?? 'new'}`
+  const formWidget = (
+    <FormWidget
+      widget={widget}
+      sitePath="e2e"
+      pages={['Notes', 'NoteForm']}
+      recordId={recordId}
+      returnTo="/e2e/notes?pageSize=10"
+      locale="en"
+    />
+  )
   const form = (
     <NarrowWidthOverride value={narrow}>
       <MemoryRouter initialEntries={[{ pathname: path, state: { from: '/e2e/notes?pageSize=10' } }]}>
@@ -510,14 +529,9 @@ function renderForm(
           <TextProvider catalogs={catalogs} development={false}>
             <RecordPagesContext value={recordPages ? { sitePath: 'e2e', recordPages } : null}>
               <RecordList value={list}>
-                <FormWidget
-                  widget={widget}
-                  sitePath="e2e"
-                  pages={['Notes', 'NoteForm']}
-                  recordId={recordId}
-                  returnTo="/e2e/notes?pageSize=10"
-                  locale="en"
-                />
+                <CanvasActionsContext.Provider value={onCanvas ? { selected: undefined } : null}>
+                  {titled ? <PageLayout title="Note">{formWidget}</PageLayout> : formWidget}
+                </CanvasActionsContext.Provider>
               </RecordList>
             </RecordPagesContext>
           </TextProvider>
@@ -527,6 +541,12 @@ function renderForm(
     </NarrowWidthOverride>
   )
   return render(mode ? <ThemeModeProvider initialMode={mode}>{form}</ThemeModeProvider> : form)
+}
+
+// A new form with no change shows no save bar, so a test that needs the server's answer to an empty form submits it, as
+// Enter does.
+function submitForm() {
+  act(() => document.querySelector('form')!.requestSubmit())
 }
 
 describe('FormWidget', () => {
@@ -754,7 +774,7 @@ describe('FormWidget', () => {
       stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
       renderForm(null, noteWidget, 'light')
 
-      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      submitForm()
 
       const message = await screen.findByTestId('field-error-title')
       expect(message.closest('.ant-form-item-explain')).toHaveStyle({
@@ -768,7 +788,7 @@ describe('FormWidget', () => {
       stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
       const { container } = renderForm(null, noteWidget, 'light')
 
-      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      submitForm()
       await screen.findByTestId('field-error-title')
 
       const items = Array.from(container.querySelectorAll<HTMLElement>('form .ant-form-item'))
@@ -822,7 +842,7 @@ describe('FormWidget', () => {
     })
     renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    submitForm()
 
     expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Required.')
     expect(screen.getByTestId('form-error')).toHaveTextContent('Must be a JSON object.')
@@ -839,7 +859,7 @@ describe('FormWidget', () => {
     try {
       renderForm()
 
-      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      submitForm()
 
       const error = await screen.findByTestId('form-error')
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
@@ -858,7 +878,7 @@ describe('FormWidget', () => {
     })
     renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    submitForm()
 
     expect(await screen.findByTestId('field-error-amount')).toHaveTextContent('Amount must be positive.')
     expect(screen.getByTestId('field-error-title')).toHaveTextContent('Required.')
@@ -896,7 +916,7 @@ describe('FormWidget', () => {
     stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
     renderForm(null, helpWidget)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    submitForm()
 
     expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Required.')
     expect(screen.getByText('Shown on the list.')).toHaveAttribute('id', 'title-help')
@@ -1816,7 +1836,7 @@ describe('FormWidget', () => {
     })
   })
 
-  it('has no save button and shows every field read-only without the grant for the write', async () => {
+  it('has no save bar and shows every field read-only without the grant for the write', async () => {
     const readerWidget: EntityWidgetMetadata = {
       ...noteWidget,
       access: { actions: ['read', 'update'], createFields: [], updateFields: ['title'] },
@@ -1824,13 +1844,28 @@ describe('FormWidget', () => {
     stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
     const { unmount } = renderForm(null, readerWidget)
     expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
     unmount()
 
     renderForm(noteId, readerWidget)
-    expect(await screen.findByRole('textbox', { name: 'Title' })).not.toHaveAttribute('readonly')
+    const title = await screen.findByRole('textbox', { name: 'Title' })
+    expect(title).not.toHaveAttribute('readonly')
+    expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
+    await userEvent.type(title, '!')
+    expect(await screen.findByTestId('form-save-bar')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+  })
+
+  it('shows no save bar and no Save or Discard to a person without the update grant', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId, { ...noteWidget, access: { actions: ['read'], createFields: [], updateFields: [] } })
+
+    expect(await screen.findByText('Buy paper')).toBeInTheDocument()
+    expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument()
   })
 
   it('shows an error on a field the form leaves out above the form', async () => {
@@ -1840,7 +1875,7 @@ describe('FormWidget', () => {
     })
     renderForm(null, sectionsWidget)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    submitForm()
 
     expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Too long.')
     expect(screen.getByTestId('form-error')).toHaveTextContent('Required.')
@@ -2091,15 +2126,114 @@ describe('FormWidget', () => {
     }
   })
 
-  it('returns to the table on cancel without a request', async () => {
-    const requests = stubFetch()
+  it('draws no Save or Cancel row, and no save bar before a change', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId)
+
+    expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Buy paper')
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
+  })
+
+  it('shows the save bar after a change, and Save sends the change and returns to the table', async () => {
+    const requests = stubFetch(
+      { status: 200, body: noteJson('Buy paper', 1) },
+      { status: 200, body: noteJson('Buy ink', 2) },
+    )
+    renderForm(noteId)
+    const title = await screen.findByRole('textbox', { name: 'Title' })
+
+    await userEvent.clear(title)
+    await userEvent.type(title, 'Buy ink')
+    const bar = await screen.findByTestId('form-save-bar')
+    expect(within(bar).getByText('Unsaved changes')).toBeInTheDocument()
+    expect(within(bar).getByTestId('form-save')).toHaveClass('ant-btn-variant-solid')
+    await userEvent.click(within(bar).getByTestId('form-save'))
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes?pageSize=10'))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"title":"Buy ink"}}',
+    })
+  })
+
+  function renderGuardedForm() {
+    return renderGuarded(
+      <TextProvider catalogs={catalogs} development={false}>
+        <FormWidget
+          widget={noteWidget}
+          sitePath="e2e"
+          pages={['Notes', 'NoteForm']}
+          recordId={noteId}
+          returnTo="/e2e/notes?pageSize=10"
+          locale="en"
+        />
+      </TextProvider>,
+    )
+  }
+
+  it('asks "Leave without saving?" before a link while the form has a change, and not without one', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    const router = renderGuardedForm()
+    const title = await screen.findByRole('textbox', { name: 'Title' })
+    await userEvent.type(title, '!')
+
+    await followLink()
+
+    expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/studio')
+  })
+
+  it('returns to the table after a save without asking "Leave without saving?"', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) }, { status: 200, body: noteJson('Buy paper!', 2) })
+    const router = renderGuardedForm()
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Title' }), '!')
+
+    await userEvent.click(await screen.findByTestId('form-save'))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/e2e/notes'))
+    expect(router.state.location.search).toBe('?pageSize=10')
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
+  })
+
+  it('asks before Discard, then puts the typed value back and hides the save bar', async () => {
+    const requests = stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId)
+    const title = await screen.findByRole('textbox', { name: 'Title' })
+
+    await userEvent.type(title, '!')
+    expect(title).toHaveValue('Buy paper!')
+    await userEvent.click(within(await screen.findByTestId('form-save-bar')).getByRole('button', { name: 'Discard' }))
+    expect(await screen.findByText('Discard all unsaved changes?')).toBeInTheDocument()
+    expect(title).toHaveValue('Buy paper!')
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Discard' }))
+
+    await waitFor(() => expect(title).toHaveValue('Buy paper'))
+    expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
+    expect(requests()).toHaveLength(1)
+  })
+
+  it('puts a new record back to its empty form on Discard', async () => {
+    stubFetch()
     renderForm()
+    const title = screen.getByRole('textbox', { name: 'Title' })
 
-    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Draft')
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await userEvent.type(title, 'Draft')
+    await userEvent.click(within(await screen.findByTestId('form-save-bar')).getByRole('button', { name: 'Discard' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Discard' }))
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes?pageSize=10')
-    expect(requests()).toEqual([])
+    await waitFor(() => expect(title).toHaveValue(''))
+    expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
+  })
+
+  it('draws no save bar inside a designer canvas, whichever change is made', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId, noteWidget, undefined, undefined, null, undefined, true)
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Title' }), '!')
+
+    expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
   })
 
   it('shows the missing-record line with a link to its list for a record the API answers 404 for', async () => {
@@ -2165,7 +2299,7 @@ describe('FormWidget', () => {
 
     stubFetch({ status: 500, body: '{}' })
     renderForm()
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    submitForm()
 
     expect(await screen.findByTestId('form-error')).toHaveTextContent('The record could not be saved.')
   })
@@ -2181,7 +2315,7 @@ describe('FormWidget', () => {
       }),
     })
     renderForm()
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    submitForm()
 
     expect(await screen.findByTestId('form-error')).toHaveTextContent('This tenant has reached its storage quota.')
   })
@@ -2190,7 +2324,7 @@ describe('FormWidget', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubFetch({ status: 403, body: '{"title":"You may not save this record.","status":403}' })
     renderForm()
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    submitForm()
 
     expect(await screen.findByTestId('form-error')).toHaveTextContent('The record could not be saved.')
   })
@@ -2205,9 +2339,9 @@ describe('FormWidget', () => {
       return user
     }
 
-    it('shows the first step with its progress, and no Save until the last step', async () => {
+    it('shows the first step with its progress, and no save bar until the last step', async () => {
       stubFetch()
-      await renderSteps()
+      const user = await renderSteps()
 
       expect(screen.getByRole('textbox', { name: 'Title' })).toBeInTheDocument()
       expect(screen.getByLabelText('Code')).toBeInTheDocument()
@@ -2216,13 +2350,15 @@ describe('FormWidget', () => {
       expect(within(progress).getByText('Step one')).toBeInTheDocument()
       expect(within(progress).getByText('Step two')).toBeInTheDocument()
       expect(progress.querySelector('[aria-current="step"]')).toHaveTextContent('Step one')
-      expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+      await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Pen')
+      expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     })
 
-    it('moves on with Next and shows Save and Back on the last step', async () => {
+    it('moves on with Next and shows Back, and the save bar after a change, on the last step', async () => {
       stateAnswers = [emptyStateJson, emptyStateJson]
       stubFetch()
       const user = await renderSteps()
@@ -2232,9 +2368,11 @@ describe('FormWidget', () => {
       expect(await screen.findByLabelText('Priority')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
       expect(screen.getByTestId('steps-bar').querySelector('[aria-current="step"]')).toHaveTextContent('Step two')
-      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
+      await user.type(screen.getByLabelText('Priority'), '5')
+      expect(await screen.findByTestId('form-save-bar')).toBeInTheDocument()
       // The check sends the step's fields as touched, at once.
       expect(stateRequests()[1].body).toMatchObject({ touched: ['title', 'code'] })
     })
@@ -2314,6 +2452,7 @@ describe('FormWidget', () => {
       })
       const user = await renderSteps()
       await user.click(screen.getByRole('button', { name: 'Next' }))
+      await user.type(await screen.findByLabelText('Priority'), '5')
       await user.click(await screen.findByRole('button', { name: 'Save' }))
 
       expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Too long.')
@@ -2326,8 +2465,9 @@ describe('FormWidget', () => {
         '{"sections":[],"fields":{"priority":{"visible":false,"required":false,"readOnly":false}},"errors":{}}',
       ]
       stubFetch()
-      await renderSteps()
+      const user = await renderSteps()
 
+      await user.type(await screen.findByRole('textbox', { name: 'Title' }), 'Pen')
       expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
       expect(screen.queryByText('Step two')).not.toBeInTheDocument()
@@ -2347,15 +2487,60 @@ describe('FormWidget', () => {
       expect(screen.queryByRole('button', { name: 'Close note' })).toBeNull()
     })
 
-    it('draws Cancel and the action as text buttons beside a solid Save', async () => {
+    const openAction = {
+      type: 'navigate' as const,
+      page: 'Notes',
+      labelKey: 'note.open',
+      parameters: { note: 'id' },
+      record: null,
+      opensForm: false,
+      paths: {},
+      visibleWhen: null,
+    }
+
+    it('draws the start and navigate actions as outlined buttons on the page heading', async () => {
       stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
-      renderForm(noteId, actionWidget)
+      renderForm(
+        noteId,
+        { ...actionWidget, actions: [openAction, ...actionWidget.actions] },
+        undefined,
+        undefined,
+        null,
+        undefined,
+        false,
+        true,
+      )
+
+      const heading = await screen.findByTestId('page-actions')
+      const action = await within(heading).findByRole('button', { name: 'Close note' })
+      const open = within(heading).getByRole('button', { name: 'note.open' })
+      expect(action).toHaveClass('ant-btn-variant-outlined')
+      expect(open).toHaveClass('ant-btn-variant-outlined')
+      expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    })
+
+    it('draws the actions at the top of the form on the right when there is no page heading', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      const { container } = renderForm(noteId, actionWidget)
 
       const action = await screen.findByRole('button', { name: 'Close note' })
-      expect(screen.getByRole('button', { name: 'Save' })).toHaveClass('ant-btn-variant-solid')
-      expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass('ant-btn-variant-text')
-      expect(action).toHaveClass('ant-btn-variant-text')
-      expect(action).toHaveStyle({ color: designTokensFor('light').colour.primaryText })
+      expect(action).toHaveClass('ant-btn-variant-outlined')
+      expect(screen.queryByTestId('page-actions')).not.toBeInTheDocument()
+      const row = action.closest<HTMLElement>('.ant-flex')!.parentElement!
+      expect(row).toHaveClass('ant-flex-justify-end')
+      expect(
+        container.querySelector('form')!.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_PRECEDING,
+      ).toBeTruthy()
+    })
+
+    it('keeps the actions inside the form on a designer canvas, and draws no save bar there', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, actionWidget, undefined, undefined, null, undefined, true, true)
+
+      const action = await screen.findByRole('button', { name: 'Close note' })
+      expect(within(screen.getByTestId('page-actions')).queryByRole('button')).not.toBeInTheDocument()
+      expect(action).toBeInTheDocument()
     })
 
     it('keeps the action outlined when the user cannot save the record', async () => {

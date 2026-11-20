@@ -39,7 +39,7 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
       exact: true,
     }),
   form: (page) =>
-    page.getByRole("button", { name: "Save", exact: true }).first(),
+    page.getByRole("button", { name: "Next", exact: true }).first(),
   taskInbox: (page) =>
     page.getByRole("link", { name: "Review the request", exact: true }).first(),
   processInspector: (page) =>
@@ -130,7 +130,11 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
         'button[aria-controls="shell-sidebar"][aria-expanded="false"]',
       ),
     "Form page": (state) =>
-      state.getByRole("button", { name: "Save", exact: true }).first(),
+      state.getByRole("heading", { name: "Request", exact: true, level: 1 }),
+    "Saved record": (state) =>
+      state.getByRole("button", { name: "Submit for approval", exact: true }),
+    "Saved record with a change": (state) => state.getByTestId("form-save-bar"),
+    "Record not found": (state) => state.getByTestId("record-not-found"),
     "Platform site": (state) =>
       state.getByText(
         "Runs the company's purchases, from the request to approval and ordering.",
@@ -490,9 +494,10 @@ test("the form preview validates and saves inside a frame sandboxed without allo
       return original.call(window, input, init);
     };
   });
-  await figure(frame, "Read-only by a condition")
-    .getByRole("button", { name: "Save", exact: true })
-    .click();
+  // A saved record shows its save bar only once something changes, so Title is edited first.
+  const locked = figure(frame, "Read-only by a condition");
+  await locked.locator("input#title").fill("Standing desks, revised");
+  await locked.getByRole("button", { name: "Save", exact: true }).click();
 
   await expect
     .poll(() =>
@@ -627,9 +632,7 @@ for (const mode of modes) {
     }
 
     const [authenticatorInset, passwordInset] = insets;
-    expect(Math.abs(passwordInset - authenticatorInset)).toBeLessThanOrEqual(
-      1,
-    );
+    expect(Math.abs(passwordInset - authenticatorInset)).toBeLessThanOrEqual(1);
     expect(recording.errors).toEqual([]);
   });
 
@@ -908,7 +911,9 @@ test("a dialog opened in the scrolled entity state of studio shows inside the fr
   await expect(page.getByTestId("studio-save-bar")).toBeVisible();
 
   expect(
-    await screen.evaluate((element) => element.scrollHeight > element.clientHeight),
+    await screen.evaluate(
+      (element) => element.scrollHeight > element.clientHeight,
+    ),
   ).toBe(true);
   await screen.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
@@ -936,9 +941,9 @@ test("a dialog opened in the scrolled entity state of studio shows inside the fr
   expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(
     screenBox.y + screenBox.height,
   );
-  expect(
-    await screen.evaluate((element) => element.scrollTop),
-  ).toBeGreaterThan(0);
+  expect(await screen.evaluate((element) => element.scrollTop)).toBeGreaterThan(
+    0,
+  );
   expect(recording.errors).toEqual([]);
 });
 
@@ -1035,9 +1040,7 @@ test("the studio preview draws no panel on its Settings page or its Entity state
   expect(settingsReport.styled).toEqual([]);
   expect(settingsReport.testIds.at(-1)).toBe("studio-section-autoAccept");
   expect(settings.errors).toEqual([]);
-  expect(
-    settings.requests.filter((url) => !url.startsWith("data:")),
-  ).toEqual([
+  expect(settings.requests.filter((url) => !url.startsWith("data:"))).toEqual([
     `${origin}/sandboxed.html`,
     `${harnessUrl}${settingsQuery}`,
     bundleUrl,
@@ -1056,9 +1059,11 @@ test("the studio preview draws no panel on its Settings page or its Entity state
   expect(entityReport.panels).toEqual([]);
   expect(entityReport.styled).toEqual([]);
   expect(entity.errors).toEqual([]);
-  expect(
-    entity.requests.filter((url) => !url.startsWith("data:")),
-  ).toEqual([`${origin}/sandboxed.html`, `${harnessUrl}${entityQuery}`, bundleUrl]);
+  expect(entity.requests.filter((url) => !url.startsWith("data:"))).toEqual([
+    `${origin}/sandboxed.html`,
+    `${harnessUrl}${entityQuery}`,
+    bundleUrl,
+  ]);
 });
 
 for (const mode of modes) {
@@ -1133,7 +1138,9 @@ for (const [slug, expectKeyElement] of [
   [
     "overview-of-a-new-application",
     async (state: FrameLocator) => {
-      await expect(state.getByTestId("studio-section-get-started")).toBeVisible();
+      await expect(
+        state.getByTestId("studio-section-get-started"),
+      ).toBeVisible();
       await expect(state.getByTestId("studio-section-more")).toBeVisible();
       await expect(state.getByTestId("studio-section-live")).toHaveCount(0);
     },
@@ -1353,7 +1360,7 @@ test("a mounted form uses the page's --primary and redraws when it changes", asy
     ).Axis.form(element);
   });
 
-  const save = page.getByRole("button", { name: "Save", exact: true }).first();
+  const save = page.getByRole("button", { name: "Next", exact: true }).first();
   const background = () =>
     save.evaluate((button) => getComputedStyle(button).backgroundColor);
   await expect.poll(background).toBe("rgb(19, 194, 194)");

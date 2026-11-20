@@ -113,4 +113,19 @@ describe('PageLayout', () => {
 
     expect(screen.getByRole('button', { name: 'Activate…' })).toBeInTheDocument()
   })
+
+  it('draws the actions where they stand inside a page when asked, not on its heading', () => {
+    render(
+      <ThemeModeProvider>
+        <PageLayout title="Purchase requests">
+          <PageActions inPlace>
+            <button type="button">Activate…</button>
+          </PageActions>
+        </PageLayout>
+      </ThemeModeProvider>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Activate…' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-actions')).queryByRole('button')).not.toBeInTheDocument()
+  })
 })

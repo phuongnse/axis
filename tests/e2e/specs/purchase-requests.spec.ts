@@ -100,7 +100,7 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(dark.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`${title} edited`)
   await expect(dark.getByLabel(fieldLabel('Department'))).toHaveValue('Finance')
   await expectShown(fieldValue(dark, 'totalAmount'), '2,550.90')
-  await dark.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.goBack()
   await expect(page).toHaveURL(tablePath)
 })
 

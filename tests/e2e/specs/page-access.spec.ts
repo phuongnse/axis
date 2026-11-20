@@ -69,12 +69,19 @@ test('a user without an update grant sees the form read-only and no Save button'
   const titleInput = page.getByRole('textbox', { name: 'Title', exact: true })
   await expect(titleInput).toHaveValue(title)
   await expect(titleInput).not.toHaveAttribute('readonly')
+  // The save bar shows once there is a change.
+  await expect(page.getByTestId('form-save-bar')).toHaveCount(0)
+  await titleInput.fill(`${title} edited`)
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
+  // Putting the value back leaves nothing to save, so leaving the page does not ask.
+  await titleInput.fill(title)
+  await expect(page.getByTestId('form-save-bar')).toHaveCount(0)
 
   await useSession(page, 'manager-2')
   await page.goto(`/purchasing/purchaserequestform/${id}`)
   await expectShown(fieldValue(page, 'title'), title)
   await expect(titleInput).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Save/i })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('form-save-bar')).toHaveCount(0)
 })

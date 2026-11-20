@@ -75,6 +75,8 @@ export const noRowsPath = `${apiPath}/data-sources/NoRequests/rows`
 
 export const requestId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
 export const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
+/** A well-formed request id that no record has, which the fixtures answer `404` for. */
+export const missingRequestId = 'c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f'
 const releaseId = '3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b0a'
 
 function field(name: string, type: FieldType, labelKey: string): FieldMetadata {
@@ -814,7 +816,7 @@ const dashboardPage: PageMetadata = {
 
 const requestPage: PageMetadata = {
   name: 'Request',
-  titleKey: 'request.new',
+  titleKey: 'request.label',
   parameters: [],
   widgets: [formWidget],
 }
@@ -1383,6 +1385,7 @@ export const routes: Record<string, FixtureRoute> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
+  [`${requestsPath}/${missingRequestId}`]: () => new Response(null, { status: 404 }),
   [categoriesPath]: () => categoryPage,
   [`${categoriesPath}/${categoryId}`]: () => categoryRecord,
   [`${categoriesPath}/${categoryId}/history`]: () => history,
