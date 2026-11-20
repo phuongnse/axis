@@ -96,7 +96,7 @@ When the owner asks, give the readiness verdicts of
 [D68](../../../docs/decisions/d68-issues-of-several-milestones-run-at-once.md)
 first, with the decisions, docs and open issues behind each. Give them for the
 milestones of the roadmap's current phase only, unless the owner names another,
-as [D165](../../../docs/decisions/d165-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md)
+as [D166](../../../docs/decisions/d166-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md)
 agrees, and write no issue of a later phase unless the owner asks. On *ready*:
 
 - Create the milestone's issues as in [Writing an issue](#writing-an-issue). The first one creates

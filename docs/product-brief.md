@@ -89,7 +89,7 @@ and its core rules still hold on every write.
 - **What large organizations, banks and government ask for** _(planned for M32)_. Conformance runs,
   signed images and alert rules for their own operations teams.
 
-The reasons are in [D165](decisions/d165-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md),
+The reasons are in [D166](decisions/d166-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md),
 [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
 [D150](decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 
@@ -107,7 +107,7 @@ that runs Axis as a SaaS for its own customers, with its own plans, prices and p
 - **Self-hosted.** The customer installs Axis on premises or in its own cloud, see
   [installation](reference/installation.md). This serves large organizations, banks and government.
 
-The reasons are in [D166](decisions/d166-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md).
+The reasons are in [D167](decisions/d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md).
 
 ## Who uses it
 

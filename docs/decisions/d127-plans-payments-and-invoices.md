@@ -4,7 +4,7 @@ Status: **Agreed**
 
 ## Context
 
-[D166](d166-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) gives each tenant a plan with one
+[D167](d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) gives each tenant a plan with one
 price for the whole tenant, and payments and invoices run by the
 [control plane](d126-sign-up-trials-and-the-control-plane.md). A price change must never surprise a
 customer, a bank transfer cannot be pulled, webhooks get lost and repeat, and the person who pays is

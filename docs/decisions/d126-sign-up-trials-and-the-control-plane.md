@@ -4,7 +4,7 @@ Status: **Agreed**
 
 ## Context
 
-[D166](d166-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) puts sign-up, trials and billing
+[D167](d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) puts sign-up, trials and billing
 apart from the [cells](d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md),
 keeps customer data in its region, and ends a trial that is not paid. Bots must not fill the cells,
 and a business that stops paying should still be able to take its data.

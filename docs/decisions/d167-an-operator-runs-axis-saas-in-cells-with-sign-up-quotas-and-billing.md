@@ -1,4 +1,4 @@
-# D166. An operator runs Axis SaaS in cells, with sign-up, quotas and billing
+# D167. An operator runs Axis SaaS in cells, with sign-up, quotas and billing
 
 Status: **Agreed**
 
@@ -6,7 +6,7 @@ Status: **Agreed**
 
 Axis is open source. An operator, such as a hosting company or an organization's IT team, can run
 Axis as a service for its own customers. It sets its own plans and prices, and it takes its own
-payments. [D165](d165-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md)
+payments. [D166](d166-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md)
 designs Axis first for small businesses and individuals, and they expect to sign up, try Axis and
 pay without installing anything or talking to anyone. A hosted Axis that someone creates by hand, or
 that never takes a payment, is only half a product. Many customers must share the same machines, while

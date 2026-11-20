@@ -29,7 +29,7 @@ such as documents made from templates, as utilities the platform owes its applic
   so no capability is left without a plan, and the marker rule of
   [writing the docs](../writing-docs.md#planned-work) keeps a row true once its milestone is done.
 - **The gaps become milestones in the existing phases**, as
-  [D165](d165-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md) orders them:
+  [D166](d166-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md) orders them:
   - **Phase 2, growth,** gets the foundations every application needs, in this order: parallel paths
     and tasks for many people (M38), working time (M39), files and documents (M40), history and
     recovery (M41), everyday pages and forms (M42) and working together (M43). They come before M30,
@@ -64,7 +64,7 @@ such as documents made from templates, as utilities the platform owes its applic
   - no compensation of earlier steps ([D35](d35-operator-retry-cancel-and-resolve.md)), by M56.
 
   Until such a decision is agreed, the old decision holds.
-- **Phases and breakdown stay as D165 agrees.** Only the current phase is broken down.
+- **Phases and breakdown stay as D166 agrees.** Only the current phase is broken down.
 
 ## Consequences
 
