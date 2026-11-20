@@ -3,8 +3,8 @@
 _(planned for M43)_
 
 This page holds the threats to people who work together on records and tasks, which belong to the **P** scope of the
-[threat model](threat-model.md). They have a page of their own because [the product page](threat-model-product.md)
-is close to its size limit. How its rows are found, rated and checked is in
+[threat model](threat-model.md). They have a page of their own so that [the product page](threat-model-product.md)
+stays under its size limit. How its rows are found, rated and checked is in
 [threat model method](threat-model-method.md), and a row added here takes the next free **P** id.
 
 ## Tasks, absences and deciding several tasks

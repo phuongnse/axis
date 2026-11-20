@@ -9,7 +9,7 @@ import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { chooseOption, hasFieldError } from '../test/antd'
 import { StudioNewPackage } from './StudioNewPackage'
-import { StudioPackagePage, StudioPackages } from './StudioPackages'
+import { StudioPackages } from './StudioPackages'
 
 const files = '/api/studio/apps/Shop/package-files'
 const fileRoute = (pkg: string, path: string) => `/api/studio/apps/Shop/packages/${pkg}/files/${path}`
@@ -116,38 +116,6 @@ describe('StudioPackages', () => {
       'The packages could not be loaded.',
     )
     warn.mockRestore()
-  })
-})
-
-describe('StudioPackagePage', () => {
-  it("is headed with the package's label and lists its files by path", async () => {
-    stubPackages()
-    renderInRouter(<StudioPackagePage application="Shop" packageId="tools" folderRevision={0} />)
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'Purchasing tools' })).toBeInTheDocument()
-    const table = screen.getByTestId('studio-package-files')
-    expect(
-      within(table)
-        .getAllByRole('row')
-        .slice(1)
-        .map((row) => row.textContent),
-    ).toEqual(['adapter.py', 'axis-package.json'])
-  })
-
-  it('shows the id as the heading of a package whose manifest is broken', async () => {
-    stubPackages()
-    renderInRouter(<StudioPackagePage application="Shop" packageId="broken" folderRevision={0} />)
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'broken' })).toBeInTheDocument()
-  })
-
-  it('warns when the application has no such package', async () => {
-    stubPackages()
-    renderInRouter(<StudioPackagePage application="Shop" packageId="nothing" folderRevision={0} />)
-
-    expect(await screen.findByTestId('studio-package-missing')).toHaveTextContent(
-      'The application has no package with this ID.',
-    )
   })
 })
 

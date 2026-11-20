@@ -572,7 +572,7 @@ describe('ProcessInstancePage', () => {
     renderPage()
     const approval = await screen.findByTestId('rf__node-managerApproval', undefined, { timeout: 5000 })
 
-    await userEvent.click(within(approval).getByRole('button', { name: 'Manager approval' }))
+    fireEvent.click(within(approval).getByRole('button', { name: 'Manager approval' }))
 
     expect(within(approval).getByRole('button', { name: 'Manager approval' })).toHaveAttribute('aria-current', 'true')
     expect(
