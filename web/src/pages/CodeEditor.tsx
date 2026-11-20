@@ -11,23 +11,14 @@ import { diagnosticCount, linter, lintGutter, nextDiagnostic, type Diagnostic } 
 import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state'
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
-import {
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Ref,
-  type RefObject,
-} from 'react'
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
 import { selectedItemTint } from '../platform/antTheme'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { indentFolding, languageSupport, type FileLanguage } from './fileLanguage'
 import { findPanel, type FindTexts } from './jsonFindPanel'
-import { jsonViewHeight, minHeight } from './jsonViewHeight'
+import { useFillHeight } from './jsonViewHeight'
 
 /** Marks a change that came from the value, not from the author, so it is not reported as an edit. */
 const external = Annotation.define<boolean>()
@@ -114,7 +105,6 @@ export default function CodeEditor({
     readOnly: new Compartment(),
     phrases: new Compartment(),
   }))
-  const [height, setHeight] = useState(minHeight)
   const theme = editorTheme(tokens, mode)
   const phrases = useMemo(() => codePhrases(t), [t])
   const latest = useRef({ onChange, value, findTexts, theme, language, readOnly, phrases, lint, onProblems, onCursor })
@@ -251,40 +241,7 @@ export default function CodeEditor({
     },
   }))
 
-  const gap = tokens.spacing.md
-  const fit = () => {
-    const host = hostRef.current
-    if (!fill || !host || host.offsetParent === null) {
-      return
-    }
-    const rect = host.getBoundingClientRect()
-    const content = host.closest('main')
-    const next = jsonViewHeight({
-      windowHeight: window.innerHeight,
-      top: rect.top + window.scrollY,
-      // Ant Design's `Layout.Footer` is a plain `footer` element and has no `contentinfo` role.
-      footerHeight: document.querySelector('footer')?.getBoundingClientRect().height ?? 0,
-      below:
-        (boundary?.current ? Math.max(boundary.current.getBoundingClientRect().bottom - rect.bottom, 0) : 0) +
-        (content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0) +
-        // The bar slot is under the page, so the editor ends above the bar that sticks to the window's foot.
-        (document.querySelector('[data-shell-bar-slot]')?.getBoundingClientRect().height ?? 0),
-      gap,
-    })
-    setHeight((current) => (current === next ? current : next))
-  }
-  const fitRef = useRef(fit)
-
-  useLayoutEffect(() => {
-    fitRef.current = fit
-    fit()
-  })
-
-  useEffect(() => {
-    const onResize = () => fitRef.current()
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
+  const height = useFillHeight(hostRef, fill, boundary)
 
   return <div ref={hostRef} style={fill ? { height } : undefined} />
 }

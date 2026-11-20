@@ -189,17 +189,18 @@ pull requests rarely edit the same lines.
   file with what it holds and when to read it, grouped by the area that a reader works in, and a new
   file gets its row in the same change. The grouping is in the map: files do not move into folders by area. A new topic that needs more than a few sections starts in
   a file of its own, and a table that many changes add rows to lives in a file of its own.
-- **Small files.** A doc under `docs/` stays at or under 1,000 lines, and a change that grows a doc
-  past 900 lines splits it, so that two changes that each add a few lines both still pass. The split
-  moves whole `##` sections, unchanged, to a new file in the same folder, named after its topic. The
-  base for "grows" is the `NEXKIT_BASE_SHA` commit when NexKit sets it, else the merge base with
-  `origin/main`.
+- **Small files.** A doc under `docs/` holds at most 12,000 words, counted as AGENTS.md's are, and it
+  has no line limit: words measure what a reader reads, and a long line dodges a line count. A change
+  that grows a doc past 10,000 words splits it, so that two changes that each add a few words both
+  still pass. The split moves whole `##` sections, unchanged, to a new file in the same folder, named
+  after its topic. The base for "grows" is the `NEXKIT_BASE_SHA` commit when NexKit sets it, else the
+  merge base with `origin/main`.
   - **No shrinking to fit.** A change near the limit does not shorten, rewrap into longer lines,
     merge or delete existing text to stay under it. Text leaves a page only for its own reason, such
     as a statement that is false or a copy of a rule whose home is another page, and the pull request
     names that reason.
   - **Split by topic, with room to grow.** The split moves the whole `##` sections of one topic, not
-    the fewest lines that pass. It leaves each page at or under 700 lines, so the next changes do not
+    the least text that passes. It leaves each page at or under 8,000 words, so the next changes do not
     meet the limit again.
 - **Short agent instructions.** [AGENTS.md](../AGENTS.md) holds only where to look, the working rules
   and the commands. A line belongs in it only when almost every session needs it, an agent would get

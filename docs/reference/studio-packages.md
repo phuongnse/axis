@@ -10,7 +10,7 @@ Studio is in [Studio](studio.md) and [Studio workspace](studio-workspace.md).
 
 The Packages entry gives an author the application's packages. It ends the sidebar's Integration group,
 see [the workspace](studio-workspace.md#workspace). It is kept in the address as `&view=packages`, and a
-package's page as `&view=packages&package=<id>`.
+package's workspace as `&view=packages&package=<id>`.
 
 - **The list.** It is the standard table, an `AxisTable`, of each package's label, id, language and
   version, one row for each folder under `packages/`. The id comes from the files that
@@ -36,49 +36,46 @@ package's page as `&view=packages&package=<id>`.
 
 ## A package's files
 
-An open package lists its files. The workspace that reads, edits, builds, tests and runs them, so that a
-package can be written in the browser, is planned, see the marked bullets below.
+An open package is a workspace that shows its files in a code editor. Saving, building, testing and running them, so
+that a package can be written in the browser, are planned, see the marked bullets below.
 
-- **The file list.** An open package lists its files by path, the manifest, the adapter, the lock file and
-  the tests among them. The page is headed with the package's label, and its table has a filter and a sort on
-  Path, and no search or pager. It shows the working folder.
-- **The workspace** _(planned for M37)_. An open package is one workspace in place of the file list. It fills the
-  window down to the footer: the explorer on the left, the open files as tabs with the code editor under them, the
-  status line at the editor's foot, and the output panel under it, with Problems, Output, Tests and Run. A handle on
-  the explorer's end rule sets its width, from a least width to half the workspace, and a handle on the output
-  panel's top rule sets its height, both drawn as the one [handle on a rule](shell.md#layout). The workspace follows
-  [rules, not boxes](shell.md#layout): a rule under the heading from the sidebar across, rules between its regions
-  and no box.
-- **The heading** _(planned for M37)_. The package's label, with its kind and version under it. Build, Run tests and
-  Run… are on the right as one [group of equal weight](actions-and-controls.md#buttons), each button as wide as the
-  widest. The heading has no tag of a change, because the band's Changes not live tells of every change, so the
-  workspace reads no diff against the live release.
-- **The explorer** _(planned for M37)_. A tree of the package's folders and files, drawn by Ant Design's `Tree`.
-  Folders come first, with a chevron on a folder's left and a folder icon, and a file has a file icon. A file keeps
-  the chevron's place only in a tree that has a folder, so without one the files start at the explorer's edge. A
-  file with unsaved changes has a dot. A chosen or hovered row is marked across its whole width, a chosen one in the
-  tint of the [navigation's](shell.md#layout) current entry, and each level steps in by 12 px. Files is its title row,
-  with New, which offers New file and New folder, and Refresh. A node's actions are on a right click, Shift+F10 or the
-  menu key: New file, New folder, Rename (F2), Delete and Copy path. A file or folder dragged onto a folder moves into
-  it, and onto the explorer's free space moves to the package's root. The folder holds only files, so a new folder
-  lives in the explorer until a file is in it, as git keeps folders.
-- **The files and the editor** _(planned for M37)_. An open file is a tab with a dot while it is unsaved, and closing
-  it asks before it discards. The tabs are line tabs in the one tab look, and their rule is level with the rule under the explorer's title
-  row.
-  The editor is one CodeMirror 6 editor, the one the [JSON view](studio-resource-form.md#json-view) is, in
+- **The workspace.** An open package is one workspace. It fills the window down to the footer: the explorer on the
+  left, the open files as tabs with the code editor under them, the status line at the editor's foot, and the output
+  panel under it. The workspace follows [rules, not boxes](shell.md#layout): rules between its regions and no box.
+- **The output panel** _(planned for M37)_. The output panel has Problems, Output, Tests and Run. A handle on the
+  explorer's end rule sets its width, from a least width to half the workspace, and a handle on the output panel's top
+  rule sets its height, both drawn as the one [handle on a rule](shell.md#layout). A rule runs under the heading from
+  the sidebar across.
+- **The heading.** The package's label, with its kind and version under it. The heading has no tag of a change,
+  because the band's Changes not live tells of every change, so the workspace reads no diff against the live release.
+- **The heading's actions** _(planned for M37)_. Build, Run tests and Run… are on the right as one
+  [group of equal weight](actions-and-controls.md#buttons), each button as wide as the widest.
+- **The explorer.** A tree of the package's folders and files, drawn by Ant Design's `Tree`. Folders come first, with
+  a chevron on a folder's left and a folder icon, and a file has a file icon. A file with unsaved changes has a dot. A
+  chosen or hovered row is marked across its whole width, a chosen one in the tint of the [navigation's](shell.md#layout)
+  current entry, and each level steps in by 12 px. Files is its title row.
+- **The explorer's actions** _(planned for M37)_. A file keeps the chevron's place only in a tree that has a folder, so
+  without one the files start at the explorer's edge. Files has New, which offers New file and New folder, and
+  Refresh. A node's actions are on a right click, Shift+F10 or the menu key: New file, New folder, Rename (F2), Delete
+  and Copy path. A file or folder dragged onto a folder moves into it, and onto the explorer's free space moves to the
+  package's root. The folder holds only files, so a new folder lives in the explorer until a file is in it, as git
+  keeps folders.
+- **The files and the editor.** An open file is a tab with a dot while it is unsaved, and closing it asks before it
+  discards. The tabs are line tabs in the one tab look, and their rule is level with the rule under the explorer's
+  title row. The editor is one CodeMirror 6 editor, the one the [JSON view](studio-resource-form.md#json-view) is, in
   `codeEditorTheme.ts`'s colours and with the highlighting of the file's language, so no editor draws in
   CodeMirror's own. It highlights C# (`.cs`), TypeScript (`.ts`), JavaScript (`.js`, `.mjs`, `.cjs`), Python (`.py`)
   and JSON (`.json`), and any other file shows as plain text. Comments are `textMuted` in italics and type names
   `successText`. It folds, matches and closes brackets, indents on input, completes the words of the text and
   marks the current line, in `fillSubtle`, and a matching bracket has the thin `border` outline of a search match. A
-  language without a syntax tree, such as C#, folds by indentation. A build problem is marked at its line. Its fold
-  column sits `spacing-sm` from the line numbers and from the gutter's rule, and shows an open fold's chevron while
-  the pointer is over the gutter and a
-  folded one always, as VS Code does. Ctrl+S saves every changed file, Ctrl+P opens a file by its name and
-  Ctrl+Shift+B builds.
+  language without a syntax tree, such as C#, folds by indentation.
+- **The editor's marks and keys** _(planned for M37)_. A build problem is marked at its line. The editor's fold column
+  sits `spacing-sm` from the line numbers and from the gutter's rule, and shows an open fold's chevron while the
+  pointer is over the gutter and a folded one always, as VS Code does. Ctrl+S saves every changed file, Ctrl+P opens a
+  file by its name and Ctrl+Shift+B builds.
 - **Saving** _(planned for M37)_. A save uses the version check of [versions](authoring.md#versions), and a save over a
   stale version answers `409`, as it does for a resource. One save bar saves every changed file.
-- **The status line** _(planned for M37)_. At the editor's foot, right above the output panel, it tells of the open
+- **The status line.** At the editor's foot, right above the output panel, it tells of the open
   file: the cursor's line and column, the file's language and what is unsaved.
 - **Save before a run** _(planned for M37)_. Build, Run tests and Run… save every changed file first, as a code
   editor saves before it runs a task, so each takes the files the editor shows. A file that cannot be saved, such as
@@ -102,8 +99,9 @@ package can be written in the browser, is planned, see the marked bullets below.
 - **Saved inputs** _(planned for M37)_. A run's named inputs are kept with the application and shared by its
   developers, as AWS Lambda's shareable test events are, so a team runs the same cases. Saved input's list ends with
   Manage saved inputs…, which opens the [dialog that keeps saved items](actions-and-controls.md#fields).
-- **Without the developer role** _(planned for M37)_. The editor is read-only, with an info alert, and the file shows
-  no save action. The explorer offers only the files, Copy path and Refresh.
+- **Without the developer role.** The editor is read-only, with an info alert.
+- **Without the developer role, saving and the explorer** _(planned for M37)_. The file shows no save action. The
+  explorer offers only the files, Copy path and Refresh.
 
 ## Diffs
 

@@ -2835,7 +2835,7 @@ describe('StudioPage Packages', () => {
     expect(await screen.findByTestId('studio-package-tools')).toHaveTextContent('Purchasing tools')
   })
 
-  it('opens a package from its row, under the Packages entry, headed with its label and listing its files', async () => {
+  it('opens a package from its row, under the Packages entry, as a read-only workspace without studioDeveloper', async () => {
     stubPackages({})
     renderPage('/studio?app=PurchaseRequests&view=packages')
 
@@ -2843,13 +2843,10 @@ describe('StudioPage Packages', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Purchasing tools' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=packages&package=tools')
-    const files = screen.getByTestId('studio-package-files')
-    expect(
-      within(files)
-        .getAllByRole('row')
-        .slice(1)
-        .map((row) => row.textContent),
-    ).toEqual(['axis-package.json', 'index.js'])
+    const tree = screen.getByTestId('studio-package-tree')
+    expect(within(tree).getByText('axis-package.json', { exact: true })).toBeInTheDocument()
+    expect(within(tree).getByText('index.js', { exact: true })).toBeInTheDocument()
+    expect(screen.getByTestId('studio-package-read-only')).toBeInTheDocument()
     expect(within(sidebar!).getByRole('link', { name: 'Packages' }).closest('li')).toHaveClass('ant-menu-item-selected')
   })
 

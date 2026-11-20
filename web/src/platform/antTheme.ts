@@ -25,8 +25,11 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
   const errorBorder = { colorError: colour.dangerText, colorErrorBorderHover: colour.dangerText }
   const warningBorder = { colorWarning: colour.warningText, colorWarningBorderHover: colour.warningText }
   const fieldBorder = { ...errorBorder, ...warningBorder }
+  const algorithm = [mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, keepLink]
+  // The tint Ant Design gives a selected item, which `selectedItemTint` reads from this theme too.
+  const selectedTint = theme.getDesignToken({ algorithm, token: { colorPrimary: seed('primary') } }).controlItemBgActive
   return {
-    algorithm: [mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, keepLink],
+    algorithm,
     token: {
       // Seed colours: Ant Design derives their shade for the mode from the seed.
       colorPrimary: seed('primary'),
@@ -111,6 +114,13 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         horizontalItemPadding: `0 0 ${spacing.sm}px`,
         horizontalItemPaddingSM: `0 0 ${spacing.xs}px`,
         horizontalItemPaddingLG: `0 0 ${spacing.md}px`,
+      },
+      // A package's explorer is the only directory tree: each level steps in by 12 px and the open file's row is marked
+      // across its whole width, see docs/reference/studio-packages.md#a-packages-files.
+      Tree: {
+        indentSize: 12,
+        directoryNodeSelectedBg: selectedTint,
+        directoryNodeSelectedColor: colour.primaryText,
       },
       Menu: {
         itemSelectedColor: colour.primaryText,

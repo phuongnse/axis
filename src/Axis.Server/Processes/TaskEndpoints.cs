@@ -904,9 +904,10 @@ internal sealed record ReassignBody(string Kind, string Assignee, string Reason)
 /// <summary>The assignee of a task: the user id or the role name, and the other is null.</summary>
 internal sealed record TaskAssignee(string? User, string? Role);
 
-/// <summary>The form a task is completed on, in the shape of a form widget's metadata, with its entity's metadata.</summary>
+/// <summary>The answer to a task save: the subject record's new version.</summary>
 internal sealed record TaskSaveResponse(long Version);
 
+/// <summary>The form a task is completed on, in the shape of a form widget's metadata, with its entity's metadata.</summary>
 internal sealed record TaskForm(string Name, IReadOnlyList<FormSectionMetadata> Sections, IReadOnlyList<FormStepMetadata> Steps, EntityMetadata Entity);
 
 /// <summary>An outcome a task can be completed with.</summary>
