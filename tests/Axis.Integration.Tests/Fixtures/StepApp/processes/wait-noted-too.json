@@ -2,6 +2,7 @@
   "id": "4c1f7e92-5d3a-4b68-8e0c-a2d9f6b13e75",
   "kind": "process",
   "name": "WaitNotedToo",
+  "title": { "textKey": "processes.waitNotedToo.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "await",

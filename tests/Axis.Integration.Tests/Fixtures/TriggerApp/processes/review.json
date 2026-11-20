@@ -2,6 +2,7 @@
   "id": "90fbfeff-ab83-46ef-a891-3bca7cc19156",
   "kind": "process",
   "name": "Review",
+  "title": { "textKey": "processes.review.title" },
   "formatVersion": 1,
   "entity": "Ticket",
   "startCondition": {

@@ -2,6 +2,7 @@
   "id": "d74f217a-8513-4825-9467-c3aa720d70a5",
   "kind": "process",
   "name": "Notify",
+  "title": { "textKey": "processes.notify.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "tell",

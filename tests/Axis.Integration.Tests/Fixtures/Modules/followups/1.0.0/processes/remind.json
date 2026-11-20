@@ -2,6 +2,7 @@
   "id": "c7e3a1d5-2b84-4f96-8a0d-1e5b9c3f7a11",
   "kind": "process",
   "name": "Remind",
+  "title": { "textKey": "followups.processes.remind.title" },
   "formatVersion": 1,
   "entity": "Followup",
   "start": "done",

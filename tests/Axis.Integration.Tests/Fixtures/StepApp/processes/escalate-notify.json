@@ -2,6 +2,7 @@
   "id": "4f04e7a2-6a94-4145-b160-10b1fed8a17d",
   "kind": "process",
   "name": "EscalateNotify",
+  "title": { "textKey": "processes.escalateNotify.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "decide",

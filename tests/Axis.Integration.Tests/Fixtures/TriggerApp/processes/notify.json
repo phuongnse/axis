@@ -2,6 +2,7 @@
   "id": "0b1e6f33-53ab-4155-8d74-3d7a3b2b6441",
   "kind": "process",
   "name": "Notify",
+  "title": { "textKey": "processes.notify.title" },
   "formatVersion": 1,
   "entity": "Ticket",
   "start": "done",

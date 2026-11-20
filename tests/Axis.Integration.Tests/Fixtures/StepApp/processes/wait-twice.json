@@ -2,6 +2,7 @@
   "id": "591a1051-9a6f-476a-bdd7-007c9c016ffd",
   "kind": "process",
   "name": "WaitTwice",
+  "title": { "textKey": "processes.waitTwice.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "await",

@@ -2,6 +2,7 @@
   "id": "662c5ed5-064d-4353-a56d-e4121a9d734c",
   "kind": "process",
   "name": "Escalate",
+  "title": { "textKey": "processes.escalate.title" },
   "formatVersion": 1,
   "entity": "Ticket",
   "start": "escalate",

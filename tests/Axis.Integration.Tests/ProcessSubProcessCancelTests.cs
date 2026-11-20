@@ -27,6 +27,7 @@ public sealed class ProcessSubProcessCancelTests(ProcessStepFixture fixture) : I
                 {
                   "id": "a7d6c9b8-b1d4-4270-8ca0-6e81df527f02",
                   "kind": "process",
+                  "title": { "textKey": "processes.submit.title" },
                   "name": "RetryChild",
                   "formatVersion": 1,
                   "entity": "Request",
@@ -180,6 +181,7 @@ public sealed class ProcessSubProcessCancelTests(ProcessStepFixture fixture) : I
         {
           "id": "{{id}}",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "{{name}}",
           "formatVersion": 1,
           "entity": "Request",
@@ -197,6 +199,7 @@ public sealed class ProcessSubProcessCancelTests(ProcessStepFixture fixture) : I
         {
           "id": "{{id}}",
           "kind": "process",
+          "title": { "textKey": "processes.approve.title" },
           "name": "{{name}}",
           "formatVersion": 1,
           "entity": "Request",

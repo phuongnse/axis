@@ -2,6 +2,7 @@
   "id": "b2f1d7a4-5c3e-4a68-9d10-7e4b8c2a6f31",
   "kind": "process",
   "name": "TimerWait",
+  "title": { "textKey": "processes.timerWait.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "pause",

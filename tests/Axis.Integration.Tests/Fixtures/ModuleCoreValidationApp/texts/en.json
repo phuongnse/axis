@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.advanceTwice.title": "Advance a request twice",
     "role.employee": "Employee",
     "ticket.main": "Ticket",
     "ticket.review": "Review the ticket",

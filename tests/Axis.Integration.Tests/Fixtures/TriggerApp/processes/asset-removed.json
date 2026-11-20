@@ -2,6 +2,7 @@
   "id": "19f293aa-e907-424f-ab3f-11a1d8e8133c",
   "kind": "process",
   "name": "AssetRemoved",
+  "title": { "textKey": "processes.assetRemoved.title" },
   "formatVersion": 1,
   "parameters": [
     { "name": "tag", "type": "text" },

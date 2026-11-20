@@ -2,6 +2,7 @@
   "id": "cc0b19ba-cc09-4374-bea1-97fbfe791141",
   "kind": "process",
   "name": "ShipOrder",
+  "title": { "textKey": "processes.shipOrder.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "createShipment",

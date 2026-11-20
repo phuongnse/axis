@@ -2,6 +2,7 @@
   "id": "3c9a7e52-1b4d-4f6a-8e2c-5d7b9f1a3e64",
   "kind": "process",
   "name": "Submit",
+  "title": { "textKey": "processes.submit.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "submit",

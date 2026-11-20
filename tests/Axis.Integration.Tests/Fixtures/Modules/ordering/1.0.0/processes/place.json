@@ -2,6 +2,7 @@
   "id": "3e8a5b71-4c2d-4f96-8b0e-7a1d9c6e2f03",
   "kind": "process",
   "name": "Place",
+  "title": { "textKey": "ordering.processes.place.title" },
   "formatVersion": 1,
   "entity": "PurchaseOrder",
   "start": "createOrder",

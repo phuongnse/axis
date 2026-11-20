@@ -121,7 +121,7 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
             .With("application.json", $$"""{ "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1 }""")
             .With("texts/en.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "routing.cannotStart": "This request cannot be routed." } }
+                  "texts": { "processes.routing.title": "Route a request", "routing.cannotStart": "This request cannot be routed." } }
                 """)
             .With("entities/employee.json", $$"""
                 { "id": "{{_employeeId}}", "kind": "entity", "name": "Employee", "formatVersion": 1, "displayField": "name",
@@ -142,7 +142,7 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
                   ] }
                 """)
             .With("processes/routing.json", $$"""
-                { "id": "{{Guid.NewGuid()}}", "kind": "process", "name": "Routing", "formatVersion": 1, "entity": "PurchaseRequest",
+                { "id": "{{Guid.NewGuid()}}", "kind": "process", "title": { "textKey": "processes.routing.title" }, "name": "Routing", "formatVersion": 1, "entity": "PurchaseRequest",
                   "startCondition": { "expression": "{{ManagerStartsWithB}}", "message": { "textKey": "routing.cannotStart" } },
                   "start": "route",
                   "steps": [

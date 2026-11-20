@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "ledgers.processes.noteEntry.title": "Note an entry",
     "ledgers.roles.clerk": "Clerk",
     "ledgers.entry.amountNotNegative": "The amount cannot be negative.",
     "ledgers.claim.effect.entryRecorded": "Entry recorded",

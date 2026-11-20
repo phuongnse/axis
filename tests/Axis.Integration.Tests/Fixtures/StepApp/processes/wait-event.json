@@ -2,6 +2,7 @@
   "id": "e7a3c5d1-2b84-4f96-a0d3-9c1e6b7f4a58",
   "kind": "process",
   "name": "WaitEvent",
+  "title": { "textKey": "processes.waitEvent.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "await",

@@ -2,6 +2,7 @@
   "id": "fe7fdf0c-1fad-40ea-8126-e12aa3c16226",
   "kind": "process",
   "name": "OAuthOrder",
+  "title": { "textKey": "processes.oAuthOrder.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "createOrder",

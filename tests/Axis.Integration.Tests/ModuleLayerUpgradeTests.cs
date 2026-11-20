@@ -80,7 +80,7 @@ public sealed class ModuleLayerUpgradeTests(DataDatabaseFixture database) : ICla
                   "sections": [ { "name": "approval", "title": { "textKey": "approvals.approval" }, "fields": [ { "field": "title" } ] } ] }
                 """)
             .With($"approvals/{version}/processes/Review.json", $$"""
-                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c41", "kind": "process", "name": "Review", "formatVersion": 1,
+                { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c41", "kind": "process", "title": { "textKey": "approvals.review" }, "name": "Review", "formatVersion": 1,
                   "entity": "Approval", "start": "{{stepName}}", "steps": [
                     { "name": "{{stepName}}", "type": "task", "label": { "textKey": "approvals.review" }, "assignee": { "user": "'u1'" }, "form": "ApprovalForm",
                       "outcomes": [ { "name": "approve", "label": { "textKey": "approvals.approve" }, "next": "done" } ] },

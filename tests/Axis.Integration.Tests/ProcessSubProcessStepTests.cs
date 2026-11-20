@@ -117,6 +117,7 @@ public sealed class ProcessSubProcessStepTests(ProcessStepFixture fixture) : ICl
                 {
                   "id": "c3f2e5d4-7d90-4e3b-8f68-2a4d9c1e3b02",
                   "kind": "process",
+                  "title": { "textKey": "processes.submit.title" },
                   "name": "ParamChild",
                   "formatVersion": 1,
                   "parameters": [{ "name": "days", "type": "integer" }],
@@ -169,6 +170,7 @@ public sealed class ProcessSubProcessStepTests(ProcessStepFixture fixture) : ICl
                 {
                   "id": "e5b4a7f6-9fb2-405d-a18a-4c6fbd305d02",
                   "kind": "process",
+                  "title": { "textKey": "processes.submit.title" },
                   "name": "SubjectChild",
                   "formatVersion": 1,
                   "entity": "Department",
@@ -197,6 +199,7 @@ public sealed class ProcessSubProcessStepTests(ProcessStepFixture fixture) : ICl
                 {
                   "id": "f6c5b8a7-a0c3-416e-b29b-5d70ce416e02",
                   "kind": "process",
+                  "title": { "textKey": "processes.submit.title" },
                   "name": "NoSubjectChild",
                   "formatVersion": 1,
                   "entity": "Department",
@@ -221,6 +224,7 @@ public sealed class ProcessSubProcessStepTests(ProcessStepFixture fixture) : ICl
         {
           "id": "{{id}}",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "{{name}}",
           "formatVersion": 1,
           "entity": "Request",
@@ -238,6 +242,7 @@ public sealed class ProcessSubProcessStepTests(ProcessStepFixture fixture) : ICl
         {
           "id": "{{id}}",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "{{name}}",
           "formatVersion": 1,
           "entity": "Request",

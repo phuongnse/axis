@@ -1025,6 +1025,7 @@ public sealed class ScenarioRunnerTests
             {
               "id": "{{Guid.NewGuid()}}",
               "kind": "process",
+              "title": { "textKey": "processes.approvalFollowUp.title" },
               "name": "ApprovalFollowUp",
               "formatVersion": 1,
               "entity": "PurchaseRequest",
@@ -1039,6 +1040,7 @@ public sealed class ScenarioRunnerTests
             {
               "id": "{{Guid.NewGuid()}}",
               "kind": "process",
+              "title": { "textKey": "processes.approvalFollowUp.title" },
               "name": "FollowUpEcho",
               "formatVersion": 1,
               "entity": "PurchaseRequest",

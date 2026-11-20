@@ -2,6 +2,7 @@
   "id": "4c8e0a26-7f19-4b53-a2d4-6e1b3f5a7c16",
   "kind": "process",
   "name": "AdvanceTwice",
+  "title": { "textKey": "processes.advanceTwice.title" },
   "formatVersion": 1,
   "entity": "stages/Ticket",
   "start": "review",

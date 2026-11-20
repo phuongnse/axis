@@ -2,6 +2,7 @@
   "id": "aea7f9fa-d81a-419d-bb86-803b1f2a7d30",
   "kind": "process",
   "name": "Settle",
+  "title": { "textKey": "processes.settle.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "settle",

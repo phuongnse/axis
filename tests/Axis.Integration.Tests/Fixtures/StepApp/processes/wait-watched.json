@@ -2,6 +2,7 @@
   "id": "b9ba5aa1-be48-47d6-9e8c-ad5c37aa8bc2",
   "kind": "process",
   "name": "WaitWatched",
+  "title": { "textKey": "processes.waitWatched.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "await",

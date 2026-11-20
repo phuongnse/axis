@@ -24,6 +24,10 @@ public sealed class TriggerSkipLogTests(DataDatabaseFixture database) : IClassFi
         var name = $"App{Guid.NewGuid():N}";
         using var folder = new TemporaryFolder()
             .With("application.json", $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "application", "name": "{{name}}", "formatVersion": 1 }""")
+            .With("texts/en.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "processes.review.title": "Review an invoice" } }
+                """)
             .With("entities/invoice.json", $$"""
                 { "id": "{{Guid.NewGuid()}}", "kind": "entity", "name": "Invoice", "formatVersion": 1, "displayField": "title",
                   "fields": [
@@ -33,7 +37,7 @@ public sealed class TriggerSkipLogTests(DataDatabaseFixture database) : IClassFi
                   ] }
                 """)
             .With("processes/review.json", $$"""
-                { "id": "{{Guid.NewGuid()}}", "kind": "process", "name": "Review", "formatVersion": 1, "entity": "Invoice",
+                { "id": "{{Guid.NewGuid()}}", "kind": "process", "title": { "textKey": "processes.review.title" }, "name": "Review", "formatVersion": 1, "entity": "Invoice",
                   "start": "done",
                   "steps": [ { "name": "done", "type": "end" } ] }
                 """)

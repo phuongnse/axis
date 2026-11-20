@@ -2,6 +2,7 @@
   "id": "b9807fa4-262f-4ea7-8bcf-2782403da367",
   "kind": "process",
   "name": "PurchaseRequestApproval",
+  "title": { "textKey": "processes.purchaseRequestApproval.title" },
   "formatVersion": 1,
   "entity": "PurchaseRequest",
   "start": "submit",

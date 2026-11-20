@@ -5,6 +5,9 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.escalate.title": "Escalate a request",
+    "processes.publish.title": "Publish a request",
+    "processes.review.title": "Review a request",
     "role.employee": "Employee",
     "role.reportingSystem": "Reporting system"
   }

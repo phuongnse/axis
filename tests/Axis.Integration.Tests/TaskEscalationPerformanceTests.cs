@@ -29,6 +29,7 @@ public sealed class TaskEscalationPerformanceTests(ProcessStepFixture fixture) :
         {
           "id": "b6a1c7a0-5e0b-4d36-9a57-2d9f0c6f3e51",
           "kind": "process",
+          "title": { "textKey": "processes.escalateNotify.title" },
           "name": "EscalateAndNotify",
           "formatVersion": 1,
           "entity": "Request",

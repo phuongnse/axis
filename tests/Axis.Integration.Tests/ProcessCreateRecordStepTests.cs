@@ -46,6 +46,7 @@ public sealed class ProcessCreateRecordStepTests(ProcessStepFixture fixture) : I
         {
           "id": "b1d7f2a4-8c36-4e59-a0b1-3f6c9d2e7a03",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "LogNote",
           "formatVersion": 1,
           "entity": "Request",
@@ -68,6 +69,7 @@ public sealed class ProcessCreateRecordStepTests(ProcessStepFixture fixture) : I
         {
           "id": "c2e8a3b5-9d47-4f60-b1c2-4a7d0e3f8b04",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "LogBadNote",
           "formatVersion": 1,
           "entity": "Request",
@@ -90,6 +92,7 @@ public sealed class ProcessCreateRecordStepTests(ProcessStepFixture fixture) : I
         {
           "id": "d3f9b4c6-ae58-4071-82d3-5b8e1f4a9c05",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "NoteCreated",
           "formatVersion": 1,
           "entity": "RequestNote",

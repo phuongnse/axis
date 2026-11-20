@@ -2,6 +2,7 @@
   "id": "b3c9d5e2-7f41-4a06-8d1b-6e2f0c9a4837",
   "kind": "process",
   "name": "FollowNote",
+  "title": { "textKey": "processes.followNote.title" },
   "formatVersion": 1,
   "entity": "Note",
   "start": "done",

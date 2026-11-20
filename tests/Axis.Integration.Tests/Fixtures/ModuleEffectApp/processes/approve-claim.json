@@ -2,6 +2,7 @@
   "id": "0aa56761-e1b6-453d-9d9c-ef6a83f680e3",
   "kind": "process",
   "name": "ApproveClaim",
+  "title": { "textKey": "processes.approveClaim.title" },
   "formatVersion": 1,
   "entity": "ledgers/Claim",
   "start": "approve",

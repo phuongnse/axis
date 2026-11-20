@@ -2,6 +2,7 @@
   "id": "976190b7-3ec9-4258-a2d8-d0aa93cfc0a1",
   "kind": "process",
   "name": "ApproveAtOnce",
+  "title": { "textKey": "processes.approveAtOnce.title" },
   "formatVersion": 1,
   "entity": "signoffs/Request",
   "start": "approve",

@@ -2,6 +2,7 @@
   "id": "c3874eee-0051-4408-a7ed-7169827f1863",
   "kind": "process",
   "name": "FlagAfterApproval",
+  "title": { "textKey": "processes.flagAfterApproval.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "approve",

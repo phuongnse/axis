@@ -2,6 +2,7 @@
   "id": "c7e3a1d5-2b84-4f96-8a0d-1e5b9c3f7a05",
   "kind": "process",
   "name": "LogDeletion",
+  "title": { "textKey": "followups.processes.logDeletion.title" },
   "formatVersion": 1,
   "parameters": [{ "name": "title", "type": "text" }],
   "start": "log",

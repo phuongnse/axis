@@ -2,6 +2,7 @@
   "id": "421e6191-b8af-4480-af55-531a93ecd861",
   "kind": "process",
   "name": "FindShipment",
+  "title": { "textKey": "processes.findShipment.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "findShipment",

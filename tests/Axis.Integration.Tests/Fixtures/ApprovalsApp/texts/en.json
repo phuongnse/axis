@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.decideRequest.title": "Decide on a request",
     "role.admin": "Administrator",
     "role.employee": "Employee",
     "decide.main": "Request",

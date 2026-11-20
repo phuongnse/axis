@@ -2,6 +2,7 @@
   "id": "d889244a-2093-467d-8018-d0f6c115fbc5",
   "kind": "process",
   "name": "ReviewNote",
+  "title": { "textKey": "processes.reviewNote.title" },
   "formatVersion": 1,
   "entity": "Note",
   "start": "review",

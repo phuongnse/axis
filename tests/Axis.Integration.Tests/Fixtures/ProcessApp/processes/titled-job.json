@@ -2,6 +2,7 @@
   "id": "6e1d3a7c-92b4-4f58-a0c6-3b8f5d2e7a41",
   "kind": "process",
   "name": "TitledJob",
+  "title": { "textKey": "processes.titledJob.title" },
   "formatVersion": 1,
   "parameters": [{ "name": "title", "type": "text" }],
   "start": "done",

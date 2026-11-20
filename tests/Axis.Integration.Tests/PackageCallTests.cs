@@ -38,6 +38,7 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         {
           "id": "4b9d6e21-7c58-4a03-b1f4-8e2a5d70c963",
           "kind": "process",
+          "title": { "textKey": "processes.submit.title" },
           "name": "ToolsSum",
           "formatVersion": 1,
           "entity": "Request",

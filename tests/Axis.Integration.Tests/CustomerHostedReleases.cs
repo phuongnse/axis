@@ -60,6 +60,7 @@ internal sealed class CustomerHostedReleases
         {
           "id": "{{_toolsSumProcessId}}",
           "kind": "process",
+          "title": { "textKey": "processes.toolsSum.title" },
           "name": "ToolsSum",
           "formatVersion": 1,
           "parameters": [{ "name": "first", "type": "integer" }, { "name": "second", "type": "integer" }],
@@ -98,6 +99,7 @@ internal sealed class CustomerHostedReleases
         {
           "id": "{{_orderSumProcessId}}",
           "kind": "process",
+          "title": { "textKey": "processes.orderSum.title" },
           "name": "OrderSum",
           "formatVersion": 1,
           "entity": "Order",
@@ -113,6 +115,8 @@ internal sealed class CustomerHostedReleases
     public static Guid ProbeEntityId { get; } = Guid.Parse("7d2e4a60-9b13-4c85-a1f7-2e6c8b0d5f39");
 
     private static readonly Guid _probeCallProcessId = Guid.Parse("c8f0a2d4-6b31-4e97-8a52-1d9e3b7c5f60");
+
+    private static readonly Guid _textsId = Guid.Parse("7c3e9a1b-5d20-4f84-9b6a-2e8d1f0c4a57");
 
     private static readonly string _probeEntity =
         $$"""
@@ -134,6 +138,7 @@ internal sealed class CustomerHostedReleases
         {
           "id": "{{_probeCallProcessId}}",
           "kind": "process",
+          "title": { "textKey": "processes.probeCall.title" },
           "name": "ProbeCall",
           "formatVersion": 1,
           "entity": "Probe",
@@ -351,7 +356,11 @@ internal sealed class CustomerHostedReleases
         var application = $$"""
             { "id": "{{ApplicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1, "packages": {{packages}} }
             """;
-        var resources = new List<ResourceContent> { new("application.json", application) };
+        var texts = $$"""
+            { "id": "{{_textsId}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+              "texts": { "processes.orderSum.title": "Sum an order", "processes.probeCall.title": "Probe a call", "processes.toolsSum.title": "Sum two numbers" } }
+            """;
+        var resources = new List<ResourceContent> { new("application.json", application), new("texts/en.json", texts) };
         resources.AddRange(files.Select(file => new ResourceContent(file.Path, file.Content)));
         return resources;
     }

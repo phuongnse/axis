@@ -2,6 +2,7 @@
   "id": "7be822ff-ec76-47f5-be70-b2f23e9970f7",
   "kind": "process",
   "name": "NoteEntry",
+  "title": { "textKey": "ledgers.processes.noteEntry.title" },
   "formatVersion": 1,
   "entity": "Entry",
   "start": "note",

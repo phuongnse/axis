@@ -2,6 +2,7 @@
   "id": "3958099d-f0ea-4585-8318-7d452ba084d5",
   "kind": "process",
   "name": "Recheck",
+  "title": { "textKey": "processes.recheck.title" },
   "formatVersion": 1,
   "entity": "Ticket",
   "start": "done",

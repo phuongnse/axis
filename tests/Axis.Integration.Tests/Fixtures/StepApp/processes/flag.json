@@ -2,6 +2,7 @@
   "id": "9581def0-2719-44e3-99d4-2d62a5d54282",
   "kind": "process",
   "name": "Flag",
+  "title": { "textKey": "processes.flag.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "flag",

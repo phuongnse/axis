@@ -2,6 +2,7 @@
   "id": "e185c4c4-a04a-4d39-b72f-e4654a0f7ff6",
   "kind": "process",
   "name": "ReviewThenApprove",
+  "title": { "textKey": "processes.reviewThenApprove.title" },
   "formatVersion": 1,
   "entity": "signoffs/Request",
   "start": "review",

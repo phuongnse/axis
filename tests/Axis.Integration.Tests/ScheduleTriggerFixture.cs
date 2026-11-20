@@ -109,6 +109,7 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
                 {
                   "id": "4b8d2e6a-7c1f-4a93-8e05-1f6a3c9d7b52",
                   "kind": "process",
+                  "title": { "textKey": "processes.submit.title" },
                   "name": "Tally",
                   "formatVersion": 1,
                   "parameters": [{ "name": "days", "type": "integer" }, { "name": "since", "type": "date-time" }],

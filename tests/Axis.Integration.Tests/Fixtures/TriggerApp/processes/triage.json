@@ -2,6 +2,7 @@
   "id": "a53294bf-8e01-49a5-8628-e15db77a4a43",
   "kind": "process",
   "name": "Triage",
+  "title": { "textKey": "processes.triage.title" },
   "formatVersion": 1,
   "entity": "Ticket",
   "start": "triage",

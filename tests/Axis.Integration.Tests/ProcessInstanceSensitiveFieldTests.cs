@@ -134,6 +134,7 @@ public sealed class ProcessInstanceSensitiveFieldTests(TaskApiFixture fixture) :
         {
           "id": "9d2c4e6a-7b18-4f35-a0e1-3c5d7f9b1a28",
           "kind": "process",
+          "title": { "textKey": "processes.notifyByEmail.title" },
           "name": "MailContact",
           "formatVersion": 1,
           "entity": "Request",

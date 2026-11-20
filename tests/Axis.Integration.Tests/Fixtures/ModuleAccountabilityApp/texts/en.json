@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.approveAtOnce.title": "Approve a request at once",
+    "processes.reviewThenApprove.title": "Review, then approve",
     "role.employee": "Employee",
     "role.approver": "Approver",
     "request.main": "Request",

@@ -2,6 +2,7 @@
   "id": "acee8d1e-0a1e-48fd-a757-b0a3a8cdd2b9",
   "kind": "process",
   "name": "Approve",
+  "title": { "textKey": "processes.approve.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "approve",

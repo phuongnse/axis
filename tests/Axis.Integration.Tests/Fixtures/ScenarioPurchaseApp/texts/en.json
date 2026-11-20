@@ -5,6 +5,10 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.approvalFollowUp.title": "Follow up an approval",
+    "processes.coolDown.title": "Cool down",
+    "processes.countScheduleRuns.title": "Count schedule runs",
+    "processes.purchaseRequestApproval.title": "Approve a purchase request",
     "purchaseRequest.label": "Purchase request",
     "purchaseRequest.number": "Number",
     "purchaseRequest.title": "Title",
