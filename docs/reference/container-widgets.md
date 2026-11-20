@@ -43,7 +43,7 @@ section is a region named by its title. A `borderSubtle` rule sits above a secti
 same list, and none above the first.
 
 A section that is not `collapsed` always shows its widgets and has no fold. A section marked `collapsed` starts closed,
-and its fold sits before its title: an icon button drawn with `FoldIcon`, named "Show section {title}" or "Hide section
+and its fold sits before its title: an icon button drawn with `Chevron`, named "Show section {title}" or "Hide section
 {title}", with the texts `shell.section.show` and `shell.section.hide` ("Hiện phần {title}" and "Ẩn phần {title}" in
 Vietnamese). The button has `aria-expanded` and `aria-controls`. A closed section draws none of its widgets. The open
 state is not in the URL, so a reload resets it to the file's `collapsed` value.

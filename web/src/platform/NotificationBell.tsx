@@ -14,7 +14,7 @@ import {
   type NotificationItem,
   type NotificationPage,
 } from './notifications'
-import { markCurrentPage } from './pagination'
+import { paginationItems } from './pagination'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
@@ -178,7 +178,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
               total={data.totalCount}
               showSizeChanger={false}
               hideOnSinglePage
-              itemRender={markCurrentPage(data.page)}
+              itemRender={paginationItems(data.page)}
               onChange={(next) => void load(next)}
             />
           )}

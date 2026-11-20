@@ -17,7 +17,7 @@ import { AxisButton } from './AxisButton'
 import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
 import { nameCompare } from './listOrder'
-import { markCurrentPage } from './pagination'
+import { paginationItems } from './pagination'
 import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
 import { TableFilterButton, TableFilterChips, type FilterColumn } from './TableFilter'
 import { TableColumnsButton } from './TableColumns'
@@ -639,7 +639,7 @@ export function AxisTable<T extends object>({
                       total: paging.total,
                       showSizeChanger: picker,
                       hideOnSinglePage: !picker,
-                      itemRender: markCurrentPage(paging.current),
+                      itemRender: paginationItems(paging.current),
                       // A shared widget keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
                       style: { marginBottom: 0 },
                       showTotal: (all, [from, to]) =>

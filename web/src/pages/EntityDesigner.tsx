@@ -10,6 +10,7 @@ import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisFieldRow } from '../platform/AxisFieldRow'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { datePickerChevrons } from '../platform/datePickerChevrons'
 import { EmptyDash } from '../platform/EmptyValue'
 import { FilledText } from '../platform/FilledText'
 import { booleanText } from '../platform/formatValue'
@@ -1434,6 +1435,7 @@ function Limit({
   if (type === 'date') {
     return (
       <DatePicker
+        {...datePickerChevrons}
         id={id}
         aria-describedby={describedBy}
         value={typeof value === 'string' && dayjs(value).isValid() ? dayjs(value) : null}
@@ -1444,6 +1446,7 @@ function Limit({
   if (type === 'date-time') {
     return (
       <DatePicker
+        {...datePickerChevrons}
         id={id}
         aria-describedby={describedBy}
         showTime

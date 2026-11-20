@@ -1,7 +1,7 @@
 import { Flex, Typography } from 'antd'
 import { Children, createContext, isValidElement, useContext, useId, useState, type ReactNode } from 'react'
 import { AxisButton } from './AxisButton'
-import { FoldIcon } from './FoldIcon'
+import { Chevron } from './Chevron'
 import { useDesignTokens } from './themeMode'
 
 /** Whether the part that reads it draws a `borderSubtle` rule above itself. */
@@ -109,7 +109,7 @@ export function SectionPart({
               {/* Outside the heading, so the region's name from the heading holds no button name. */}
               <AxisButton
                 role="icon"
-                icon={<FoldIcon open={fold.open} />}
+                icon={<Chevron point={fold.open ? 'down' : 'right'} />}
                 nameKey={fold.open ? 'shell.section.hide' : 'shell.section.show'}
                 nameValues={{ title: fold.title }}
                 aria-expanded={fold.open}
