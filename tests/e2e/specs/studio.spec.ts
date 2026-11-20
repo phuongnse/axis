@@ -675,7 +675,7 @@ test.describe('Studio on a copy of its own', () => {
     await expect(panel.getByTestId('studio-step-3')).toBeVisible()
     await expect(page.getByTestId('studio-graph-node-3')).toHaveAttribute('aria-current', 'true')
 
-    await page.getByTestId('rf__edge-/steps/3/outcomes/0').click()
+    await page.getByTestId('rf__edge-/steps/3/outcomes/0').locator('.react-flow__edge-textwrapper').click()
     await expect(panel.getByTestId('studio-step-3')).toBeVisible()
     await expect(page.getByTestId('studio-graph-node-3')).toHaveAttribute('aria-current', 'true')
   })

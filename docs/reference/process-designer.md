@@ -24,7 +24,7 @@ panel, the Form tab or the JSON view redraws the graph at once.
   step `{i}`, so the Design tab shows it on return.
 - **Nested steps in the address.** _(planned for M38)_ A path under `/steps/{i}/branches/{j}/steps/{k}` or
   `/steps/{i}/steps/{k}` opens the Form tab and selects that nested step, as `/steps/{i}` selects a top-level step.
-- **Names.** Each node has a text label with the step's name and type.
+- **Names.** Each card is named by the step's name and type, as its visible type is an icon.
 - **No invented parts.** A transition to a step that does not exist draws no edge, and the graph never
   invents a node.
 
@@ -44,7 +44,7 @@ the blocks are in [process blocks](process-blocks.md).
 - **Nesting.** Frames nest. A block inside a lane or an area is drawn as a smaller frame inside it.
 - **Layout.** The graph's layout places the steps of each lane or area inside its frame, and no position is stored, as
   [the canvas](#canvas) says.
-- **Leaving a block.** A block's handle sits at the frame's bottom and sets its `next`, as the other steps'
+- **Leaving a block.** A block's handle sits on the frame's right edge and sets its `next`, as the other steps'
   handles do. No transition leaves a block, as [structure](process-blocks.md#structure) says.
 
 ## Loading and redraw
@@ -75,7 +75,7 @@ operation is missing from the palette.
 - **Package operation.** The entry adds an operation step with an empty `operation`, which the author
   types as `<package>/<operation>` in the panel, as the operation picker does.
 - **Dropping on the canvas** adds an unconnected step.
-- **Dropping on an edge** _(planned)_ inserts the step into that transition. The drop target is the middle of the
+- **Dropping on an edge** inserts the step into that transition. The drop target is the middle of the
   transition's route, a small area that takes no clicks, so clicking an edge still selects it. The transition names the new
   step, and the new step's `next` names the old target. A type with no `next`, such as `decision`, gets
   the old target as its `otherwise`. A `task` gets one outcome with an empty name and label whose `next`
@@ -100,7 +100,7 @@ operation is missing from the palette.
 
 ## Transitions
 
-Every step except an `end` step has a handle at its bottom edge, and dragging from it and dropping
+Every step except an `end` step has a handle on its card's right edge, and dragging from it and dropping
 anywhere on another step sets a transition. A step with one transition, such as an operation, sets its
 `next` at once. A step with several opens a small menu at the drop point: a decision lists its branches,
 `otherwise` and New branch, and a task lists its outcomes and New outcome. The handle has no keyboard
