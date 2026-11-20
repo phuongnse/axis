@@ -358,13 +358,13 @@ export function PackageRun({
             </div>
           )}
           {shown === 'json' && (
-            <div style={{ flex: '1 0 160px' }}>
+            <div style={{ flex: 'none' }}>
               <CodeEditor
                 label={t('shell.studio.package.run.inputJson')}
                 value={jsonText}
                 onChange={setJsonText}
                 language={jsonLanguage}
-                fill
+                grow
                 findTexts={{
                   field: t('shell.studio.package.findField'),
                   count: t('shell.studio.json.findCount'),
@@ -378,8 +378,9 @@ export function PackageRun({
       </div>
       <div
         data-testid="package-run-result"
-        style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}
+        style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}
       >
+        {/* One scroll for the whole pane, its output and its log, so the pane scrolls once from top to bottom. */}
         {run === null ? (
           <div style={{ padding: pad }}>
             <EmptyState text={t('shell.studio.package.run.none')} />
@@ -409,14 +410,14 @@ export function PackageRun({
               </div>
             ) : (
               run.output !== null && (
-                <div style={{ flex: 1, minHeight: 120 }} data-testid="package-run-output">
+                <div data-testid="package-run-output">
                   <CodeEditor
                     label={t('shell.studio.package.run.output')}
                     value={JSON.stringify(run.output, null, 2)}
                     onChange={() => {}}
                     readOnly
                     language={jsonLanguage}
-                    fill
+                    grow
                     findTexts={{
                       field: t('shell.studio.package.findField'),
                       count: t('shell.studio.json.findCount'),
@@ -427,17 +428,9 @@ export function PackageRun({
               )
             )}
             {output.length > 0 && (
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', borderTop: rule }}>
+              <div style={{ borderTop: rule }}>
                 <PaneHeader title={t('shell.studio.package.run.log')} height={rowHeight} />
-                <div
-                  style={{
-                    flex: 1,
-                    minHeight: 0,
-                    overflowY: 'auto',
-                    overscrollBehavior: 'contain',
-                    padding: pad,
-                  }}
-                >
+                <div style={{ padding: pad }}>
                   <CodeBlock text={output.join('\n')} plain wrap />
                 </div>
               </div>

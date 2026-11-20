@@ -48,6 +48,11 @@ export interface CodeEditorProps {
    * does, in place of filling the window down to the footer.
    */
   fill?: boolean
+  /**
+   * Proposed, see #3978: the editor is as tall as its text, with no scroll of its own, so the pane that holds it scrolls
+   * once from top to bottom, as a run's input and output do. One a person types in is at least `minHeight` tall.
+   */
+  grow?: boolean
   /** Called with the number of problems that the checks mark, each time it changes. */
   onProblems?: (count: number) => void
   /** Called with the number of steps that can be undone and redone, each time either changes. */
@@ -85,6 +90,7 @@ export default function CodeEditor({
   checks,
   readOnly = false,
   fill = false,
+  grow = false,
   boundary,
   findTexts,
   onProblems,
@@ -114,7 +120,7 @@ export default function CodeEditor({
     onProblems,
     onHistory,
     onCursor,
-    fill,
+    fill: fill || grow,
   })
 
   useEffect(() => {
@@ -129,7 +135,7 @@ export default function CodeEditor({
       onProblems,
       onHistory,
       onCursor,
-      fill,
+      fill: fill || grow,
     }
   })
 
@@ -175,7 +181,8 @@ export default function CodeEditor({
             ...searchKeymap.filter((binding) => binding.key !== 'Mod-Alt-g'),
           ]),
           themeCompartment.of(initial.theme),
-          // Proposed, see #3978: an editor that fills a workspace draws no border of its own, as the workspace's rules part it.
+          // Proposed, see #3978: an editor that fills or grows in a workspace draws no border of its own, as the workspace's
+          // rules part it.
           initial.fill
             ? Prec.highest(
                 EditorView.theme({
@@ -296,7 +303,7 @@ export default function CodeEditor({
   const gap = tokens.spacing.md
   const fit = () => {
     const host = hostRef.current
-    if (fill || !host || host.offsetParent === null) {
+    if (fill || grow || !host || host.offsetParent === null) {
       return
     }
     const rect = host.getBoundingClientRect()
@@ -330,7 +337,15 @@ export default function CodeEditor({
       <span ref={foldMark} hidden>
         <Chevron />
       </span>
-      <div ref={hostRef} style={{ height: fill ? '100%' : height }} />
+      {/* A growing editor drops the theme's fixed height and inner scroll, so its pane scrolls it with the rest. */}
+      {grow && (
+        <style>{`.axis-code-grow .cm-editor { height: auto !important; } .axis-code-grow:not(.axis-code-read) .cm-editor { min-height: ${minHeight}px; } .axis-code-grow .cm-scroller { overflow: visible !important; }`}</style>
+      )}
+      <div
+        ref={hostRef}
+        className={grow ? (readOnly ? 'axis-code-grow axis-code-read' : 'axis-code-grow') : undefined}
+        style={{ height: fill ? '100%' : grow ? undefined : height }}
+      />
     </>
   )
 }
