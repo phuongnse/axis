@@ -324,6 +324,12 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   for closes an issue of its own, with the `hand-made` label, and the follow-ups are *blocked by* that
   issue. A follow-up and a part of a split take their milestone by the same test, as
   [how issues run](#how-issues-run) says.
+- **An issue with an open pull request keeps its criteria.** NexKit's review checks the pull request
+  against the issue as it reads at each round, so a criterion added after the plan leaves the pull
+  request short on every round. New scope that comes up while the work runs is a follow-up, *blocked
+  by* the issue, as above. When the work in flight is wrong, comment `/nexkit plan` to plan the issue
+  again, as NexKit's [rules for changing a plan][nexkit-how] say. Fixing a word that misleads is not
+  new scope.
 
 ## The life of a milestone
 
