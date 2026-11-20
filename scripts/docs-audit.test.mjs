@@ -322,6 +322,15 @@ describe('readFindings', () => {
     withFile(undefined, (file) => assert.throws(() => readFindings(file), (e) => e.message.includes(file) && e.message.includes('no findings')))
   })
 
+  test('a cut-off file is refused with its name', () => {
+    withFile('[{"page": "docs/a.md"', (file) =>
+      assert.throws(
+        () => readFindings(file),
+        (e) => e.message.includes(file) && e.message.includes('not a JSON list'),
+      ),
+    )
+  })
+
   test('a file with a list is read as that list', () => {
     withFile('[]', (file) => assert.deepEqual(readFindings(file), []))
     const one = [finding('docs/a.md', 3, 'wrong')]

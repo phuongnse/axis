@@ -349,7 +349,11 @@ async function read(runNumber) {
 export function readFindings(file) {
   const text = existsSync(file) ? readFileSync(file, 'utf8').trim() : ''
   if (!text) throw new Error(`${file} holds no findings: the audit job passed none, so nothing is filed`)
-  return JSON.parse(text)
+  try {
+    return JSON.parse(text)
+  } catch (error) {
+    throw new Error(`${file} is not a JSON list of findings, so nothing is filed: ${error.message}`)
+  }
 }
 
 function file(findingsFile, runId) {

@@ -85,8 +85,24 @@ jobs:
         run: |
           printf '%s' "$LINKS" > artifacts/docs-audit/links.json
           node scripts/docs-audit.mjs homes artifacts/docs-audit/links.json > artifacts/docs-audit/homes.json
-      # The file job reads the findings and homes from this artifact. A job output would drop them whole
-      # when GitHub finds a secret's value in them.
+      # The file job opens public issues from this artifact, so no file of it may carry the Claude token
+      # (threat B6 in docs/reference/threat-model-build.md). A job output is not used: GitHub drops one whole
+      # when any registered mask matches a part of it, and on 2026-11-20 that dropped findings that held no
+      # token at all.
+      - name: Refuse a file that holds the Claude token
+        if: ${{ !cancelled() }}
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_FALLBACK_OAUTH_TOKEN }}
+        run: |
+          leaked=0
+          for f in artifacts/docs-audit/*; do
+            if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] && grep -qF -- "$CLAUDE_CODE_OAUTH_TOKEN" "$f"; then
+              rm -f "$f"
+              echo "::error::$f held the Claude token, so it was deleted and nothing is filed."
+              leaked=1
+            fi
+          done
+          exit "$leaked"
       - name: Upload the pages and findings
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
