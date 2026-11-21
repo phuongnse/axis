@@ -17,7 +17,7 @@ type Closing =
  * docs/reference/shell.md#layout. It is a titled panel that is not modal. A handle on its start edge, a `separator`
  * that takes the arrow keys, Home and End and a drag, sets its width from `sidePanel` to half the window, and the
  * browser keeps that width for every side panel, see `useSidePanelWidth`. A `status`, such as a `StatusTag`, shows
- * beside the title. The head stays in place, and the body, which holds `children`, scrolls on its own and keeps room
+ * beside the title, and a `line` shows under it in `textMuted`. The head stays in place, and the body, which holds `children`, scrolls on its own and keeps room
  * for its scrollbar. `testId` marks the panel. With `onClose` the panel has a close button named by `closeNameKey` and
  * marked by `closeTestId`, and it counts as opened by the person, so it shows over a panel with no close button.
  */
@@ -25,6 +25,7 @@ export function SidePanel({
   id,
   title,
   status,
+  line,
   testId,
   onClose,
   closeNameKey,
@@ -34,6 +35,7 @@ export function SidePanel({
   id: string
   title: string
   status?: ReactNode
+  line?: ReactNode
   testId: string
   children: ReactNode
 } & Closing) {
@@ -99,11 +101,14 @@ export function SidePanel({
           }}
         />
         <Flex justify="space-between" align="center" gap={spacing.sm} style={{ flex: 'none' }}>
-          <Flex align="center" gap={spacing.sm} style={{ minWidth: 0 }}>
-            <Typography.Title level={5} style={{ margin: 0 }}>
-              {title}
-            </Typography.Title>
-            {status}
+          <Flex vertical style={{ minWidth: 0 }}>
+            <Flex align="center" gap={spacing.sm}>
+              <Typography.Title level={5} style={{ margin: 0 }}>
+                {title}
+              </Typography.Title>
+              {status}
+            </Flex>
+            {line !== undefined && <span style={{ color: colour.textMuted }}>{line}</span>}
           </Flex>
           {onClose !== undefined && (
             <AxisButton

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { ShellAsideHost } from '../test/shellAsideHost'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { PlatformContext, type Platform } from './context'
@@ -100,9 +101,11 @@ function renderPage(search = '') {
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <MemoryRouter initialEntries={[`/console/instances/${instanceId}${search}`]}>
-            <Routes>
-              <Route path="console/instances/:id" element={<ConsoleInstancePage />} />
-            </Routes>
+            <ShellAsideHost>
+              <Routes>
+                <Route path="console/instances/:id" element={<ConsoleInstancePage />} />
+              </Routes>
+            </ShellAsideHost>
           </MemoryRouter>
         </TextProvider>
       </ThemeModeProvider>
@@ -136,6 +139,34 @@ describe('ConsoleInstancePage', () => {
     expect(within(screen.getByTestId('inspector-call-c-1')).getByText('Input: Hidden')).toBeVisible()
     expect(screen.queryByTestId('inspector-command-retry')).toBeNull()
     expect(screen.getByRole('link', { name: 'Operator console' })).toHaveAttribute('href', '/console')
+  })
+
+  it("opens a step's run in the side panel by the step's name, with the stored error and a sub-process that is not a link", async () => {
+    const child = {
+      id: '0192f4c0-1a2b-7c3d-8e4f-5a6b7c8d9e02',
+      process: 'ChildJob',
+      processTitleKey: 'processes.childJob.title',
+      step: 'managerApproval',
+      state: 'running',
+      createdAt: '2026-10-10T02:05:10.000000Z',
+      endedAt: null,
+    }
+    stubServer(
+      () =>
+        new Response(JSON.stringify({ ...detail, subProcesses: [child] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
+    renderPage('?step=managerApproval')
+
+    const panel = within(await screen.findByTestId('inspector-step-run'))
+    expect(panel.getByRole('heading', { name: 'managerApproval' })).toBeVisible()
+    expect(panel.getByText('Failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
+    expect(panel.getByText('ChildJob')).toBeVisible()
+    expect(panel.queryByRole('link', { name: 'ChildJob' })).toBeNull()
+    await userEvent.click(panel.getByRole('tab', { name: 'Error' }))
+    expect(panel.getByText('System.InvalidOperationException')).toBeVisible()
   })
 
   it('is headed by the name of its process, with its state as a tag and Process as its line', async () => {

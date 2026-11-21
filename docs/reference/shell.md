@@ -63,7 +63,7 @@ their own controls where they expect them.
   request panel, closes the other. It holds details or tools for what is chosen, while the page stays in use. A task
   to finish or cancel is a dialog, and what stands alone is a page. A handle on its edge, a `separator` that takes the
   arrow keys, Home and End, sets its width from `sidePanel` to half the shell, and the browser keeps that width, so
-  every side panel opens at the width last chosen. Its title can carry a `status`, such as a `StatusTag`. Its head
+  every side panel opens at the width last chosen. Its title can carry a `status`, such as a `StatusTag`, and a line under it. Its head
   stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
   a scrollbar comes. A panel with no close button, such as the process designer's step panel, gives way while a panel
   the person opened is open, and comes back when that one closes. The page keeps the browser's scroll.

@@ -166,6 +166,27 @@ describe('ProcessGraphControls', () => {
     expect(screen.queryByRole('button', { name: 'Go to the current step' })).not.toBeInTheDocument()
   })
 
+  it('chooses the current step when Go to the current step is clicked', async () => {
+    const onChoose = vi.fn()
+    const runStates = new Map<string, RunState>([['a', 'done']])
+    render(
+      <Providers>
+        <ProcessGraphCanvas
+          steps={steps}
+          transitions={transitions}
+          label="Process"
+          runStates={runStates}
+          current="b"
+          onChoose={onChoose}
+        />
+      </Providers>,
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Go to the current step' }, slow))
+
+    expect(onChoose).toHaveBeenCalledWith('b')
+  })
+
   it('opens an instance on the current step at zoom 1, and Show the whole process and Go to the current step move between the views', async () => {
     stubReducedMotion()
     const { container } = render(
