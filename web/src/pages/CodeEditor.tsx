@@ -12,7 +12,7 @@ import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state'
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
-import { selectedItemTint } from '../platform/antTheme'
+import { useSelectedItemTint } from '../platform/antTheme'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
@@ -105,7 +105,8 @@ export default function CodeEditor({
     readOnly: new Compartment(),
     phrases: new Compartment(),
   }))
-  const theme = editorTheme(tokens, mode)
+  const selectedTint = useSelectedItemTint()
+  const theme = editorTheme(tokens, mode, selectedTint)
   const phrases = useMemo(() => codePhrases(t), [t])
   const latest = useRef({ onChange, value, findTexts, theme, language, readOnly, phrases, lint, onProblems, onCursor })
 
@@ -275,7 +276,7 @@ function codePhrases(t: (key: string) => string) {
   })
 }
 
-const editorTheme = sharedTheme((tokens, mode) => {
+const editorTheme = sharedTheme((tokens, mode, selectedTint: string) => {
   const { colour, spacing, radius, type } = tokens
   return [
     codeEditorTheme(tokens, mode),
@@ -321,7 +322,7 @@ const editorTheme = sharedTheme((tokens, mode) => {
       '.cm-findBar input:focus': { outline: `2px solid ${colour.focusRing}` },
       '.cm-findCount': { color: colour.textMuted },
       '.cm-searchMatch': { backgroundColor: 'transparent', outline: `1px solid ${colour.border}` },
-      '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: selectedItemTint(mode) },
+      '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: selectedTint },
     }),
   ]
 })

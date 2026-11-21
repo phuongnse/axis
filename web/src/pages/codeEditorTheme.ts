@@ -20,18 +20,22 @@ export function codeHighlightStyle(colour: DesignTokens['colour']): HighlightSty
 }
 
 /**
- * Builds a theme once for a set of tokens and a mode, so every editor shares it. Each theme adds its style rules to the
- * page, and the more rules there are, the slower every style lookup is.
+ * Builds a theme once for a set of tokens, a mode and any extra keys, so every editor shares it. An extra key, such as
+ * the selected tint of the theme in use, builds one more theme. Each theme adds its style rules to the page, and the
+ * more rules there are, the slower every style lookup is.
  */
-export function sharedTheme(build: (tokens: DesignTokens, mode: ThemeMode) => Extension) {
-  const built = new WeakMap<DesignTokens, Map<ThemeMode, Extension>>()
-  return (tokens: DesignTokens, mode: ThemeMode): Extension => {
-    const modes = built.get(tokens) ?? new Map<ThemeMode, Extension>()
-    built.set(tokens, modes)
-    let theme = modes.get(mode)
+export function sharedTheme<Keys extends string[] = []>(
+  build: (tokens: DesignTokens, mode: ThemeMode, ...keys: Keys) => Extension,
+) {
+  const built = new WeakMap<DesignTokens, Map<string, Extension>>()
+  return (tokens: DesignTokens, mode: ThemeMode, ...keys: Keys): Extension => {
+    const themes = built.get(tokens) ?? new Map<string, Extension>()
+    built.set(tokens, themes)
+    const key = [mode, ...keys].join(' ')
+    let theme = themes.get(key)
     if (!theme) {
-      theme = build(tokens, mode)
-      modes.set(mode, theme)
+      theme = build(tokens, mode, ...keys)
+      themes.set(key, theme)
     }
     return theme
   }
