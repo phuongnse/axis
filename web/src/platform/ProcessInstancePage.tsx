@@ -24,7 +24,7 @@ import {
 } from './inspection'
 import { InstanceHistory } from './InstanceHistory'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
-import { PageActions, PageLayout, type BreadcrumbStep } from './PageLayout'
+import { PageActions, PageLayout } from './PageLayout'
 import { PersonName } from './PersonName'
 import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
@@ -171,8 +171,8 @@ interface InstanceLayoutProps {
   instance?: InstanceDetail
   /** The page's title, which heads the page without an instance. */
   title: string
-  /** The steps above the heading, for a page that is in a site's navigation or the operator console. */
-  breadcrumb?: readonly BreadcrumbStep[]
+  /** Draws the heading in a band, for the operator console's page. */
+  band?: boolean
   children?: ReactNode
 }
 
@@ -181,14 +181,14 @@ interface InstanceLayoutProps {
  * docs/reference/process-inspector-widget.md#instance-page: the process's title, its state as a tag beside it, and
  * Process as its line. Without an instance the heading is the given title, with no tag.
  */
-export function InstanceLayout({ instance, title, breadcrumb, children }: InstanceLayoutProps) {
+export function InstanceLayout({ instance, title, band, children }: InstanceLayoutProps) {
   const t = useText()
   return (
     <PageLayout
       title={instance ? processTitle(t, instance.processTitleKey, instance.process) : title}
       tags={instance && <StatusTag tone={stateTone(instance.state)}>{stateText(t, instance.state)}</StatusTag>}
       line={t('shell.inspector.process')}
-      breadcrumb={breadcrumb}
+      band={band}
     >
       {children}
     </PageLayout>

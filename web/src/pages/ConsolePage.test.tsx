@@ -13,6 +13,7 @@ import type {
 } from '../platform/console'
 import { TextProvider } from '../platform/TextProvider'
 import { optionTexts } from '../test/antd'
+import { expectTitleAloneInBand } from '../test/pageBand'
 import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { PlatformContext, type Platform } from './context'
 import { ConsolePage } from './ConsolePage'
@@ -245,6 +246,15 @@ function failedWorkRequests(fetchMock: ReturnType<typeof stubServer>) {
 }
 
 describe('ConsolePage', () => {
+  it('holds the title alone in the band', async () => {
+    stubServer(tenantAndFailedWork)
+    renderPage()
+
+    await screen.findByTestId('console-tenant')
+
+    expectTitleAloneInBand('Operator console')
+  })
+
   it('shows the status and each application with its active release', async () => {
     const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
     renderPage()

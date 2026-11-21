@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { expectTitleAloneInBand } from '../test/pageBand'
 import { ShellAsideHost } from '../test/shellAsideHost'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
@@ -119,6 +120,17 @@ afterEach(() => {
 })
 
 describe('ConsoleInstancePage', () => {
+  it('holds the process title alone in the band', async () => {
+    stubServer(
+      () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1, name: 'PurchaseRequestApproval' })
+
+    expectTitleAloneInBand('PurchaseRequestApproval')
+  })
+
   it('draws the steps by name with the failed step current, and the stored error in the banner and not in History', async () => {
     const fetchMock = stubServer(
       () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
@@ -141,7 +153,6 @@ describe('ConsoleInstancePage', () => {
     expect(history.queryByText('Input: Hidden')).toBeNull()
     expect(within(screen.getByTestId('inspector-failure')).getByText(/System.InvalidOperationException/)).toBeVisible()
     expect(screen.queryByTestId('inspector-command-retry')).toBeNull()
-    expect(screen.getByRole('link', { name: 'Operator console' })).toHaveAttribute('href', '/console')
   })
 
   it("opens a step's run in the side panel by the step's name, with the stored error and a sub-process that is not a link", async () => {

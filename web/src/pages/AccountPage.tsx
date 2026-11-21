@@ -116,10 +116,7 @@ export function AccountPage() {
   const time = (value: string) => new Date(value).toLocaleString(locale)
 
   return (
-    <PageLayout
-      title={t('shell.account.title')}
-      breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.account.title') }]}
-    >
+    <PageLayout title={t('shell.account.title')} band>
       <Tabs
         defaultActiveKey="security"
         items={[

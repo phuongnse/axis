@@ -166,6 +166,14 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
         name: "Tasks: In the application",
         exact: true,
       }),
+    "Users page": (state) =>
+      state.getByRole("link", { name: "Priya Raman", exact: true }),
+    "User page": (state) =>
+      state.getByRole("heading", {
+        name: "Priya Raman",
+        exact: true,
+        level: 1,
+      }),
   },
   signIn: {
     "Sign-in refused": (state) => state.getByTestId("sign-in-failed"),
@@ -729,9 +737,6 @@ for (const mode of modes) {
     await expect(
       formPage.getByRole("link", { name: "Requests", exact: true }),
     ).toHaveAttribute("aria-current", "page");
-    await expect(
-      formPage.getByRole("navigation", { name: "Breadcrumb", exact: true }),
-    ).toHaveCount(0);
     expect(recording.errors).toEqual([]);
   });
 }
@@ -972,6 +977,14 @@ test("a framed studio state fills the window, never less than its height, and fo
   const frame = state.locator(":scope > div");
   const screen = state.locator(":scope > div > :first-child");
   await expect(screen).toBeVisible();
+  // Studio loads in a chunk of its own, so the entity is drawn after the frame is.
+  await expect(
+    state.getByRole("heading", {
+      name: "Purchase request",
+      exact: true,
+      level: 1,
+    }),
+  ).toBeVisible();
 
   // The space under the frame, less the canvas's padding, which the figure's parent draws. It is 0 when the frame
   // reaches the canvas's padding from the window's bottom edge.

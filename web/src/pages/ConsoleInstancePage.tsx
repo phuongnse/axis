@@ -45,15 +45,7 @@ export function ConsoleInstancePage() {
   }, [load])
 
   return (
-    <InstanceLayout
-      instance={typeof instance === 'object' && instance !== null ? instance : undefined}
-      title={id}
-      breadcrumb={[
-        { label: t(platform.site.titleKey), to: '/' },
-        { label: t('shell.console.title'), to: '/console' },
-        { label: id },
-      ]}
-    >
+    <InstanceLayout instance={typeof instance === 'object' && instance !== null ? instance : undefined} title={id} band>
       {instance === forbidden && (
         <div data-testid="console-forbidden">
           <Result status="403" title={t('shell.console.forbidden')} />

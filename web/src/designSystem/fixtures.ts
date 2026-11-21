@@ -47,6 +47,7 @@ import type {
   UpdateProfileContext,
   UpdateProfileTexts,
 } from '../identitySignIn/signInContext'
+import type { UserList, UserRoles } from '../platform/users'
 import type { FixtureRoute } from './fixtureFetch'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
@@ -77,6 +78,8 @@ export const requestId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
 export const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 /** The id of the saved request that the `shell` preview opens, whose Urgent box is not checked. */
 export const shellRequestId = '9d4f5a6b-7c81-4d93-a4b5-c6d7e8f90a1b'
+/** The first person of the users page, whose page the `shell` preview opens. */
+export const shellUserId = 'b5e6f708-1c2d-4e3f-8a4b-5c6d7e8f9a0b'
 /** A well-formed request id that no record has, which the fixtures answer `404` for. */
 export const missingRequestId = 'c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f'
 /** The first task of the inbox, which the `shell` preview opens. */
@@ -1230,6 +1233,51 @@ const ownSessions: OwnSessions = {
   ],
 }
 
+const shellUsers: UserList = {
+  page: 1,
+  pageSize: 20,
+  totalCount: 3,
+  items: [
+    {
+      id: shellUserId,
+      displayName: 'Priya Raman',
+      email: 'priya.raman@example.com',
+      provider: null,
+      status: 'active',
+      lastSignedInAt: '2026-11-19T07:45:00Z',
+    },
+    {
+      id: 'c6f70819-2d3e-4f40-9b5c-6d7e8f9a0b1c',
+      displayName: 'Tomas Berg',
+      email: 'tomas.berg@example.com',
+      provider: 'google',
+      status: 'active',
+      lastSignedInAt: '2026-11-18T16:20:00Z',
+    },
+    {
+      id: 'd708192a-3e4f-4051-8c6d-7e8f9a0b1c2d',
+      displayName: 'Lena Fischer',
+      email: 'lena.fischer@example.com',
+      provider: null,
+      status: 'invited',
+      lastSignedInAt: null,
+    },
+  ],
+}
+
+const shellApplicationId = '5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c01'
+
+const shellUserRoles: UserRoles = {
+  displayName: 'Priya Raman',
+  email: 'priya.raman@example.com',
+  given: [
+    { applicationId: shellApplicationId, role: 'buyer', declared: true },
+    { applicationId: null, role: 'author', declared: true },
+  ],
+  applications: [{ id: shellApplicationId, name: 'Purchase requests', roles: ['approver', 'buyer'] }],
+  platformRoles: ['author', 'publisher', 'developer', 'operator', 'administrator'],
+}
+
 // Process has the daily digest on, so the hour shows. Authoring requests have no email.
 const ownNotificationPreferences: OwnNotificationPreferences = {
   sources: {
@@ -1715,6 +1763,8 @@ export const fixtureScopes = [
   '/api/me',
   '/api/about',
   '/api/notifications',
+  '/api/users',
+  '/api/tenant/',
 ] as const
 
 /** A person's table choices when nothing is kept. */
@@ -1777,6 +1827,15 @@ export const routes: Record<string, FixtureRoute> = {
   // A save is a PUT, which the page answers with its status alone, so 204 is enough.
   '/api/me/notification-preferences': (init) =>
     init?.method === 'PUT' ? new Response(null, { status: 204 }) : ownNotificationPreferences,
+  '/api/me/tables/users': () => noTableChoices,
+  '/api/users': () => shellUsers,
+  [`/api/users/${shellUserId}/roles`]: () => shellUserRoles,
+  // The users page's tenant sections answer 404, so it shows only its people.
+  '/api/tenant/outside-clients': () => new Response(null, { status: 404 }),
+  '/api/tenant/usage': () => new Response(null, { status: 404 }),
+  '/api/tenant/hosts': () => new Response(null, { status: 404 }),
+  '/api/tenant/model-key': () => new Response(null, { status: 404 }),
+  '/api/tenant/application-packages': () => new Response(null, { status: 404 }),
   '/api/about': () => ({ version: '0.1.0' }),
   '/api/notifications': () => tenantNoticePage,
 }
