@@ -217,14 +217,16 @@ const HelpedInput = forwardRef(function HelpedInput(
   return (
     <>
       {help !== '' && (
-        // The label has 8px of padding below it, so this pulls the help 4px under it.
+        // The label has 8px of padding below it, so this pulls the help 2px under it. The help's small lower-case
+        // letters start lower in their line than the label's end in theirs, so 2px looks as far as the space between
+        // the help and the input, see #3264.
         <div
           id={helpId}
           style={{
             fontSize: 12,
             lineHeight: '20px',
             color: colour.textMuted,
-            marginTop: -4,
+            marginTop: -6,
             marginBottom: spacing.xs,
           }}
         >
