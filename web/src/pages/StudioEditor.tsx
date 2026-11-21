@@ -1,5 +1,5 @@
 import { AlignLeftOutlined, CopyOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Flex, message, Modal, Tabs } from 'antd'
+import { ConfigProvider, Flex, message, Modal, Tabs } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import {
   lazy,
@@ -1328,8 +1328,11 @@ export function StudioEditor({
                 data-testid="studio-conflict"
                 kind="warning"
                 message={t('shell.studio.conflict')}
-                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
+                action={
+                  <AxisButton role="secondary" onClick={reload}>
+                    {t('shell.studio.reload')}
+                  </AxisButton>
+                }
               />
             )}
             {saveError !== null && <AxisAlert data-testid="studio-save-error" kind="error" message={saveError} />}
