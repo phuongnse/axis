@@ -214,6 +214,15 @@ directory. The server listens on https at `AXIS_E2E_TENANT_HTTPS_PORT`, with a c
 on the tenant host with no port in the address. No redirect address is added by hand: only
 `tenant create` writes them.
 
+**The new package spec** creates the tenant `packages-made` and serves it from a directory server on the port offset
+11, with a temporary `Studio:ApplicationsPath`. The developer creates a TypeScript package and a Python package,
+`checks`, and adds a test file to it. The build and the test run of the Python package need a package host and a
+publisher that the shared stack does not start, so the spec starts its own. The package host is `Axis.PackageHost host`
+on a spare loopback port, started by `tests/e2e/package-host.ts`. Its `PackageBuild:Trivy` is a stub that reports no
+findings, as the integration tests' `StubTrivy` does. The publisher comes from `startSpecPublisher`, with application
+packages on and `Extensions:Runners:Application` set to that host. It runs alone under the publishers' lock. The spec
+stops the publisher and the package host when the build and the test run end.
+
 **The Ask AI agent spec** plans a request for real. It runs `tenant create` for `ask-ai-agent`, on the host
 `ask-ai-agent.eval.localhost`, and gives an author of that realm the author role and the agent client's roles mapper. Its
 server starts on offset 9, from the directory, with Ask AI on through the scripted binding. The spec makes its own
