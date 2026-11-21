@@ -12,7 +12,7 @@ sign-in. Every other request goes to the page's own fetch, unchanged.
 
 `scripts/design-system.sh` builds the bundle into `artifacts/design-system/axis-design-system.js` and
 checks it with `scripts/check-design-system.mjs`: one classic script, no `import`, no literal
-`</script` or `<!--`, at most 6 MB, and no HTML file in the folder. It needs no Playwright browser and
+`</script` or `<!--`, no font, at most 6 MB, and no HTML file in the folder. It needs no Playwright browser and
 is not a NexKit check. The local agent session publishes the bundle as the Design System artifact.
 The bundle carries its own React and never uses one that the page provides, because React 19 ships no
 UMD build.
@@ -52,6 +52,8 @@ UMD build.
   preview, and `?preview=<name>&mode=light|dark` mounts one preview in that mode.
   `&state=<slug>` opens a preview that shows one state at a time on that state, the caption in kebab
   case, such as `?preview=studio&state=access-denied`. With no `state`, it opens on the first state.
+  The dev server also loads the app's fonts, `web/src/fonts.css`, so its previews show IBM Plex Sans. Opened
+  from disk, the harness shows the reviewer's system font, because the bundle carries no fonts.
 
 ## The cards
 
