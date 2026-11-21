@@ -77,7 +77,8 @@ application up in Studio. They need:
 - **Vietnamese and English.**
 - **Axis as a service that an operator runs**, with nothing to install.
 - **Sign-up and a trial** _(planned for M33)_, so they try Axis before they pay.
-- **Paying online** _(planned for M34)_.
+- **A plan from the operator's billing system** _(planned for M34)_. The operator's own system takes
+  the payments, and Axis keeps the plans as sets of quotas and the subscription's clock.
 - **Their data kept safe** as Vietnam's personal data rules ask.
 
 What sets Axis apart for them is that they change a standard process anywhere, keep its upgrades,
@@ -96,7 +97,9 @@ The reasons are in [D166](decisions/d166-axis-is-designed-for-small-businesses-f
 ## Ways to run Axis
 
 The same software runs in three ways. An **operator** is a hosting company or an organization's IT team
-that runs Axis as a SaaS for its own customers, with its own plans, prices and payments.
+that runs Axis as a SaaS for its own customers. The operator's own billing system holds its prices,
+invoices and payments, and Axis keeps the plans as sets of quotas, the subscription's clock and a
+billing API for that system.
 
 - **SaaS, shared**. Many customers share a cell, which is one full installation of
   Axis in a region that the operator runs. Each tenant, one of the operator's customers with its own
@@ -107,7 +110,7 @@ that runs Axis as a SaaS for its own customers, with its own plans, prices and p
 - **Self-hosted.** The customer installs Axis on premises or in its own cloud, see
   [installation](reference/installation.md). This serves large organizations, banks and government.
 
-The reasons are in [D167](decisions/d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md).
+The reasons are in [D168](decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md).
 
 ## Who uses it
 

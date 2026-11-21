@@ -1,11 +1,11 @@
 # Control plane
 
-The control plane is the service that runs the operator's business around the [cells](cells.md):
-sign-up, trials, plans, payments and invoices. This page covers what the service is, how it reaches
+The control plane is the service that runs the operator's side of Axis SaaS around the [cells](cells.md):
+sign-up, trials, subscriptions and plans. The operator's own billing system holds prices, invoices and
+payments. This page covers what the service is, how it reaches
 the cells, the work it runs, its operators and settings, its image and chart, and its health. The
-business it runs is on the pages of [sign-up](sign-up.md), [subscriptions](subscriptions.md),
-[plans](plans.md), [payments](payments.md), [e-invoices](e-invoices.md) and the
-[billing portal](billing-portal.md).
+work it runs is on the pages of [sign-up](sign-up.md), [subscriptions](subscriptions.md) and
+[plans](plans.md).
 
 ## What it is
 
@@ -17,7 +17,7 @@ through a cell's API.
   real PostgreSQL through Testcontainers for its storage, and Playwright for its pages.
 - **Apart from the cells.** It runs on a small Kubernetes cluster of its own, with its own managed
   PostgreSQL, in the region it serves. It is never deployed in a cell, and a cell never calls it. So
-  a failing cell never stops sign-up or billing, and billing code never runs beside a customer's data.
+  a failing cell never stops sign-up or the subscription's clock, and its code never runs beside a customer's data.
 - **No engine.** It holds no application, process or record of a customer. It reaches a tenant only
   through the cell's [provisioning API](tenant-lifecycle.md#provisioning-api).
 - **Its own Helm chart and image.** `deploy/helm/axis-controlplane` and the image
@@ -34,10 +34,10 @@ personal data stays in its region.
 | Part | Where it runs | What it holds |
 | --- | --- | --- |
 | The [region directory](region-directory.md) | One instance for all regions | Which cell holds each tenant and host. No personal data. |
-| The regional control plane | One instance in each region, with its data in that region | Sign-up, [billing portal](billing-portal.md) accounts, [subscriptions](subscriptions.md), [plans](plans.md), [payments](payments.md), [e-invoices](e-invoices.md), terms acceptances, and the emails it sends |
+| The regional control plane | One instance in each region, with its data in that region | Sign-up, [subscriptions](subscriptions.md), [plans](plans.md), terms acceptances, and the emails it sends |
 
-- **Data stays in its region.** A person who signs up in `vn` gives their name, email and billing
-  details to the `vn` control plane, and nothing of it leaves the region. The directory holds tenant
+- **Data stays in its region.** A person who signs up in `vn` gives their name and email
+  to the `vn` control plane, and nothing of it leaves the region. The directory holds tenant
   ids, hosts and cell ids only.
 - **Where the directory runs.** Beside the first region's control plane, in its own database. It
   holds no personal data, so its place does not change where customer data is kept.
@@ -92,8 +92,8 @@ over a private network with mutual TLS.
 The control plane runs its work as durable jobs in its own database, sends its own emails, and audits
 every business change.
 
-- **Durable jobs.** Provisioning a tenant, the subscription clock, emails, invoice issuing and the
-  daily reconciliation run as jobs in the control plane's database, on the queue below, which follows
+- **Durable jobs.** Provisioning a tenant, the subscription clock and emails
+  run as jobs in the control plane's database, on the queue below, which follows
   the [publisher](publisher.md#publisher) in claiming with a lease.
   - **The `control_plane.jobs` table.** `id`, `kind`, `payload` (JSON), `state` (`queued`,
     `running`, `succeeded` or `failed`), `attempts`, `next_attempt_at`, `lease_owner`,
@@ -165,7 +165,7 @@ every business change.
     `ControlPlane:MailFrom`. A job that runs twice after a crash sends the same message twice, and the
     receiver can drop the copy.
 - **Audit.** Every change to a subscription, a payment, an invoice or an account writes an
-  append-only audit record with its actor: a person of the [billing portal](billing-portal.md), a
+  append-only audit record with its actor: a person who signs up, a
   provider's webhook, a job, or an operator.
   - **The `control_plane.audit_records` table.** `id`, `occurred_at`, `actor_kind` (`account`,
     `webhook`, `job` or `operator`), `actor`, `action` and `subject`. The database rejects every
@@ -214,9 +214,6 @@ The platform operator, who runs the cells, runs the control plane too, from the 
 - **`--operator` is required.** A change command names the operator who runs it, and a missing or
   blank name is a usage error. The audit record of the change has the actor kind `operator` and
   that name as its actor. Every change command commits the change and its audit record in one transaction.
-- **Billing commands** _(planned for M34)_. `Axis.ControlPlane.Admin` also records a bank transfer
-  that arrived without a payment link, issues a refund and adjusts an e-invoice. Each writes an audit
-  record.
 - **No web page.** The operator works through these commands, and the control plane has no operator
   web page.
 
@@ -249,8 +246,6 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   `/run/secrets/ControlPlane__PayOs__ChecksumKey`. The PayOS keys come only from these files, and no log
   line or error message holds one.
 - **Plans.** `ControlPlane:` settings also hold the [plans](plans.md#the-catalogue).
-- **Providers** _(planned for M34)_. `ControlPlane:` settings also hold the Paddle and e-invoice
-  providers' non-secret values.
 
 | Setting | Meaning | Start check |
 | --- | --- | --- |

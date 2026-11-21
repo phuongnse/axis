@@ -668,7 +668,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Tell tenants about maintenance ahead of time | _(planned for M57)_ |
 | Quotas for each tenant | [Quotas](reference/tenant-quotas.md#quotas) |
 | Usage measured for each tenant | [Usage](reference/tenant-quotas.md#usage) |
-| Plans, payment and invoices | _(planned for M34)_ |
+| Plans as sets of quotas, and a billing API for the operator's billing system | _(planned for M34)_ |
 | Images and dependencies scanned for vulnerabilities | [Scans](development.md#scans) |
 | Signed images, each with a bill of materials | _(planned for M32)_ |
 | A hardening checklist for the operator | _(planned for M32)_ |

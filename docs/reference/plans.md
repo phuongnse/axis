@@ -110,29 +110,21 @@ The control plane turns a subscription's plan and add-ons into the tenant's quot
 
 _(planned for M34)_
 
-An add-on lets a business buy more users without moving to the next plan.
+An add-on lets a business have more users without moving to the next plan.
 
-- **User packs.** An add-on adds a fixed number of users, such as 10, at the add-on's price. A
-  business with a few more people than its plan buys a pack instead of the next plan.
-- **Buying.** The owner or a billing contact adds a pack in the [billing portal](billing-portal.md).
-  It applies at once, and its price for the rest of the period is charged at once, prorated.
-- **Dropping.** A pack is dropped at the period's end. Dropping one that would leave more enabled
-  users than the new number is refused, naming how many users to disable first.
+- **User packs.** An add-on adds a fixed number of users, such as 10. A business with a few more
+  people than its plan takes a pack instead of the next plan.
+- **Adding and dropping.** The operator's billing system adds or drops a pack of a tenant. Dropping one
+  that would leave more enabled users than the new number is refused, naming how many users to disable
+  first.
 
 ## Changing a plan
 
 _(planned for M34)_
 
-A larger plan applies at once, with the rest of the period prorated, and a smaller one applies at the
-period's end.
+The operator's billing system changes a tenant's plan, and Axis refuses a smaller plan that the
+tenant's use does not fit.
 
-- **Upgrade at once.** A larger plan applies at once. The unused part of the current period is
-  credited, and the new plan's price for the rest of the period is charged, both by the days left.
-  The charge is invoiced at once, see [payments](payments.md).
-- **Downgrade at the period's end.** A smaller plan applies when the period ends. It is refused when
-  the tenant's use is over one of the smaller plan's quotas, such as more users or storage, and the
-  refusal names each quota and the amount over. At the period's end the check runs again. If the use
-  is over then, the change waits one more period, and the owner gets an email.
-- **Switching period.** Monthly to yearly applies at once, as an upgrade. Yearly to monthly applies
-  at the end of the year.
-- **Proration.** By whole days, rounded down in the customer's favour, in minor units.
+- **A larger plan** applies at once, and the control plane writes its quotas to the cell.
+- **A smaller plan** is refused when the tenant's use is over one of the smaller plan's quotas, such as
+  more users or storage. The refusal names each quota and the amount over.

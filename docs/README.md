@@ -197,7 +197,7 @@ Read by people who install, run, observe or operate Axis.
 
 ### Axis SaaS
 
-Read by people who run or change the hosted service: cells, tenants, sign-up and billing.
+Read by people who run or change the hosted service: cells, tenants, sign-up, plans and subscriptions.
 
 | Doc                                                         | What it holds                                                                                               | Read it when                                                             |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -206,14 +206,12 @@ Read by people who run or change the hosted service: cells, tenants, sign-up and
 | [Worker scheduling](reference/worker-scheduling.md)         | How the worker shares its time between tenants, and wakes an idle tenant                                    | You change how the worker shares time between tenants                    |
 | [Tenant lifecycle in a cell](reference/tenant-lifecycle.md) | The cell's provisioning API: create a tenant, hosts, the export ZIP, deletion                               | You change the cell's provisioning API                                   |
 | [Cell console](reference/cell-console.md)                   | The page where the platform operator sees and provisions every tenant of a cell, and its operator realm     | You change the cell console or its operator realm                        |
-| [Control plane](reference/control-plane.md)                 | The service apart from the cells that runs sign-up, trials, plans and billing, and how it reaches the cells | You change the service that runs sign-up, plans and billing              |
+| [Control plane](reference/control-plane.md)                 | The service apart from the cells that runs sign-up, trials, subscriptions and plans, and how it reaches the cells | You change the service that runs sign-up, subscriptions and plans        |
 | [Region directory](reference/region-directory.md)           | Which cell holds each tenant and host, picking a cell, DNS routing and reserved names                       | You change how a tenant or host is routed to a cell                      |
 | [Sign-up](reference/sign-up.md)                             | The public sign-up page, the subdomain, bot checks, email verification, provisioning and terms acceptance   | You change the public sign-up page or its checks                         |
-| [Subscriptions](reference/subscriptions.md)                 | A tenant's trial and paid states, the read-only tenant, the dunning timeline and the control plane's emails | You change trial, paid or read-only states or dunning emails             |
+| [Subscriptions](reference/subscriptions.md)                 | A tenant's trial and paid-through states, the read-only tenant, the timeline and the control plane's emails | You change trial, paid-through or read-only states or their emails       |
 | [Plans](reference/plans.md)                                 | The plan catalogue, versions, quotas from a plan, user packs and changing a plan                            | You change the plan catalogue or a plan's quotas                         |
 | [Payments](reference/payments.md)                           | Billing invoices, PayOS and VietQR, Paddle, webhooks, the daily reconciliation and the ledger               | You change invoices, payment providers, webhooks or the ledger           |
-| [E-invoices](reference/e-invoices.md)                       | Vietnamese e-invoices issued on payment through a provider adapter                                          | You change how e-invoices are issued on payment                          |
-| [Billing portal](reference/billing-portal.md)               | The portal where a tenant's owner and billing contacts choose a plan, pay and get invoices                  | You change what the billing portal lets a tenant do                      |
 
 ### Security
 
@@ -240,7 +238,7 @@ Read by people who change sign-in, authorization, keys, headers or the threat mo
 | [Threat model: collaboration](reference/threat-model-product-collaboration.md)                            | The threats to tasks handed between people, absences, deciding several tasks, comments, live pages and notification preferences _(planned for M43)_                                               | You assess a threat to a task, an absence or deciding several tasks |
 | [Threat model: the installation](reference/threat-model-installation.md)                                  | The images, hosts, databases, backups, secrets and the cell console threats of an install                                                         | You assess a threat to an installation                              |
 | [Threat model: the way Axis is built](reference/threat-model-build.md)                                    | The NexKit, CI and AI agent threats of how Axis is built                                                                                          | You assess a threat to how Axis is built                            |
-| [Threat model: the control plane](reference/threat-model-control-plane.md)                                | The sign-up, cell call, DNS, payment webhook, e-invoice and billing portal threats of Axis SaaS                                                   | You assess a threat to the control plane of Axis SaaS               |
+| [Threat model: the control plane](reference/threat-model-control-plane.md)                                | The sign-up, cell call, DNS and payment webhook threats of Axis SaaS                                                                              | You assess a threat to the control plane of Axis SaaS               |
 | [Threat model method](reference/threat-model-method.md)                                                   | How the threat model is filled: the methods, the rows, the ratings and the statuses                                                               | You fill in or rate a threat model row                              |
 
 ### Platform internals
