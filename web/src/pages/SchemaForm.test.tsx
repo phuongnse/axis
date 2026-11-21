@@ -360,7 +360,10 @@ describe('SchemaForm sections', () => {
     renderForm((await loadKindSchema('application'))!, applicationValue)
 
     const section = screen.getByTestId('studio-section-modules')
-    expect(within(section).getAllByRole('button', { name: 'Add module…' })).toHaveLength(1)
+    const add = within(section).getAllByRole('button', { name: 'Add module…' })
+    expect(add).toHaveLength(1)
+    expect(add[0]).toHaveClass('ant-btn-variant-text')
+    expect(add[0]).not.toHaveClass('ant-btn-variant-outlined')
     expect(
       within(screen.getByTestId('studio-field-/modules')).queryByRole('button', { name: 'Add module…' }),
     ).toBeNull()
