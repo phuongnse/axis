@@ -1,5 +1,6 @@
 import { Button, Card, ConfigProvider, Flex, Input, Select, Typography } from 'antd'
 import { useContext } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
@@ -174,10 +175,12 @@ function withoutSubject(schema: JsonSchema): JsonSchema {
 
 /**
  * The subject of a process: a choice of an entity or parameters. A choice replaces the draft, so that it holds only the
- * chosen key, and one undo step brings the other back.
+ * chosen key, and one undo step brings the other back. Parameters are rows with Add on their title row and each row's
+ * Remove in its "…" menu. A read-only editor shows neither, see docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
   const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   const { field, group } = useFieldTexts('process')
   const mode = value.parameters !== undefined && value.entity === undefined ? 'parameters' : 'entity'
   const parameters = Array.isArray(value.parameters) ? value.parameters : []
@@ -208,46 +211,63 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
             onPick={(next) => onChange('/entity', next)}
           />
         ) : (
-          <AxisFieldGroup {...group('parameters')}>
-            {parameters.map((parameter, index) => {
-              const pointer = `/parameters/${index}`
-              const content = isContent(parameter) ? parameter : {}
-              return (
-                <Flex key={index} vertical gap="small" data-testid={`studio-field-${pointer}`}>
-                  <div data-testid={`studio-field-${pointer}/name`}>
-                    <AxisField {...field('parameters.name')} required>
-                      <Input
-                        value={text(content.name)}
-                        onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
-                      />
-                    </AxisField>
-                  </div>
-                  <div data-testid={`studio-field-${pointer}/type`}>
-                    <AxisField {...field('parameters.type')} required>
-                      <Select
-                        style={{ minWidth: 160 }}
-                        virtual={false}
-                        value={typeof content.type === 'string' ? content.type : undefined}
-                        options={parameterTypes.map((type) => ({ value: type, label: type }))}
-                        onChange={(next: string) => onChange(`${pointer}/type`, next)}
-                      />
-                    </AxisField>
-                  </div>
-                  <div>
-                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                    <Button onClick={() => onChange(pointer, undefined)}>
-                      {t('shell.studio.process.removeParameter')}
-                    </Button>
-                  </div>
-                </Flex>
+          <AxisFieldGroup
+            {...group('parameters')}
+            action={
+              componentDisabled ? undefined : (
+                <AxisButton
+                  role="secondary"
+                  onClick={() => onChange('/parameters', [...parameters, { name: '', type: 'text' }])}
+                >
+                  {t('shell.studio.process.addParameter')}
+                </AxisButton>
               )
-            })}
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => onChange('/parameters', [...parameters, { name: '', type: 'text' }])}>
-                {t('shell.studio.process.addParameter')}
-              </Button>
-            </div>
+            }
+          >
+            <Flex vertical gap="small">
+              {parameters.map((parameter, index) => {
+                const pointer = `/parameters/${index}`
+                const content = isContent(parameter) ? parameter : {}
+                return (
+                  <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-${pointer}`}>
+                    <Flex vertical gap="small" style={{ flex: 1 }}>
+                      <div data-testid={`studio-field-${pointer}/name`}>
+                        <AxisField {...field('parameters.name')} required>
+                          <Input
+                            value={text(content.name)}
+                            onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
+                          />
+                        </AxisField>
+                      </div>
+                      <div data-testid={`studio-field-${pointer}/type`}>
+                        <AxisField {...field('parameters.type')} required>
+                          <Select
+                            style={{ minWidth: 160 }}
+                            virtual={false}
+                            value={typeof content.type === 'string' ? content.type : undefined}
+                            options={parameterTypes.map((type) => ({ value: type, label: type }))}
+                            onChange={(next: string) => onChange(`${pointer}/type`, next)}
+                          />
+                        </AxisField>
+                      </div>
+                    </Flex>
+                    {componentDisabled ? null : (
+                      <RowActions
+                        fold
+                        actions={[
+                          {
+                            key: 'remove',
+                            labelKey: 'shell.studio.process.removeParameter',
+                            destructive: true,
+                            onClick: () => onChange(pointer, undefined),
+                          },
+                        ]}
+                      />
+                    )}
+                  </Flex>
+                )
+              })}
+            </Flex>
           </AxisFieldGroup>
         )}
       </Flex>
@@ -1046,6 +1066,11 @@ function SubProcess({
   )
 }
 
+/**
+ * A decision's branches, each a row of a `when` expression, a label and a target. Add branch sits on the title row as a
+ * light text button, and each row's Remove is in its "…" menu. A read-only editor shows neither, see
+ * docs/reference/studio-editors-by-kind.md#process-editor.
+ */
 function Decision({
   pointer,
   step,
@@ -1058,6 +1083,7 @@ function Decision({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   const { field, group } = useFieldTexts('process')
   const branchesPointer = `${pointer}/branches`
   const branches = Array.isArray(step.branches) ? step.branches : []
@@ -1065,50 +1091,12 @@ function Decision({
   return (
     <>
       <div data-testid={`studio-field-${branchesPointer}`}>
-        <AxisFieldGroup {...group('steps.branches')}>
-          <Flex vertical gap="small">
-            {branches.map((branch, index) => {
-              const branchPointer = `${branchesPointer}/${index}`
-              const whenPointer = `${branchPointer}/when`
-              const when = text(isContent(branch) ? branch.when : undefined)
-              return (
-                <Flex key={index} vertical gap="small" data-testid={`studio-field-${branchPointer}`}>
-                  <div data-testid={`studio-field-${whenPointer}`}>
-                    <AxisField {...field('steps.branches.when')} required>
-                      <Expression
-                        pointer={whenPointer}
-                        name={field('steps.branches.when').label}
-                        value={when}
-                        onChange={onChange}
-                      />
-                    </AxisField>
-                  </div>
-                  <NamePicker
-                    pointer={`${branchPointer}/label/textKey`}
-                    {...field('steps.branches.label')}
-                    kind="text"
-                    value={isContent(branch) && isContent(branch.label) ? branch.label.textKey : undefined}
-                    onPick={(next) => onChange(`${branchPointer}/label/textKey`, next)}
-                  />
-                  <Transition
-                    pointer={`${branchPointer}/next`}
-                    path="steps.branches.next"
-                    value={isContent(branch) ? branch.next : undefined}
-                    names={names}
-                    onChange={onChange}
-                  />
-                  <div>
-                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                    <Button onClick={() => onChange(branchPointer, undefined)}>
-                      {t('shell.studio.process.removeBranch')}
-                    </Button>
-                  </div>
-                </Flex>
-              )
-            })}
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button
+        <AxisFieldGroup
+          {...group('steps.branches')}
+          action={
+            componentDisabled ? undefined : (
+              <AxisButton
+                role="secondary"
                 onClick={() =>
                   onChange(branchesPointer, [
                     ...branches,
@@ -1117,8 +1105,59 @@ function Decision({
                 }
               >
                 {t('shell.studio.process.addBranch')}
-              </Button>
-            </div>
+              </AxisButton>
+            )
+          }
+        >
+          <Flex vertical gap="small">
+            {branches.map((branch, index) => {
+              const branchPointer = `${branchesPointer}/${index}`
+              const whenPointer = `${branchPointer}/when`
+              const when = text(isContent(branch) ? branch.when : undefined)
+              return (
+                <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-${branchPointer}`}>
+                  <Flex vertical gap="small" style={{ flex: 1 }}>
+                    <div data-testid={`studio-field-${whenPointer}`}>
+                      <AxisField {...field('steps.branches.when')} required>
+                        <Expression
+                          pointer={whenPointer}
+                          name={field('steps.branches.when').label}
+                          value={when}
+                          onChange={onChange}
+                        />
+                      </AxisField>
+                    </div>
+                    <NamePicker
+                      pointer={`${branchPointer}/label/textKey`}
+                      {...field('steps.branches.label')}
+                      kind="text"
+                      value={isContent(branch) && isContent(branch.label) ? branch.label.textKey : undefined}
+                      onPick={(next) => onChange(`${branchPointer}/label/textKey`, next)}
+                    />
+                    <Transition
+                      pointer={`${branchPointer}/next`}
+                      path="steps.branches.next"
+                      value={isContent(branch) ? branch.next : undefined}
+                      names={names}
+                      onChange={onChange}
+                    />
+                  </Flex>
+                  {componentDisabled ? null : (
+                    <RowActions
+                      fold
+                      actions={[
+                        {
+                          key: 'remove',
+                          labelKey: 'shell.studio.process.removeBranch',
+                          destructive: true,
+                          onClick: () => onChange(branchPointer, undefined),
+                        },
+                      ]}
+                    />
+                  )}
+                </Flex>
+              )
+            })}
           </Flex>
         </AxisFieldGroup>
       </div>
@@ -1133,7 +1172,11 @@ function Decision({
   )
 }
 
-/** The outcomes of a task as rows of name, label and target step. Each value is edited through its own pointer. */
+/**
+ * The outcomes of a task as rows of name, label and target step. Each value is edited through its own pointer. Add
+ * outcome sits on the title row as a light text button, and each row's Remove is in its "…" menu. A read-only editor
+ * shows neither, see docs/reference/studio-editors-by-kind.md#process-editor.
+ */
 function Outcomes({
   pointer,
   step,
@@ -1146,59 +1189,73 @@ function Outcomes({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   const { field, group } = useFieldTexts('process')
   const outcomesPointer = `${pointer}/outcomes`
   const outcomes = Array.isArray(step.outcomes) ? step.outcomes : []
 
   return (
     <div data-testid={`studio-field-${outcomesPointer}`}>
-      <AxisFieldGroup {...group('steps.outcomes')}>
+      <AxisFieldGroup
+        {...group('steps.outcomes')}
+        action={
+          componentDisabled ? undefined : (
+            <AxisButton
+              role="secondary"
+              onClick={() => onChange(outcomesPointer, [...outcomes, { name: '', label: { textKey: '' }, next: '' }])}
+            >
+              {t('shell.studio.process.addOutcome')}
+            </AxisButton>
+          )
+        }
+      >
         <Flex vertical gap="small">
           {outcomes.map((outcome, index) => {
             const outcomePointer = `${outcomesPointer}/${index}`
             const content = isContent(outcome) ? outcome : {}
             return (
-              <Flex key={index} vertical gap="small" data-testid={`studio-field-${outcomePointer}`}>
-                <div data-testid={`studio-field-${outcomePointer}/name`}>
-                  <AxisField {...field('steps.outcomes.name')} required>
-                    <Input
-                      value={text(content.name)}
-                      onChange={(event) => onChange(`${outcomePointer}/name`, event.target.value)}
-                    />
-                  </AxisField>
-                </div>
-                <NamePicker
-                  pointer={`${outcomePointer}/label/textKey`}
-                  {...field('steps.outcomes.label')}
-                  required
-                  kind="text"
-                  value={isContent(content.label) ? content.label.textKey : undefined}
-                  onPick={(next) => onChange(`${outcomePointer}/label/textKey`, next)}
-                />
-                <Transition
-                  pointer={`${outcomePointer}/next`}
-                  path="steps.outcomes.next"
-                  value={content.next}
-                  names={names}
-                  onChange={onChange}
-                />
-                <div>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button onClick={() => onChange(outcomePointer, undefined)}>
-                    {t('shell.studio.process.removeOutcome')}
-                  </Button>
-                </div>
+              <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-${outcomePointer}`}>
+                <Flex vertical gap="small" style={{ flex: 1 }}>
+                  <div data-testid={`studio-field-${outcomePointer}/name`}>
+                    <AxisField {...field('steps.outcomes.name')} required>
+                      <Input
+                        value={text(content.name)}
+                        onChange={(event) => onChange(`${outcomePointer}/name`, event.target.value)}
+                      />
+                    </AxisField>
+                  </div>
+                  <NamePicker
+                    pointer={`${outcomePointer}/label/textKey`}
+                    {...field('steps.outcomes.label')}
+                    required
+                    kind="text"
+                    value={isContent(content.label) ? content.label.textKey : undefined}
+                    onPick={(next) => onChange(`${outcomePointer}/label/textKey`, next)}
+                  />
+                  <Transition
+                    pointer={`${outcomePointer}/next`}
+                    path="steps.outcomes.next"
+                    value={content.next}
+                    names={names}
+                    onChange={onChange}
+                  />
+                </Flex>
+                {componentDisabled ? null : (
+                  <RowActions
+                    fold
+                    actions={[
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.studio.process.removeOutcome',
+                        destructive: true,
+                        onClick: () => onChange(outcomePointer, undefined),
+                      },
+                    ]}
+                  />
+                )}
               </Flex>
             )
           })}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button
-              onClick={() => onChange(outcomesPointer, [...outcomes, { name: '', label: { textKey: '' }, next: '' }])}
-            >
-              {t('shell.studio.process.addOutcome')}
-            </Button>
-          </div>
         </Flex>
       </AxisFieldGroup>
     </div>
