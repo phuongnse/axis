@@ -44,19 +44,19 @@ below.
   left, the open files as tabs with the code editor under them, the status line at the editor's foot, and the output
   panel under it. The workspace follows [rules, not boxes](shell.md#layout): rules between its regions and no box.
 - **The output panel.** The output panel under the status line has a Problems tab, which lists the problems of the
-  package's files, see Problems below, and an Output tab, which shows the last build, see Build below. The tab row is
-  a line tab row, in the workspace's one tab-row look.
-- **The output panel's other tabs and handles** _(planned for M37)_. The output panel also has Tests and Run.
+  package's files, see Problems below, and an Output tab, which shows the last build, see Build below. For a developer
+  it also has a Run tab, see Run below. The tab row is a line tab row, in the workspace's one tab-row look.
+- **The output panel's other tabs and handles** _(planned for M37)_. The output panel also has Tests.
   A handle on the explorer's end rule sets its width, from a least width to half the workspace, and a handle on the
   output panel's top rule sets its height, both drawn as the one [handle on a rule](shell.md#layout). A rule runs
   under the heading from the sidebar across.
 - **The heading.** The package's label, with its kind and version under it. The heading has no tag of a change,
   because the band's Changes not live tells of every change, so the workspace reads no diff against the live release.
-- **The heading's actions.** Build and Run tests are on the right as one secondary
+- **The heading's actions.** Build, Run tests and Run… are on the right as one secondary
   [group of equal weight](actions-and-controls.md#buttons), each button as wide as the widest, named Build and test
   for assistive technology. They show only with the developer role. Run tests is off while it runs nothing, and Build
-  is off while a save or a build runs and while Studio reconnects.
-- **Run tests and Run… in the group** _(planned for M37)_. Run tests runs a package's tests, and Run… joins the group.
+  is off while a save or a build runs and while Studio reconnects. Run… opens the Run tab.
+- **Run tests in the group** _(planned for M37)_. Run tests runs a package's tests.
 - **The explorer.** A tree of the package's folders and files, drawn by Ant Design's `Tree`. Folders come first, with
   a chevron on a folder's left and a folder icon, and a file has a file icon. A file with unsaved changes has a dot. A
   chosen or hovered row is marked across its whole width, a chosen one in the tint of the [navigation's](shell.md#layout)
@@ -93,10 +93,10 @@ below.
   still save. A quota refusal shows as it does for a resource.
 - **The status line.** At the editor's foot, right above the output panel, it tells of the open
   file: the cursor's line and column, the file's language and what is unsaved.
-- **Save before a run.** Build saves every changed file first, as a code editor saves before it runs a task, so it
-  takes the files the editor shows. A file that cannot be saved, such as one changed elsewhere, or one already in
-  conflict, stops it with that file's notice: its tab opens with Reload and nothing is sent.
-- **Save before a test or a run** _(planned for M37)_. Run tests and Run… save every changed file first, as Build does.
+- **Save before a build or a run.** Build and Run… save every changed file first, as a code editor saves before it
+  runs a task, so each takes the files the editor shows. A file that cannot be saved, such as one changed elsewhere, or
+  one already in conflict, stops it with that file's notice: its tab opens with Reload and nothing is sent.
+- **Save before a test** _(planned for M37)_. Run tests saves every changed file first, as Build does.
 - **Build.** A build runs only when asked, from Build or Ctrl+Shift+B (Cmd+Shift+B on macOS). Each save still answers
   the folder's diagnostics. Once every file is saved, Build sends `POST .../build` with the package and follows the
   request until it ends, see [the authoring API](#the-authoring-api). The Output tab opens when it starts. Its title
@@ -114,7 +114,7 @@ below.
   row has room.
 - **Tests** _(planned for M37)_. Run tests shows one row a test in Tests, with its result, name, duration and message.
   A failed test's place, its file at its line, follows its message and opens there, as a problem's file does.
-- **Run** _(planned for M37)_. Run… shows two panes parted by a rule that runs the panel's height. The Input pane is
+- **Run.** Run… shows two panes parted by a rule that runs the panel's height. The Input pane is
   one block under its title row, in the order a person works: Operation, then Saved input, then the Form and JSON
   tabs and the values, with no rule between them. Run sits in the pane's action bar at its foot, outlined as the
   pane's main action and lined up with the fields. The JSON shows each field the input lacks as `null`. The Output
@@ -123,11 +123,11 @@ below.
   [scroll areas](actions-and-controls.md#scroll-areas). A run's CPU time is not shown, because one run's CPU time
   tells the author nothing they act on, and it counts in the tenant's
   [package run time](tenant-quotas.md#package-run-time-a-day).
-- **Saved inputs** _(planned for M37)_. A run's named inputs are kept with the application and shared by its
+- **Saved inputs.** A run's named inputs are kept with the application and shared by its
   developers, as AWS Lambda's shareable test events are, so a team runs the same cases. Saved input's list ends with
   Manage saved inputs…, which opens the [dialog that keeps saved items](actions-and-controls.md#fields).
-- **Without the developer role.** The editor is read-only, with an info alert. The workspace shows no save bar and no
-  Build and Run tests group, Ctrl+S saves nothing and Ctrl+Shift+B builds nothing.
+- **Without the developer role.** The editor is read-only, with an info alert. The workspace shows no save bar, no
+  Build, Run tests and Run… group and no Run tab, Ctrl+S saves nothing and Ctrl+Shift+B builds nothing.
 - **Without the developer role, the explorer.** The explorer offers only the files, Copy path and Refresh. The node's
   menu holds Copy path alone, and F2 does nothing.
 

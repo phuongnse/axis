@@ -143,11 +143,10 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   password or a label's Translations.
 - **An action on a select's value** _(planned)_. It is an icon joined after the select, such as a reference's Open, the
   two as wide as the field.
-- **One dialog keeps saved items.** Saved items that a person names, such as a table's views, are kept in one dialog,
-  `SavedItemsDialog`. Each name opens its item, its line holds one split button, Overwrite with Rename and Delete in
-  its menu, and Name with Save saves what is shown now as a new item. A table opens it from Views.
-- **A select of saved items opens it** _(planned for M37)_. A package's saved run inputs are kept in the same dialog,
-  opened from the end of a select's list.
+- **One dialog keeps saved items.** Saved items that a person names, such as a table's views and a package's saved run
+  inputs, are kept in one dialog, `SavedItemsDialog`. Each name opens its item, its line holds one split button,
+  Overwrite with Rename and Delete in its menu, and Name with Save saves what is shown now as a new item. A table opens
+  it from Views, and a select of saved items from the end of its list.
 - **A field's status.** A field inside a form takes a `status`, what the screen found about the
   field beyond its rules: a check run while the person types, such as whether a subdomain is free, or
   choices that could not load. Running shows the input busy. A status that passed leaves the field as it
