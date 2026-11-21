@@ -147,7 +147,7 @@ developer role and the switch as a write has, and answers `403` otherwise.
 | Route                                                                                  | Response                                                                                                                                                                                                                                                         |
 | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /api/studio/apps/{application}/build`                                            | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below                                              |
-| `POST /api/studio/apps/{application}/test` _(planned for M37)_                         | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below                                      |
+| `POST /api/studio/apps/{application}/test`                                             | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below                                      |
 | `POST /api/studio/apps/{application}/run` _(planned for M37)_                          | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run`, see A run of one operation below                                                                                                            |
 | `GET /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ items: [{ name, operation, input }] }`. The version is the `ETag`, which comes once the inputs are saved, see Saved run inputs below                                                                                                                                    |
 | `PUT /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ version }` and an `ETag`. The body is `{ items }`, with `If-None-Match: *` for the first save or `If-Match` of the version, and a stale version answers `409`                                                                                       |
@@ -206,10 +206,15 @@ developer role and the switch as a write has, and answers `403` otherwise.
   list until it ends, and `null` for every other kind of request.
 - **A Node.js package's TypeScript** _(planned for M37)_. A Node.js package's build compiles its TypeScript with its
   `tsconfig.json` before the checks, so an author never compiles on their own machine.
-- **A package's tests from Studio** _(planned for M37)_. `POST .../test` with `{ package }` queues a `test` request
-  for that package's files, as `test_package` does. Its answer has `package`, `packageTests` and `output`. Each of
-  `packageTests` has `name`, `outcome`, `message` and `durationMs`, and a failed test has `file`, `line` and `column`,
-  where it failed in the package. Without `package` the request is the application's scenario test, see
+- **A package's tests from Studio.** `POST .../test` with `{ package }` queues a `test` request for that package's
+  working files, from a snapshot of the folder, as `test_package` does. Its answer has `package`, `packageTests` and
+  `output`. Each of `packageTests` has `name`, `outcome`, `message` and `durationMs`, and a failed test has `file`,
+  `line` and `column`, where it failed in the package. `output` holds the lines the host wrote: what the tests
+  printed, or what the build wrote when the host refused the package. The body is `{ package }` with a string, or
+  `{ scenarios }` alone, and a body with both, or a `package` that is not a string, answers `400`. A package with no
+  file in the folder answers `404`. Only a body with `package` needs the developer role and the switch, and the
+  route answers `403` otherwise, checked once the body is read. No quota is checked. Without `package` the request
+  is the application's scenario test, which needs the author role only, see
   [test](authoring-publishing.md#test).
 - **A run of one operation** _(planned for M37)_. `POST .../run` with `{ package, operation, input }` queues a `run`
   request. The host builds the package's working files and calls the operation with the folder's bindings for its

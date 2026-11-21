@@ -22,6 +22,7 @@ import { paginationItems } from './pagination'
 import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
 import { TableFilterButton, TableFilterChips, type FilterColumn } from './TableFilter'
 import { TableColumnsButton } from './TableColumns'
+import { menuOf } from './menuActions'
 import { TableViewsButton } from './TableViews'
 import { shownColumns, type TableQuery, type TableSort } from './tableQuery'
 import { makeRoom, type ColumnPriority } from './tableRoom'
@@ -841,13 +842,7 @@ export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null;
         trigger={['click']}
         autoFocus
         menu={{
-          items: actions.map((action) => ({
-            key: action.key,
-            label: t(action.labelKey),
-            danger: action.destructive,
-            disabled: action.disabled,
-            onClick: action.onClick,
-          })),
+          items: menuOf(actions.map((action) => ({ ...action, label: t(action.labelKey) }))),
           'aria-label': t('shell.table.rowActions'),
         }}
       >

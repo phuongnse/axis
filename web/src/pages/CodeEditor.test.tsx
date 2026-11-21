@@ -1,39 +1,81 @@
 import { EditorView } from '@codemirror/view'
 import { act, render, screen } from '@testing-library/react'
-import { createRef } from 'react'
+import { ConfigProvider, theme } from 'antd'
+import { createRef, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { antThemeFor } from '../platform/antTheme'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import type { ThemeMode } from '../platform/themeMode'
+import { withAntdStyles } from '../test/antdStyles'
 import CodeEditor, { type CodeEditorHandle, type CodeEditorProps } from './CodeEditor'
 import { jsonViewHeight } from './jsonViewHeight'
 
 const findTexts = { field: 'Find in code', count: '{current} of {count}', none: 'No matches' }
 
-function renderEditor(props: Partial<CodeEditorProps> = {}) {
+interface RenderOptions {
+  /** The mode the provider starts in, so a test does not depend on the stored or system choice. */
+  initialMode?: ThemeMode
+  /** Wraps the editor, for example in a nested ConfigProvider with page values. */
+  wrap?: (editor: ReactNode) => ReactNode
+}
+
+function renderEditor(props: Partial<CodeEditorProps> = {}, { initialMode, wrap }: RenderOptions = {}) {
   const handle = createRef<CodeEditorHandle>()
-  const view = (extra: Partial<CodeEditorProps>) => (
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <footer />
-        <CodeEditor
-          label="Code"
-          value={'one\ntwo\nthree'}
-          language="plain"
-          findTexts={findTexts}
-          ref={handle}
-          {...props}
-          {...extra}
-        />
-      </TextProvider>
-    </ThemeModeProvider>
-  )
+  const view = (extra: Partial<CodeEditorProps>) => {
+    const editor = (
+      <CodeEditor
+        label="Code"
+        value={'one\ntwo\nthree'}
+        language="plain"
+        findTexts={findTexts}
+        ref={handle}
+        {...props}
+        {...extra}
+      />
+    )
+    return (
+      <ThemeModeProvider initialMode={initialMode}>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <footer />
+          {wrap ? wrap(editor) : editor}
+        </TextProvider>
+      </ThemeModeProvider>
+    )
+  }
   const { rerender } = render(view({}))
   return { handle, rerender: (extra: Partial<CodeEditorProps>) => rerender(view(extra)) }
 }
 
 const editorView = () => EditorView.findFromDOM(screen.getByRole('textbox', { name: 'Code' }))!
 const typeAtStart = (view: EditorView) => view.dispatch({ changes: { from: 0, insert: 'x' }, userEvent: 'input.type' })
+
+/** A colour as the browser writes it, so a hex value and the rgb value jsdom reads back compare equal. */
+function asStyled(colour: string) {
+  const probe = document.createElement('div')
+  probe.style.backgroundColor = colour
+  return probe.style.backgroundColor
+}
+
+/**
+ * The background of a selected search match. jsdom's computed style drops the editor's rules, so the test adds a match
+ * to the content and reads the rules that match it, as JsonView.test.tsx does for the scroller.
+ */
+function selectedMatchBackground() {
+  const match = document.createElement('span')
+  match.className = 'cm-searchMatch cm-searchMatch-selected'
+  const content = document.querySelector('.cm-content')!
+  content.append(match)
+  const rules = Array.from(document.styleSheets).flatMap((sheet) => Array.from(sheet.cssRules))
+  const styleRules = rules.filter((rule): rule is CSSStyleRule => 'selectorText' in rule)
+  const backgrounds = styleRules
+    .filter((rule) => match.matches(rule.selectorText))
+    .map((rule) => rule.style.getPropertyValue('background-color'))
+    .filter(Boolean)
+  match.remove()
+  return backgrounds.at(-1)
+}
 
 describe('CodeEditor', () => {
   it('accepts typing and reports it', () => {
@@ -154,6 +196,39 @@ describe('CodeEditor', () => {
 
       const host = screen.getByRole('textbox', { name: 'Code' }).closest('.cm-editor')!.parentElement!
       expect(host.style.height).toBe('')
+    })
+  })
+
+  describe('with antd styles', () => {
+    withAntdStyles()
+
+    describe.each(['light', 'dark'] as const)('the selected search match in %s mode', (mode) => {
+      it('takes the selected tint of the theme in use, with no page values', () => {
+        renderEditor({}, { initialMode: mode })
+
+        const tint = theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
+        expect(selectedMatchBackground()).toBe(asStyled(tint))
+      })
+    })
+
+    it('takes the selected tint of a page whose primary differs from the token file', () => {
+      const primary = '#c41d7f'
+      renderEditor(
+        {},
+        {
+          initialMode: 'light',
+          wrap: (editor) => <ConfigProvider theme={{ token: { colorPrimary: primary } }}>{editor}</ConfigProvider>,
+        },
+      )
+
+      const base = antThemeFor('light')
+      const pageTint = theme.getDesignToken({
+        ...base,
+        token: { ...base.token, colorPrimary: primary },
+      }).controlItemBgActive
+      const defaultTint = theme.getDesignToken(base).controlItemBgActive
+      expect(asStyled(pageTint)).not.toBe(asStyled(defaultTint))
+      expect(selectedMatchBackground()).toBe(asStyled(pageTint))
     })
   })
 })

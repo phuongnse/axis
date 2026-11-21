@@ -1,4 +1,4 @@
-import { Button, Card, Flex, Input, Select, Typography } from 'antd'
+import { Button, Card, Flex, Input, Select } from 'antd'
 import { useContext, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
@@ -6,6 +6,7 @@ import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { StudioBindingsContext } from '../platform/studioCatalog'
 import { useText } from '../platform/texts'
+import { WarningLine } from '../platform/WarningLine'
 import { BindingSelect } from './CatalogControls'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
@@ -300,9 +301,7 @@ function Operation({
           onChange={onChange}
         />
         {operation.method === 'GET' && hasBodyInput && (
-          <Typography.Text type="warning" data-testid="studio-connector-get-no-input">
-            {t('shell.studio.connector.getNoInput')}
-          </Typography.Text>
+          <WarningLine testId="studio-connector-get-no-input">{t('shell.studio.connector.getNoInput')}</WarningLine>
         )}
         <FieldRows
           kind="output"

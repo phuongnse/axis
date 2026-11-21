@@ -26,6 +26,7 @@ interface Row {
 const texts = {
   'shell.table.refresh': 'Refresh',
   'shell.table.rowActions': 'Actions',
+  'shell.actionRow.more': 'More actions',
   'shell.table.selected': '{count} selected',
   'shell.table.range': '{from}–{to} of {total}',
   'shell.table.search': 'Search',
@@ -1038,9 +1039,40 @@ describe('AxisTable', () => {
         await userEvent.click(await screen.findByRole('button', { name: 'Views' }))
         return viewsDialog()
       }
+      /** Opens the caret's menu of a view's line and chooses an entry. The menu is in a portal, outside the dialog. */
+      const chooseFromMenu = async (dialog: HTMLElement, view: string, entry: 'Rename' | 'Delete') => {
+        await userEvent.click(within(dialog).getByRole('button', { name: `More actions ${view}` }))
+        await userEvent.click(await screen.findByRole('menuitem', { name: entry }))
+      }
       const mutations = (fetchMock: ReturnType<typeof serveViews>['fetchMock']) =>
         fetchMock.mock.calls.filter(([, init]) => init?.method !== undefined)
       const address = () => new URLSearchParams(screen.getByTestId('address').textContent ?? '')
+
+      it('opens the saved items dialog, whose lines are each one split button with Rename and Delete in its menu', async () => {
+        serveViews([
+          { id: 'a', name: 'Zed', search: null, filter: null, sort: null },
+          { id: 'b', name: 'Abe', search: null, filter: null, sort: null },
+        ])
+        open()
+
+        const dialog = await openViews()
+
+        expect(dialog.querySelector('[data-saved-items]')).not.toBeNull()
+        expect(dialog.querySelectorAll('.ant-space-compact')).toHaveLength(2)
+        expect(
+          within(dialog)
+            .getAllByRole('button', { name: /^(Overwrite|More actions) / })
+            .map((button) => button.getAttribute('aria-label')),
+        ).toEqual(['Overwrite Abe', 'More actions Abe', 'Overwrite Zed', 'More actions Zed'])
+        expect(within(dialog).queryByRole('button', { name: /^(Rename|Delete) / })).not.toBeInTheDocument()
+
+        await userEvent.click(within(dialog).getByRole('button', { name: 'More actions Abe' }))
+        const menu = await screen.findByRole('menu', { name: 'More actions' })
+        const entries = within(menu).getAllByRole('menuitem')
+        expect(entries.map((entry) => entry.textContent)).toEqual(['Rename', 'Delete'])
+        expect(entries[0]).not.toHaveClass('ant-dropdown-menu-item-danger')
+        expect(entries[1]).toHaveClass('ant-dropdown-menu-item-danger')
+      })
 
       it('saves the address as a view, and opens it again at page 1 with a history entry', async () => {
         const { fetchMock } = serveViews([])
@@ -1112,7 +1144,7 @@ describe('AxisTable', () => {
         expect(viewsDialog()).toBe(dialog)
         expect(screen.getByTestId('address')).toHaveTextContent('?search=pen')
         expect(screen.getByTestId('navigation')).toHaveTextContent('POP')
-        expect(within(dialog).getAllByRole('button', { name: /^(Rename|Overwrite|Delete) / })).toHaveLength(3)
+        expect(within(dialog).getAllByRole('button', { name: /^(Overwrite|More actions) / })).toHaveLength(2)
         expect(server.views).toHaveLength(1)
       })
 
@@ -1135,7 +1167,7 @@ describe('AxisTable', () => {
         open()
 
         const dialog = await openViews()
-        await userEvent.click(within(dialog).getByRole('button', { name: 'Rename Old' }))
+        await chooseFromMenu(dialog, 'Old', 'Rename')
         const input = within(dialog).getByRole('textbox', { name: 'Name', description: '' })
         await userEvent.clear(input)
         await userEvent.type(input, 'New{Enter}')
@@ -1226,14 +1258,14 @@ describe('AxisTable', () => {
         open()
 
         const dialog = await openViews()
-        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete Old' }))
+        await chooseFromMenu(dialog, 'Old', 'Delete')
         expect(within(dialog).getByText('Delete the view Old?')).toBeInTheDocument()
         expect(mutations(fetchMock)).toHaveLength(0)
         // The line's Cancel comes before the dialog's own.
         await userEvent.click(within(dialog).getAllByRole('button', { name: 'Cancel' })[0])
         expect(within(dialog).getByRole('button', { name: 'Old' })).toBeInTheDocument()
 
-        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete Old' }))
+        await chooseFromMenu(dialog, 'Old', 'Delete')
         await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
 
         await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Old' })).not.toBeInTheDocument())

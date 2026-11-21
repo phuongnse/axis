@@ -20,9 +20,9 @@ tenant only.
 | `POST /api/studio/apps/{application}/validate`               | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role                                                                                                                              |
 | `POST /api/studio/apps/{application}/publish`                | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role                                               |
 | `POST /api/studio/apps/{application}/preview`                | `202` with the request and a `Location` header. It needs the author role only, and answers `409` when the tenant has no preview tenant, see [Preview](#preview)                                                               |
-| `POST /api/studio/apps/{application}/test`                   | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`, and none or an empty list means every scenario. It needs the author role only, see [Test](#test) |
+| `POST /api/studio/apps/{application}/test`                   | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`, and none or an empty list means every scenario, or `{ "package": "<id>" }` to test one package. The scenario test needs the author role only, see [Test](#test) |
 | `POST /api/studio/apps/{application}/build`                  | `202` with the request and a `Location` header. The body is `{ "package": "<id>" }`. It needs the author role, the developer role and the tenant's application packages switch, see [Build](#build)                           |
-| `GET /api/studio/apps/{application}/requests/{id}`           | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes and, for `build`, its output                                                                                                       |
+| `GET /api/studio/apps/{application}/requests/{id}`           | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes or its package's tests and, for `build` and a package `test`, its output                                                                                                       |
 | `GET /api/studio/apps/{application}/releases`                | `200` with the activation history, newest first, and which release is active, see [Release history](#release-history)                                                                                                         |
 | `POST /api/studio/apps/{application}/releases/{id}/activate` | `202` with the request and a `Location` header. It needs the author role and the publisher role, see [Activating a release](#activating-a-release)                                                                            |
 
@@ -35,7 +35,7 @@ rest of the API, see [Order of checks](authoring.md#order-of-checks) and [Respon
 ### The request
 
 A request is shown as
-`{ id, application, kind, target, status, label, note, requestedBy, requestedByName, requestedAt, startedAt, finishedAt, releaseId, diagnostics, scenarios, output }`.
+`{ id, application, kind, target, status, label, note, requestedBy, requestedByName, requestedAt, startedAt, finishedAt, releaseId, diagnostics, scenarios, package, packageTests, output }`.
 
 | Field             | Meaning                                                                                                                                                                                                                                                    |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -53,8 +53,10 @@ A request is shown as
 | `finishedAt`      | When it reached `succeeded` or `failed`, or null before                                                                                                                                                                                                    |
 | `releaseId`       | The release a `publish` activated or an `activate` named, or null. A `validate`, a `test` and a `build` have none                                                                                                                                          |
 | `diagnostics`     | The diagnostics, in the form of [Diagnostics](authoring.md#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings. An `accept`'s `AXC0377` adds `changedBy` and `changedAt`, see [accepting](authoring-requests.md#accepting) |
-| `scenarios`       | The scenario outcomes, see below. For a `test`, empty until the request ends. For a `publish`, a `validate` or an `accept`, null until the request ends and when no scenario ran. Null for an `activate`                                                   |
-| `output`          | For a `build`, the lines the package host wrote, as a list of strings, empty until the request ends. Null for every other kind                                                                                                                             |
+| `scenarios`       | The scenario outcomes, see below. For a scenario `test`, empty until the request ends. For a `publish`, a `validate` or an `accept`, null until the request ends and when no scenario ran. Null for an `activate` and for a package `test`, as no scenario runs |
+| `package`         | The package a `build` builds or a package `test` tests. Null for every other request                                                                                                                                                                       |
+| `packageTests`    | For a package `test`, the outcome of each test, `{ name, outcome, message, durationMs }` and for a failed test `file`, `line` and `column`, empty until the request ends. Null for every other request                                                    |
+| `output`          | For a `build` or a package `test`, the lines the package host wrote, as a list of strings, empty until the request ends. Null for every other request                                                                                                      |
 
 `scenarios` has one item for each scenario that ran, in file order: for a `test`, the application's
 scenarios, and for a `publish`, a `validate` and an `accept`, the stored results of their
@@ -135,12 +137,16 @@ Studio. The request has the kind `test` and the target `tenant`. Studio's Run te
 send it, and its Test results list shows the outcome, see [Studio](studio.md).
 
 - **Who may.** The author role is enough, because a test changes no tenant. It costs database time,
-  so the limits below apply.
+  so the limits below apply. A test whose body names a `package` needs the developer role and the tenant's
+  application packages switch too, and answers `403` and stores nothing without them, see
+  [Order of checks](authoring.md#order-of-checks). It checks no quota.
 - **The body.** The optional `scenarios` list names the scenarios to run, by their `name`. With no
   body, no list or an empty list, every scenario runs, a pinned module's after the application's own,
   as `<module id>/<name>`. An unknown name is accepted with `202`, and the request then ends `failed`
   with `AXC0218`, as for a folder with errors. A [contract scenario](module-contracts.md#contract-scenarios)
   that covers a relaxed point of its module does not run. Its `skipped` item comes first, see [the request](#the-request).
+  The body may name `package` instead, a string, see A package's tests below. A body with both keys, or a `package` that is
+  not a string, answers `400`, and a package with no file in the working folder answers `404`.
 - **Where it runs.** The server stores the request with a snapshot, taken as for `validate`, or of
   the person's [draft](revisions-and-drafts.md#drafts) for the MCP server's `run_scenarios` and `test_package`. The
   publisher runs it with `Scenarios:ServerConnectionString`, in a new database for each scenario, see
@@ -163,11 +169,11 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
 - **A package's tests.** A `test` whose request names a `package` tests that one application package, see
   [an application's packages](package-runners.md#an-applications-packages). The publisher compiles
   nothing and runs no scenario. It sends the package's files from the snapshot to `application-package-host`
-  as a `test` and stores each test's outcome in `package_tests`, so it needs no scenario server. The request
-  ends `succeeded` when every test passed and `failed` otherwise. A refused build is `AXC0149` at the problem's
+  as a `test` and stores each test's outcome in `package_tests` and the lines the host wrote in `output`, so it needs no
+  scenario server. The request answers `scenarios` as null. It ends `succeeded` when every test passed and `failed` otherwise. A refused build is `AXC0149` at the problem's
   file, a host that gives no answer within 5 minutes is one `AXC0152` at the manifest, and the setting off is
   one `AXC0148` at the manifest, with nothing sent. A stop ends it with `AXC0220`. In each case `package_tests`
-  is empty.
+  is empty. `output` then holds the lines of the refused build, and is empty for no answer, the setting off and a stop.
 - **Audit.** A `test` writes no audit record.
 - **A request that runs again.** A request claimed again after a lost lease runs every scenario again.
 
