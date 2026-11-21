@@ -161,7 +161,7 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
             {textField('/name', 'name', value.name, true)}
             <div data-testid="studio-field-/description">
               <AxisFieldGroup {...groupTexts(t, 'description')}>
-                <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+                <LabelTexts pointer="/description" value={value.description} onChange={onChange} multiline />
               </AxisFieldGroup>
             </div>
           </>,

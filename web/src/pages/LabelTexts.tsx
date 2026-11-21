@@ -25,7 +25,22 @@ type Resource = NonNullable<React.ContextType<typeof LabelTextsContext>>
  * Outside the resource's context, as in the module editor, it is the plain key box, because a module layer's label is
  * a key and a save there writes no text.
  */
-export function LabelTexts({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
+export function LabelTexts({
+  pointer,
+  value,
+  onChange,
+  multiline = false,
+}: {
+  pointer: string
+  value: unknown
+  onChange: ChangeHandler
+  /**
+   * Proposed, #3264: a text of a sentence or more, such as a description or a message's body, is typed in a box of
+   * several lines that grows with its text, here and in the Translations dialog, see
+   * docs/reference/studio-resource-form.md#labels.
+   */
+  multiline?: boolean
+}) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const resource = useContext(LabelTextsContext)
@@ -47,8 +62,20 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
       </div>
     )
   }
-  return <LabelEditor pointer={pointer} value={value} onChange={onChange} names={names} resource={resource} />
+  return (
+    <LabelEditor
+      pointer={pointer}
+      value={value}
+      onChange={onChange}
+      names={names}
+      resource={resource}
+      multiline={multiline}
+    />
+  )
 }
+
+/** A box of several lines starts three lines high and grows with its text up to ten. */
+const severalLines = { minRows: 3, maxRows: 10 }
 
 function LabelEditor({
   pointer,
@@ -56,12 +83,14 @@ function LabelEditor({
   onChange,
   names,
   resource,
+  multiline,
 }: {
   pointer: string
   value: unknown
   onChange: ChangeHandler
   names: StudioNames
   resource: Resource
+  multiline: boolean
 }) {
   const t = useText()
   const { colour, size, spacing } = useDesignTokens()
@@ -110,25 +139,41 @@ function LabelEditor({
     return t('shell.studio.label.notTranslated').replace('{languages}', languages)
   }
 
+  const box = {
+    'aria-label': shown === undefined ? undefined : languageName(shown, author),
+    value: shown === undefined ? '' : (texts[shown] ?? ''),
+    onChange: (event: { target: { value: string } }) =>
+      shown !== undefined && changeTexts({ ...texts, [shown]: event.target.value }),
+  }
+  const translations = (
+    <AxisButton
+      role="icon"
+      inside
+      nameKey="shell.studio.label.translations"
+      icon={<TranslationOutlined />}
+      onClick={() => {
+        setCopy({ ...texts })
+        setOpen(true)
+      }}
+    />
+  )
+
   return (
     <Flex vertical gap="small" data-testid="studio-label">
       <div>
-        <Input
-          aria-label={shown === undefined ? undefined : languageName(shown, author)}
-          value={shown === undefined ? '' : (texts[shown] ?? '')}
-          onChange={(event) => shown !== undefined && changeTexts({ ...texts, [shown]: event.target.value })}
-          suffix={
-            <AxisButton
-              role="icon"
-              nameKey="shell.studio.label.translations"
-              icon={<TranslationOutlined />}
-              onClick={() => {
-                setCopy({ ...texts })
-                setOpen(true)
-              }}
+        {multiline ? (
+          // A text area has no suffix, so Translations sits over its top end, where an input's suffix sits.
+          <div style={{ position: 'relative' }}>
+            <Input.TextArea
+              {...box}
+              autoSize={severalLines}
+              style={{ paddingInlineEnd: spacing.md + 22 + spacing.xs }}
             />
-          }
-        />
+            <span style={{ position: 'absolute', top: 5, insetInlineEnd: 12 }}>{translations}</span>
+          </div>
+        ) : (
+          <Input {...box} suffix={translations} />
+        )}
         {missing.length > 0 && (
           <div
             style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted, marginTop: spacing.xs }}
@@ -154,14 +199,19 @@ function LabelEditor({
         destroyOnHidden
       >
         <Flex vertical gap="small">
-          {names.locales.map((locale) => (
-            <Input
-              key={locale}
-              aria-label={languageName(locale, author)}
-              value={copy?.[locale] ?? ''}
-              onChange={(event) => setCopy((current) => ({ ...current, [locale]: event.target.value }))}
-            />
-          ))}
+          {names.locales.map((locale) => {
+            const language = {
+              'aria-label': languageName(locale, author),
+              value: copy?.[locale] ?? '',
+              onChange: (event: { target: { value: string } }) =>
+                setCopy((current) => ({ ...current, [locale]: event.target.value })),
+            }
+            return multiline ? (
+              <Input.TextArea key={locale} {...language} autoSize={severalLines} />
+            ) : (
+              <Input key={locale} {...language} />
+            )
+          })}
         </Flex>
       </Modal>
       {others > 0 && (

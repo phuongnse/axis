@@ -254,7 +254,7 @@ export function EntityDesigner({
             </div>
             <div data-testid="studio-field-/description">
               <AxisFieldGroup {...groupTexts(t, 'description')}>
-                <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+                <LabelTexts pointer="/description" value={value.description} onChange={onChange} multiline />
               </AxisFieldGroup>
             </div>
             <Picker

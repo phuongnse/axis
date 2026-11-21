@@ -225,7 +225,13 @@ function Message({
         </div>
         <div data-testid={`studio-field-${pointer}/body`}>
           <AxisFieldGroup {...bodyGroup}>
-            <LabelTexts key={`${pointer}/body`} pointer={`${pointer}/body`} value={message.body} onChange={onChange} />
+            <LabelTexts
+              key={`${pointer}/body`}
+              pointer={`${pointer}/body`}
+              value={message.body}
+              onChange={onChange}
+              multiline
+            />
           </AxisFieldGroup>
         </div>
         <MappingRows

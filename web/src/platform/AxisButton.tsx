@@ -44,6 +44,11 @@ export type AxisButtonProps =
       /** Draws a bordered default button, to sit joined to an input in a Space.Compact. */
       joined?: boolean
       /**
+       * Proposed, #3264: draws the button inside an input, at its end, as tall as the input's line, so the input keeps
+       * the height of every other input, see docs/reference/actions-and-controls.md#fields.
+       */
+      inside?: boolean
+      /**
        * The text key of what the button says right after it did its work, such as Copied. While it is set, the tooltip
        * opens with that text, even after a pointer click. The accessible name stays the name. The caller clears it to go
        * back to normal.
@@ -54,6 +59,9 @@ export type AxisButtonProps =
 const ActionRowContext = createContext(false)
 
 type IconButtonProps = Extract<AxisButtonProps, { role: 'icon' }>
+
+/** An input's line is 22px high, so a button inside it is no taller and the input keeps its height. */
+const insideStyle: CSSProperties = { width: 22, minWidth: 22, height: 22 }
 
 /** Opens on hover and Tab focus, and a click hides it until the pointer comes back, except to say `doneKey`. */
 function IconButton(props: IconButtonProps) {
@@ -66,6 +74,7 @@ function IconButton(props: IconButtonProps) {
     destructive,
     nameSuffix,
     joined,
+    inside,
     doneKey,
     icon,
     style,
@@ -103,7 +112,8 @@ function IconButton(props: IconButtonProps) {
         disabled={disabled}
         aria-label={nameSuffix ? `${name} ${nameSuffix}` : name}
         icon={<span aria-hidden>{icon}</span>}
-        style={{ ...tint, ...style }}
+        size={inside ? 'small' : rest.size}
+        style={{ ...(inside ? insideStyle : {}), ...tint, ...style }}
         onMouseEnter={(event) => {
           pointerOver.current = true
           onMouseEnter?.(event)

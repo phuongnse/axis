@@ -182,7 +182,7 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
             </div>
             <div data-testid="studio-field-/description">
               <AxisFieldGroup {...texts.group('description')}>
-                <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+                <LabelTexts pointer="/description" value={value.description} onChange={onChange} multiline />
               </AxisFieldGroup>
             </div>
             <div data-testid="studio-field-/now">

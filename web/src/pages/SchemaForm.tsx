@@ -441,7 +441,8 @@ function SchemaNode({
     grouped = true
     input = (
       <div data-testid={`studio-group-${pointer}`} style={groupStyle}>
-        <LabelTexts pointer={pointer} value={value} onChange={onChange} />
+        {/* Proposed, #3264: a description is a sentence or more, see docs/reference/studio-resource-form.md#labels. */}
+        <LabelTexts pointer={pointer} value={value} onChange={onChange} multiline={pointer.endsWith('/description')} />
       </div>
     )
   } else if (isObject && named) {
