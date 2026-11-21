@@ -1376,6 +1376,90 @@ describe('ProcessInstancePage', () => {
 })
 
 /** The panel of a step's run, once the page has opened it. */
+const connectorCallId = '0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b9e'
+
+/** A connector call of `registerPurchase` that sent a request, was retried once and then succeeded. */
+function connectorCall(patch: Record<string, unknown> = {}) {
+  return {
+    id: connectorCallId,
+    kind: 'connector',
+    step: 'registerPurchase',
+    connector: 'PurchasingSystem',
+    operation: 'createOrder',
+    state: 'succeeded',
+    attempts: [
+      {
+        kind: 'attempt',
+        number: 1,
+        startedAt: '2026-10-10T04:00:01.000000Z',
+        finishedAt: '2026-10-10T04:00:03.000000Z',
+        outcome: 'retryable',
+        httpStatus: 503,
+        error: null,
+        problem: null,
+        traceId: '0af7651916cd43dd8448eb211c80319c',
+        response: { status: 503, headers: {}, body: null, truncated: false },
+      },
+      {
+        kind: 'attempt',
+        number: 2,
+        startedAt: '2026-10-10T04:00:10.000000Z',
+        finishedAt: '2026-10-10T04:00:11.500000Z',
+        outcome: 'succeeded',
+        httpStatus: 201,
+        error: null,
+        problem: null,
+        traceId: '1bf7651916cd43dd8448eb211c80319d',
+        response: {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+          body: '{"orderId":"PO-77"}',
+          truncated: false,
+        },
+      },
+    ],
+    input: null,
+    inputHidden: false,
+    request: {
+      method: 'POST',
+      url: 'https://erp.example/orders',
+      query: { dryRun: 'false' },
+      headers: { 'x-source': 'axis' },
+      body: '{"title":"Laptops","lines":2}',
+      truncated: false,
+    },
+    returned: null,
+    resolvable: false,
+    ...patch,
+  }
+}
+
+/**
+ * The detail text with `calls` in place of its own, and with a path entry for `registerPurchase` that made `made` where
+ * given. `registerPurchase` is the instance's current step.
+ */
+function detailForRun({ calls, made }: { calls?: unknown[]; made?: Record<string, unknown> }) {
+  const detail = JSON.parse(detailText) as { calls: unknown[]; path: Record<string, unknown>[] }
+  if (calls) {
+    detail.calls = calls
+  }
+  if (made) {
+    detail.path.push({
+      step: 'registerPurchase',
+      startedAt: '2026-10-10T04:00:00.000000Z',
+      finishedAt: '2026-10-10T04:00:03.000000Z',
+      decision: null,
+      output: null,
+      error: null,
+      problem: null,
+      traceId: null,
+      read: null,
+      made: { changes: null, event: null, notified: null, created: null, ...made },
+    })
+  }
+  return JSON.stringify(detail)
+}
+
 async function stepPanel() {
   return within(await screen.findByTestId('inspector-step-run'))
 }
@@ -1470,7 +1554,7 @@ describe('ProcessInstancePage step run panel', () => {
       'href',
       '/e2e/inspector/' + instanceId + '?step=managerApproval',
     )
-    expect(panel.queryByRole('tab')).not.toBeInTheDocument()
+    expect(panel.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Overview', 'Input', 'Output', 'Attempts'])
   })
 
   it("shows a task's assignee and its due time with Overdue while it is open past due", async () => {
@@ -1549,5 +1633,194 @@ describe('ProcessInstancePage step run panel', () => {
 
     expect(await stepPanel()).toBeDefined()
     expect(screen.getByTestId('address')).toHaveTextContent(/^\?step=registerPurchase$/)
+  })
+
+  it("shows a connector call's request as its method and address on one line, with its body as a table or JSON", async () => {
+    stubApi({ detail: { status: 200, body: detailForRun({ calls: [connectorCall()] }) } })
+
+    renderPage('?step=registerPurchase&stepTab=input')
+
+    const panel = await stepPanel()
+    const line = panel.getByTestId('inspector-run-request-line')
+    expect(line).toHaveTextContent('POST')
+    expect(line).toHaveTextContent('https://erp.example/orders')
+    expect(panel.getByText('Query parameters')).toBeVisible()
+    expect(panel.getByText('dryRun')).toBeVisible()
+    expect(panel.getByText('x-source')).toBeVisible()
+    expect(panel.getByRole('tab', { name: 'Table' })).toHaveAttribute('aria-selected', 'true')
+    expect(panel.getByText('title')).toBeVisible()
+    expect(panel.getByText('Laptops')).toBeVisible()
+    await userEvent.click(panel.getByRole('tab', { name: 'JSON' }))
+    expect(panel.getByText(/"title": "Laptops"/)).toBeVisible()
+  })
+
+  it('reads Hidden for a request that the reader may not see, and Not set for one the call kept none of', async () => {
+    stubApi({
+      detail: { status: 200, body: detailForRun({ calls: [connectorCall({ request: null, inputHidden: true })] }) },
+    })
+    const { unmount } = renderPage('?step=registerPurchase&stepTab=input')
+    const hidden = await stepPanel()
+    expect(hidden.getByText('Request')).toBeVisible()
+    expect(hidden.getByText('Hidden')).toBeVisible()
+    unmount()
+
+    stubApi({ detail: { status: 200, body: detailForRun({ calls: [connectorCall({ request: null })] }) } })
+    renderPage('?step=registerPurchase&stepTab=input')
+    expect((await stepPanel()).getByText('Not set')).toBeVisible()
+  })
+
+  it("shows a package call's values, and its returned values on the Output tab", async () => {
+    const call = {
+      ...connectorCall(),
+      kind: 'package',
+      connector: undefined,
+      package: 'PaymentReferences',
+      version: '1.0.0',
+      request: null,
+      input: { title: 'Laptops' },
+      returned: { reference: 'PAY-9' },
+    }
+    stubApi({ detail: { status: 200, body: detailForRun({ calls: [call] }) } })
+
+    renderPage('?step=registerPurchase&stepTab=input')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('Values')).toBeVisible()
+    expect(panel.getByText('Laptops')).toBeVisible()
+    await userEvent.click(panel.getByRole('tab', { name: 'Output' }))
+    expect(panel.getByText('Returned values')).toBeVisible()
+    expect(panel.getByText('PAY-9')).toBeVisible()
+  })
+
+  it('shows the answer that settled a connector call on the Output tab, with the body as a table', async () => {
+    stubApi({ detail: { status: 200, body: detailForRun({ calls: [connectorCall()] }) } })
+
+    renderPage('?step=registerPurchase&stepTab=output')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('Status')).toBeVisible()
+    expect(panel.getByText('201')).toBeVisible()
+    expect(panel.getByText('content-type')).toBeVisible()
+    expect(panel.getByText('PO-77')).toBeVisible()
+    expect(panel.queryByText('503')).not.toBeInTheDocument()
+  })
+
+  it('shows a changed field as a "−" line and a "+" line read as "Changed from X to Y", and a hidden change as Hidden', async () => {
+    stubApi({
+      detail: {
+        status: 200,
+        body: detailForRun({
+          calls: [],
+          made: {
+            changes: [
+              { field: 'amount', before: 100, after: 120, hidden: false },
+              { field: 'note', before: null, after: null, hidden: true },
+            ],
+          },
+        }),
+      },
+    })
+
+    renderPage('?step=registerPurchase&stepTab=output')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('amount')).toBeVisible()
+    expect(panel.getByText('− 100')).toHaveAttribute('aria-hidden', 'true')
+    expect(panel.getByText('+ 120')).toHaveAttribute('aria-hidden', 'true')
+    expect(panel.getByText('Changed from 100 to 120')).toBeInTheDocument()
+    const note = panel.getByText('note').closest('div')!
+    expect(within(note).getByText('Hidden')).toBeVisible()
+    expect(within(note).queryByText(/Changed from/)).not.toBeInTheDocument()
+  })
+
+  it('shows the event a run raised, the people it notified and the record it created', async () => {
+    stubApi({
+      detail: {
+        status: 200,
+        body: detailForRun({
+          calls: [],
+          made: {
+            event: { name: 'OrderPlaced', fields: [{ name: 'orderId', value: 'PO-77', hidden: false }] },
+            notified: {
+              to: [
+                { kind: 'user', name: 'Grace Hopper', id: 'grace', hidden: false },
+                { kind: 'role', name: 'buyers', id: null, hidden: false },
+                { kind: 'email', name: null, id: null, hidden: true },
+              ],
+              channels: ['inApp', 'email'],
+              subject: 'purchaseRequest.submit',
+            },
+            created: { entity: 'order', id: '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a99' },
+          },
+        }),
+      },
+    })
+
+    renderPage('?step=registerPurchase&stepTab=output')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('Event raised')).toBeVisible()
+    expect(panel.getByText('OrderPlaced')).toBeVisible()
+    expect(panel.getByText('PO-77')).toBeVisible()
+    expect(panel.getByText('Grace Hopper')).toBeVisible()
+    expect(panel.getByText('buyers')).toBeVisible()
+    expect(panel.getByText('Hidden')).toBeVisible()
+    expect(panel.getByText('In-app and Email')).toBeVisible()
+    expect(panel.getByText('Submit for approval')).toBeVisible()
+    expect(panel.getByText('Created record')).toBeVisible()
+  })
+
+  it("lists a call's attempts newest first and folds a row open to its start, trace id and answer", async () => {
+    stubApi({ detail: { status: 200, body: detailForRun({ calls: [connectorCall()] }) } })
+
+    renderPage('?step=registerPurchase&stepTab=attempts')
+
+    const panel = await stepPanel()
+    const table = within(panel.getByTestId('inspector-run-attempts'))
+    expect(table.getAllByRole('columnheader').map((head) => head.textContent)).toEqual([
+      '#',
+      'Result',
+      'HTTP',
+      'Duration',
+    ])
+    const [newest, oldest] = table.getAllByRole('row').slice(1)
+    expect(newest).toHaveTextContent('Succeeded')
+    expect(newest).toHaveTextContent('201')
+    expect(oldest).toHaveTextContent('Retryable')
+    expect(table.queryByText('Trace ID')).not.toBeInTheDocument()
+
+    await userEvent.click(within(newest).getByRole('button', { name: 'Show the details' }))
+
+    expect(table.getByText('Started')).toBeVisible()
+    expect(table.getByText('Trace ID')).toBeVisible()
+    expect(table.getByText('1bf76519')).toBeVisible()
+    expect(table.getByText('PO-77')).toBeVisible()
+    await userEvent.click(within(newest).getByRole('button', { name: 'Hide the details' }))
+    expect(table.queryByText('Trace ID')).not.toBeVisible()
+  })
+
+  it('says "No attempts yet." for a call with no attempts, in place of the table', async () => {
+    stubApi({
+      detail: { status: 200, body: detailForRun({ calls: [connectorCall({ attempts: [], state: 'pending' })] }) },
+    })
+
+    renderPage('?step=registerPurchase&stepTab=attempts')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('No attempts yet.')).toBeVisible()
+    expect(panel.queryByTestId('inspector-run-attempts')).not.toBeInTheDocument()
+  })
+
+  it('has no Input, Output or Attempts tab for the run of a task, so its panel has no tab bar', async () => {
+    stubApi()
+
+    renderPage('?step=managerApproval&stepTab=attempts')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('Assigned to')).toBeVisible()
+    for (const name of ['Input', 'Output', 'Attempts']) {
+      expect(panel.queryByRole('tab', { name })).not.toBeInTheDocument()
+    }
+    expect(panel.queryByRole('tablist')).not.toBeInTheDocument()
   })
 })

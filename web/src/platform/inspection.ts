@@ -238,14 +238,34 @@ export interface GraphStep {
   transitions: GraphTransition[]
 }
 
+/** One field a run changed. A `hidden` change has no values, see docs/reference/process-inspection.md#values-and-masking. */
+export interface RunChange {
+  field: string
+  before: unknown
+  after: unknown
+  hidden: boolean
+}
+
+/**
+ * One person or address a notification reached. `kind` is `user`, `role` or `email`. `name` is `null` for a `hidden`
+ * address, and `id` is a user's id.
+ */
+export interface RunRecipient {
+  kind: string
+  name: string | null
+  id: string | null
+  hidden: boolean
+}
+
 /**
  * What a run made, with each part `null` where it made none, see docs/reference/process-inspection.md#instance-detail.
- * The panel reads which part is set. What each part holds is for the Output tab.
+ * The shapes are for the Output tab: `changes` are the record's changed fields, `event` the event it raised with its
+ * fields, `notified` the people it reached with the channels and the subject's text key, and `created` the record it made.
  */
 export interface RunMade {
-  changes: unknown[] | null
-  event: { name: string } | null
-  notified: unknown | null
+  changes: RunChange[] | null
+  event: { name: string; fields: InstanceValue[] } | null
+  notified: { to: RunRecipient[]; channels: string[]; subject: string } | null
   created: { entity: string; id: string } | null
 }
 
@@ -261,6 +281,8 @@ export interface PathEntry {
   problem: StepProblem | null
   /** The trace id of the run that wrote the entry, or `null` when it stored none. */
   traceId: string | null
+  /** The record fields a decision's conditions read, `null` for another run and for an entry stored before the engine kept them. */
+  read?: InstanceValue[] | null
   /** What the run made. A detail from before the API sent it has none. */
   made?: RunMade
 }
@@ -284,6 +306,24 @@ export interface InstanceTask {
   completedAt: string | null
 }
 
+/** The request of a connector call's last sending attempt. `body` is the text sent, `null` when none was. */
+export interface CallRequest {
+  method: string
+  url: string
+  query: Record<string, string>
+  headers: Record<string, string>
+  body: string | null
+  truncated: boolean
+}
+
+/** The response of the outside system to an attempt. `body` is the text received, `null` when none came. */
+export interface CallResponse {
+  status: number
+  headers: Record<string, string>
+  body: string | null
+  truncated: boolean
+}
+
 /** An attempt or reconciliation lookup of a call. `kind` is `attempt` or `lookup`. */
 export interface CallAttempt {
   kind: string
@@ -297,6 +337,8 @@ export interface CallAttempt {
   problem: StepProblem | null
   /** The trace id of the run that wrote the row, or `null` when it stored none. */
   traceId: string | null
+  /** The outside system's answer, or `null` when the attempt got none and where the masking rule hides it. */
+  response?: CallResponse | null
 }
 
 /** An output the operation of a resolvable call declares. `type` is the field type, such as `text` or `decimal`. */
@@ -325,6 +367,10 @@ export interface InstanceCall {
   attempts: CallAttempt[]
   input: unknown
   inputHidden: boolean
+  /** The request of a connector call, or `null` when the call kept none and where the masking rule hides it. */
+  request?: CallRequest | null
+  /** The values a package call's operation returned, or `null` where it returned none and where the masking rule hides them. */
+  returned?: Record<string, unknown> | null
   /** Whether the signed-in user may resolve the call now. The server decides. */
   resolvable: boolean
   /** The outputs the operation declares. Only a resolvable call has them. */

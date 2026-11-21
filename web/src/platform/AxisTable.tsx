@@ -14,6 +14,7 @@ import {
 } from 'react'
 import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
+import { Chevron } from './Chevron'
 import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
 import { nameCompare } from './listOrder'
@@ -174,6 +175,11 @@ export interface AxisTableProps<T> {
   bulkActions?: AxisBulkAction<T>[]
   /** Whether a row is a group row: its empty cells stay blank instead of showing the em dash. */
   blankRow?: (row: T) => boolean
+  /**
+   * What a row folds open to when it has more to show than its columns, such as a call's attempt, or `null` for a row
+   * with none. A fold in the row's first cell opens and closes it, see docs/reference/actions-and-controls.md#tables.
+   */
+  details?: (row: T) => ReactNode | null
   /** Attributes for the row's element, such as test ids and data attributes. */
   rowAttributes?: (row: T, index?: number) => HTMLAttributes<HTMLElement>
   /** The test id of the table's outer element. */
@@ -233,6 +239,7 @@ export function AxisTable<T extends object>({
   rowActions,
   bulkActions,
   blankRow,
+  details,
   rowAttributes,
   testId,
 }: AxisTableProps<T>) {
@@ -248,6 +255,7 @@ export function AxisTable<T extends object>({
     setDraft(query?.search ?? '')
   }
   const [selectedKeys, setSelectedKeys] = useState<Key[]>([])
+  const [openRows, setOpenRows] = useState<string[]>([])
   const tableRef = useRef<HTMLDivElement>(null)
   // Ant Design has no prop for the focus of its scrolling region, so the attribute is set on the element.
   useEffect(() => {
@@ -450,14 +458,31 @@ export function AxisTable<T extends object>({
               ) : (
                 content
               )
-            if (lines.length === 0) {
-              return own
+            const cell =
+              lines.length === 0 ? (
+                own
+              ) : (
+                <>
+                  {own}
+                  <MovedCells lines={lines} width={room.lineWidth} />
+                </>
+              )
+            // The fold sits before the first cell's content, for a row that has details.
+            if (position !== 0 || details === undefined || details(row) == null) {
+              return cell
             }
+            const key = rowKey(row)
+            const open = openRows.includes(key)
             return (
-              <>
-                {own}
-                <MovedCells lines={lines} width={room.lineWidth} />
-              </>
+              <Flex align="start" gap={tokens.spacing.xs}>
+                <RowFold
+                  open={open}
+                  onToggle={() =>
+                    setOpenRows((rows) => (open ? rows.filter((candidate) => candidate !== key) : [...rows, key]))
+                  }
+                />
+                <div style={{ minWidth: 0 }}>{cell}</div>
+              </Flex>
             )
           },
         }
@@ -616,6 +641,18 @@ export function AxisTable<T extends object>({
                   : undefined
               }
               columns={antColumns}
+              expandable={
+                details
+                  ? {
+                      expandedRowKeys: openRows,
+                      expandedRowRender: (row) => (
+                        <div style={{ padding: `${tokens.spacing.xs}px ${cellPadding}px` }}>{details(row)}</div>
+                      ),
+                      rowExpandable: (row) => details(row) != null,
+                      showExpandColumn: false,
+                    }
+                  : undefined
+              }
               showHeader={!headless}
               // The table moves columns under their row first. Only what stays still and does not fit scrolls sideways.
               scroll={{ x: true }}
@@ -659,6 +696,22 @@ export function AxisTable<T extends object>({
         </>
       )}
     </Flex>
+  )
+}
+
+/**
+ * The fold of a row, an `AxisButton` of the role `icon` with `Chevron`, named "Show the details" or "Hide the details",
+ * see docs/reference/actions-and-controls.md#tables.
+ */
+function RowFold({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <AxisButton
+      role="icon"
+      icon={<Chevron point={open ? 'down' : 'right'} />}
+      nameKey={open ? 'shell.table.hideDetails' : 'shell.table.showDetails'}
+      aria-expanded={open}
+      onClick={onToggle}
+    />
   )
 }
 
