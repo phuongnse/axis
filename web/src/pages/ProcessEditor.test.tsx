@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import { useEffect, useState, type ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -11,7 +12,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, openDropdown, optionTexts, selectRoot } from '../test/antd'
+import { chooseOption, chooseRowAction, openDropdown, openRowMenu, optionTexts, selectRoot } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { ProcessEditor } from './ProcessEditor'
 
@@ -242,7 +243,7 @@ function ThemeRoot({ children }: { children: ReactNode }) {
 let schema: JsonSchema
 
 /** Applies each change to its own copy of the value, as the Studio editor does, and exposes the latest value. */
-function renderEditor(value: Record<string, unknown> = process, checked = false) {
+function renderEditor(value: Record<string, unknown> = process, checked = false, readOnly = false) {
   const latest = { value }
   function Harness() {
     const [draft, setDraft] = useState(value)
@@ -271,7 +272,9 @@ function renderEditor(value: Record<string, unknown> = process, checked = false)
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={names}>
-            <Harness />
+            <ConfigProvider componentDisabled={readOnly}>
+              <Harness />
+            </ConfigProvider>
           </StudioNamesContext.Provider>
         </TextProvider>
       </ThemeRoot>
@@ -1232,5 +1235,35 @@ describe('ProcessEditor choices, rows and required fields', () => {
       expect(field.getByRole(role)).not.toHaveAttribute('aria-required')
       expect(field.queryByText('*')).toBeNull()
     }
+  })
+})
+
+describe('ProcessEditor step actions', () => {
+  it("keeps a step's Move up, Move down and Delete in its menu, with Move up off on the first step", async () => {
+    renderEditor()
+    const menu = await openRowMenu(screen.getByTestId('studio-step-actions-0'))
+
+    expect(within(menu).getByRole('menuitem', { name: 'Move up' })).toHaveAttribute('aria-disabled', 'true')
+    expect(within(menu).getByRole('menuitem', { name: 'Move down' })).not.toHaveAttribute('aria-disabled', 'true')
+    expect(within(menu).getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
+  })
+
+  it("removes that step when Delete is chosen in the step's menu", async () => {
+    const latest = renderEditor()
+    await chooseRowAction(screen.getByTestId('studio-step-actions-1'), 'Delete')
+
+    expect((latest.value.steps as Record<string, unknown>[]).map((step) => step.name)).toEqual([
+      'submit',
+      'financeCheck',
+      'done',
+      'pause',
+    ])
+  })
+
+  it('shows no step menu while the editor is read-only', () => {
+    renderEditor(process, false, true)
+
+    expect(screen.queryAllByTestId(/^studio-step-actions-/)).toHaveLength(0)
+    expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
   })
 })

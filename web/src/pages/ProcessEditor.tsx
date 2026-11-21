@@ -1,9 +1,10 @@
-import { Button, Card, Flex, Input, Select, Typography } from 'antd'
+import { Button, Card, ConfigProvider, Flex, Input, Select, Typography } from 'antd'
 import { useContext } from 'react'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { RowActions } from '../platform/AxisTable'
 import { StudioNamesContext } from '../platform/studioNames'
 import type { StudioNames } from '../platform/studio'
 import type { JsonSchema } from '../platform/studioSchemas'
@@ -255,8 +256,10 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
 }
 
 /**
- * The card of one step of a process, as the Form tab shows it, for the Design tab's side panel. Move up and Move down
- * call `onMove`, and Remove calls `onRemove`. Each owns the change, the selection and what is said.
+ * The card of one step of a process, as the Form tab shows it, for the Design tab's side panel. Move up, Move down and
+ * Delete are entries of the card's "…" menu, which a read-only editor does not show, see
+ * docs/reference/process-designer.md#step-panel. Move up and Move down call `onMove`, and Delete calls `onRemove`.
+ * Each owns the change, the selection and what is said.
  */
 export function ProcessStepPanel({
   schema,
@@ -317,7 +320,7 @@ function Step({
   onChange: ChangeHandler
   layer?: DesignerLayer
 }) {
-  const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   const { field } = useFieldTexts('process')
   const pointer = `/steps/${index}`
   const type = typeof step.type === 'string' ? step.type : undefined
@@ -329,20 +332,28 @@ function Step({
         data-testid={`studio-step-${index}`}
         title={`${text(step.name)}, ${type ?? ''}`}
         extra={
-          <Flex gap="small">
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button disabled={index === 0} onClick={() => onMove(-1)}>
-              {t('shell.studio.process.moveUp')}
-            </Button>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button disabled={last} onClick={() => onMove(1)}>
-              {t('shell.studio.process.moveDown')}
-            </Button>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button danger onClick={onRemove}>
-              {t('shell.studio.delete')}
-            </Button>
-          </Flex>
+          componentDisabled ? undefined : (
+            <span data-testid={`studio-step-actions-${index}`}>
+              <RowActions
+                fold
+                actions={[
+                  {
+                    key: 'moveUp',
+                    labelKey: 'shell.studio.process.moveUp',
+                    disabled: index === 0,
+                    onClick: () => onMove(-1),
+                  },
+                  {
+                    key: 'moveDown',
+                    labelKey: 'shell.studio.process.moveDown',
+                    disabled: last,
+                    onClick: () => onMove(1),
+                  },
+                  { key: 'delete', labelKey: 'shell.studio.delete', destructive: true, onClick: onRemove },
+                ]}
+              />
+            </span>
+          )
         }
       >
         <Flex vertical gap="small">
