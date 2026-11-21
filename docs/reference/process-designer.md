@@ -186,7 +186,7 @@ field of the picked entity, as the `updateRecord` panel has for the subject enti
 
 ### Notify
 
-The operation picker offers `notify`. Its recipients are rows, with Add recipient and Remove. Each row stacks
+The operation picker offers `notify`. Its recipients are rows, with Add recipient on the recipients' title row and Remove recipient in each row's "…" menu, and a read-only tab shows neither. Each row stacks
 a Recipient type choice of User, Role or Email, with a help line under each option, then the one field of that
 type: a user expression, a role picker or an email expression. Each field has its label and help, one field to
 a line, and the required fields are marked. Its `inApp` and `email` channels are two checkboxes, and
@@ -206,7 +206,8 @@ The `input` of a `callConnector` step is rows. Each row stacks a Name, a Kind ch
 with a help line under each option, and an Expression for a value. Each field has its label and help, one
 field to a line, and the required fields are marked. The names route lists no input types, so the panel
 reads a row's kind from the draft: text is a Value, an object with `from` a List, and any other object an
-Object.
+Object. Add row and each row's Remove sit as [the operation's rows](studio-editors-by-kind.md#process-editor) have
+them, and a row's Remove removes what is nested in it.
 
 - **Object.** An `object` shows nested rows, each with the same Name, Kind and Expression, over the subject.
 - **List.** A `list` shows a From picker of the subject's child collections, then nested field rows with

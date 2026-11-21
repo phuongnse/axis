@@ -1,6 +1,7 @@
-import { Button, Flex, Input, Select, Typography } from 'antd'
+import { ConfigProvider, Flex, Input, Select, Typography } from 'antd'
 import { useContext } from 'react'
 import { AxisButton } from '../platform/AxisButton'
+import { RowActions } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
 import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
@@ -18,7 +19,8 @@ function escapeSegment(segment: string): string {
  * row's field is picked from `fields`, or typed while they are unknown. The rows edit the draft through `onChange`: a
  * rename keeps the row's place in the file, and a value that is not an object is left to the JSON view. The rows sit in
  * a part headed with the values' title and help, and an endpoint with no values says so. Its Add mapping sits on the right
- * of the part's heading, see docs/reference/studio-resource-form.md#sections.
+ * of the part's heading, see docs/reference/studio-resource-form.md#sections, and each row's Remove is in its "…" menu. A
+ * read-only editor, Ant Design's `componentDisabled`, shows neither, see docs/reference/studio-form-editors.md#endpoint-rows.
  */
 export function EndpointValues({
   fields,
@@ -31,6 +33,7 @@ export function EndpointValues({
 }) {
   const t = useText()
   const check = useContext(ExpressionCheckContext)
+  const { componentDisabled } = ConfigProvider.useConfig()
 
   const heading = {
     title: t('shell.studio.field.endpoint.values'),
@@ -59,13 +62,12 @@ export function EndpointValues({
     onChange('/values', Object.fromEntries(entries.map(([key, value]) => [key === from ? to : key, value])))
   }
 
-  // Add mapping sits on the right of the heading, see docs/reference/studio-resource-form.md#sections. An explicit `false`
-  // would override a read-only editor's componentDisabled, so the button passes `undefined` unless a blank key holds it.
+  // Add mapping sits on the right of the heading, see docs/reference/studio-resource-form.md#sections.
   const add =
     fields === undefined ? (
       <AxisButton
         role="secondary"
-        disabled={entries.some(([key]) => key === '') || undefined}
+        disabled={entries.some(([key]) => key === '')}
         onClick={() => onChange('/values/', '')}
       >
         {t('shell.studio.endpoint.addMapping')}
@@ -84,43 +86,56 @@ export function EndpointValues({
     )
 
   return (
-    <SectionPart testName="values" heading={heading} action={add}>
+    <SectionPart testName="values" heading={heading} action={componentDisabled ? undefined : add}>
       <div data-testid="studio-field-/values">
         <Flex vertical gap="small">
           {entries.map(([key, expression], index) => {
             const pointer = `/values/${escapeSegment(key)}`
             const text = typeof expression === 'string' ? expression : ''
             return (
-              <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
-                <div>
-                  {fields === undefined ? (
-                    <Input
-                      aria-label={t('shell.studio.endpoint.field')}
-                      value={key}
-                      onChange={(event) => rename(key, event.target.value)}
-                    />
-                  ) : (
-                    <ReferencePicker
-                      name={t('shell.studio.endpoint.field')}
-                      value={key}
+              <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-${pointer}`}>
+                <Flex gap="small" align="flex-start" wrap style={{ flex: 1 }}>
+                  <div>
+                    {fields === undefined ? (
+                      <Input
+                        aria-label={t('shell.studio.endpoint.field')}
+                        value={key}
+                        onChange={(event) => rename(key, event.target.value)}
+                      />
+                    ) : (
+                      <ReferencePicker
+                        name={t('shell.studio.endpoint.field')}
+                        value={key}
+                        required
+                        options={fields}
+                        onChange={(next) => rename(key, next ?? '')}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 240 }}>
+                    <ExpressionField
+                      check={check}
+                      pointer={pointer}
+                      name={t('shell.studio.endpoint.expression')}
+                      value={text}
                       required
-                      options={fields}
-                      onChange={(next) => rename(key, next ?? '')}
+                      onChange={onChange}
                     />
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: 240 }}>
-                  <ExpressionField
-                    check={check}
-                    pointer={pointer}
-                    name={t('shell.studio.endpoint.expression')}
-                    value={text}
-                    required
-                    onChange={onChange}
+                  </div>
+                </Flex>
+                {componentDisabled ? null : (
+                  <RowActions
+                    fold
+                    actions={[
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.studio.endpoint.removeMapping',
+                        destructive: true,
+                        onClick: () => onChange(pointer, undefined),
+                      },
+                    ]}
                   />
-                </div>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.endpoint.removeMapping')}</Button>
+                )}
               </Flex>
             )
           })}

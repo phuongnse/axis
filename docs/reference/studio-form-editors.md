@@ -44,6 +44,11 @@ The field is picked from the fields of the endpoint's entity, found by name amon
 names, and is typed while those are unknown. Add mapping lists the fields that have no row. Renaming a
 row's field keeps its place in the file, and a value that is not an object is left to the JSON view.
 
+- **Where the actions sit.** Add mapping is a light action on the part's title row. Each row's "…" menu holds Remove.
+  The `event`'s fields use the same rows.
+- **Read-only.** While the tab is read-only, such as while the JSON has an error, the part shows neither Add mapping nor
+  any row's menu.
+
 ## Form steps
 
 A form keeps the generic form for its entity, sections and fields, with an

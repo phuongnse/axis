@@ -7,7 +7,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { optionTexts } from '../test/antd'
+import { optionTexts, shownMenu } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { EndpointValues } from './EndpointValues'
 
@@ -76,7 +76,8 @@ describe.each(['light', 'dark'])('EndpointValues in %s mode', (mode) => {
       expect(row).toBeVisible()
       expect(within(row).getByRole('combobox', { name: 'Field' })).toBeVisible()
       expect(within(row).getByRole('textbox', { name: 'Expression' })).toBeVisible()
-      expect(within(row).getByRole('button', { name: 'Remove' })).toBeVisible()
+      expect(within(row).getByRole('button', { name: 'Actions' })).toBeVisible()
+      expect(within(row).queryByRole('button', { name: 'Remove' })).toBeNull()
     }
     expect(screen.getByRole('combobox', { name: 'Add mapping' })).toBeVisible()
   })
@@ -119,11 +120,13 @@ describe('EndpointValues', () => {
   )
 
   it.each(addMapping)(
-    'keeps Add mapping off when the editor is read-only and the fields are $when',
-    ({ known, role }) => {
+    'shows no Add mapping and no row menu when the editor is read-only and the fields are $when',
+    ({ known }) => {
       renderValues(values, vi.fn(), known, true)
 
-      expect(screen.getByRole(role, { name: 'Add mapping' })).toBeDisabled()
+      expect(screen.queryByRole('combobox', { name: 'Add mapping' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Add mapping' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull()
     },
   )
 
@@ -131,8 +134,10 @@ describe('EndpointValues', () => {
     const onChange = renderValues()
 
     await userEvent.click(
-      within(screen.getByTestId('studio-field-/values/department')).getByRole('button', { name: 'Remove' }),
+      within(screen.getByTestId('studio-field-/values/department')).getByRole('button', { name: 'Actions' }),
     )
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     expect(onChange).toHaveBeenLastCalledWith('/values/department', undefined)
   })
 
