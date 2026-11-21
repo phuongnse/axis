@@ -1,5 +1,6 @@
 import { Button, Flex, Form, Input, Modal, Select, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { StatusTag } from '../platform/StatusTag'
 import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
@@ -856,10 +857,18 @@ export function StudioModuleContract({
             <ul data-testid="studio-contract-diagnostics" style={{ margin: 0 }}>
               {layerDiagnostics.map((diagnostic, index) => (
                 <li key={`${diagnostic.code}-${diagnostic.path}-${index}`}>
-                  <Typography.Text strong type={diagnostic.severity === 'error' ? 'danger' : 'warning'}>
-                    {diagnostic.code}
-                  </Typography.Text>{' '}
-                  {diagnostic.message}
+                  <Flex gap="small" align="baseline" wrap>
+                    <StatusTag tone={diagnostic.severity === 'error' ? 'danger' : 'attention'}>
+                      {t(
+                        diagnostic.severity === 'error'
+                          ? 'shell.studio.problems.severity.error'
+                          : 'shell.studio.problems.severity.warning',
+                      )}
+                    </StatusTag>
+                    <span>
+                      <strong>{diagnostic.code}</strong> {diagnostic.message}
+                    </span>
+                  </Flex>
                 </li>
               ))}
             </ul>

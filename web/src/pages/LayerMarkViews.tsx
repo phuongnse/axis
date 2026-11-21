@@ -26,11 +26,9 @@ export function LayerMarkLabel({
 }) {
   const t = useText()
   return (
-    <span role="note" aria-label={markName(t, mark, name)}>
-      <StatusTag tone="neutral" data-testid={testId}>
-        {t(`shell.studio.module.${mark}`)}
-      </StatusTag>
-    </span>
+    <StatusTag tone="neutral" role="note" aria-label={markName(t, mark, name)} data-testid={testId}>
+      {t(`shell.studio.module.${mark}`)}
+    </StatusTag>
   )
 }
 
