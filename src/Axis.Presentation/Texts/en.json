@@ -847,8 +847,6 @@
   "shell.inspector.run.eventFields": "Event fields",
   "shell.inspector.run.notified": "Notified",
   "shell.inspector.run.channels": "Channels",
-  "shell.inspector.run.channelNames.inApp": "In-app",
-  "shell.inspector.run.channelNames.email": "Email",
   "shell.inspector.run.subject": "Subject",
   "shell.inspector.run.created": "Created record",
   "shell.inspector.run.result": "Result",

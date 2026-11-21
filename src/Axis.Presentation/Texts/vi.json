@@ -847,8 +847,6 @@
   "shell.inspector.run.eventFields": "Trường của sự kiện",
   "shell.inspector.run.notified": "Đã thông báo",
   "shell.inspector.run.channels": "Kênh",
-  "shell.inspector.run.channelNames.inApp": "Trong ứng dụng",
-  "shell.inspector.run.channelNames.email": "Thư điện tử",
   "shell.inspector.run.subject": "Tiêu đề",
   "shell.inspector.run.created": "Bản ghi đã tạo",
   "shell.inspector.run.result": "Kết quả",

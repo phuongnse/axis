@@ -181,7 +181,8 @@ function Recipient({ recipient }: { recipient: RunRecipient }) {
 
 /** The words of a notification's channel, or the channel as stored for one this build does not know. */
 function channelText(t: Translate, channel: string): string {
-  return channel === 'inApp' || channel === 'email' ? t(`shell.inspector.run.channelNames.${channel}`) : channel
+  if (channel === 'inApp') return t('shell.studio.process.channelInApp')
+  return channel === 'email' ? t('shell.studio.process.channelEmail') : channel
 }
 
 /**
