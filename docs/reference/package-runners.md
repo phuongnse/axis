@@ -87,7 +87,7 @@ package reaches nothing of the host and no binding of another call.
 - **No host.** A host that cannot be reached, that starts no runner, or that is not set makes the
   attempt retryable, because the operation never ran. The error names the setting of the call's runtime.
 
-The server reads `Extensions:Isolation`, and the worker reads all seven settings. The publisher reads `Extensions:Runners:Application` and `Extensions:Runners:ProxyPort` only:
+The server reads `Extensions:Isolation`, and the worker reads all seven settings. The publisher reads `Extensions:Runners:Application`, `Extensions:Runners:ProxyPort` and `Extensions:ApplicationPackages` only:
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |

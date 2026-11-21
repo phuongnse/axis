@@ -10,9 +10,24 @@ import { useStudioConnection } from '../platform/studioConnection'
 /** The file that names a package, see docs/reference/studio-packages.md#the-packages-entry. */
 const manifestPath = 'axis-package.json'
 
+/** One input field of a package's operation, as its manifest declares it. */
+export interface PackageOperationField {
+  name: string
+  type: string
+  required: boolean
+}
+
+/** One operation of a package, with its input fields, as its manifest declares them. */
+export interface PackageOperation {
+  name: string
+  input: PackageOperationField[]
+}
+
 /**
  * One package folder under `packages/`. `label`, `language` and `version` come from its manifest. A package whose manifest is
  * missing or is not valid JSON has its id as the label, and no language or version. `files` are the paths in the package.
+ * `operations` are the manifest's operations that have a name, each with the input fields that have a name and a type,
+ * and none when the manifest lists none.
  */
 export interface PackageRow {
   id: string
@@ -20,6 +35,7 @@ export interface PackageRow {
   language: string | null
   version: string | null
   files: string[]
+  operations: PackageOperation[]
 }
 
 /** The packages of one application, or null when they did not load. `application` says which one they were loaded for. */
@@ -29,6 +45,32 @@ type PackagesState = { application: string; rows: PackageRow[] | null }
 function manifestText(manifest: Record<string, unknown> | null, name: string): string | null {
   const value = manifest?.[name]
   return typeof value === 'string' && value !== '' ? value : null
+}
+
+/** The operations of a manifest, keeping each with a text name and its input fields with a text name and type. */
+function manifestOperations(manifest: Record<string, unknown> | null): PackageOperation[] {
+  const list = manifest?.operations
+  if (!Array.isArray(list)) {
+    return []
+  }
+  return list.flatMap((entry: unknown): PackageOperation[] => {
+    const operation = entry as { name?: unknown; input?: unknown } | null
+    if (typeof operation?.name !== 'string') {
+      return []
+    }
+    const input = Array.isArray(operation.input) ? (operation.input as unknown[]) : []
+    return [
+      {
+        name: operation.name,
+        input: input.flatMap((field: unknown): PackageOperationField[] => {
+          const candidate = field as { name?: unknown; type?: unknown; required?: unknown } | null
+          return typeof candidate?.name === 'string' && typeof candidate.type === 'string'
+            ? [{ name: candidate.name, type: candidate.type, required: candidate.required === true }]
+            : []
+        }),
+      },
+    ]
+  })
 }
 
 /** The manifest at the package's root, or null when the package has none or it is not a JSON object. */
@@ -72,6 +114,7 @@ async function loadRows(
         language: manifestText(manifest, 'language'),
         version: manifestText(manifest, 'version'),
         files: files.toSorted(),
+        operations: manifestOperations(manifest),
       }
     }),
   )

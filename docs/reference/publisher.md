@@ -8,7 +8,9 @@ are on that page. In this page, "database role" always means the PostgreSQL role
 `publisher` runs the [publish requests](authoring-publishing.md#publishing) that Studio stores, and the
 provisioning jobs of a cell. It is the only host that activates a release on an author's behalf, so
 the server never needs a tenant schema connection. It takes no option and, unlike the other commands,
-runs until it is stopped. It has no HTTP endpoint and listens on no port, so nothing can call it.
+runs until it is stopped. It has no HTTP endpoint, so nothing can call it. With `Extensions:ApplicationPackages` on, it also runs an
+egress proxy on `Extensions:Runners:ProxyPort` for a package `run`, which only the application package host reaches, see
+[package runners](package-runners.md#package-runners).
 
 The `axis-admin` image runs it. Both production installs start one, see
 [installation](installation.md), and `scripts/dev.sh`, the Docker Compose file in the repository root
