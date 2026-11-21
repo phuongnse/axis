@@ -3,12 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { DatePicker, Table, theme } from 'antd'
 import viVN from 'antd/locale/vi_VN'
 import dayjs from 'dayjs'
-import { useEffect, type ReactNode } from 'react'
+import { useContext, useEffect, type ReactNode } from 'react'
 import { MemoryRouter, type InitialEntry } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
-import { designTokensFor, sizeTokens } from './designTokens'
+import { ContentInsetContext } from './contentInsetContext'
+import { designTokensFor, sizeTokens, spacingTokens } from './designTokens'
 import { PreferencesMenu } from './PreferencesMenu'
 import { SaveBar } from './SaveBar'
 import { Shell } from './Shell'
@@ -42,6 +43,12 @@ const navigationTexts = [
     fallbackTexts: {},
   },
 ]
+
+/** Shows the content inset that the shell gives the content area, which a band reaches past. */
+function InsetReader() {
+  const inset = useContext(ContentInsetContext)
+  return <span data-testid="inset">{inset}</span>
+}
 
 /** Shows the container background token the theme gives components inside the shell. */
 function Background() {
@@ -562,6 +569,26 @@ describe('Shell sidebar claimed by a page', () => {
     await screen.findByRole('link', { name: 'Entities' })
 
     expect(mounts).toBe(1)
+  })
+
+  it('gives the content area its inset of spacing-lg, which a page reads, while no page claims the sidebar', () => {
+    renderShell('en', ['/'], notesNavigation.slice(0, 1), <InsetReader />)
+
+    expect(screen.getByTestId('inset').textContent).toBe(String(spacingTokens.lg))
+  })
+
+  it('gives the content area its inset of spacing-md once a page claims the sidebar', async () => {
+    renderShell(
+      'en',
+      ['/'],
+      notesNavigation.slice(0, 1),
+      <>
+        {claim()}
+        <InsetReader />
+      </>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('inset').textContent).toBe(String(spacingTokens.md)))
   })
 })
 

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { ContentInsetContext } from '../platform/contentInsetContext'
 import { colourTokens } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioDiagnostic, StudioReleaseItem, StudioReleases } from '../platform/studio'
@@ -50,18 +51,21 @@ function renderBand(
   history: StudioReleases | 'failed' | undefined,
   diagnostics: StudioDiagnostic[] = [],
   onToggleProblems = vi.fn(),
+  inset = 0,
 ) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioBand
-          diagnostics={diagnostics}
-          history={history}
-          problemsOpen={false}
-          onToggleProblems={onToggleProblems}
-        >
-          <button type="button">Action</button>
-        </StudioBand>
+        <ContentInsetContext.Provider value={inset}>
+          <StudioBand
+            diagnostics={diagnostics}
+            history={history}
+            problemsOpen={false}
+            onToggleProblems={onToggleProblems}
+          >
+            <button type="button">Action</button>
+          </StudioBand>
+        </ContentInsetContext.Provider>
       </TextProvider>
     </ThemeModeProvider>,
   )
@@ -103,6 +107,18 @@ describe('StudioBand', () => {
     await userEvent.click(screen.getByTestId('studio-problems'))
 
     expect(toggle).toHaveBeenCalledOnce()
+  })
+
+  it.each([16, 24])("reaches the page area's edges by the content inset of %dpx it is given", (inset) => {
+    renderBand(live, [], vi.fn(), inset)
+
+    expect(screen.getByTestId('studio-band')).toHaveStyle({
+      marginTop: `-${inset}px`,
+      marginLeft: `-${inset}px`,
+      marginRight: `-${inset}px`,
+      paddingLeft: `${inset}px`,
+      paddingRight: `${inset}px`,
+    })
   })
 
   it('says Changes not live when the folder differs from the live release', () => {

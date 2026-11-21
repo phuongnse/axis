@@ -1,6 +1,7 @@
 import { Flex, Typography } from 'antd'
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { ContentInsetContext } from './contentInsetContext'
 import { useDesignTokens } from './themeMode'
 
 /** The element of the page's heading that {@link PageActions} draws into: `null` before it is drawn, `undefined` outside a page. */
@@ -97,14 +98,16 @@ export function PageHeading({
 
 function HeaderBand({ children }: { children: ReactNode }) {
   const { colour, spacing } = useDesignTokens()
+  const inset = useContext(ContentInsetContext)
 
   return (
     <div
       data-testid="page-band"
       style={{
-        // Negative margins reach the edges of the content area, whose padding is spacing.lg.
-        margin: `-${spacing.lg}px -${spacing.lg}px 0`,
-        padding: `${spacing.md}px ${spacing.lg}px`,
+        // Negative margins reach the edges of the content area, whose padding the shell gives through ContentInsetContext,
+        // see docs/reference/shell.md#layout.
+        margin: `-${inset}px -${inset}px 0`,
+        padding: `${spacing.md}px ${inset}px`,
         background: colour.surface,
         borderBottom: `1px solid ${colour.borderSubtle}`,
       }}
