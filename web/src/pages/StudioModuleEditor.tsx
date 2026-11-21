@@ -396,7 +396,8 @@ export function StudioModuleEditor({
         <Flex gap="small" align="center">
           <Tag data-testid="studio-module-layer">{t('shell.studio.module.layer')}</Tag>
           <AxisButton
-            role="destructive"
+            role="secondary"
+            destructive
             data-testid="studio-module-reset-all"
             disabled={saving || resetting || reconnecting}
             onClick={() => setResetOpen(true)}

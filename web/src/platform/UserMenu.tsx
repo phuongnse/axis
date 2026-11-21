@@ -68,7 +68,7 @@ export function UserMenu() {
   return (
     <Dropdown trigger={['click']} menu={{ items, 'aria-label': t('shell.account.label') }}>
       <AxisButton
-        role="plain"
+        role="subtle"
         caret
         style={{ display: 'inline-flex', alignItems: 'center', gap: spacing.xs, minWidth: 0, maxWidth: 200 }}
       >

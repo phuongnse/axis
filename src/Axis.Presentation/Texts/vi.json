@@ -2300,7 +2300,6 @@
   "shell.studio.deleteUsedBy": "Những chỗ sau đang dùng tài nguyên này và sẽ lỗi:",
   "shell.studio.deleteFailed": "Không xóa được tài nguyên.",
   "shell.studio.delete.button": "Xóa…",
-  "shell.studio.resourceActions": "Thao tác khác",
   "shell.studio.deleteSeeUses": "Xem nơi sử dụng",
   "shell.studio.labelKey": "Khóa văn bản",
   "shell.studio.labelUsedBy": "Những tên hiển thị khác cũng dùng khóa này và sẽ đổi theo:",

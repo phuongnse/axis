@@ -29,6 +29,11 @@ export type AxisButtonProps =
       icon?: never
       /** A text trigger that opens a menu ends in a caret, see docs/reference/actions-and-controls.md#menus. */
       caret?: boolean
+      /**
+       * Proposed, #4902: the destructive tone, `dangerText`, for an action that removes. A tone of the main, secondary
+       * and subtle roles, never of the finish button, see docs/reference/actions-and-controls.md#buttons.
+       */
+      destructive?: boolean
     })
   | (Omit<Base, 'children' | 'aria-label'> & {
       role: 'icon'
@@ -264,15 +269,17 @@ export function AxisActionRow({
 }
 
 /**
- * The one button of Axis, see docs/reference/actions-and-controls.md#buttons. `finish` completes a form or a dialog and
- * is solid primary. `main` is the main action of a page and is an outline in `primaryText`. `secondary` is every other
- * action and is the grey outline. `destructive` removes data and is an outline in `dangerText`. `icon` has no text, so
- * it takes a text key and shows the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless
- * `joined` draws it as a bordered default button for a control joined to an input. Inside an `AxisActionRow`, `main`,
- * `secondary` and `destructive` are text buttons, `main` in `primaryText` and `destructive` in `dangerText`. `plain` is
- * a borderless text button in the text colour, for header controls such as the account button. `caret` adds a down
- * caret after the text of any text role. `link` is a button drawn as a link, in `primaryText`, for an action that goes to
- * no address. The role is not passed on to the DOM.
+ * The one button of Axis, see docs/reference/actions-and-controls.md#buttons. Proposed, #4902: four roles, by weight.
+ * `finish` completes a form or a dialog and is solid primary. `main` is the main action of a region and is an outline in
+ * `primaryText`, which it keeps wherever it sits, a title row included. `secondary` is most actions and is the grey
+ * outline. `subtle` is a tool, such as Refresh or Undo, and is borderless in the text colour, with a light fill on hover.
+ * `icon` is a subtle button with only an icon, so it takes a text key and shows the name as a tooltip on hover and on
+ * keyboard focus; `joined` draws it bordered, for a control joined to an input. `destructive` is a tone of `main`,
+ * `secondary` and `subtle`: `dangerText` for an action that removes. Inside an `AxisActionRow` beside a finish button,
+ * `main` and `secondary` are borderless in the text colour, or in `dangerText` when destructive, so the finish button is
+ * the only filled shape and no button looks like a link. `caret` adds a down caret after the text of any text role.
+ * `link` is a button drawn as a link, in `primaryText`, for an action that goes to no address. The role is not passed on
+ * to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
@@ -280,41 +287,50 @@ export function AxisButton(props: AxisButtonProps) {
 
   if (props.role === 'icon') return <IconButton {...props} />
 
-  const { role, style, disabled, caret, children, ...rest } = props
+  const { role, style, disabled, caret, destructive, children, ...rest } = props
   const body = {
     ...rest,
     children: caret ? [children, <Chevron key="caret" />] : children,
   }
   const outline = (text: string): CSSProperties => (disabled ? {} : { color: text, borderColor: text })
   const tinted = (text: string): CSSProperties => (disabled ? {} : { color: text })
-  const variant = inRow ? 'text' : 'outlined'
+  const danger = destructive === true
+  // Borderless beside a finish button, and always for a tool: the text colour, or `dangerText` for the destructive tone.
+  const borderless = (
+    <Button
+      {...body}
+      type="text"
+      disabled={disabled}
+      style={{ ...(danger ? tinted(colour.dangerText) : {}), ...style }}
+    />
+  )
   switch (role) {
     case 'finish':
       return <Button {...body} type="primary" disabled={disabled} style={style} />
     case 'main':
-      return (
+      return inRow ? (
+        borderless
+      ) : (
         <Button
           {...body}
-          color="primary"
-          variant={variant}
+          variant="outlined"
           disabled={disabled}
-          style={{ ...(inRow ? tinted(colour.primaryText) : outline(colour.primaryText)), ...style }}
-        />
-      )
-    case 'destructive':
-      return (
-        <Button
-          {...body}
-          color="danger"
-          variant={variant}
-          disabled={disabled}
-          style={{ ...(inRow ? tinted(colour.dangerText) : outline(colour.dangerText)), ...style }}
+          style={{ ...outline(danger ? colour.dangerText : colour.primaryText), ...style }}
         />
       )
     case 'secondary':
-      return <Button {...body} type={inRow ? 'text' : 'default'} disabled={disabled} style={style} />
-    case 'plain':
-      return <Button {...body} type="text" disabled={disabled} style={style} />
+      return inRow ? (
+        borderless
+      ) : (
+        <Button
+          {...body}
+          type="default"
+          disabled={disabled}
+          style={{ ...(danger ? outline(colour.dangerText) : {}), ...style }}
+        />
+      )
+    case 'subtle':
+      return borderless
     case 'link':
       return (
         <Button
@@ -337,7 +353,7 @@ export function AxisButtonGroup({
   nameKey,
   actions,
 }: {
-  role: 'main' | 'secondary' | 'destructive'
+  role: 'main' | 'secondary'
   nameKey: string
   actions: readonly {
     key: string

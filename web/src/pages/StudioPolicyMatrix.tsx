@@ -523,7 +523,8 @@ function OwnGrants({
                 </Typography.Text>
               )}
               <AxisButton
-                role="destructive"
+                role="secondary"
+                destructive
                 size="small"
                 disabled={grants.length === 1}
                 onClick={() => edit(`/grants/${index}`, undefined)}

@@ -176,7 +176,7 @@ function ItemLine<T>({
         <Flex align="center" justify="space-between" gap="small" wrap>
           <span>{t(texts.deleteConfirm).replace('{name}', itemName)}</span>
           <Flex gap="small">
-            <AxisButton role="destructive" disabled={working} onClick={() => void remove()}>
+            <AxisButton role="secondary" destructive disabled={working} onClick={() => void remove()}>
               {t(texts.delete)}
             </AxisButton>
             <AxisButton role="secondary" onClick={show}>

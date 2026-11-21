@@ -372,7 +372,7 @@ export function SignUpPage({
             <AxisButton role="secondary" loading={resending} onClick={sendAgain}>
               {t('signUp.inbox.sendAgain')}
             </AxisButton>
-            <AxisButton role="plain" onClick={changeEmail}>
+            <AxisButton role="subtle" onClick={changeEmail}>
               {t('signUp.inbox.changeEmail')}
             </AxisButton>
           </Flex>

@@ -121,7 +121,7 @@ function StubCard({
             />
           )}
           <div>
-            <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
+            <AxisButton role="secondary" destructive onClick={() => onChange(pointer, undefined)}>
               {t('shell.studio.scenario.remove')}
             </AxisButton>
           </div>
@@ -217,7 +217,7 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
                       onChange={(next: string[]) => onChange(pointer, next)}
                     />
                   </AxisField>
-                  <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
+                  <AxisButton role="secondary" destructive onClick={() => onChange(pointer, undefined)}>
                     {t('shell.studio.scenario.remove')}
                   </AxisButton>
                 </Flex>
