@@ -74,7 +74,9 @@ away instead.
 ## Lists of objects
 
 A list of objects is a table with one column per property, named by its field text. A list of plain
-values keeps its rows of inputs.
+values and a map with marked keys are rows of inputs, with no box round a row, and spacing sets the
+rows apart. Add, or Add row in a dialog, is a light text button on the list's title row. Each row's
+Remove is in its "…" menu, the table's row actions. A field in `readOnlyNames` shows none of them.
 
 - **A cell shows content, never a bare count.** A cell shows the value, Yes or No, a label's text, a
   nested list's items one to a line, or a map's entries as `key: value`. A label shows its text in the
@@ -94,8 +96,8 @@ values keeps its rows of inputs.
   list as one step to undo. Done stays on, and a click on it with a required field empty shows what to fill in under
   each such field and focuses the first, as [fields](actions-and-controls.md#fields) says, and the dialog stays open.
   Cancel leaves the list as it was, so
-  Add… adds no row until Done. Inside the dialog a nested list is rows of inputs with Add row, because a
-  dialog never opens another.
+  Add… adds no row until Done. Inside the dialog a nested list is rows of inputs with Add row on its title
+  row, because a dialog never opens another.
 - **Labels in the dialog.** The texts typed in a label's boxes in the dialog are held with the copy. Done
   writes them with the item, in the same step to undo, and Cancel drops them, so the label's texts stay as
   they were.
