@@ -441,13 +441,19 @@ change, a design review and a sync are in the
   It keeps one look for each control. It never trims a shared control, such as a tab row, a button's size
   or a rule, to suit one place. Before it changes a shared widget's behaviour, the session lists each place
   that uses it and checks each one. The widget is one mechanism for all of them, as
-  [shared widgets](reference/shared-widgets.md#the-rule) says. A change that alters another screen goes to
-  the owner before it is built. If the owner accepts it, it becomes its own design issue, as a step that
-  reaches outside its subject does.
-- **A step stays one step.** When a step reaches anything outside the subject, not only a new screen or a
-  new concept of the platform, the session proposes it to the owner as its own design issue. The issue
-  has the `design` and `on-hold` labels and no milestone. It is *blocked by* the review's design issue
-  only when it builds on what that issue agrees. The step goes on without it.
+  [shared widgets](reference/shared-widgets.md#the-rule) says. A change the subject needs in a shared
+  widget is made for every screen that uses it, because a shared part is one look and one behaviour. The
+  step's rule comment names that reach. The session asks the owner only about the design choice, not
+  whether the other screens follow.
+- **Each change is checked against the subject before it is built.** Before the session builds a change
+  the owner asks for, it names the subject the change belongs to, by the rule of the bullet **A design
+  issue designs one subject** above. So the owner never has to ask whether a change is in scope. When a
+  change, or any part a step reaches, is outside the subject, the session says so in its reply. It names
+  that subject and recommends where the change goes: the open design issue of that subject, or a new
+  design issue with the `design` and `on-hold` labels and no milestone. A new issue is *blocked by* the
+  review's design issue only when it builds on what that issue agrees. The session builds nothing outside
+  the subject until the owner has chosen, and the rest of the step goes on. A requested change is checked
+  the same way against the subjects of the open design issues.
 - **The design runs ahead of the repository only by open issues.** While a design issue is open, the
   artifact holds its change and its last change note names the issue. A review does not change the
   artifact: it is published once the review's issues are merged, so nothing else in the artifact
