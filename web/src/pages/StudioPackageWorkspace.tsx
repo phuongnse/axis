@@ -31,6 +31,7 @@ import type { CodeCursor, CodeEditorHandle } from './CodeEditor'
 import { PlatformContext } from './context'
 import { fileLanguage } from './fileLanguage'
 import { useFillHeight } from './jsonViewHeight'
+import { StudioPackageRun } from './StudioPackageRun'
 import { StudioProblemList } from './StudioProblems'
 import { useStudioPackages, type PackageRow } from './useStudioPackages'
 
@@ -38,8 +39,11 @@ const CodeEditor = lazy(() => import('./CodeEditor'))
 
 /** The explorer's width. Handles that set it are planned, see docs/reference/studio-packages.md#a-packages-files. */
 const explorerWidth = 240
-/** The output panel's height. Handles that set it are planned, see docs/reference/studio-packages.md#a-packages-files. */
-const outputHeight = 120
+/**
+ * The output panel's height, tall enough for the Run tab's two panes. Handles that set it are planned, see
+ * docs/reference/studio-packages.md#a-packages-files.
+ */
+const outputHeight = 320
 
 /** The tone and the text key of a build's state in the Output tab. */
 const buildStates: Record<StudioRequest['status'], { tone: StatusTone; text: string }> = {
@@ -218,7 +222,7 @@ function Workspace({
   const [build, setBuild] = useState<StudioRequest | null>(null)
   const [buildProblems, setBuildProblems] = useState<StudioDiagnostic[]>([])
   const [building, setBuilding] = useState(false)
-  const [panelTab, setPanelTab] = useState<'problems' | 'output'>('problems')
+  const [panelTab, setPanelTab] = useState<'problems' | 'output' | 'run'>('problems')
   const editors = useRef(new Map<string, CodeEditorHandle>())
   const pending = useRef<{ path: string; line: number } | null>(null)
   const [jump, setJump] = useState(0)
@@ -505,6 +509,7 @@ function Workspace({
                 onClick: () => void startBuild(),
               },
               { key: 'test', label: t('shell.studio.runTests'), disabled: true, onClick: () => undefined },
+              { key: 'run', label: t('shell.studio.packages.run.open'), onClick: () => setPanelTab('run') },
             ]}
           />
         </PageActions>
@@ -659,7 +664,7 @@ function Workspace({
               type="line"
               {...workspaceTabRow(tokens)}
               activeKey={panelTab}
-              onChange={(key) => setPanelTab(key === 'output' ? 'output' : 'problems')}
+              onChange={(key) => setPanelTab(key === 'output' || key === 'run' ? key : 'problems')}
               items={[
                 {
                   key: 'problems',
@@ -713,6 +718,23 @@ function Workspace({
                     </div>
                   ),
                 },
+                ...(canDevelop
+                  ? [
+                      {
+                        key: 'run',
+                        label: t('shell.studio.packages.run.tab'),
+                        children: (
+                          <StudioPackageRun
+                            application={application}
+                            packageId={row.id}
+                            operations={row.operations}
+                            height={outputHeight - workspaceRowHeight(tokens)}
+                            beforeRun={saveAll}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
           </div>

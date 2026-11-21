@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import type { StudioDiagnostic } from '../platform/studio'
+import type { StudioDiagnostic, StudioRunInput } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioPackageWorkspace } from './StudioPackageWorkspace'
@@ -17,8 +17,30 @@ const contents: Record<string, string> = {
   'src/a.cs': 'class A {}',
   'lib/x.py': 'x = 1\ny = 2\nz = 3',
   'adapter.py': 'print(1)',
-  'axis-package.json': JSON.stringify({ id: 'tools', label: 'Purchasing tools', version: '1.2.0' }),
+  'axis-package.json': JSON.stringify({
+    id: 'tools',
+    label: 'Purchasing tools',
+    version: '1.2.0',
+    operations: [
+      {
+        name: 'greet',
+        type: 'greet',
+        idempotent: true,
+        input: [
+          { name: 'name', type: 'text', required: true },
+          { name: 'count', type: 'integer' },
+        ],
+      },
+    ],
+  }),
 }
+const runInputs = '/api/studio/apps/Shop/packages/tools/run-inputs'
+const runRoute = '/api/studio/apps/Shop/run'
+const requestRoute = '/api/studio/apps/Shop/requests/r1'
+
+/** Every request of the last stubbed package, in order, with its method, URL, headers and body. */
+let requests: { method: string; url: string; headers: Headers; body: unknown }[] = []
+const callsTo = (method: string, url: string) => requests.filter((call) => call.method === method && call.url === url)
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -49,17 +71,67 @@ const failedBuild = {
  * Stubs a package `tools` with five files, and answers a file's read from `contents`. A write answers
  * `{ version: 'new-<path>' }` unless `writes` has a response for its path. The writes are recorded in `puts`. Each write
  * and each build post is also recorded in `calls`, in order, as `PUT <path>` and `POST build <body>`. A build post answers
- * the queued build `b1`, and its read answers `failedBuild` unless `readBuild` answers otherwise.
+ * the queued build `b1`, and its read answers `failedBuild` unless `readBuild` answers otherwise. The package's run
+ * inputs start as `saved` at version `v0`, or have no version before the first save, and a write with a wrong version
+ * answers `409`. A run answers `202`, and its request has ended with the run `greet`. Every request is recorded in
+ * `requests`.
  */
 function stubPackage(
   writes: Record<string, () => Response> = {},
   calls: string[] = [],
   readBuild: () => Response = () => json(failedBuild),
+  saved: StudioRunInput[] | null = null,
 ) {
   const puts: { path: string; ifMatch: string | null; body: { content: string } }[] = []
+  let stored = { items: saved ?? [], version: saved === null ? null : 0 }
+  requests = []
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string, init?: RequestInit): Promise<Response> => {
+      const headers = new Headers(init?.headers)
+      requests.push({
+        method: init?.method ?? 'GET',
+        url: input,
+        headers,
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      })
+      if (input === runInputs && init?.method === 'PUT') {
+        const current = stored.version === null ? null : `"v${stored.version}"`
+        if (headers.get('If-None-Match') === '*' ? current !== null : headers.get('If-Match') !== current) {
+          return json({ title: 'Changed.' }, 409)
+        }
+        const version = (stored.version ?? -1) + 1
+        stored = { items: (JSON.parse(init.body as string) as { items: StudioRunInput[] }).items, version }
+        return json({ version: `v${version}` })
+      }
+      if (input === runInputs) {
+        return new Response(JSON.stringify({ items: stored.items }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(stored.version === null ? {} : { ETag: `"v${stored.version}"` }),
+          },
+        })
+      }
+      if (input === runRoute) {
+        return json({ id: 'r1', status: 'queued', kind: 'run' }, 202)
+      }
+      if (input === requestRoute) {
+        return json({
+          id: 'r1',
+          kind: 'run',
+          status: 'succeeded',
+          diagnostics: [],
+          run: {
+            operation: 'greet',
+            outcome: 'succeeded',
+            output: { greeting: 'Hello Ada' },
+            error: null,
+            durationMs: 1234,
+          },
+          output: ['hello from greet', 'done'],
+        })
+      }
       if (input === buildRoute) {
         calls.push(`POST build ${init?.body as string}`)
         return json(queuedBuild, 202)
@@ -438,6 +510,184 @@ describe('StudioPackageWorkspace', () => {
       await screen.findByTestId('studio-package-tree')
 
       expect(within(within(output()).getByRole('tabpanel')).getByText('No problems.')).toBeInTheDocument()
+    })
+  })
+  describe('Run tab', () => {
+    const runPanel = () => within(screen.getByTestId('studio-package-output')).getByRole('tabpanel', { name: 'Run' })
+    const jsonOf = async () =>
+      EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'JSON' }))!.state.doc.toString()
+
+    async function openRun() {
+      await screen.findByTestId('studio-package-tree')
+      await userEvent.click(await screen.findByRole('button', { name: 'Run…' }))
+      return runPanel()
+    }
+
+    it('opens from Run… with the input pane, and after a run shows the outcome, duration, output and log', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      const panel = await openRun()
+
+      expect(within(screen.getByTestId('studio-package-output')).getByRole('tab', { name: 'Run' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      )
+      expect(within(panel).getByRole('heading', { level: 2, name: 'Input' })).toBeInTheDocument()
+      expect(within(panel).getByRole('combobox', { name: 'Operation' })).toBeInTheDocument()
+      expect(within(panel).getByRole('combobox', { name: 'Saved input' })).toBeInTheDocument()
+      expect(within(panel).getByRole('tab', { name: 'Form' })).toBeInTheDocument()
+      expect(within(panel).getByRole('tab', { name: 'JSON' })).toBeInTheDocument()
+      expect(within(panel).getByRole('textbox', { name: /^name/ })).toBeInTheDocument()
+      expect(within(panel).getByRole('heading', { level: 2, name: 'Output' })).toBeInTheDocument()
+
+      await userEvent.type(within(panel).getByRole('textbox', { name: /^name/ }), 'Ada')
+      await userEvent.click(within(panel).getByRole('button', { name: 'Run' }))
+
+      expect(await within(panel).findByTestId('studio-run-outcome', {}, { timeout: 3000 })).toHaveTextContent(
+        'Succeeded',
+      )
+      expect(within(panel).getByTestId('studio-run-duration')).toHaveTextContent('Duration: 1.2 sec')
+      expect(within(panel).getByTestId('studio-run-log')).toHaveTextContent('hello from greet')
+      const output = EditorView.findFromDOM(await within(panel).findByRole('textbox', { name: 'Output' }))!
+      expect(JSON.parse(output.state.doc.toString())).toEqual({ greeting: 'Hello Ada' })
+      expect(output.state.readOnly).toBe(true)
+      expect(callsTo('POST', runRoute)[0].body).toEqual({
+        package: 'tools',
+        operation: 'greet',
+        input: { name: 'Ada', count: null },
+      })
+    })
+
+    it('shows each input field that has no value as null in the JSON, and follows the form', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      const panel = await openRun()
+
+      await userEvent.click(within(panel).getByRole('tab', { name: 'JSON' }))
+      expect(JSON.parse(await jsonOf())).toEqual({ name: null, count: null })
+      expect(await jsonOf()).toBe('{\n  "name": null,\n  "count": null\n}')
+
+      await userEvent.click(within(panel).getByRole('tab', { name: 'Form' }))
+      await userEvent.type(within(panel).getByRole('textbox', { name: /^count/ }), '3')
+      await userEvent.click(within(panel).getByRole('tab', { name: 'JSON' }))
+      expect(JSON.parse(await jsonOf())).toEqual({ name: null, count: 3 })
+    })
+
+    it('saves a changed file before it posts the run', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+      typeAtStart(await openFile('b.ts', 'src/b.ts'))
+      await screen.findAllByTestId('studio-package-unsaved')
+      await userEvent.click(screen.getByRole('button', { name: 'Run…' }))
+
+      await userEvent.click(within(runPanel()).getByRole('button', { name: 'Run' }))
+
+      await within(runPanel()).findByTestId('studio-run-outcome', {}, { timeout: 3000 })
+      const sent = requests.filter((call) => call.method !== 'GET').map((call) => `${call.method} ${call.url}`)
+      expect(sent).toEqual([`PUT ${fileRoute('src/b.ts')}`, `POST ${runRoute}`])
+    })
+
+    it('posts no run and shows the file’s conflict notice when its save answers 409', async () => {
+      stubPackage({ 'src/b.ts': () => json({ title: 'Changed.' }, 409) })
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+      typeAtStart(await openFile('b.ts', 'src/b.ts'))
+      await screen.findAllByTestId('studio-package-unsaved')
+      await userEvent.click(screen.getByRole('button', { name: 'Run…' }))
+
+      await userEvent.click(within(runPanel()).getByRole('button', { name: 'Run' }))
+
+      expect(await screen.findByTestId('studio-package-conflict')).toHaveTextContent('Someone else changed this file.')
+      expect(callsTo('POST', runRoute)).toHaveLength(0)
+      expect(within(runPanel()).queryByTestId('studio-run-outcome')).not.toBeInTheDocument()
+
+      // The file is still in conflict, so a second Run stops too.
+      await userEvent.click(within(runPanel()).getByRole('button', { name: 'Run' }))
+      await waitFor(() => expect(screen.getByRole('tab', { name: /b\.ts/ })).toHaveAttribute('aria-selected', 'true'))
+      expect(callsTo('POST', runRoute)).toHaveLength(0)
+    })
+
+    it('keeps saved inputs in the saved items dialog and writes them with the version', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      const panel = await openRun()
+      await waitFor(() => expect(callsTo('GET', runInputs)).toHaveLength(1))
+      await userEvent.type(within(panel).getByRole('textbox', { name: /^name/ }), 'Ada')
+
+      const manage = async () => {
+        await userEvent.click(within(panel).getByRole('combobox', { name: 'Saved input' }))
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Manage saved inputs…' }))
+        return within(await screen.findByRole('dialog', { name: 'Saved inputs' }))
+      }
+      const lastPut = () => callsTo('PUT', runInputs).at(-1)!
+
+      // The first save has no version.
+      let dialog = await manage()
+      await userEvent.type(dialog.getByRole('textbox', { name: 'Name' }), 'Ada case')
+      await userEvent.click(dialog.getByRole('button', { name: 'Save input' }))
+      await waitFor(() => expect(callsTo('PUT', runInputs)).toHaveLength(1))
+      expect(lastPut().headers.get('If-None-Match')).toBe('*')
+      expect(lastPut().headers.get('If-Match')).toBeNull()
+      expect(lastPut().body).toEqual({
+        items: [{ name: 'Ada case', operation: 'greet', input: { name: 'Ada', count: null } }],
+      })
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(within(panel).getByRole('combobox', { name: 'Saved input' })).toBeInTheDocument()
+
+      // Overwrite takes what the form shows now.
+      await userEvent.type(within(panel).getByRole('textbox', { name: /^count/ }), '2')
+      dialog = await manage()
+      await userEvent.click(dialog.getByRole('button', { name: 'Overwrite Ada case' }))
+      await userEvent.click(dialog.getByRole('button', { name: 'Overwrite' }))
+      await waitFor(() => expect(callsTo('PUT', runInputs)).toHaveLength(2))
+      expect(lastPut().headers.get('If-Match')).toBe('"v0"')
+      expect(lastPut().body).toEqual({
+        items: [{ name: 'Ada case', operation: 'greet', input: { name: 'Ada', count: 2 } }],
+      })
+
+      // Rename.
+      await userEvent.click(dialog.getByRole('button', { name: 'More actions Ada case' }))
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }))
+      // The line's own Name field comes before the one that saves a new input.
+      const name = dialog.getAllByRole('textbox', { name: 'Name' })[0]
+      await userEvent.clear(name)
+      await userEvent.type(name, 'Ada two')
+      await userEvent.click(dialog.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(callsTo('PUT', runInputs)).toHaveLength(3))
+      expect(lastPut().headers.get('If-Match')).toBe('"v1"')
+      expect(lastPut().body).toMatchObject({ items: [{ name: 'Ada two' }] })
+
+      // Delete.
+      await userEvent.click(await dialog.findByRole('button', { name: 'More actions Ada two' }))
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+      await userEvent.click(dialog.getByRole('button', { name: 'Delete' }))
+      await waitFor(() => expect(callsTo('PUT', runInputs)).toHaveLength(4))
+      expect(lastPut().headers.get('If-Match')).toBe('"v2"')
+      expect(lastPut().body).toEqual({ items: [] })
+    })
+
+    it('opens a saved input with its operation and values from the Saved input list', async () => {
+      stubPackage({}, [], undefined, [{ name: 'Grace case', operation: 'greet', input: { name: 'Grace', count: 5 } }])
+      renderWorkspace(true)
+      const panel = await openRun()
+      await waitFor(() => expect(callsTo('GET', runInputs)).toHaveLength(1))
+
+      await userEvent.click(within(panel).getByRole('combobox', { name: 'Saved input' }))
+      await userEvent.click(await screen.findByText('Grace case'))
+
+      await waitFor(() => expect(within(panel).getByRole('textbox', { name: /^name/ })).toHaveValue('Grace'))
+      expect(within(panel).getByRole('textbox', { name: /^count/ })).toHaveValue('5')
+    })
+
+    it('shows no Run… and no Run tab, and asks for no run inputs, without the developer role', async () => {
+      stubPackage()
+      renderWorkspace(false)
+      await screen.findByTestId('studio-package-tree')
+
+      expect(screen.queryByRole('button', { name: 'Run…' })).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('studio-package-output')).queryByRole('tab', { name: 'Run' })).toBeNull()
+      expect(callsTo('GET', runInputs)).toHaveLength(0)
     })
   })
 
