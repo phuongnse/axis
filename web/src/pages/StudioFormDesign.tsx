@@ -8,8 +8,9 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { Button, Flex } from 'antd'
+import { Flex } from 'antd'
 import { useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import type { StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { outlineCollision, silent } from './designDrag'
@@ -124,8 +125,9 @@ export default function StudioFormDesign({
           />
         </Flex>
       </div>
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <DragOverlay dropAnimation={null}>{dragging === undefined ? null : <Button>{dragging}</Button>}</DragOverlay>
+      <DragOverlay dropAnimation={null}>
+        {dragging === undefined ? null : <AxisButton role="secondary">{dragging}</AxisButton>}
+      </DragOverlay>
     </DndContext>
   )
 }

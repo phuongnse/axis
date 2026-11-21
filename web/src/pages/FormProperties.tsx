@@ -1,5 +1,6 @@
-import { Button, Flex, Input, InputNumber, Select, Typography } from 'antd'
+import { Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
@@ -167,9 +168,8 @@ function FieldProperties({
           onChange={onChange}
         />
       ))}
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button
-        danger
+      <AxisButton
+        role="destructive"
         data-testid="studio-design-remove-field"
         onClick={() => {
           const match = fieldPointer.exec(pointer)
@@ -186,7 +186,7 @@ function FieldProperties({
         }}
       >
         {t('shell.studio.design.removeField')}
-      </Button>
+      </AxisButton>
     </Flex>
   )
 }
@@ -256,16 +256,15 @@ function SectionProperties({
         textPath="sections"
         onChange={onChange}
       />
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button
-        danger
+      <AxisButton
+        role="destructive"
         data-testid="studio-design-remove-section"
         onClick={() =>
           removeSectionAt(t, draft, Number(pointer.slice('/sections/'.length)), onChange, onSelect, onAnnounce)
         }
       >
         {t('shell.studio.design.removeSection')}
-      </Button>
+      </AxisButton>
     </Flex>
   )
 }
@@ -344,14 +343,13 @@ function StepProperties({
   return (
     <Flex vertical gap="small" data-testid="studio-design-step">
       <TitleEditor pointer={pointer} element={step} textPath="steps" onChange={onChange} />
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button
-        danger
+      <AxisButton
+        role="destructive"
         data-testid="studio-design-remove-step"
         onClick={() => removeStepAt(t, draft, Number(pointer.slice('/steps/'.length)), onChange, onSelect, onAnnounce)}
       >
         {t('shell.studio.design.removeStep')}
-      </Button>
+      </AxisButton>
     </Flex>
   )
 }

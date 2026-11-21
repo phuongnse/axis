@@ -115,8 +115,12 @@ test.describe("Studio edits form conditions and steps", () => {
     );
     await page
       .getByTestId("studio-field-/steps/1")
-      .getByRole("button", { name: "Move up", exact: true })
+      .getByRole("button", { name: "Actions", exact: true })
       .click();
+    await page
+      .getByRole("menu", { name: "Actions", exact: true })
+      .getByRole("menuitem", { name: "Move up", exact: true })
+      .press("Enter");
 
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByTestId("studio-saved")).toBeVisible();

@@ -9,7 +9,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, optionTexts, shownDropdown } from '../test/antd'
+import { chooseOption, optionTexts, shownDropdown, shownMenu } from '../test/antd'
 import { FormSteps } from './FormSteps'
 import { LabelTextsContext } from './labelTextsContext'
 
@@ -65,23 +65,29 @@ function renderSteps(value: unknown, onChange = vi.fn(), available: unknown = se
   return onChange
 }
 
+/** Opens the "…" menu of the step at `index` and returns the menu. */
+async function openStepMenu(index: number) {
+  await userEvent.click(
+    within(screen.getByTestId(`studio-field-/steps/${index}`)).getByRole('button', { name: 'Actions' }),
+  )
+  return within(await shownMenu('Actions'))
+}
+
 afterEach(() => localStorage.clear())
 
 describe.each(['light', 'dark'])('FormSteps in %s mode', (mode) => {
   beforeEach(() => localStorage.setItem('axis.themeMode', mode))
 
-  it('renders inside the theme root with a card per step', () => {
+  it('renders inside the theme root with a row per step and a "…" menu on each', () => {
     renderSteps(steps)
 
     const root = screen.getByTestId('studio-field-/steps')
     expect(root.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
     expect(root).toBeVisible()
     for (const index of [0, 1]) {
-      const card = screen.getByTestId(`studio-field-/steps/${index}`)
-      expect(card).toBeVisible()
-      expect(within(card).getByRole('button', { name: 'Move up' })).toBeVisible()
-      expect(within(card).getByRole('button', { name: 'Move down' })).toBeVisible()
-      expect(within(card).getByRole('button', { name: 'Delete step' })).toBeVisible()
+      const row = screen.getByTestId(`studio-field-/steps/${index}`)
+      expect(row).toBeVisible()
+      expect(within(row).getByRole('button', { name: 'Actions' })).toBeVisible()
     }
     expect(screen.getByRole('button', { name: 'Add step' })).toBeVisible()
   })
@@ -101,10 +107,42 @@ describe('FormSteps', () => {
     ).toBeTruthy()
   })
 
-  it('keeps Add step off when the editor is read-only', () => {
+  it('draws Add step as a text button in the title row', () => {
+    renderSteps(steps)
+
+    const part = screen.getByTestId('studio-section-steps')
+    expect(within(part).getByRole('button', { name: 'Add step' })).toHaveClass('ant-btn-variant-text')
+  })
+
+  it('keeps no step button of its own in a row: each step moves and deletes from its menu', () => {
+    renderSteps(steps)
+
+    for (const index of [0, 1]) {
+      const row = within(screen.getByTestId(`studio-field-/steps/${index}`))
+      expect(row.queryByRole('button', { name: 'Move up' })).toBeNull()
+      expect(row.queryByRole('button', { name: 'Move down' })).toBeNull()
+      expect(row.queryByRole('button', { name: 'Delete step' })).toBeNull()
+    }
+  })
+
+  it('lists Move up, Move down and a destructive Delete step in each step menu, in that order', async () => {
+    renderSteps(steps)
+
+    const menu = await openStepMenu(0)
+    expect(menu.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual([
+      'Move up',
+      'Move down',
+      'Delete step',
+    ])
+    expect(menu.getByRole('menuitem', { name: 'Delete step' })).toHaveClass('ant-dropdown-menu-item-danger')
+  })
+
+  it('hides Add step and every step menu when the editor is read-only', () => {
     renderSteps(steps, vi.fn(), sections, true)
 
-    expect(screen.getByRole('button', { name: 'Add step' })).toBeDisabled()
+    expect(screen.getByTestId('studio-field-/steps/0')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Add step' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull()
   })
 
   it('adds the first step by creating the steps', async () => {
@@ -141,29 +179,32 @@ describe('FormSteps', () => {
   it('moves a step down and up by swapping it with its neighbour', async () => {
     const onChange = renderSteps(steps)
 
-    await userEvent.click(
-      within(screen.getByTestId('studio-field-/steps/0')).getByRole('button', { name: 'Move down' }),
-    )
+    await userEvent.click((await openStepMenu(0)).getByRole('menuitem', { name: 'Move down' }))
     expect(onChange).toHaveBeenLastCalledWith('/steps', [steps[1], steps[0]])
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/steps/1')).getByRole('button', { name: 'Move up' }))
+    await userEvent.click((await openStepMenu(1)).getByRole('menuitem', { name: 'Move up' }))
     expect(onChange).toHaveBeenLastCalledWith('/steps', [steps[1], steps[0]])
   })
 
-  it('cannot move the first step up or the last step down', () => {
+  it('cannot move the first step up or the last step down', async () => {
     renderSteps(steps)
 
-    expect(within(screen.getByTestId('studio-field-/steps/0')).getByRole('button', { name: 'Move up' })).toBeDisabled()
-    expect(
-      within(screen.getByTestId('studio-field-/steps/1')).getByRole('button', { name: 'Move down' }),
-    ).toBeDisabled()
+    expect(await (await openStepMenu(0)).findByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+    await userEvent.click(document.body)
+    expect(await (await openStepMenu(1)).findByRole('menuitem', { name: 'Move down' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
   })
 
   it('lists only the named sections and gives the step the one picked', async () => {
     const onChange = renderSteps(steps)
-    const card = screen.getByTestId('studio-field-/steps/0')
+    const row = screen.getByTestId('studio-field-/steps/0')
 
-    const sections = within(card).getByRole('combobox', { name: 'Sections' })
+    const sections = within(row).getByRole('combobox', { name: 'Sections' })
     expect(sections).toHaveAccessibleDescription(platformEnglish['shell.studio.field.form.steps.sections.help'])
     await userEvent.click(sections)
     await waitFor(() => expect(optionTexts(shownDropdown()!)).toEqual(['request', 'decision']))
@@ -174,18 +215,16 @@ describe('FormSteps', () => {
 
   it('removes one step by its place and removes the steps when the last one goes', async () => {
     const onChange = renderSteps(steps)
-    await userEvent.click(
-      within(screen.getByTestId('studio-field-/steps/1')).getByRole('button', { name: 'Delete step' }),
-    )
+
+    await userEvent.click((await openStepMenu(1)).getByRole('menuitem', { name: 'Delete step' }))
+
     expect(onChange).toHaveBeenLastCalledWith('/steps/1', undefined)
   })
 
   it('removes /steps when the only step is removed', async () => {
     const onChange = renderSteps([steps[0]])
 
-    await userEvent.click(
-      within(screen.getByTestId('studio-field-/steps/0')).getByRole('button', { name: 'Delete step' }),
-    )
+    await userEvent.click((await openStepMenu(0)).getByRole('menuitem', { name: 'Delete step' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/steps', undefined)
   })
@@ -193,11 +232,11 @@ describe('FormSteps', () => {
   it('shows the title texts of a step', () => {
     renderSteps(steps)
 
-    const card = screen.getByTestId('studio-field-/steps/1')
-    expect(within(card).getByRole('group', { name: 'Title' })).toHaveAccessibleDescription(
+    const row = screen.getByTestId('studio-field-/steps/1')
+    expect(within(row).getByRole('group', { name: 'Title' })).toHaveAccessibleDescription(
       platformEnglish['shell.studio.field.form.steps.title.help'],
     )
-    expect(within(card).getByRole('textbox', { name: 'English' })).toHaveValue('Decision')
+    expect(within(row).getByRole('textbox', { name: 'English' })).toHaveValue('Decision')
   })
 
   it('leaves steps that are not a list to the JSON view', () => {
