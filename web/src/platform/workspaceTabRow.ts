@@ -11,16 +11,20 @@ export function workspaceRowHeight(tokens: DesignTokens): number {
 
 /**
  * The look of a workspace's tab row: the same padding and a `borderSubtle` rule the region's width, which every tab row
- * of a workspace takes, see docs/reference/actions-and-controls.md#tab-bars. Spread it on a line `Tabs`.
+ * of a workspace takes, see docs/reference/actions-and-controls.md#tab-bars. Spread it on a line `Tabs`. A tab row on a
+ * page gives the content area's padding as `bleed`.
  */
-export function workspaceTabRow(tokens: DesignTokens): Pick<TabsProps, 'size' | 'tabBarStyle'> {
+export function workspaceTabRow(tokens: DesignTokens, bleed = 0): Pick<TabsProps, 'size' | 'tabBarStyle'> {
   return {
     size: 'small',
     tabBarStyle: {
       boxSizing: 'border-box',
       height: workspaceRowHeight(tokens),
-      margin: 0,
-      paddingInline: tokens.spacing.md,
+      // Proposed, #3264 and #4888: on a page, `bleed` is the content area's padding, so the row's rule runs the whole
+      // way and its tabs still start at the page's inset.
+      // What the tabs show starts `spacing-md` under the rule, as a part does under its rule.
+      margin: bleed === 0 ? 0 : `0 -${bleed}px ${tokens.spacing.md}px`,
+      paddingInline: bleed === 0 ? tokens.spacing.md : bleed,
       borderBottom: `1px solid ${tokens.colour.borderSubtle}`,
     },
   }

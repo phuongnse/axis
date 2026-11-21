@@ -17,6 +17,7 @@ import { ShellBarSlotContext } from './shellBarSlotContext'
 import { ShellSidebarContext } from './shellSidebarContext'
 import { SiteMark } from './SiteMark'
 import type { NavigationItem, SiteLegal } from './site'
+import { ContentInsetContext } from './contentInset'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
 import { UserMenu } from './UserMenu'
@@ -297,11 +298,13 @@ export function Shell({
                 <Layout style={{ minWidth: 0 }}>
                   {!hasAccount && <ReadOnlyBanner />}
                   <Layout.Content style={{ background: colour.surface, padding: claimed ? spacing.md : spacing.lg }}>
-                    <ShellSidebarContext.Provider value={sidebarContext}>
-                      <ShellAsideContext.Provider value={asideContext}>
-                        <ShellBarSlotContext.Provider value={barContext}>{children}</ShellBarSlotContext.Provider>
-                      </ShellAsideContext.Provider>
-                    </ShellSidebarContext.Provider>
+                    <ContentInsetContext.Provider value={claimed ? spacing.md : spacing.lg}>
+                      <ShellSidebarContext.Provider value={sidebarContext}>
+                        <ShellAsideContext.Provider value={asideContext}>
+                          <ShellBarSlotContext.Provider value={barContext}>{children}</ShellBarSlotContext.Provider>
+                        </ShellAsideContext.Provider>
+                      </ShellSidebarContext.Provider>
+                    </ContentInsetContext.Provider>
                   </Layout.Content>
                   <div ref={setBarTarget} data-shell-bar-slot style={{ position: 'sticky', bottom: 0, zIndex: 10 }} />
                 </Layout>

@@ -32,6 +32,8 @@ import {
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { SectionParts } from '../platform/SectionParts'
+import { useContentInset } from '../platform/contentInset'
+import { workspaceTabRow } from '../platform/workspaceTabRow'
 import { SaveBar } from '../platform/SaveBar'
 import { QuotaRefusedError } from '../platform/quota'
 import { savedRecordIds, seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
@@ -245,7 +247,9 @@ export function StudioEditor({
   ref?: Ref<StudioEditorHandle>
 }) {
   const t = useText()
-  const { size, colour } = useDesignTokens()
+  const tokens = useDesignTokens()
+  const { size, colour } = tokens
+  const wholeWayTabRow = workspaceTabRow(tokens, useContentInset())
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -1161,6 +1165,9 @@ export function StudioEditor({
             <ExpressionCheckContext.Provider value={checkContext}>
               <LabelTextsContext.Provider value={labelContext}>
                 <Tabs
+                  // Proposed, #3264 and #4888: a view switch is a row of line tabs in the one look every tab row has,
+                  // and its rule runs the whole way, see docs/reference/shell.md#layout.
+                  {...wholeWayTabRow}
                   activeKey={tab}
                   onChange={(key) => openTab(key as 'design' | 'form' | 'json' | 'usedBy')}
                   tabBarExtraContent={

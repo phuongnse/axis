@@ -1,5 +1,15 @@
 import { Flex, Typography } from 'antd'
-import { Children, createContext, isValidElement, useContext, useId, useState, type ReactNode } from 'react'
+import {
+  Children,
+  createContext,
+  useCallback,
+  isValidElement,
+  useContext,
+  useId,
+  useState,
+  type ReactNode,
+} from 'react'
+import { useContentInset } from './contentInset'
 import { AxisButton } from './AxisButton'
 import { Chevron } from './Chevron'
 import { useDesignTokens } from './themeMode'
@@ -68,7 +78,7 @@ export function SectionPart({
   /** A function child gets a slot on the right of the heading, for a list that draws its own Add… into it. */
   children: ReactNode | ((actionSlot: HTMLElement | null) => ReactNode)
 }) {
-  const { colour, spacing } = useDesignTokens()
+  const { spacing } = useDesignTokens()
   const ruled = useContext(RuleAbove)
   const headingId = useId()
   const bodyId = useId()
@@ -88,7 +98,7 @@ export function SectionPart({
       {heading?.line !== undefined && <Typography.Text type="secondary">{heading.line}</Typography.Text>}
     </div>
   )
-  const rule = ruled && <div role="separator" style={{ borderTop: `1px solid ${colour.borderSubtle}` }} />
+  const rule = ruled && <PartRule />
   if (heading === undefined) {
     return (
       <>
@@ -126,5 +136,28 @@ export function SectionPart({
         {body}
       </section>
     </>
+  )
+}
+
+/**
+ * Proposed, #3264 and #4888: the rule above a part, which runs the whole way: from the content area's one edge to the
+ * other, past its padding, see docs/reference/shell.md#layout. A part in a drawer or a dialog keeps its rule inside it,
+ * as the content area's padding is not around it.
+ */
+function PartRule() {
+  const { colour } = useDesignTokens()
+  const inset = useContentInset()
+  const [inside, setInside] = useState(false)
+  const measure = useCallback((rule: HTMLDivElement | null) => {
+    if (rule !== null) {
+      setInside(rule.closest('.ant-drawer, .ant-modal') !== null)
+    }
+  }, [])
+  return (
+    <div
+      ref={measure}
+      role="separator"
+      style={{ borderTop: `1px solid ${colour.borderSubtle}`, marginInline: inside ? 0 : -inset }}
+    />
   )
 }
