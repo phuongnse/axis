@@ -4,6 +4,7 @@
 import json
 import os
 import sys
+import time
 import traceback
 import unittest
 
@@ -20,18 +21,43 @@ sys.path.insert(0, copy)
 
 
 class Outcomes(unittest.TestResult):
-    """Keeps the outcome of each test by its id. A skipped test is left out and a failed one stays failed."""
+    """Keeps the outcome and the duration of each test by its id. A skipped test is left out and a failed one stays failed."""
 
     def __init__(self):
         super().__init__()
         self.tests = {}
+        self._started = {}
+        self._root = os.path.realpath(copy)
 
-    def _record(self, test, outcome, message=None):
+    def startTest(self, test):
+        super().startTest(test)
+        self._started[test.id()] = time.perf_counter()
+
+    def stopTest(self, test):
+        super().stopTest(test)
+        started = self._started.pop(test.id(), None)
+        if started is not None and test.id() in self.tests:
+            self.tests[test.id()]['durationMs'] = max(0, round((time.perf_counter() - started) * 1000))
+
+    def _record(self, test, outcome, message=None, place=None):
         if self.tests.get(test.id(), {}).get('outcome') != 'failed':
-            self.tests[test.id()] = {'name': test.id(), 'outcome': outcome, 'message': message}
+            self.tests[test.id()] = {'name': test.id(), 'outcome': outcome, 'message': message, 'durationMs': 0, **(place or {})}
+
+    def _place(self, err):
+        """Where the test failed: the last traceback frame inside the built copy, counted from 1, or nothing."""
+        for frame in reversed(traceback.extract_tb(err[2])):
+            path = os.path.realpath(frame.filename)
+            if path.startswith(self._root + os.sep):
+                column = getattr(frame, 'colno', None)
+                return {
+                    'file': os.path.relpath(path, self._root).replace(os.sep, '/'),
+                    'line': frame.lineno,
+                    'column': 1 if column is None else column + 1,
+                }
+        return None
 
     def _failed(self, test, err):
-        self._record(test, 'failed', traceback.format_exception_only(*err[:2])[-1].strip())
+        self._record(test, 'failed', traceback.format_exception_only(*err[:2])[-1].strip(), self._place(err))
 
     def addSuccess(self, test):
         self._record(test, 'passed')

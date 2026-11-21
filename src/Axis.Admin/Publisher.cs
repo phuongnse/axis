@@ -648,7 +648,20 @@ internal sealed class Publisher(
                 diagnostics.AddRange(result.Diagnostics);
                 foreach (var outcome in result.Tests)
                 {
-                    tests.Add(new JsonObject { ["name"] = outcome.Name, ["outcome"] = outcome.Outcome, ["message"] = outcome.Message });
+                    var test = new JsonObject { ["name"] = outcome.Name, ["outcome"] = outcome.Outcome, ["message"] = outcome.Message };
+                    if (outcome.DurationMs is { } durationMs)
+                    {
+                        test["durationMs"] = durationMs;
+                    }
+
+                    if (outcome.File is not null)
+                    {
+                        test["file"] = outcome.File;
+                        test["line"] = outcome.Line;
+                        test["column"] = outcome.Column;
+                    }
+
+                    tests.Add(test);
                 }
             }
             catch (OperationCanceledException) when (stopping.IsCancellationRequested)

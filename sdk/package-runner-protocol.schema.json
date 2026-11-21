@@ -170,9 +170,18 @@
             "properties": {
               "name": { "type": "string" },
               "outcome": { "enum": ["passed", "failed"] },
-              "message": { "type": ["string", "null"], "maxLength": 1000 }
+              "message": { "type": ["string", "null"], "maxLength": 1000 },
+              "durationMs": { "type": "integer", "minimum": 0 },
+              "file": { "type": "string" },
+              "line": { "type": "integer", "minimum": 1 },
+              "column": { "type": "integer", "minimum": 1 }
             }
           }
+        },
+        "output": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "type": "string", "maxLength": 1000 }
         }
       }
     },
