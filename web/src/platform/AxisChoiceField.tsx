@@ -1,7 +1,6 @@
 import { Flex, Radio, Tag, Typography, type FormItemProps } from 'antd'
 import { useId } from 'react'
 import { AxisField, type AxisFieldStatus } from './AxisField'
-import { useDesignTokens } from './themeMode'
 
 /** An option of a choice: its value, its label, its help and an optional mark such as "Built in". */
 export interface AxisChoiceOption {
@@ -17,11 +16,6 @@ type Shared = {
   /** Required, as for {@link AxisField}. */
   help: string
   options: readonly AxisChoiceOption[]
-  /**
-   * Proposed: the options in two columns, read down the first column and then the second, for a choice of many options
-   * such as a field's type. One column by default.
-   */
-  columns?: 1 | 2
 }
 
 type FormMode = Shared & {
@@ -60,26 +54,11 @@ function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
  * `requiredMark`. Each choice gives its radio group a name of its own, so two choices on one panel never join.
  */
 export function AxisChoiceField(props: FormMode | OwnMode) {
-  const { label, help, options, columns = 1 } = props
+  const { label, help, options } = props
   const optionId = useId()
   const groupName = useId()
-  const { spacing } = useDesignTokens()
   const radios = (
-    <Flex
-      vertical
-      style={
-        columns === 2
-          ? {
-              display: 'grid',
-              gridAutoFlow: 'column',
-              gridTemplateColumns: '1fr 1fr',
-              gridTemplateRows: `repeat(${Math.ceil(options.length / 2)}, auto)`,
-              // The rows keep the one-column choice's spacing, so the control has one look.
-              columnGap: spacing.lg,
-            }
-          : undefined
-      }
-    >
+    <Flex vertical>
       {options.map((option, index) => {
         const helpId = `${optionId}-${index}-help`
         return (

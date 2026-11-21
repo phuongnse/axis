@@ -603,12 +603,14 @@ export function AxisTable<T extends object>({
     )
   // Rows hidden by a search or a filter leave the shown order unlike the list's, so the handles are off.
   const reorderOff = reorder !== undefined && (pageRows?.length ?? 0) !== (dataSource?.length ?? 0)
+  const handleCell: CSSProperties = { width: fitContent, paddingInline: tokens.spacing.xs, textAlign: 'center' }
   if (reorder) {
     antColumns.unshift({
       key: reorderKey,
       title: <span style={visuallyHidden}>{t('shell.table.reorder')}</span>,
-      onHeaderCell: () => ({ style: { width: fitContent, paddingInlineEnd: 0 }, 'data-column-key': reorderKey }),
-      onCell: () => ({ style: { width: fitContent, paddingInlineEnd: 0, ...line } }),
+      // The handle sits in the middle of its column, with the same room on either side.
+      onHeaderCell: () => ({ style: handleCell, 'data-column-key': reorderKey }),
+      onCell: () => ({ style: { ...handleCell, ...line } }),
       render: () => <ReorderHandle off={reorderOff} />,
     })
   }

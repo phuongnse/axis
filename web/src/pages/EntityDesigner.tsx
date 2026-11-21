@@ -1,17 +1,5 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import {
-  ConfigProvider,
-  Drawer,
-  Flex,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Tag,
-  Typography,
-  DatePicker,
-} from 'antd'
+import { ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Tag, Typography, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
@@ -58,7 +46,6 @@ import { ReferencePicker } from './ReferencePicker'
 import { fieldElement } from './studioFieldElement'
 import type { ChangeHandler } from './SchemaForm'
 import { setOwn } from '../platform/ownProperty'
-import { requiredMark } from '../platform/requiredMark'
 
 type Content = Record<string, unknown>
 
@@ -606,18 +593,14 @@ const Fields = memo(function Fields({
     )
   }, [])
 
-  const [adding, setAdding] = useState(false)
-
   /**
-   * Proposed: adds a field of the name and type that Add field's dialog asked for, and opens its drawer at its name, see
-   * #3264. A field is never added without a name.
+   * Proposed, #3264: Add field adds a text field with no name and opens its drawer at once, the same drawer that opens a
+   * field, with its name to type first, so adding a field takes no step of its own.
    */
-  function addField(name: string, type: FieldType) {
-    setAdding(false)
-    onChange('/fields', [...fields!, { name, type }])
+  function addField() {
+    onChange('/fields', [...fields!, { name: '', type: 'text' }])
     onOriginsChange?.([...rowOrigins(fields!, origins), null])
-    setDrawer({ index: fields!.length, open: true })
-    writeField(name, false)
+    openDrawer(fields!.length)
   }
 
   if (fields === undefined) {
@@ -683,7 +666,7 @@ const Fields = memo(function Fields({
       action={
         readOnly ? undefined : (
           <AxisActionRow outlined>
-            <AxisButton role="secondary" onClick={() => setAdding(true)}>
+            <AxisButton role="secondary" onClick={addField}>
               {t('shell.studio.entity.addField')}
             </AxisButton>
           </AxisActionRow>
@@ -757,7 +740,6 @@ const Fields = memo(function Fields({
         onChange={onChange}
         onClose={closeDrawer}
       />
-      <AddFieldDialog open={adding} fields={fields} onAdd={addField} onClose={() => setAdding(false)} />
     </SectionPart>
   )
 })
@@ -790,94 +772,6 @@ function fieldTypeChoices(t: (key: string) => string) {
   }))
 }
 
-/**
- * Proposed: Add field's dialog, which asks for the new field's name and type before the field is added, see #3264. Add
- * is never off: a click checks the name, shows under it what is wrong and focuses it, as docs/reference/actions-and-controls.md#fields
- * says. The type starts at Text, the most common one. The rest of the field's settings are in its drawer.
- */
-function AddFieldDialog({
-  open,
-  fields,
-  onAdd,
-  onClose,
-}: {
-  open: boolean
-  fields: unknown[]
-  onAdd: (name: string, type: FieldType) => void
-  onClose: () => void
-}) {
-  const t = useText()
-  const { size, spacing } = useDesignTokens()
-  const [form] = Form.useForm<{ name: string; type: FieldType }>()
-  const nameTexts = fieldTexts(t, 'fields.name')
-  const typeTexts = fieldTexts(t, 'fields.type')
-
-  function add({ name, type }: { name: string; type: FieldType }) {
-    const entered = name.trim()
-    const problem = !/^[A-Za-z][A-Za-z0-9]*$/.test(entered)
-      ? 'nameInvalid'
-      : fields.some((field) => fieldName(field)?.toLowerCase() === entered.toLowerCase())
-        ? 'nameTaken'
-        : null
-    if (problem !== null) {
-      form.setFields([{ name: 'name', errors: [t(`shell.studio.entity.addFieldDialog.${problem}`)] }])
-      form.focusField('name')
-      return
-    }
-    onAdd(entered, type)
-  }
-
-  return (
-    <Modal
-      open={open}
-      width={size.dialog.large}
-      title={t('shell.studio.entity.addFieldDialog.title')}
-      okText={t('shell.studio.entity.addFieldDialog.add')}
-      cancelText={t('shell.studio.cancel')}
-      onOk={() => form.submit()}
-      onCancel={onClose}
-      // Each opening starts with an empty name and Text.
-      afterClose={() => form.resetFields()}
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        requiredMark={requiredMark}
-        initialValues={{ name: '', type: 'text' }}
-        scrollToFirstError={{ focus: true }}
-        onFinish={add}
-      >
-        <Flex vertical gap={spacing.lg}>
-          <AxisField
-            name="name"
-            label={nameTexts.label}
-            help={nameTexts.help}
-            requiredMessage={t('shell.studio.entity.addFieldDialog.nameRequired')}
-          >
-            <Input
-              aria-label={nameTexts.label}
-              autoFocus
-              // The browser also submits a form with one text box on Enter, so this stops it from adding twice.
-              onPressEnter={(event) => {
-                event.preventDefault()
-                form.submit()
-              }}
-            />
-          </AxisField>
-          <AxisChoiceField
-            name="type"
-            label={typeTexts.label}
-            help={t('shell.studio.entity.addFieldDialog.type.help')}
-            requiredMessage={t('shell.studio.entity.addFieldDialog.typeRequired')}
-            options={fieldTypeChoices(t)}
-            columns={2}
-          />
-        </Flex>
-      </Form>
-    </Modal>
-  )
-}
-
 /** `list` with its item at `from` moved to `to`, the items between them shifting by one. */
 function moved<T>(list: readonly T[], from: number, to: number): T[] {
   const next = [...list]
@@ -892,6 +786,17 @@ function movedIndex(index: number, from: number, to: number): number {
   if (from < index && index <= to) return index - 1
   if (to <= index && index < from) return index + 1
   return index
+}
+
+/** A field type in the Type list: its name, and under it what it holds, in muted small text. */
+function TypeOption({ label, help }: { label: string; help: string }) {
+  const { colour } = useDesignTokens()
+  return (
+    <div style={{ whiteSpace: 'normal' }}>
+      <div>{label}</div>
+      <div style={{ fontSize: 12, lineHeight: '20px', fontWeight: 'normal', color: colour.textMuted }}>{help}</div>
+    </div>
+  )
 }
 
 /** The query of the open resource with the drawer of the field `name` open, and no path. */
@@ -1155,8 +1060,10 @@ const FieldDrawer = memo(function FieldDrawer({
                     optionFilterProp="label"
                     virtual={false}
                     value={type === '' ? undefined : type}
-                    // Proposed: the types by name in words, in Add field's order, see #3264.
-                    options={fieldTypeChoices(t).map(({ value, label }) => ({ value, label }))}
+                    // Proposed, #3264: the types by name in words, each with a line that says what it holds, as
+                    // the choice of a new field's type is made here.
+                    options={fieldTypeChoices(t)}
+                    optionRender={({ data }) => <TypeOption label={data.label} help={data.help} />}
                     onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
                   />
                 </AxisField>
