@@ -36,6 +36,13 @@ const splitLines = (text) => text.replace(/\n$/, '').split('\n')
 export const lines = (file) => splitLines(readFileSync(file, 'utf8'))
 export const countWords = (text) => (text.match(/\S+/g) ?? []).filter((word) => /[\p{L}\p{N}]/u.test(word)).length
 
+/** Returns each doc under root/docs, sorted, with its path from root and its words, counted as the size check counts them. */
+export function docWordCounts(root) {
+  return markdownFiles(path.join(root, 'docs'))
+    .sort()
+    .map((file) => ({ file, page: relativePath(root, file), words: countWords(lines(file).join('\n')) }))
+}
+
 /** Yields { index, raw } for each row of every table in text, an array of lines, whose header line, trimmed, equals header. Separator rows are skipped. */
 export function* tableRows(text, header) {
   for (let headerIndex = 0; headerIndex < text.length; headerIndex++) {
