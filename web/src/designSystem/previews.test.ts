@@ -77,6 +77,7 @@ describe('design-system previews', () => {
         'Task',
         'Task not found',
         'Dashboard',
+        'Process instance',
         'Platform site',
         'App switcher',
         'Language and theme',

@@ -433,7 +433,7 @@ to the frame shows in every state. How previews work is in
 
   | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Saved record, Saved record with a change, Record not found, Task, Task not found, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                 |
+  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Saved record, Saved record with a change, Record not found, Task, Task not found, Dashboard, Process instance, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                               |
   | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
   | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 
@@ -449,6 +449,8 @@ to the frame shows in every state. How previews work is in
   Security tab, and Account notifications, the same page on its Notifications tab. Both use fixtures of
   `GET /api/me/authenticators`, `GET /api/me/sessions` and `GET /api/me/notification-preferences`, and `PUT`
   answers `204`.
+- **Process instance.** The `shell` preview gains Process instance, which opens a waiting instance from the fixture
+  site's Approvals page, on its Diagram. It uses fixtures of the instance detail and of the instance's release texts.
 - **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
   through the shell over fixtures of the purchase request sample, in sixteen states: Typical, Empty,
   Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live,
