@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { ContentInsetContext } from './contentInsetContext'
 import { spacingTokens } from './designTokens'
 import { PageActions, PageLayout } from './PageLayout'
 import { ThemeModeProvider } from './theme'
@@ -32,25 +33,33 @@ describe('PageLayout', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Purchase requests' })).toBeInTheDocument()
   })
 
-  it('draws the heading alone in a band with spacing-md above and below it and spacing-lg at its sides', () => {
-    render(
-      <ThemeModeProvider>
-        <PageLayout title="Users" band>
-          <p>Page content</p>
-        </PageLayout>
-      </ThemeModeProvider>,
-    )
+  it.each([24, 16])(
+    'draws the heading alone in a band with spacing-md above and below it and its sides and top reach the content inset of %dpx',
+    (inset) => {
+      render(
+        <ThemeModeProvider>
+          <ContentInsetContext.Provider value={inset}>
+            <PageLayout title="Users" band>
+              <p>Page content</p>
+            </PageLayout>
+          </ContentInsetContext.Provider>
+        </ThemeModeProvider>,
+      )
 
-    const band = screen.getByTestId('page-band')
-    expect(within(band).getByRole('heading', { level: 1, name: 'Users' })).toBeInTheDocument()
-    expect(within(band).queryByText('Page content')).not.toBeInTheDocument()
-    expect(band).toHaveStyle({
-      paddingTop: `${spacingTokens.md}px`,
-      paddingBottom: `${spacingTokens.md}px`,
-      paddingLeft: `${spacingTokens.lg}px`,
-      paddingRight: `${spacingTokens.lg}px`,
-    })
-  })
+      const band = screen.getByTestId('page-band')
+      expect(within(band).getByRole('heading', { level: 1, name: 'Users' })).toBeInTheDocument()
+      expect(within(band).queryByText('Page content')).not.toBeInTheDocument()
+      expect(band).toHaveStyle({
+        marginTop: `-${inset}px`,
+        marginLeft: `-${inset}px`,
+        marginRight: `-${inset}px`,
+        paddingTop: `${spacingTokens.md}px`,
+        paddingBottom: `${spacingTokens.md}px`,
+        paddingLeft: `${inset}px`,
+        paddingRight: `${inset}px`,
+      })
+    },
+  )
 
   it('draws no band without band', () => {
     render(
