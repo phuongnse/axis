@@ -1,4 +1,4 @@
-import { Flex, Tag } from 'antd'
+import { Flex } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -219,13 +219,13 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     ) : field.type === 'references' ? (
       <Flex wrap gap="small" data-testid={`detail-references-${field.name}`}>
         {(Array.isArray(value) ? (value as string[]) : []).map((target, index) => (
-          <Tag key={target}>
+          <span key={target}>
             <RecordLink
               entity={field.target?.entity ?? ''}
               id={target}
               label={referenceLabels(record.labels[field.name])[index] ?? null}
             />
-          </Tag>
+          </span>
         ))}
         {!Array.isArray(value) || value.length === 0 ? <NotSet /> : null}
       </Flex>

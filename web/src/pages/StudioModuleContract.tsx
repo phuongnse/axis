@@ -1,4 +1,4 @@
-import { Button, Flex, Form, Input, Modal, Select, Tag, Typography } from 'antd'
+import { Button, Flex, Form, Input, Modal, Select, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
@@ -7,14 +7,17 @@ import { AxisField } from '../platform/AxisField'
 import { AxisTable } from '../platform/AxisTable'
 import { fillText } from '../platform/fillText'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
-import { layerMarks, markName, markOf } from '../platform/layerMarks'
+import { layerMarks, markOf } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
 import { requiredMark } from '../platform/requiredMark'
+import { StatusTag } from '../platform/StatusTag'
 import {
   fetchStudioModuleResource,
   patchStudioResource,
   saveStudioModuleResource,
   ServerUnreachableError,
+  severityText,
+  severityTone,
   type StudioDiagnostic,
   type StudioModuleLayer,
   type StudioModuleResource,
@@ -29,6 +32,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { useUnsavedChanges } from '../platform/unsavedChanges'
 import { useTableView } from '../platform/useTableView'
 import { type ContractView, contractView } from './contractView'
+import { LayerMarkLabel } from './LayerMarkViews'
 import {
   moduleIndex,
   relaxedManifest,
@@ -501,9 +505,7 @@ function RowName({ name, added, onRemove }: { name: string; added: boolean; onRe
   return (
     <Flex gap="small" align="center" wrap>
       {name}
-      <Tag role="note" aria-label={markName(t, 'added', name)}>
-        {t('shell.studio.module.added')}
-      </Tag>
+      <LayerMarkLabel mark="added" name={name} />
       {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button size="small" aria-label={fillText(t('shell.studio.contract.removeName'), { name })} onClick={onRemove}>
         {t('shell.studio.contract.remove')}
@@ -857,10 +859,8 @@ export function StudioModuleContract({
             <ul data-testid="studio-contract-diagnostics" style={{ margin: 0 }}>
               {layerDiagnostics.map((diagnostic, index) => (
                 <li key={`${diagnostic.code}-${diagnostic.path}-${index}`}>
-                  <Typography.Text strong type={diagnostic.severity === 'error' ? 'danger' : 'warning'}>
-                    {diagnostic.code}
-                  </Typography.Text>{' '}
-                  {diagnostic.message}
+                  <StatusTag tone={severityTone(diagnostic.severity)}>{severityText(t, diagnostic.severity)}</StatusTag>{' '}
+                  <Typography.Text strong>{diagnostic.code}</Typography.Text> {diagnostic.message}
                 </li>
               ))}
             </ul>

@@ -61,12 +61,15 @@ function escapeScriptEndings(): Plugin {
 }
 
 // Under `vite`, the harness loads the previews from source so that React Fast Refresh swaps an edit in
-// place: the module below replaces the script tag of the built bundle. Only the harness is checked, since
-// Vite runs this transform on every HTML page it serves. A harness without that tag fails the page load, so
-// the dev server never serves a stale bundle unnoticed.
+// place: the module below replaces the script tag of the built bundle. The harness also loads the app's fonts,
+// web/src/fonts.css, so a preview shows its text as the app does. The built bundle carries no fonts, see
+// docs/development.md#widget-previews. Only the harness is checked, since Vite runs this transform on every HTML
+// page it serves. A harness without that tag fails the page load, so the dev server never serves a stale bundle
+// unnoticed.
 function serveBundleFromSource(): Plugin {
   const bundleTag = '<script src="../artifacts/design-system/axis-design-system.js"></script>'
   const sourceModule = `<script type="module">
+      import '/src/fonts.css'
       import Axis from '/src/designSystem/bundle.ts'
       window.Axis = Axis
     </script>`

@@ -1,7 +1,8 @@
-import { Flex, Tag } from 'antd'
+import { Flex } from 'antd'
 import { EmptyState } from '../platform/EmptyState'
 import { SidePanel } from '../platform/SidePanel'
-import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
+import { StatusTag } from '../platform/StatusTag'
+import { severityText, severityTone, type StudioDiagnostic, type StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { problemsPanelId } from './StudioBand'
 import { FileAtLine } from './FileAtLine'
@@ -89,14 +90,14 @@ function DiagnosticRow({
   onSelect?: (resourceId: string, path: string) => void
   onOpenFile?: (file: string, line?: number) => void
 }) {
+  const t = useText()
   const resourceId = diagnostic.resourceId
   const resource = resourceId === null ? undefined : resources?.find((item) => item.id === resourceId)
   return (
     <div style={{ padding: '4px 15px' }}>
       <Flex vertical align="flex-start" style={{ minWidth: 0, whiteSpace: 'normal' }}>
         <span>
-          {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-          <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
+          <StatusTag tone={severityTone(diagnostic.severity)}>{severityText(t, diagnostic.severity)}</StatusTag>{' '}
           <strong>{diagnostic.code}</strong> {diagnostic.message}
         </span>
         {resource === undefined && onOpenFile ? (

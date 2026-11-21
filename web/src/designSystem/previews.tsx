@@ -16,6 +16,7 @@ import { FieldPreview } from './FieldPreview'
 import type { FixtureRoute } from './fixtureFetch'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SignUpPreview } from './SignUpPreview'
+import { StatusTagPreview } from './StatusTagPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview, TypedOnMount } from './ShellPreview'
 import {
@@ -255,6 +256,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Loading', draw: () => requestTable(loadingTableWidget), routes: loadingRoutes },
     { caption: 'Load error', draw: () => requestTable(failingTableWidget), routes: failingRoutes },
   ],
+  statusTag: typical(() => <StatusTagPreview />),
   ...Object.fromEntries(
     fieldTypes.map((type) => [
       `field-${type}`,

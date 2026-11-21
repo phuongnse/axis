@@ -521,7 +521,7 @@ transitions through a layer, and relaxes and restores points.
   stays on, and a click [checks the fields](actions-and-controls.md#fields), including a name the
   contract already uses and a to-state that is also a from-state. The diagnostics of the contract's layer, such as `AXC0370` for a transition into a protected state,
   show in a list in the editor after a save and when the contract is opened again.
-- **A problem's severity in words** _(planned)_. Each diagnostic in the editor's list leads with its severity as a
+- **A problem's severity in words.** Each diagnostic in the editor's list leads with its severity as a
   status tag, Error in `danger` or Warning in `attention`, then its code and message, as in the
   [Problems panel](studio-workspace.md#problems-panel).
 - **Added rows.** A state or transition that the application added shows an **Added** tag and a

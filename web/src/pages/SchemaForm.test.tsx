@@ -942,7 +942,7 @@ describe('SchemaForm controls that know what they hold', () => {
     expect(within(screen.getByTestId('studio-field-/packages')).getByRole('button', { name: 'Finance' })).toBeVisible()
   })
 
-  it('shows each role slot of the installed module as a line, and "Not mapped" in warning colour for one no role plays', async () => {
+  it('shows each role slot of the installed module as a line, and "Not mapped" as an attention tag for one no role plays', async () => {
     renderForm(
       (await loadKindSchema('application'))!,
       { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0' }] },
@@ -953,7 +953,7 @@ describe('SchemaForm controls that know what they hold', () => {
     const modules = screen.getByTestId('studio-field-/modules')
     const line = within(modules).getByText(/^Budget approver:/)
     expect(line).toHaveTextContent('Budget approver: Not mapped')
-    expect(within(line).getByText('Not mapped')).toHaveStyle({ color: designTokensFor('light').colour.warningText })
+    expect(within(line).getByText('Not mapped')).toHaveAttribute('data-tone', 'attention')
   })
 
   it('shows the role that plays a slot by its name, without the warning', async () => {
