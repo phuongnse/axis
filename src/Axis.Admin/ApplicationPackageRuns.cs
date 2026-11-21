@@ -113,7 +113,8 @@ internal sealed class ApplicationPackageRuns(ApplicationPackageBuilds builds, Pa
 
         try
         {
-            return new PackageRunResult([], built.Output, await CallAsync(runner, declaration, package, encoded, urls, secrets, cancellationToken));
+            var (run, cpuSeconds) = await CallAsync(runner, declaration, package, encoded, urls, secrets, cancellationToken);
+            return new PackageRunResult([], built.Output, run, cpuSeconds);
         }
         finally
         {
@@ -131,8 +132,9 @@ internal sealed class ApplicationPackageRuns(ApplicationPackageBuilds builds, Pa
     }
 
     // Sends the one run. The runner's proxy admits the hosts of the declared url bindings for this call only. A request that it refused ends the run
-    // whatever the runner answered, and so does a timeout.
-    private async Task<JsonObject> CallAsync(
+    // whatever the runner answered, and so does a timeout. The call's CPU seconds are counted as the worker counts a call, see
+    // docs/reference/tenant-quotas.md#package-run-time-a-day, and go back beside the run, never into it.
+    private async Task<(JsonObject Run, long CpuSeconds)> CallAsync(
         RunnerConnection runner,
         PackageOperation declaration,
         string package,
@@ -171,17 +173,18 @@ internal sealed class ApplicationPackageRuns(ApplicationPackageBuilds builds, Pa
         }
 
         var duration = (long)Stopwatch.GetElapsedTime(sent).TotalMilliseconds;
+        var cpuSeconds = PackageCallHandler.RunTimeSeconds(reply.CpuMilliseconds, sent);
         if (runner.EndCall())
         {
-            return Fail(declaration.Name, BindingCode, PackageOperationContext.RefusedMessage(declaration.Name, package, "sent a request through the egress proxy to a host that none of its url bindings declares."), duration);
+            return (Fail(declaration.Name, BindingCode, PackageOperationContext.RefusedMessage(declaration.Name, package, "sent a request through the egress proxy to a host that none of its url bindings declares."), duration), cpuSeconds);
         }
 
         if (timedOut)
         {
-            return Fail(declaration.Name, TimeoutCode, PackageCallHandler.TimedOut, duration);
+            return (Fail(declaration.Name, TimeoutCode, PackageCallHandler.TimedOut, duration), cpuSeconds);
         }
 
-        return reply.Answer switch
+        var run = reply.Answer switch
         {
             ResultMessage result => new JsonObject
             {
@@ -196,6 +199,7 @@ internal sealed class ApplicationPackageRuns(ApplicationPackageBuilds builds, Pa
             FailureMessage failure => Fail(declaration.Name, failure.Error ?? nameof(FailureMessage), $"The operation raised {failure.Error ?? nameof(FailureMessage)}.", duration),
             _ => Fail(declaration.Name, ExitedCode, PackageCallHandler.RunnerExited, duration),
         };
+        return (run, cpuSeconds);
     }
 
     // The input must be a JSON object whose values fit the operation's inputs. A field it lacks is null.
@@ -232,6 +236,9 @@ internal sealed class ApplicationPackageRuns(ApplicationPackageBuilds builds, Pa
 
 /// <summary>
 /// The result of <see cref="ApplicationPackageRuns.RunAsync"/>: the diagnostics of a refused or unanswered build, the lines the host wrote, and the
-/// <paramref name="Run"/> that the request stores, or <see langword="null"/> when the build had a diagnostic.
+/// <paramref name="Run"/> that the request stores, or <see langword="null"/> when the build had a diagnostic. <paramref name="CpuSeconds"/> are the
+/// CPU seconds of the call, rounded up, for the publisher to count in the tenant's package run time, see
+/// docs/reference/tenant-quotas.md#package-run-time-a-day. They are <see langword="null"/> when no call went to a runner, and <paramref name="Run"/>
+/// never holds them.
 /// </summary>
-internal sealed record PackageRunResult(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<string> Output, JsonObject? Run);
+internal sealed record PackageRunResult(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<string> Output, JsonObject? Run, long? CpuSeconds = null);

@@ -13,8 +13,10 @@ namespace Axis.Integration.Tests;
 /// process, with its <c>phonenumbers</c> wheel from the wheel cache that <c>scripts/setup.sh</c> fills, so pip installs it
 /// offline. The scan is a stub script that reports what the test says. Each test checks that the extensions folder stays empty
 /// and that the host leaves no <c>axis-package-build-*</c> folder behind. Each wait ends on the host's answer.
-/// The tests run a shell script, so they are skipped on Windows.
+/// The tests run a shell script, so they are skipped on Windows. The class runs one after the other with the classes that build
+/// packages, see <see cref="PackageBuilds"/>.
 /// </summary>
+[Collection(PackageBuilds.Name)]
 [UnsupportedOSPlatform("windows")]
 public sealed class ApplicationPackageBuildTests
 {

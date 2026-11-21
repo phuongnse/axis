@@ -20,6 +20,7 @@ namespace Axis.Integration.Tests;
 /// it the developer role with <c>Studio:DeveloperRole</c> to allow the tools, and another role name to refuse them. The model is the scripted adapter.
 /// The tests use a stub shell script for Trivy, so they are skipped on Windows.
 /// </summary>
+[Collection(PackageBuilds.Name)]
 [UnsupportedOSPlatform("windows")]
 public sealed class AgentPackageTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
 {
