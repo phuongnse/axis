@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Admin" />
     <InternalsVisibleTo Include="Axis.Integration.Tests" />
     <InternalsVisibleTo Include="Axis.Scenarios.Runner" />
   </ItemGroup>

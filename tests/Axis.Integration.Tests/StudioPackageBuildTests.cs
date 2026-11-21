@@ -364,7 +364,7 @@ public sealed class StudioPackageBuildTests(PostgreSqlFixture database) : IClass
     private async Task<WebApplicationFactory<Program>> CreateFactoryAsync(string folder, bool switchOn)
     {
         var platform = await database.CreateDatabaseAsync("studio_package_build", CancellationToken);
-        await MigrateTenantDatabaseAsync();
+        await MigrateTenantDatabaseAsync(database.ConnectionString);
         var revisions = Directory.CreateTempSubdirectory("axis-studio-package-build-revisions-").FullName;
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -392,9 +392,10 @@ public sealed class StudioPackageBuildTests(PostgreSqlFixture database) : IClass
         });
     }
 
-    private async Task MigrateTenantDatabaseAsync()
+    // Migrates the three contexts of a tenant database and grants the runtime role, which the publisher of tenant default needs before it serves it.
+    internal static async Task MigrateTenantDatabaseAsync(string connectionString)
     {
-        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        await using (var connection = new NpgsqlConnection(connectionString))
         {
             await connection.OpenAsync(CancellationToken);
             await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
@@ -403,11 +404,11 @@ public sealed class StudioPackageBuildTests(PostgreSqlFixture database) : IClass
             await data.Database.MigrateAsync(CancellationToken);
         }
 
-        await using (var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(database.ConnectionString).Options))
+        await using (var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options))
         {
             await processes.Database.MigrateAsync(CancellationToken);
         }
 
-        await PostgreSqlServer.GrantRuntimeRoleAsync(database.ConnectionString, CancellationToken);
+        await PostgreSqlServer.GrantRuntimeRoleAsync(connectionString, CancellationToken);
     }
 }

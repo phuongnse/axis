@@ -50,7 +50,7 @@ public sealed record PackageIsolation(
         ArgumentNullException.ThrowIfNull(environment);
 
         var inProcess = ReadInProcess(configuration, environment);
-        var proxyPort = ReadProxyPort(configuration);
+        var proxyPort = LoadProxyPort(configuration);
 
         var (dotnetHost, dotnetPort) = ReadRunner(configuration, DotnetRunnerSetting);
         var (nodeHost, nodePort) = ReadRunner(configuration, NodeRunnerSetting);
@@ -107,13 +107,22 @@ public sealed record PackageIsolation(
             : throw new InvalidOperationException($"'{setting}' must be a host and a port from 1 to 65535, as in 'host:port'.");
     }
 
-    private static int ReadProxyPort(IConfiguration configuration) =>
-        configuration[ProxySetting] switch
+    /// <summary>
+    /// Reads only <c>Extensions:Runners:ProxyPort</c>, a whole number from 0 to 65535 that defaults to <see cref="RunnerProtocol.ProxyPort"/>, for the
+    /// publisher, whose egress proxy of a run uses the same setting as the worker's.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The setting has another value. The message names the setting.</exception>
+    public static int LoadProxyPort(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        return configuration[ProxySetting] switch
         {
             null or "" => RunnerProtocol.ProxyPort,
             var value when int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var port) && port is >= 0 and <= 65535 => port,
             _ => throw new InvalidOperationException($"'{ProxySetting}' must be a whole number from 0 to 65535."),
         };
+    }
 
     private static bool ReadInProcess(IConfiguration configuration, IHostEnvironment environment)
     {

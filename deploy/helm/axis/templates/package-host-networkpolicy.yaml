@@ -2,8 +2,10 @@
 ---
 # Threats P151 and P152 of docs/reference/threat-model-product.md, see
 # docs/reference/package-runners.md#package-runners. A package host takes calls from worker pods, and the
-# application package host from publisher pods too. It sends traffic to worker pods only, with no DNS. A reply on a
-# connection that ingress admitted needs no egress rule. It holds only where the network plugin enforces NetworkPolicy.
+# application package host from publisher pods too. It sends traffic to worker pods only, with no DNS, and the
+# application package host also to publisher pods on TCP 5311 only, the port of the publisher's egress proxy for a
+# run from Studio. A reply on a connection that ingress admitted needs no egress rule. It holds only where the network
+# plugin enforces NetworkPolicy.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -36,4 +38,13 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "axis.selectorLabels" (dict "root" $ "component" "worker") | nindent 14 }}
+    {{- if $host.publisher }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "axis.selectorLabels" (dict "root" $ "component" "publisher") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 5311
+    {{- end }}
 {{- end }}
