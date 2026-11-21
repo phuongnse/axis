@@ -7,6 +7,7 @@ import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import type { UserList, UserRoles } from '../platform/users'
 import { TextProvider } from '../platform/TextProvider'
 import { isRequiredLabel, openDropdown, optionTexts } from '../test/antd'
+import { expectTitleAloneInBand } from '../test/pageBand'
 import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { PlatformContext, type Platform } from './context'
 import { UsersPage } from './UsersPage'
@@ -178,12 +179,20 @@ afterEach(() => {
 })
 
 describe('UsersPage', () => {
-  it('shows the band, the columns and a row of each kind', async () => {
+  it('holds the title alone in the band', async () => {
+    stubServer(() => json(users))
+    renderPage()
+
+    await screen.findByText('Ann Invited')
+
+    expectTitleAloneInBand('Users')
+  })
+
+  it('shows the columns and a row of each kind', async () => {
     stubServer(() => json(users))
     renderPage()
 
     const row = (await screen.findByText('Ann Invited')).closest('tr')!
-    expect(screen.getByText('Axis')).toBeVisible()
     expect(screen.getAllByText('Users').length).toBeGreaterThan(0)
     for (const title of ['Name', 'Email', 'Signs in with', 'Status', 'Last sign-in']) {
       expect(screen.getByRole('columnheader', { name: title })).toBeVisible()

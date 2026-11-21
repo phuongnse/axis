@@ -63,6 +63,7 @@ import {
   requestId,
   sectionWidgets,
   shellRequestId,
+  shellUserId,
   signUpApplications,
   signUpDocuments,
   signUpRegion,
@@ -362,6 +363,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       entry: '/account',
+      frameHeight: shellFrameHeight,
+    },
+    { caption: 'Users page', draw: () => <ShellPreview />, entry: '/users', frameHeight: shellFrameHeight },
+    {
+      caption: 'User page',
+      draw: () => <ShellPreview />,
+      entry: `/users/${shellUserId}`,
       frameHeight: shellFrameHeight,
     },
   ],

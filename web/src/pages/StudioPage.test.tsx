@@ -1035,7 +1035,7 @@ describe('StudioPage', () => {
       ['a resource', `/studio?app=PurchaseRequests&resource=${entityId}`],
       ['Releases', '/studio?app=PurchaseRequests&view=releases'],
       ['the policy matrix', '/studio?app=PurchaseRequests&view=policies'],
-    ])('has no breadcrumb and exactly one level-one heading on %s', async (_, entry) => {
+    ])('has exactly one level-one heading on %s', async (_, entry) => {
       stubServer()
       renderPage(entry)
 
@@ -1046,7 +1046,6 @@ describe('StudioPage', () => {
         await screen.findByTestId('studio-editor')
       }
 
-      expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
     })
   })

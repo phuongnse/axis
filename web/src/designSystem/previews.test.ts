@@ -83,6 +83,8 @@ describe('design-system previews', () => {
         'Language and theme',
         'Account page',
         'Account notifications',
+        'Users page',
+        'User page',
       ],
     ],
     ['signIn', ['Sign-in refused', 'Signed out', 'Session ended']],
