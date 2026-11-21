@@ -1,4 +1,5 @@
-import { Button, Flex, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { fillText } from '../platform/fillText'
 import { markName, markOf, type LayerElement, type LayerMark } from '../platform/layerMarks'
 import { StatusTag } from '../platform/StatusTag'
@@ -59,19 +60,24 @@ export function LayerMarkTag({
   )
 }
 
-/** The Reset to module button of one element, named after the element. */
+/**
+ * The Reset to module button of one element, named after the element. It is a light action, a text button drawn through
+ * `AxisActionRow`, see docs/reference/shell.md#layout ('A title row's actions are light').
+ */
 function ResetElement({ layer, list, name }: { layer: DesignerLayer; list: string; name: string }) {
   const t = useText()
   return (
-    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-    <Button
-      size="small"
-      aria-label={fillText(t('shell.studio.module.resetElementName'), { name })}
-      disabled={layer.disabled}
-      onClick={() => layer.onReset(list, name)}
-    >
-      {t('shell.studio.module.resetElement')}
-    </Button>
+    <AxisActionRow>
+      <AxisButton
+        role="secondary"
+        size="small"
+        aria-label={fillText(t('shell.studio.module.resetElementName'), { name })}
+        disabled={layer.disabled}
+        onClick={() => layer.onReset(list, name)}
+      >
+        {t('shell.studio.module.resetElement')}
+      </AxisButton>
+    </AxisActionRow>
   )
 }
 

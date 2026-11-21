@@ -1,6 +1,7 @@
-import { Button, Flex, Input, Typography } from 'antd'
+import { Flex, Input, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { useMemo, useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { StatusTag } from '../platform/StatusTag'
@@ -175,10 +176,9 @@ export function TextTable({
             onChange={(event) => setNewTexts((current) => ({ ...current, [column.locale]: event.target.value }))}
           />
         ))}
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button loading={adding} disabled={adding} onClick={add}>
+        <AxisButton role="secondary" loading={adding} disabled={adding} onClick={add}>
           {t('shell.studio.texts.addKey')}
-        </Button>
+        </AxisButton>
         {problem && (
           <Typography.Text type="danger" data-testid="studio-text-add-problem">
             {problem}

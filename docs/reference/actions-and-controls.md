@@ -189,12 +189,15 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 
 ## Tab bars
 
-A tab bar sits `spacing-md` under what precedes it. The theme starts a tab's label at the top of its
-bar, with the underline right under the label, for every tab bar, because Ant Design's padding above
-the label reads as a gap too wide.
+A tab bar sits `spacing-md` under what precedes it, except a page's tab row, see below. The theme starts a
+tab's label at the top of its bar, with the underline right under the label, for every tab bar, because Ant
+Design's padding above the label reads as a gap too wide.
 
 - **One tab row look.** Every tab row of a workspace has the same padding and a rule the region's width,
   whether it holds a file's tabs or a view switch.
+- **A page's tab row.** A tab row on a page, such as a Studio resource's Design, Form, JSON and Used by, has the
+  same look. Its rule reaches the page's edges, past the content area's padding. The row sits `spacing-sm` into the
+  gap above it, and its content starts `spacing-md` under its rule.
 
 ## Text
 

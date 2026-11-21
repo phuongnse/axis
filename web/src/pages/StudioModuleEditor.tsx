@@ -1,4 +1,4 @@
-import { Button, Flex, Modal } from 'antd'
+import { Flex, Modal } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { StatusTag } from '../platform/StatusTag'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
@@ -509,8 +509,11 @@ export function StudioModuleEditor({
           data-testid="studio-conflict"
           kind="warning"
           message={t('shell.studio.conflict')}
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          action={<Button onClick={() => void reload()}>{t('shell.studio.reload')}</Button>}
+          action={
+            <AxisButton role="secondary" onClick={() => void reload()}>
+              {t('shell.studio.reload')}
+            </AxisButton>
+          }
         />
       )}
       {saveError !== null && <AxisAlert data-testid="studio-save-error" kind="error" message={saveError} />}

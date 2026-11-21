@@ -312,6 +312,18 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('draws Add grant as a text button on the title row of the grants panel', async () => {
+    stubFetch()
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
+    const panel = screen.getByRole('region', { name: 'Grants of employee on PurchaseRequest' })
+    const addGrant = await within(panel).findByRole('button', { name: 'Add grant' })
+
+    expect(addGrant).toHaveClass('ant-btn-variant-text')
+    expect(addGrant).not.toHaveClass('ant-btn-variant-outlined')
+  })
+
   it('says a cell has no grant', async () => {
     renderMatrix()
 
