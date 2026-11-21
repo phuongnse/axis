@@ -367,6 +367,8 @@ internal static class McpWriteTools
             folder: null,
             client: null,
             package: null,
+            operation: null,
+            input: null,
             ct);
         return (new McpScenarioRun(id.ToString("D"), "queued", EmptyList(), EmptyList()), null);
     }
@@ -485,6 +487,8 @@ internal static class McpWriteTools
             folder: application,
             client: context.Caller.ClientId,
             package: null,
+            operation: null,
+            input: null,
             ct);
         await transaction.CommitAsync(ct);
         await AuditAsync(context, folder, "accept_draft", draft, null);
