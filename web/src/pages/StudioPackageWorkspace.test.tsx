@@ -802,6 +802,123 @@ describe('StudioPackageWorkspace', () => {
       expect(writesSent()).toEqual([])
       expect(treeNames()).toContain('adapter.py')
     })
+
+    describe('dragging', () => {
+      const row = (name: string) => within(tree()).getAllByText(name, { exact: true })[0].closest('.ant-tree-treenode')!
+      const dataTransfer = { setData: vi.fn(), getData: vi.fn(), effectAllowed: 'move', dropEffect: 'move' }
+      /** Drags the node `from` and drops it on `onto`, a row of the tree or the tree's free space. */
+      function drag(from: string, onto: Element) {
+        fireEvent.dragStart(row(from), { dataTransfer, clientX: 0 })
+        fireEvent.dragEnter(onto, { dataTransfer, clientX: 100 })
+        fireEvent.dragOver(onto, { dataTransfer, clientX: 100 })
+        fireEvent.drop(onto, { dataTransfer, clientX: 100 })
+        fireEvent.dragEnd(row(from), { dataTransfer })
+      }
+
+      it('moves a file dropped on a folder into it with one move', async () => {
+        stubPackage()
+        renderWorkspace(true)
+        await screen.findByTestId('studio-package-tree')
+
+        drag('adapter.py', row('src'))
+
+        await waitFor(() => expect(writesSent()).toHaveLength(1))
+        expect(writesSent()[0].method).toBe('POST')
+        expect(writesSent()[0].url).toBe(moveRoute)
+        expect(writesSent()[0].body).toEqual({
+          moves: [{ from: 'adapter.py', to: 'src/adapter.py', version: 'v-adapter.py' }],
+        })
+        await waitFor(() =>
+          expect(treeNames()).toEqual(['lib', 'x.py', 'src', 'a.cs', 'adapter.py', 'b.ts', 'axis-package.json']),
+        )
+      })
+
+      it('moves a folder dropped on a folder, and then on the free space to the root, with one move each', async () => {
+        stubPackage()
+        renderWorkspace(true)
+        await screen.findByTestId('studio-package-tree')
+
+        drag('src', row('lib'))
+        await waitFor(() => expect(writesSent()).toHaveLength(1))
+        await waitFor(() =>
+          expect(treeNames()).toEqual(['lib', 'src', 'a.cs', 'b.ts', 'x.py', 'adapter.py', 'axis-package.json']),
+        )
+        expect(writesSent()[0].body).toEqual({
+          moves: [
+            { from: 'src/a.cs', to: 'lib/src/a.cs', version: 'v-src/a.cs' },
+            { from: 'src/b.ts', to: 'lib/src/b.ts', version: 'v-src/b.ts' },
+          ],
+        })
+
+        drag('src', tree())
+
+        await waitFor(() => expect(writesSent()).toHaveLength(2))
+        expect(writesSent()[1].url).toBe(moveRoute)
+        expect(writesSent()[1].body).toEqual({
+          moves: [
+            { from: 'lib/src/a.cs', to: 'src/a.cs', version: 'v-lib/src/a.cs' },
+            { from: 'lib/src/b.ts', to: 'src/b.ts', version: 'v-lib/src/b.ts' },
+          ],
+        })
+      })
+
+      it('sends nothing for a node dropped where it already is, or a folder dropped into itself', async () => {
+        stubPackage()
+        renderWorkspace(true)
+        await screen.findByTestId('studio-package-tree')
+
+        drag('x.py', row('lib'))
+        drag('lib', row('lib'))
+        drag('adapter.py', tree())
+        drag('adapter.py', row('b.ts'))
+
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(writesSent()).toEqual([])
+      })
+
+      it('says above the workspace that a file was not moved on a 409, and reads the list again', async () => {
+        stubPackage({}, [], undefined, null, undefined, 409)
+        renderWorkspace(true)
+        await screen.findByTestId('studio-package-tree')
+        const listed = () => vi.mocked(fetch).mock.calls.filter(([url]) => url === files).length
+        const before = listed()
+
+        drag('adapter.py', row('src'))
+
+        expect(await screen.findByText(/adapter\.py was not moved/)).toBeInTheDocument()
+        await waitFor(() => expect(listed()).toBe(before + 1))
+      })
+
+      it('says a file was not moved when the target already holds that name, and sends nothing', async () => {
+        stubPackage()
+        renderWorkspace(true)
+        await screen.findByTestId('studio-package-tree')
+        await userEvent.click(
+          within(screen.getByRole('region', { name: 'Files' })).getByRole('button', { name: 'New' }),
+        )
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'New folder…' }))
+        await submitName('x.py', 'Create')
+        await waitFor(() => expect(treeNames()).toContain('x.py'))
+
+        drag('x.py', tree())
+
+        expect(await screen.findByText(/x\.py was not moved/)).toBeInTheDocument()
+        expect(writesSent()).toEqual([])
+      })
+
+      it('cannot drag any node without the developer role, and a drag sends nothing', async () => {
+        stubPackage()
+        renderWorkspace(false)
+        await screen.findByTestId('studio-package-tree')
+
+        expect(tree().querySelectorAll('[draggable="true"]')).toHaveLength(0)
+        drag('adapter.py', row('src'))
+        drag('src', tree())
+
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(writesSent()).toEqual([])
+      })
+    })
   })
 
   describe('Problems tab', () => {

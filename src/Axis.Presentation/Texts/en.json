@@ -3075,6 +3075,7 @@
   "shell.studio.packages.create": "Create",
   "shell.studio.packages.renameOk": "Rename",
   "shell.studio.packages.nameTaken": "This name is taken, or a file changed since the list was read. The list is read again.",
+  "shell.studio.packages.moveRefused": "{name} was not moved. The folder already has that name, or a file changed since the list was read. The list is read again.",
   "shell.studio.packages.nameInvalid": "This name is not allowed. It cannot be empty, start with a dot or hold a slash or a line break.",
   "shell.studio.packages.deleteFailed": "{file} could not be deleted.",
   "shell.studio.packages.deleteFile": "Delete {file}?",
