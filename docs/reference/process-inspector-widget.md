@@ -115,16 +115,19 @@ wrong form show the not-found page, and the instance is not requested.
   or Duration. Paging and Refresh complete the toolbar. The timeline holds its rows and does these itself. A click on
   a run's step opens that run in the side panel, as the step's run rule below says.
 
-- **A step's run** _(planned)_. A click on a step, or on a run's step in History, chooses the step and opens
+- **A step's run**. A click on a step, or on a run's step in History, chooses the step and opens
   `StepRunPanel` in the page's `SidePanel`, see [layout](shell.md#layout). The page opens no panel at first, and
   Close shuts the panel while the step stays chosen. The address keeps `step`, the step's name, `run`, the run's
   number, left out for the latest run, and `stepTab`, the panel's tab, left out for the first tab. The panel's title
   is the step's label, with the run's state as a `StatusTag` beside it. Its line is the step's kind alone, or its
-  operation's when it has one, such as Calls a connector. A step run more than once has a run chooser on top. Its
-  tabs are Overview, Input, Output, Attempts and Error, only those that apply, and Error only for a failed run. A run
-  with one part has no tab bar.
+  operation's when it has one, such as Calls a connector. An operation is named by what its run did: a call reads
+  Calls a connector or Calls an extension package, a child instance Starts a sub-process, and what the run made
+  reads Raises an event, Sends a notification, Creates a record or Changes the record. A step run more than once
+  has a run chooser on top. Its tabs are the parts below that apply to the run, in their order, and Error only for a
+  failed run. A run with one part has no tab bar. A step the instance has not reached opens the panel with its
+  title and its line, and says "This step has not run." ("Bước này chưa chạy.") in place of the parts.
 
-- **Overview** _(planned)_. The run's facts, each a term above its value in `TermList`, each on a row of its own
+- **Overview**. The run's facts, each a term above its value in `TermList`, each on a row of its own
   unless two belong together:
   - Started beside Ended, then Duration.
   - A task's Assigned to, Due, with Overdue while it is open past its due time, and Completed by.
@@ -160,7 +163,7 @@ wrong form show the not-found page, and the instance is not requested.
   made, never the step's retry policy, which is the author's setting. A call with no attempts shows "No attempts
   yet." in place of the table. An empty cell shows `EmptyDash`.
 
-- **Error** _(planned)_. The run's `problem` worded through `shell.stepProblem.<code>` in the reader's language,
+- **Error**. The run's `problem` worded through `shell.stepProblem.<code>` in the reader's language,
   falling back to the stored error. No stack trace or exception message shows, see
   [step errors](process-inspection.md#step-errors-in-inspection).
 
@@ -223,7 +226,8 @@ A process is drawn as one graph, with the same layout, cards and controls wherev
 - **Controls** _(planned)_. `ProcessGraphControls` gives each control a tooltip in the reader's language:
   - Zoom in and Zoom out.
   - Show the whole process.
-  - Go to the current step ("Tới bước hiện tại"), on an instance only.
+  - Go to the current step ("Tới bước hiện tại"), on an instance only. It also chooses the current step and opens
+    its run.
   - Full screen, the browser's own, left with Esc or Exit full screen.
   - Find a step, a searchable list of the steps in the process's order, at the graph's top left and as wide as a card.
     Choosing a step moves the view to it and chooses it. On an instance, it also opens that step's run, see

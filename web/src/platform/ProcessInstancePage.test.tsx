@@ -4,7 +4,8 @@ import dayjs from 'dayjs'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { formItem, optionTexts } from '../test/antd'
+import { chooseOption, formItem, optionTexts } from '../test/antd'
+import { ShellAsideHost } from '../test/shellAsideHost'
 import { dialog } from '../test/tableFilter'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
@@ -52,6 +53,7 @@ const detailText = `{
   "releaseNumber": 3,
   "state": "waiting",
   "step": "registerPurchase",
+  "timerDueAt": null,
   "createdAt": "2026-10-10T02:05:00.123456Z",
   "endedAt": null,
   "startedBy": { "kind": "person", "name": "Ada Lovelace", "id": "ada", "via": "purchaseRequest.submit" },
@@ -101,10 +103,13 @@ const detailText = `{
       "step": "managerApproval",
       "assigneeKind": "role",
       "assignee": "manager",
+      "assigneeId": null,
       "state": "open",
       "outcome": null,
       "completedBy": null,
+      "completedById": null,
       "createdAt": "2026-10-10T02:05:00.123456Z",
+      "dueAt": "2026-10-11T02:05:00.123456Z",
       "completedAt": null
     }
   ],
@@ -431,15 +436,17 @@ function renderPage(search = '') {
       <Address />
       <ThemeModeProvider>
         <TextProvider catalogs={catalogs} development={false}>
-          <ProcessInstancePage
-            sitePath="e2e"
-            pages={['Inspector', 'Children']}
-            widget={inspectorWidget}
-            instanceId={instanceId}
-            title="Approvals"
-            locale="en"
-            fallbackLocale="en"
-          />
+          <ShellAsideHost>
+            <ProcessInstancePage
+              sitePath="e2e"
+              pages={['Inspector', 'Children']}
+              widget={inspectorWidget}
+              instanceId={instanceId}
+              title="Approvals"
+              locale="en"
+              fallbackLocale="en"
+            />
+          </ShellAsideHost>
         </TextProvider>
       </ThemeModeProvider>
     </MemoryRouter>,
@@ -1365,5 +1372,182 @@ describe('ProcessInstancePage', () => {
       expect(within(data).queryByText('The instance has not ended yet.')).not.toBeInTheDocument()
       unmount()
     }
+  })
+})
+
+/** The panel of a step's run, once the page has opened it. */
+async function stepPanel() {
+  return within(await screen.findByTestId('inspector-step-run'))
+}
+
+describe('ProcessInstancePage step run panel', () => {
+  it("opens a step's latest run in the side panel when its card is clicked, with the state as a tag and step in the address", async () => {
+    stubApi({ detail: { status: 200, body: detailLooping() } })
+    renderPage()
+    const again = await screen.findByTestId('rf__node-again', undefined, { timeout: 5000 })
+    expect(screen.queryByTestId('inspector-step-run')).not.toBeInTheDocument()
+
+    fireEvent.click(within(again).getByRole('button', { name: 'again' }))
+
+    const panel = await stepPanel()
+    expect(panel.getByRole('heading', { name: 'again' })).toBeVisible()
+    expect(panel.getByText('Done').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
+    expect(panel.getByText('Operation')).toBeVisible()
+    expect(screen.getByTestId('address')).toHaveTextContent(/^\?step=again$/)
+  })
+
+  it('keeps run in the address for an earlier run that the run chooser picks', async () => {
+    stubApi({ detail: { status: 200, body: detailLooping() } })
+    renderPage()
+    const again = await screen.findByTestId('rf__node-again', undefined, { timeout: 5000 })
+    fireEvent.click(within(again).getByRole('button', { name: 'again' }))
+    const panel = await stepPanel()
+
+    await chooseOption(
+      'Run 1',
+      panel.getByRole('combobox', { name: 'Choose a run' }).closest('.ant-select') as HTMLElement,
+    )
+
+    expect(screen.getByTestId('address')).toHaveTextContent(/^\?step=again&run=1$/)
+    expect(panel.getByRole('combobox', { name: 'Choose a run' }).closest('.ant-select')).toHaveTextContent('Run 1')
+  })
+
+  it('shows no run chooser for a step that ran once', async () => {
+    stubApi({ detail: { status: 200, body: detailLooping() } })
+    renderPage('?step=done')
+
+    const panel = await stepPanel()
+
+    expect(panel.queryByRole('combobox')).not.toBeInTheDocument()
+  })
+
+  it('shuts the panel on Close, takes step out of the address and keeps the step chosen', async () => {
+    stubApi()
+    renderPage('?step=managerApproval')
+    await stepPanel()
+
+    await userEvent.click(screen.getByTestId('inspector-step-run-close'))
+
+    expect(screen.queryByTestId('inspector-step-run')).not.toBeInTheDocument()
+    expect(screen.getByTestId('address')).toHaveTextContent(/^$/)
+    const approval = await screen.findByTestId('rf__node-managerApproval', undefined, { timeout: 5000 })
+    expect(within(approval).getByRole('button', { name: 'Manager approval' })).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('opens the panel on the step that the address names', async () => {
+    stubApi()
+
+    renderPage('?step=managerApproval')
+
+    const panel = await stepPanel()
+    expect(panel.getByRole('heading', { name: 'Manager approval' })).toBeVisible()
+    expect(panel.getByText('Task')).toBeVisible()
+    const approval = await screen.findByTestId('rf__node-managerApproval', undefined, { timeout: 5000 })
+    expect(within(approval).getByRole('button', { name: 'Manager approval' })).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('opens no panel for a step that the graph does not have', async () => {
+    stubApi()
+
+    renderPage('?step=nowhere')
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.queryByTestId('inspector-step-run')).not.toBeInTheDocument()
+  })
+
+  it("shows the run's times, task and call facts, and calls an operation by what it does", async () => {
+    stubApi()
+
+    renderPage('?step=registerPurchase')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('Calls a connector')).toBeVisible()
+    expect(panel.getByText('Connector')).toBeVisible()
+    expect(panel.getByText('PurchasingSystem')).toBeVisible()
+    expect(panel.getByText('createOrder')).toBeVisible()
+    expect(panel.getByText('Came from')).toBeVisible()
+    expect(panel.getByRole('link', { name: 'Manager approval' })).toHaveAttribute(
+      'href',
+      '/e2e/inspector/' + instanceId + '?step=managerApproval',
+    )
+    expect(panel.queryByRole('tab')).not.toBeInTheDocument()
+  })
+
+  it("shows a task's assignee and its due time with Overdue while it is open past due", async () => {
+    stubApi()
+
+    renderPage('?step=managerApproval')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('Assigned to')).toBeVisible()
+    expect(panel.getByText('manager')).toBeVisible()
+    expect(panel.getByText('Due')).toBeVisible()
+    expect(panel.getByText('Overdue').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
+    expect(panel.getByText('Completed by')).toBeVisible()
+  })
+
+  it('has an Error tab for a failed run that words its problem', async () => {
+    stubApi({ detail: { status: 200, body: detailFailedAt({ code: 'refused', values: {} }) } })
+
+    renderPage('?step=registerPurchase')
+
+    const panel = await stepPanel()
+    expect(panel.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+    await userEvent.click(panel.getByRole('tab', { name: 'Error' }))
+    expect(panel.getByText('The outside system refused the call.')).toBeVisible()
+    expect(screen.getByTestId('address')).toHaveTextContent('stepTab=error')
+  })
+
+  it('opens the Error tab from the address, and shows the stored error when the run has no problem code', async () => {
+    stubApi({ detail: { status: 200, body: detailFailedAt(null, 'Connection reset') } })
+
+    renderPage('?step=registerPurchase&stepTab=error')
+
+    const panel = await stepPanel()
+    expect(panel.getByRole('tab', { name: 'Error' })).toHaveAttribute('aria-selected', 'true')
+    expect(panel.getByText('Connection reset')).toBeVisible()
+  })
+
+  it('has no Error tab and no tab bar for a run that did not fail', async () => {
+    stubApi()
+
+    renderPage('?step=managerApproval&stepTab=error')
+
+    const panel = await stepPanel()
+    expect(panel.queryByRole('tab', { name: 'Error' })).not.toBeInTheDocument()
+    expect(panel.queryByRole('tablist')).not.toBeInTheDocument()
+  })
+
+  it('names the child of a sub-process step by its process title, as a link to its inspector page', async () => {
+    stubApi({ detail: { status: 200, body: detailWithRelatives() } })
+
+    renderPage('?step=wait')
+
+    const link = await screen.findByTestId(`inspector-run-subprocess-${childId}`)
+    expect(link).toHaveTextContent('ChildJob')
+    expect(link).toHaveAttribute('href', `/e2e/children/${childId}`)
+    expect(within(link.closest('dd')!).getByText('Running')).toBeVisible()
+  })
+
+  it('says that a step the instance has not reached has not run', async () => {
+    stubApi()
+
+    renderPage('?step=done')
+
+    const panel = await stepPanel()
+    expect(panel.getByRole('heading', { name: 'done' })).toBeVisible()
+    expect(panel.getByText('This step has not run.')).toBeVisible()
+    expect(panel.queryByText('Started')).not.toBeInTheDocument()
+  })
+
+  it('opens a step through Find a step and Go to the current step', async () => {
+    stubApi()
+    renderPage()
+    const goTo = await screen.findByRole('button', { name: 'Go to the current step' }, { timeout: 5000 })
+
+    await userEvent.click(goTo)
+
+    expect(await stepPanel()).toBeDefined()
+    expect(screen.getByTestId('address')).toHaveTextContent(/^\?step=registerPurchase$/)
   })
 })

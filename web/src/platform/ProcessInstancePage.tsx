@@ -21,10 +21,12 @@ import {
   problemText,
   processTitle,
   retryWarns,
+  runProblem,
   sendCommand,
   startKindText,
   stateText,
   stateTone,
+  stepRuns,
   taskStates,
   type CallAttempt,
   type InstanceCommand,
@@ -42,6 +44,7 @@ import { RecordNotFound } from './RecordNotFound'
 import { ReasonDialog } from './ReasonDialog'
 import { ResolveDialog } from './ResolveDialog'
 import { StatusTag } from './StatusTag'
+import { StepRunPanel } from './StepRunPanel'
 import { SectionPart, SectionParts } from './SectionParts'
 import { studioResourceAddress } from './studioAddress'
 import { TermList, type Term } from './TermList'
@@ -54,6 +57,7 @@ import { useDesignTokens } from './themeMode'
 import { useAddressTab } from './useAddressTab'
 import { useEmptyStyle } from './useEmptyStyle'
 import { useReleaseTexts } from './useReleaseTexts'
+import { useStepRunAddress } from './useStepRunAddress'
 import { useTableView } from './useTableView'
 import { namedValues } from './valueRows'
 import { ValueTable } from './ValueTable'
@@ -295,6 +299,17 @@ export function InstanceDetailView({
 }: InstanceDetailViewProps) {
   const t = useText()
   const [tab, selectTab] = useAddressTab('tab', instanceTabs)
+  const instanceRuns = useMemo(() => stepRuns(instance), [instance])
+  const stepKeys = useMemo(() => instance.graph.steps.map((step) => step.name), [instance.graph.steps])
+  const address = useStepRunAddress(instanceRuns.runs, stepKeys)
+  // The step with the border: the one the address names, else the one chosen last, which starts as the current step.
+  // Close removes `step` from the address, and the step stays chosen.
+  const [picked, setPicked] = useState(instance.step)
+  const chosen = address.step ?? picked
+  const choose = (step: string) => {
+    setPicked(step)
+    address.open(step)
+  }
   const historyView = useTableView(historyFields, recordPageSize, noParameters, false, true, false, 'history.')
   const taskView = useTableView(taskFields, recordPageSize, noParameters, false, true, false, 'tasks.')
   const subProcessView = useTableView(
@@ -559,17 +574,9 @@ export function InstanceDetailView({
     }
     return startKindText(t, by.kind)
   }
-  // The step a failed instance stopped at, and why: the latest entry of that step with a problem or an error, or else the
-  // last attempt with one of the last failed call on that step. See docs/reference/process-inspector-widget.md#instance-page.
-  const stopReason = (): string | null => {
-    const entry = instance.path.findLast((row) => row.step === instance.step && (row.problem || row.error))
-    if (entry) {
-      return problemText(t, locale, entry.problem, entry.error)
-    }
-    const call = instance.calls.findLast((row) => row.step === instance.step && row.state === 'failed')
-    const attempt = call?.attempts.findLast((row) => row.problem || row.error)
-    return attempt ? problemText(t, locale, attempt.problem, attempt.error) : null
-  }
+  // The step a failed instance stopped at, and why, from its current step's last run, as the panel's Error tab words it.
+  // See docs/reference/process-inspector-widget.md#instance-page.
+  const stopReason = (): string | null => runProblem(t, locale, instance, instanceRuns.runs, instanceRuns.runs.at(-1)!)
   const stopped = fillText(t('shell.inspector.stoppedAt'), { step: stepLabel(instance.step) })
   const reason = instance.state === 'failed' ? stopReason() : null
   const facts: Term[] = [
@@ -661,7 +668,15 @@ export function InstanceDetailView({
     diagram: (
       <div data-testid="inspector-diagram" style={{ height: diagramHeight, position: 'relative' }}>
         <Suspense fallback={null}>
-          <LazyInstanceDiagram instance={instance} stepLabel={stepLabel} stepNames={stepNames} locale={locale} />
+          <LazyInstanceDiagram
+            instance={instance}
+            runs={instanceRuns}
+            chosen={chosen}
+            onChoose={choose}
+            stepLabel={stepLabel}
+            stepNames={stepNames}
+            locale={locale}
+          />
         </Suspense>
       </div>
     ),
@@ -695,6 +710,24 @@ export function InstanceDetailView({
           />
         </SectionPart>
       </SectionParts>
+      {address.step !== undefined && (
+        <StepRunPanel
+          instance={instance}
+          runs={instanceRuns.runs}
+          step={address.step}
+          run={address.run}
+          stepLabel={stepLabel}
+          inspectors={inspectors}
+          sitePath={sitePath}
+          locale={locale}
+          search={address.search}
+          onChooseRun={(number) => address.open(address.step!, number)}
+          onClose={() => {
+            setPicked(chosen)
+            address.close()
+          }}
+        />
+      )}
     </div>
   )
 }
