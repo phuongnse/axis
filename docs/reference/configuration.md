@@ -84,6 +84,9 @@ them is resolved.
 - **An application's packages.** No file under `packages/` at the folder root is loaded as a resource,
   whatever its extension, see [an application's packages](package-runners.md#an-applications-packages).
   Each is read as UTF-8 text, and one that is not UTF-8 is `AXC0010`.
+- **Saved run inputs.** No file under `run-inputs/` at the folder root is loaded, with no diagnostic, because it
+  holds Studio's saved run inputs, see [the authoring API](studio-packages.md#the-authoring-api). So it is in no
+  release and no content hash.
 - **Stored releases.** The same checks run on a release's stored resources when the server rebuilds
   its model.
 
@@ -661,7 +664,8 @@ The Release step stores the compiled application as a release, which is immutabl
 - **Modules and scenarios in the hash.** Module files are hashed as ordinary resource paths under
   `modules/<id>/`, see [modules](modules-and-templates.md#modules).
   [Scenario](test-scenarios.md) files under `scenarios/` are left out of the release and its content
-  hash, so adding or editing a scenario keeps the hash and the release.
+  hash, so adding or editing a scenario keeps the hash and the release. Files under `run-inputs/` are left out
+  of both too.
 - **Identity.** A release is unique per application `id` and content hash. Compiling an unchanged
   folder returns the stored release instead of storing a second one, also when two compiles run at
   the same time.

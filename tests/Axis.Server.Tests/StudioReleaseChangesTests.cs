@@ -7,7 +7,8 @@ namespace Axis.Server.Tests;
 /// <summary>
 /// The release compare of Studio reads resources as JSON. An application's package files under <c>packages/</c>, see
 /// docs/reference/package-runners.md#an-applications-packages, are not resources, so a release that holds a package
-/// compares and lists without an error and the files are not shown as changes.
+/// compares and lists without an error and the files are not shown as changes. A package's saved run inputs under
+/// <c>run-inputs/</c> are not resources either.
 /// </summary>
 public sealed class StudioReleaseChangesTests
 {
@@ -37,6 +38,15 @@ public sealed class StudioReleaseChangesTests
     {
         ResourceContent[] release = [new("entities/order.json", Entity), .. _package];
         StudioSnapshotFile[] folder = [new("entities/order.json", "v1", Entity)];
+
+        Assert.Empty(StudioReleaseChanges.Compare(folder, release));
+    }
+
+    [Fact]
+    public void A_folder_file_under_run_inputs_is_no_change()
+    {
+        ResourceContent[] release = [new("entities/order.json", Entity)];
+        StudioSnapshotFile[] folder = [new("entities/order.json", "v1", Entity), new("run-inputs/x.json", "v2", """{"items":[]}""")];
 
         Assert.Empty(StudioReleaseChanges.Compare(folder, release));
     }

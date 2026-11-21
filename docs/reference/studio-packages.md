@@ -149,8 +149,8 @@ developer role and the switch as a write has, and answers `403` otherwise.
 | `POST /api/studio/apps/{application}/build` _(planned for M37)_                        | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below                                              |
 | `POST /api/studio/apps/{application}/test` _(planned for M37)_                         | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below                                      |
 | `POST /api/studio/apps/{application}/run` _(planned for M37)_                          | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run`, see A run of one operation below                                                                                                            |
-| `GET /api/studio/apps/{application}/packages/{package}/run-inputs` _(planned for M37)_ | `200` with `{ items: [{ name, operation, input }] }` and the version as an `ETag`, see Saved run inputs below                                                                                                                                    |
-| `PUT /api/studio/apps/{application}/packages/{package}/run-inputs` _(planned for M37)_ | `200` with `{ version }` and an `ETag`. The body is `{ items }`, with `If-None-Match: *` for the first save or `If-Match` of the version, and a stale version answers `409`                                                                                       |
+| `GET /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ items: [{ name, operation, input }] }`. The version is the `ETag`, which comes once the inputs are saved, see Saved run inputs below                                                                                                                                    |
+| `PUT /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ version }` and an `ETag`. The body is `{ items }`, with `If-None-Match: *` for the first save or `If-Match` of the version, and a stale version answers `409`                                                                                       |
 | `POST /api/studio/apps/{application}/packages/{package}/move` _(planned for M37)_      | `200` with `{ diagnostics }`. The body is `{ moves: [{ from, to, version }] }`, see Moves below                                                                                                                                                              |
 
 - **The checks.** A write to a package's files is under the [versions](authoring.md#versions) and the write
@@ -212,10 +212,20 @@ developer role and the switch as a write has, and answers `403` otherwise.
   capabilities. The request ends with `run`, which has `operation`, `outcome`, `output`, `error` (`code` and
   `message`) and `durationMs`. The run's CPU seconds count in the tenant's
   [package run time](tenant-quotas.md#package-run-time-a-day), and the answer carries no CPU time.
-- **Saved run inputs** _(planned for M37)_. `GET` and `PUT .../packages/{package}/run-inputs` read and replace the
-  application's named inputs for the package, `{ items: [{ name, operation, input }] }`, under the
-  [versions](authoring.md#versions) as a file is. They are kept outside the package's folder so no build holds
-  them, and each save is a revision.
+- **Saved run inputs.** `GET` and `PUT .../packages/{package}/run-inputs` read and replace the application's named
+  inputs for the package, `{ items: [{ name, operation, input }] }`, under the [versions](authoring.md#versions) as a
+  file is. The package must be a plain folder name, but it needs no files. The inputs are the file
+  `run-inputs/<package>.json` at the folder root. It is outside `packages/`, so no build holds it, and the loader
+  skips the `run-inputs/` folder, so no compile, release or content hash reads it and it is no change that waits for a
+  publish. Before the first save `GET` answers `200` with `{ items: [] }` and no `ETag`, so the client sends
+  `If-None-Match: *` to create. A save needs `If-None-Match: *` or the current `If-Match`, and a stale version or a
+  second create answers `409` and writes nothing. The body is an object with only `items`. Each item has a non-empty
+  string `name`, a non-empty string `operation` and an `input` of any JSON value, and no name appears twice, or the
+  answer is `400`. The route does not check the input against the operation. Both routes check the session, the
+  author role, the developer role, the switch, the application, the package, and for `PUT` the precondition headers
+  (`428` for none, `400` for both), the content type (`415`), the body and the version. In a cell `PUT` also checks the
+  [storage quota](tenant-quotas.md#refusals). Each save is a revision, "Create run inputs of package x" or "Change
+  run inputs of package x", and [undo](revisions-and-drafts.md#undo) puts the earlier inputs back.
 - **Moves** _(planned for M37)_. `POST .../packages/{package}/move` with `{ moves: [{ from, to, version }] }` moves
   files as one revision, so one [undo](revisions-and-drafts.md#undo) puts them all back. Renaming a folder moves each
   of its files. A changed file or a taken path answers `409`, and a refused path `400`, by the rules of
