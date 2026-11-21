@@ -111,7 +111,11 @@ test('the operator opens an instance waiting for the manager and sees the path a
     )
     await expect(approval.getByRole('img', { name: 'Waiting for a person', exact: true })).toBeVisible()
     await shell.getByRole('tab', { name: 'History', exact: true }).click()
-    await expect(shell.getByRole('row', { name: /Manager approval.*user: Manager 2 User.*open/ })).toBeVisible()
+    await shell
+      .getByRole('row', { name: /Manager approval/ })
+      .getByRole('button', { name: 'Show the rows in it', exact: true })
+      .click()
+    await expect(shell.getByRole('row', { name: /Task Waits for Manager 2 User\..*Open/ })).toBeVisible()
   }
 })
 
@@ -233,6 +237,12 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
   const orderNumber = orders[0].orderNumber
 
   await page.goto(`/purchasing/approvals/${instanceId}?tab=history`)
+  // The call waits at the instance's current step, so it is in the newest run, the first row of History.
+  await page
+    .getByTestId('inspector-history')
+    .getByRole('button', { name: 'Show the rows in it', exact: true })
+    .first()
+    .click()
   await page.getByTestId(`inspector-resolve-${callId}`).click()
   const dialog = await waitForDialog(page)
   await dialog.getByLabel(fieldLabel('Reason')).fill('The order exists in the purchasing system')

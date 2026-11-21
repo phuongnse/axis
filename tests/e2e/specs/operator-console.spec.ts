@@ -85,7 +85,8 @@ test('the platform operator opens a failed instance from Failed work and sees it
   const failed = page.getByTestId('rf__node-managerApproval')
   await expect(failed.getByRole('img', { name: 'Failed', exact: true })).toBeVisible()
   await page.getByRole('tab', { name: 'History', exact: true }).click()
-  await expect(page.getByRole('row', { name: /managerApproval.*System\.InvalidOperationException/ })).toBeVisible()
+  await expect(page.getByRole('row', { name: /managerApproval.*Failed/ })).toBeVisible()
+  await expect(page.getByTestId('inspector-failure')).toContainText('System.InvalidOperationException')
   await expect(page.getByTestId('inspector-command-retry')).toBeVisible()
 })
 
@@ -103,7 +104,8 @@ test('the platform operator sees the named point of a refused write in Failed wo
 
   await expect(page).toHaveURL(new RegExp(`/console/instances/${instanceId}$`))
   await page.getByRole('tab', { name: 'History', exact: true }).click()
-  await expect(page.getByRole('row', { name: /managerApproval.*named point Request\/transitions\/submit/ })).toBeVisible()
+  await expect(page.getByRole('row', { name: /managerApproval.*Failed/ })).toBeVisible()
+  await expect(page.getByTestId('inspector-failure')).toContainText('named point Request/transitions/submit')
 })
 
 test('the platform operator retries a failed instance from the console with a reason and it leaves Failed work', async ({

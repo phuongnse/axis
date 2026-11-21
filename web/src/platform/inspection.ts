@@ -138,6 +138,43 @@ export function callStateText(t: (key: string) => string, state: string): string
   return textOf(t, 'shell.inspector.callStates.', callStates, state)
 }
 
+const taskTones: Record<(typeof taskStates)[number], StatusTone> = {
+  open: 'attention',
+  completed: 'success',
+  cancelled: 'muted',
+  expired: 'muted',
+}
+
+/** The tone of a task state. An unknown state is `neutral`. */
+export function taskStateTone(state: string): StatusTone {
+  return toneOf(taskTones, state)
+}
+
+/** The platform text of a task state. A state this build does not know shows as the API sends it. */
+export function taskStateText(t: (key: string) => string, state: string): string {
+  return textOf(t, 'shell.inspector.taskStates.', taskStates, state)
+}
+
+/**
+ * Where a run's state comes in History's State sort: Failed, then Waiting, Running and Done, see
+ * docs/reference/process-inspector-widget.md#instance-page. A cancelled run comes last.
+ */
+export function historyStateRank(state: RunState): number {
+  switch (state) {
+    case 'failed':
+      return 0
+    case 'waitingForPerson':
+    case 'waitingForEvent':
+      return 1
+    case 'running':
+      return 2
+    case 'done':
+      return 3
+    case 'cancelled':
+      return 4
+  }
+}
+
 /** The code of a failed step or attempt with its values, see docs/reference/process-inspection.md#step-errors-in-inspection. */
 export interface StepProblem {
   code: string

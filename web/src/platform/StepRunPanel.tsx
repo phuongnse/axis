@@ -14,7 +14,6 @@ import {
   runStateTone,
   stateText,
   stateTone,
-  stepTypeText,
   takenTransition,
   type InstanceDetail,
   type StepRun,
@@ -22,7 +21,7 @@ import {
 import { inspectorPath } from './inspectorPages'
 import { PersonName } from './PersonName'
 import { SidePanel } from './SidePanel'
-import { runHasInput, runHasOutput } from './runPanelParts'
+import { runHasInput, runHasOutput, runKindText } from './runPanelParts'
 import { RunAttempts, RunInput, RunOutput } from './StepRunParts'
 import { StatusTag } from './StatusTag'
 import { TermList, type Term } from './TermList'
@@ -142,7 +141,7 @@ export function StepRunPanel({
       testId="inspector-step-run"
       title={stepLabel(step)}
       status={run && <StatusTag tone={runStateTone(run.state)}>{runStateText(t, run.state)}</StatusTag>}
-      line={stepLine(t, instance, runs, run, type)}
+      line={runKindText(t, instance, runs, run, type)}
       onClose={onClose}
       closeNameKey="shell.inspector.run.close"
       closeTestId="inspector-step-run-close"
@@ -164,43 +163,6 @@ export function StepRunPanel({
       </Flex>
     </SidePanel>
   )
-}
-
-/**
- * The panel's line: what an operation step's run did, such as "Calls a connector", worked out from the run's call, its
- * child instance and what it made, since the graph gives every operation the type `operation`. Any other step, and an
- * operation that shows none of these, reads its type's word.
- */
-function stepLine(
-  t: (key: string) => string,
-  instance: InstanceDetail,
-  runs: readonly StepRun[],
-  run: StepRun | undefined,
-  type: string,
-): string {
-  if (type === 'operation' && run !== undefined) {
-    const { calls, subProcesses } = runParts(instance, runs, run)
-    const made = run.entries.at(-1)?.made
-    const operation = calls[0]
-      ? calls[0].kind === 'package'
-        ? 'package'
-        : 'connector'
-      : subProcesses.length > 0
-        ? 'subProcess'
-        : made?.event
-          ? 'event'
-          : made?.notified
-            ? 'notify'
-            : made?.created
-              ? 'create'
-              : made?.changes
-                ? 'change'
-                : undefined
-    if (operation !== undefined) {
-      return t(`shell.inspector.run.operations.${operation}`)
-    }
-  }
-  return stepTypeText(t, type)
 }
 
 interface RunOverviewProps {
