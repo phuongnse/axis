@@ -231,6 +231,22 @@ public sealed class ContentHashTests
           "changes": [ { "type": "fill", "field": "number", "value": "{{value}}" } ] }
         """;
 
+    [Fact]
+    public void Saved_run_inputs_under_run_inputs_are_skipped_so_they_change_no_hash_and_raise_no_diagnostic()
+    {
+        ResourceContent application = new("application.json", Manifest);
+        ResourceContent runInputs = new("run-inputs/x.json", """{ "items": [] }""");
+
+        var without = ApplicationCompiler.CompileFiles([application], null, null);
+        var with = ApplicationCompiler.CompileFiles([application, runInputs], null, null);
+
+        Assert.Empty(without.Diagnostics);
+        Assert.Empty(with.Diagnostics);
+        Assert.NotNull(with.ContentHash);
+        Assert.Equal(without.ContentHash, with.ContentHash);
+        Assert.DoesNotContain(with.Resources, resource => resource.Path.StartsWith("run-inputs/", StringComparison.Ordinal));
+    }
+
     private static TemporaryFolder SampleFolder(string order = Order) =>
         new TemporaryFolder()
             .With("application.json", Manifest)

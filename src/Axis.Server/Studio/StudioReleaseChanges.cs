@@ -10,7 +10,7 @@ namespace Axis.Server.Studio;
 /// Compares the files of an application folder with the resources of its active release, file by file, as canonical
 /// JSON, without compiling the folder. Scenarios are left out because a release never stores them, and so are the
 /// modules' copies under <c>modules/</c> on both sides, which Studio shows as module rows. An application's package files
-/// under <c>packages/</c> are left out too, because they are not resources.
+/// under <c>packages/</c> and Studio's saved run inputs under <c>run-inputs/</c> are left out too, because they are not resources.
 /// </summary>
 internal static class StudioReleaseChanges
 {
@@ -72,10 +72,11 @@ internal static class StudioReleaseChanges
         return changes;
     }
 
-    // A module's copy or an application's package file, neither of which is a resource that Studio compares.
+    // A module's copy, an application's package file or a package's saved run inputs, none of which is a resource that Studio compares.
     private static bool IsModuleCopy(string path) =>
         path.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal)
-        || path.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal);
+        || path.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal)
+        || path.StartsWith(ApplicationLoader.RunInputsFolderPrefix, StringComparison.Ordinal);
 
     // The canonical text of a folder file, its raw text when it is not valid JSON, or null for a scenario.
     internal static string? Canonical(string content)

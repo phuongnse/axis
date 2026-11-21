@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
 using Axis.Studio;
@@ -17,7 +18,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The package file routes of the authoring API, see <c>docs/reference/studio-packages.md#the-authoring-api</c>. A write takes the
+/// The package file routes and the run inputs routes of the authoring API, see <c>docs/reference/studio-packages.md#the-authoring-api</c>. A write takes the
 /// write lock in the platform database, so these tests run on real PostgreSQL. The identity <c>developer</c> holds the author and
 /// developer roles, <c>author</c> holds the author role only and <c>outsider</c> holds the developer role only. The tenant's
 /// application packages switch is on in the host unless a test turns it off, see <see cref="CreateFactoryAsync"/>. They also cover
@@ -28,6 +29,8 @@ public sealed class StudioPackageFileTests(PostgreSqlFixture database) : IClassF
     private const string Url = "/api/studio/apps/PurchaseRequests";
 
     private const string FileUrl = $"{Url}/packages/x/files/adapter.py";
+
+    private const string RunInputsUrl = $"{Url}/packages/x/run-inputs";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -356,6 +359,147 @@ public sealed class StudioPackageFileTests(PostgreSqlFixture database) : IClassF
 
         using var diff = await SendAsync(author, HttpMethod.Get, $"{Url}/drafts/{draft}/diff", null);
         Assert.Empty((await ReadAsync(diff)).GetProperty("resources").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_developer_reads_no_run_inputs_before_a_save_then_saves_them_with_if_none_match_and_reads_the_same_items_and_version()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        using var client = factory.CreateClient().SignedInAs("developer");
+        var file = Path.Combine(folder.Path, "run-inputs", "x.json");
+
+        using var before = await client.GetAsync(new Uri(RunInputsUrl, UriKind.Relative), CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, before.StatusCode);
+        Assert.Null(before.Headers.ETag);
+        Assert.Empty((await ReadAsync(before)).GetProperty("items").EnumerateArray());
+
+        const string items = """{"items":[{"name":"Small","operation":"echo","input":{"text":"hi"}},{"name":"Empty","operation":"echo","input":null}]}""";
+        using var save = await SendAsync(client, HttpMethod.Put, RunInputsUrl, items, ("If-None-Match", "*"));
+        Assert.Equal(HttpStatusCode.OK, save.StatusCode);
+        var version = Version(File.ReadAllBytes(file));
+        Assert.Equal($"\"{version}\"", save.Headers.ETag?.Tag);
+        Assert.Equal(version, (await ReadAsync(save)).GetProperty("version").GetString());
+
+        using var after = await client.GetAsync(new Uri(RunInputsUrl, UriKind.Relative), CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, after.StatusCode);
+        Assert.Equal($"\"{version}\"", after.Headers.ETag?.Tag);
+        var read = await ReadAsync(after);
+        Assert.True(JsonElement.DeepEquals(JsonDocument.Parse(items).RootElement, read), read.GetRawText());
+
+        using var replace = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[]}""", ("If-Match", $"\"{version}\""));
+        Assert.Equal(HttpStatusCode.OK, replace.StatusCode);
+        using var replaced = await client.GetAsync(new Uri(RunInputsUrl, UriKind.Relative), CancellationToken);
+        Assert.Empty((await ReadAsync(replaced)).GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_run_inputs_save_with_a_stale_version_or_a_second_create_answers_409_and_a_bad_body_answers_400_and_the_file_keeps_its_bytes()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        using var client = factory.CreateClient().SignedInAs("developer");
+        var file = Path.Combine(folder.Path, "run-inputs", "x.json");
+        using var create = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[{"name":"a","operation":"echo","input":1}]}""", ("If-None-Match", "*"));
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+        var bytes = File.ReadAllBytes(file);
+
+        using var stale = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[]}""", ("If-Match", "\"stale\""));
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        using var again = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[]}""", ("If-None-Match", "*"));
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        using var other = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[]}""", ("If-None-Match", "\"x\""));
+        Assert.Equal(HttpStatusCode.Conflict, other.StatusCode);
+        Assert.Equal(bytes, File.ReadAllBytes(file));
+
+        var ifMatch = ("If-Match", $"\"{Version(bytes)}\"");
+        foreach (var body in new[]
+        {
+            """[]""",
+            """{}""",
+            """{"items":{}}""",
+            """{"items":[],"extra":1}""",
+            """{"items":[{"name":"","operation":"echo","input":1}]}""",
+            """{"items":[{"name":"a","operation":"","input":1}]}""",
+            """{"items":[{"name":"a","operation":"echo"}]}""",
+            """{"items":[{"name":"a","operation":"echo","input":1,"extra":1}]}""",
+            """{"items":[{"name":"a","operation":"echo","input":1},{"name":"a","operation":"echo","input":2}]}""",
+            "not json",
+        })
+        {
+            using var bad = await SendAsync(client, HttpMethod.Put, RunInputsUrl, body, ifMatch);
+            Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        }
+
+        using var none = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[]}""");
+        Assert.Equal(HttpStatusCode.PreconditionRequired, none.StatusCode);
+        using var text = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[]}""", ifMatch, "text/plain");
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, text.StatusCode);
+        using var badPackage = await SendAsync(client, HttpMethod.Put, $"{Url}/packages/.hidden/run-inputs", """{"items":[]}""", ("If-None-Match", "*"));
+        Assert.Equal(HttpStatusCode.BadRequest, badPackage.StatusCode);
+        using var getBadPackage = await client.GetAsync(new Uri($"{Url}/packages/.hidden/run-inputs", UriKind.Relative), CancellationToken);
+        Assert.Equal(HttpStatusCode.NotFound, getBadPackage.StatusCode);
+        Assert.Equal(bytes, File.ReadAllBytes(file));
+    }
+
+    [Fact]
+    public async Task Run_inputs_without_the_developer_role_the_author_role_or_the_switch_answer_403_on_a_read_and_a_write_and_create_no_file()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var on = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        await using var off = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: false);
+
+        foreach (var (factory, identity) in new[] { (on, "author"), (on, "outsider"), (off, "developer") })
+        {
+            using var client = factory.CreateClient().SignedInAs(identity);
+            using var put = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[]}""", ("If-None-Match", "*"));
+            Assert.Equal(HttpStatusCode.Forbidden, put.StatusCode);
+            using var get = await client.GetAsync(new Uri(RunInputsUrl, UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.Forbidden, get.StatusCode);
+            Assert.False(File.Exists(Path.Combine(folder.Path, "run-inputs", "x.json")), identity);
+        }
+    }
+
+    [Fact]
+    public async Task A_run_inputs_save_is_a_revision_that_undo_reverts_and_it_changes_no_compile_hash_resource_or_package_file()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        using var client = factory.CreateClient().SignedInAs("developer");
+        var file = Path.Combine(folder.Path, "run-inputs", "x.json");
+        var hash = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules).ContentHash;
+        Assert.NotNull(hash);
+
+        using var create = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[{"name":"a","operation":"echo","input":1}]}""", ("If-None-Match", "*"));
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+        var created = File.ReadAllBytes(file);
+        using var change = await SendAsync(client, HttpMethod.Put, RunInputsUrl, """{"items":[{"name":"b","operation":"echo","input":2}]}""", ("If-Match", create.Headers.ETag!.Tag));
+        Assert.Equal(HttpStatusCode.OK, change.StatusCode);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions, SampleModules.Modules);
+        Assert.Equal(hash, compiled.ContentHash);
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.File.StartsWith("run-inputs/", StringComparison.Ordinal));
+        Assert.DoesNotContain(compiled.Resources, resource => resource.Path.StartsWith("run-inputs/", StringComparison.Ordinal));
+        using var packageFiles = await client.GetAsync(new Uri($"{Url}/package-files", UriKind.Relative), CancellationToken);
+        Assert.Empty((await ReadAsync(packageFiles)).GetProperty("items").EnumerateArray());
+
+        using var repository = new Repository(Path.Combine(revisions.Path, Path.GetFileName(folder.Path) + ".git"));
+        Assert.Equal(
+            ["Start of history", "Create run inputs of package x", "Change run inputs of package x"],
+            repository.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = "refs/heads/main", SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Reverse })
+                .Select(commit => commit.MessageShort));
+        Assert.NotNull(repository.Branches["main"].Tip["run-inputs/x.json"]);
+
+        using var list = await client.GetAsync(new Uri($"{Url}/revisions", UriKind.Relative), CancellationToken);
+        var latest = (await ReadAsync(list)).GetProperty("items")[0];
+        Assert.Equal("Change run inputs of package x", latest.GetProperty("summary").GetString());
+        using var undo = await SendAsync(client, HttpMethod.Post, $"{Url}/revisions/{latest.GetProperty("id").GetString()}/undo", null);
+        Assert.Equal(HttpStatusCode.OK, undo.StatusCode);
+        Assert.Equal(created, File.ReadAllBytes(file));
     }
 
     private static async Task<string> CreateDraftAsync(WebApplicationFactory<Program> factory, string folder, string revisions, string userId)

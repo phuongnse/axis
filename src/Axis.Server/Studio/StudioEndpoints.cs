@@ -137,6 +137,7 @@ internal static class StudioEndpoints
         endpoints.MapStudioActivityEndpoints();
         endpoints.MapStudioKindListEndpoints();
         endpoints.MapStudioPackageFileEndpoints();
+        endpoints.MapStudioRunInputEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)

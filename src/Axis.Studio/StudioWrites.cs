@@ -371,7 +371,7 @@ internal static class StudioWrites
     /// <paramref name="ifMatch"/> is not the file's version or the file is missing, and as <see cref="StudioWriteRefusal.Exists"/> when
     /// <paramref name="ifNoneMatch"/> is set and the file exists, or when a folder or a file is in the way. Nothing is written when it refuses.
     /// </summary>
-    public static async Task<StudioWriteOutcome> WritePackageFileAsync(
+    public static Task<StudioWriteOutcome> WritePackageFileAsync(
         IStudioWriteLock writeLock,
         StudioRevisions? revisions,
         string folder,
@@ -379,6 +379,37 @@ internal static class StudioWrites
         byte[] bytes,
         string? ifMatch,
         bool ifNoneMatch,
+        CancellationToken cancellationToken) =>
+        WriteTextFileAsync(writeLock, revisions, folder, file, bytes, ifMatch, ifNoneMatch, $"package file {file}", cancellationToken);
+
+    /// <summary>
+    /// Creates or replaces the run inputs of <paramref name="package"/>, the file <see cref="StudioRunInputs.File"/> names, with
+    /// <paramref name="bytes"/> as given, and records "Create run inputs of package &lt;package&gt;" or "Change run inputs of package
+    /// &lt;package&gt;". It refuses as <see cref="WritePackageFileAsync"/> does.
+    /// </summary>
+    public static Task<StudioWriteOutcome> WriteRunInputsAsync(
+        IStudioWriteLock writeLock,
+        StudioRevisions? revisions,
+        string folder,
+        string package,
+        byte[] bytes,
+        string? ifMatch,
+        bool ifNoneMatch,
+        CancellationToken cancellationToken) =>
+        WriteTextFileAsync(
+            writeLock, revisions, folder, StudioRunInputs.File(package)!, bytes, ifMatch, ifNoneMatch, $"run inputs of package {package}", cancellationToken);
+
+    // The write of a text file by its exact bytes, which a package file and a package's run inputs share. The revision names the
+    // file by noun.
+    private static async Task<StudioWriteOutcome> WriteTextFileAsync(
+        IStudioWriteLock writeLock,
+        StudioRevisions? revisions,
+        string folder,
+        string file,
+        byte[] bytes,
+        string? ifMatch,
+        bool ifNoneMatch,
+        string noun,
         CancellationToken cancellationToken)
     {
         if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
@@ -415,7 +446,7 @@ internal static class StudioWrites
             return StudioWriteOutcome.Refused(refused);
         }
 
-        revisions?.Record($"{(exists ? "Change" : "Create")} package file {file}");
+        revisions?.Record($"{(exists ? "Change" : "Create")} {noun}");
         return new StudioWriteOutcome(null, Version(bytes));
     }
 

@@ -27,6 +27,9 @@ public static class ApplicationLoader
     /// <summary>The folder at the root of an application that holds its own extension packages, as <c>packages/&lt;id&gt;/</c>. No file in it is a resource.</summary>
     public const string PackagesFolderPrefix = "packages/";
 
+    /// <summary>The folder at the root of an application's working folder that holds Studio's saved run inputs, as <c>run-inputs/&lt;package&gt;.json</c>. The loader skips it.</summary>
+    public const string RunInputsFolderPrefix = "run-inputs/";
+
     private static readonly JsonDocumentOptions _documentOptions = new() { AllowDuplicateProperties = false };
 
     private static readonly UTF8Encoding _strictUtf8 = new(false, true);
@@ -151,6 +154,13 @@ public static class ApplicationLoader
         foreach (var source in sources)
         {
             var file = source.Path;
+            if (file.StartsWith(RunInputsFolderPrefix, StringComparison.Ordinal))
+            {
+                // Studio's saved run inputs, see docs/reference/studio-packages.md#the-authoring-api. They are neither loaded
+                // nor added to the release, so no compile, release or content hash holds them. No diagnostic: the folder is reserved.
+                continue;
+            }
+
             if (file.StartsWith(ModulesFolderPrefix, StringComparison.Ordinal))
             {
                 // Releases keep the files of pinned modules under this folder, so an application file there

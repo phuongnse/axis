@@ -17,9 +17,12 @@ internal static class StudioPackageFiles
     /// <c>\</c>. A hidden file is left out of revisions and snapshots, so a write must never create one.
     /// </summary>
     public static string? File(string package, string path) =>
-        StudioOptions.IsPlainName(package) && IsPlainSegment(package) && path.Split('/').All(IsPlainSegment)
+        IsPackage(package) && path.Split('/').All(IsPlainSegment)
             ? $"{ApplicationLoader.PackagesFolderPrefix}{package}/{path}"
             : null;
+
+    /// <summary>True when <paramref name="package"/> is a plain folder name, as <see cref="File"/> and the run inputs of a package need.</summary>
+    public static bool IsPackage(string package) => StudioOptions.IsPlainName(package) && IsPlainSegment(package);
 
     /// <summary>
     /// Every file of <paramref name="folder"/> under <c>packages/</c>, sorted by file, with the SHA-256 of its bytes as lower-case hex.
