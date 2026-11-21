@@ -105,7 +105,7 @@ internal static class PackageTests
     }
 
     /// <summary>Cuts the message at <see cref="MaxMessage"/> characters, and never between the two halves of a surrogate pair.</summary>
-    private static string Cut(string message)
+    internal static string Cut(string message)
     {
         if (message.Length <= MaxMessage)
         {
