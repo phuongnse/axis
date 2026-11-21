@@ -599,6 +599,8 @@
   "shell.table.filterOp.notEmpty": "is not empty",
   "shell.table.refresh": "Refresh",
   "shell.table.rowActions": "Actions",
+  "shell.table.reorder": "Drag to reorder",
+  "shell.table.reorderOff": "Clear the search and the filter to reorder",
   "shell.table.showDetails": "Show the details",
   "shell.table.hideDetails": "Hide the details",
   "shell.pagination.previous": "Previous page",

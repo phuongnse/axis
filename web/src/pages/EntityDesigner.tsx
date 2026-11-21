@@ -572,25 +572,15 @@ const Fields = memo(function Fields({
     [matchSignature],
   )
 
+  // Moves the field at `index` by `offset` rows, one for Move up and Move down, or many for a drag.
   const onMove = useCallback((index: number, offset: number) => {
     const { fields, origins, onOriginsChange, onChange } = latest.current
+    const to = index + offset
     // The drawer's field moves with it, and a closed drawer keeps its index in step, so it never opens on another field.
-    setDrawer(
-      (current) =>
-        current &&
-        (current.index === index
-          ? { ...current, index: index + offset }
-          : current.index === index + offset
-            ? { ...current, index }
-            : current),
-    )
-    const next = [...fields!]
-    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
-    onChange('/fields', next)
+    setDrawer((current) => current && { ...current, index: movedIndex(current.index, index, to) })
+    onChange('/fields', moved(fields!, index, to))
     if (onOriginsChange) {
-      const moved = rowOrigins(fields!, origins)
-      ;[moved[index], moved[index + offset]] = [moved[index + offset], moved[index]]
-      onOriginsChange(moved)
+      onOriginsChange(moved(rowOrigins(fields!, origins), index, to))
     }
   }, [])
 
@@ -711,6 +701,7 @@ const Fields = memo(function Fields({
             rowAttributes={(row) =>
               ({ 'data-testid': `studio-field-/fields/${row.index}` }) as React.HTMLAttributes<HTMLElement>
             }
+            reorder={readOnly ? undefined : { onMove: (from, to) => onMove(from, to - from) }}
             rowActions={
               readOnly
                 ? undefined
@@ -885,6 +876,22 @@ function AddFieldDialog({
       </Form>
     </Modal>
   )
+}
+
+/** `list` with its item at `from` moved to `to`, the items between them shifting by one. */
+function moved<T>(list: readonly T[], from: number, to: number): T[] {
+  const next = [...list]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
+}
+
+/** Where the item at `index` ends when the item at `from` moves to `to`. */
+function movedIndex(index: number, from: number, to: number): number {
+  if (index === from) return to
+  if (from < index && index <= to) return index - 1
+  if (to <= index && index < from) return index + 1
+  return index
 }
 
 /** The query of the open resource with the drawer of the field `name` open, and no path. */

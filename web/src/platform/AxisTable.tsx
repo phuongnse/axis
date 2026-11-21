@@ -1,6 +1,15 @@
-import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
+import { EllipsisOutlined, HolderOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Button, ConfigProvider, Dropdown, Flex, Input, Table, type TableColumnType, type TableProps } from 'antd'
 import {
+  createContext,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -185,10 +194,111 @@ export interface AxisTableProps<T> {
   rowAttributes?: (row: T, index?: number) => HTMLAttributes<HTMLElement>
   /** The test id of the table's outer element. */
   testId?: string
+  /**
+   * Proposed, #3264: rows a person orders by dragging, for a list whose order means something, such as an entity's
+   * fields. A handle starts each row, and the keyboard drags with it too. `onMove` gets the row's index in `dataSource`
+   * and the index it moves to. The handles are off, saying why, while a search or a filter hides rows, as the order
+   * of the rows shown is then not the list's. The row's menu keeps Move up and Move down, the way to move a row with no
+   * drag, see docs/reference/actions-and-controls.md#tables.
+   */
+  reorder?: { onMove: (from: number, to: number) => void }
 }
 
 /** Column key of the row actions. A field name starts with a letter, so no field column has it. */
 const actionsKey = '$actions'
+
+/** Column key of the handles that reorder the rows. */
+const reorderKey = '$reorder'
+
+type Handle = Pick<ReturnType<typeof useSortable>, 'setActivatorNodeRef' | 'listeners' | 'attributes'>
+
+/** The handle of the row it is drawn in, which `ReorderRow` gives. */
+const HandleContext = createContext<Handle | null>(null)
+
+/**
+ * The rows of a table that reorders, as one sortable list of `keys`, the shown rows' keys in their order. A drop calls
+ * `onMove` with the row's index and the one it moves to. Without `keys` it draws `children` alone.
+ */
+function ReorderRows({
+  keys,
+  onMove,
+  children,
+}: {
+  keys: string[] | null
+  onMove: (from: number, to: number) => void
+  children: ReactNode
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  if (keys === null) {
+    return children
+  }
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={({ active, over }) => {
+        const from = keys.indexOf(String(active.id))
+        const to = over === null ? -1 : keys.indexOf(String(over.id))
+        if (from >= 0 && to >= 0 && from !== to) {
+          onMove(from, to)
+        }
+      }}
+    >
+      <SortableContext items={keys} strategy={verticalListSortingStrategy}>
+        {children}
+      </SortableContext>
+    </DndContext>
+  )
+}
+
+/** A body row of a table that reorders. Ant Design's placeholder row has no key, so it does not move. */
+function ReorderRow(props: HTMLAttributes<HTMLTableRowElement> & { 'data-row-key'?: string }) {
+  return props['data-row-key'] === undefined ? <tr {...props} /> : <SortableRow {...props} id={props['data-row-key']} />
+}
+
+function SortableRow({ id, style, ...props }: HTMLAttributes<HTMLTableRowElement> & { id: string }) {
+  const { colour } = useDesignTokens()
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  })
+  return (
+    <HandleContext.Provider value={{ setActivatorNodeRef, listeners, attributes }}>
+      <tr
+        {...props}
+        ref={setNodeRef}
+        style={{
+          ...style,
+          transform: CSS.Translate.toString(transform),
+          transition,
+          // The dragged row stays above the others and on the surface, so the rows it passes do not show through.
+          ...(isDragging ? { position: 'relative', zIndex: 1, background: colour.surface } : {}),
+        }}
+      />
+    </HandleContext.Provider>
+  )
+}
+
+/** The handle that starts a row's drag, with the pointer or the keyboard. While `off`, it says why it is off. */
+function ReorderHandle({ off }: { off: boolean }) {
+  const handle = useContext(HandleContext)
+  // The handle is a button already, so the library's `role` is left out; AxisButton's `role` is its look.
+  const { role: _role, ...attributes } = handle?.attributes ?? {}
+  return (
+    <AxisButton
+      role="icon"
+      size="small"
+      icon={<HolderOutlined />}
+      nameKey={off ? 'shell.table.reorderOff' : 'shell.table.reorder'}
+      disabled={off}
+      ref={handle?.setActivatorNodeRef}
+      {...(off ? {} : { ...attributes, ...handle?.listeners })}
+      style={off ? undefined : { cursor: 'grab' }}
+    />
+  )
+}
 
 /** A width of 1 % makes an auto-layout column as narrow as its content, which `nowrap` keeps on one line. */
 const fitContent = '1%'
@@ -243,6 +353,7 @@ export function AxisTable<T extends object>({
   details,
   rowAttributes,
   testId,
+  reorder,
 }: AxisTableProps<T>) {
   const t = useText()
   // The shell sets the locale of Ant Design's ConfigProvider. Outside it, there is none.
@@ -489,6 +600,17 @@ export function AxisTable<T extends object>({
         }
       },
     )
+  // Rows hidden by a search or a filter leave the shown order unlike the list's, so the handles are off.
+  const reorderOff = reorder !== undefined && (pageRows?.length ?? 0) !== (dataSource?.length ?? 0)
+  if (reorder) {
+    antColumns.unshift({
+      key: reorderKey,
+      title: <span style={visuallyHidden}>{t('shell.table.reorder')}</span>,
+      onHeaderCell: () => ({ style: { width: fitContent, paddingInlineEnd: 0 }, 'data-column-key': reorderKey }),
+      onCell: () => ({ style: { width: fitContent, paddingInlineEnd: 0, ...line } }),
+      render: () => <ReorderHandle off={reorderOff} />,
+    })
+  }
   if (rowActions && rowActions.configured > 0) {
     const cell = { style: { width: fitContent, whiteSpace: 'nowrap', ...line } satisfies CSSProperties }
     antColumns.push({
@@ -629,71 +751,77 @@ export function AxisTable<T extends object>({
             </Flex>
           )}
           <ConfigProvider theme={theme}>
-            <Table<T>
-              rowKey={rowKey}
-              rowSelection={
-                bulk
-                  ? {
-                      selectedRowKeys: selected.map(rowKey),
-                      onChange: (keys) => setSelectedKeys(keys),
-                      getCheckboxProps: () => ({ 'aria-label': t('shell.table.selectRow') }),
-                      fixed: room.scrolls,
-                      onCell: () => ({ style: staysRoom }),
-                    }
-                  : undefined
-              }
-              columns={antColumns}
-              expandable={
-                details
-                  ? {
-                      expandedRowKeys: openRows,
-                      expandedRowRender: (row) => (
-                        <div style={{ padding: `${tokens.spacing.xs}px ${cellPadding}px` }}>{details(row)}</div>
-                      ),
-                      rowExpandable: (row) => details(row) != null,
-                      showExpandColumn: false,
-                    }
-                  : undefined
-              }
-              showHeader={!headless}
-              // The table moves columns under their row first. Only what stays still and does not fit scrolls sideways.
-              scroll={{ x: true }}
-              // Ant Design otherwise switches to a fixed layout once a column is fixed.
-              tableLayout="auto"
-              dataSource={pageRows as T[] | undefined}
-              loading={loading}
-              // The table gives the space that EmptyState no longer keeps, so an empty table keeps its height.
-              locale={{
-                emptyText: (
-                  <div style={{ padding: `${tokens.spacing.xl}px ${tokens.spacing.xs}px` }}>
-                    <EmptyState text={emptyText} />
-                  </div>
-                ),
-              }}
-              pagination={
-                paging
-                  ? {
-                      current: paging.current,
-                      pageSize: paging.pageSize,
-                      total: paging.total,
-                      showSizeChanger: picker,
-                      hideOnSinglePage: !picker,
-                      itemRender: paginationItems(paging.current, t),
-                      // A shared widget keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
-                      style: { marginBottom: 0 },
-                      showTotal: (all, [from, to]) =>
-                        t('shell.table.range')
-                          .replace('{from}', number.format(from))
-                          .replace('{to}', number.format(to))
-                          .replace('{total}', number.format(all)),
-                      ...(picker ? { pageSizeOptions: sizes } : {}),
-                    }
-                  : false
-              }
-              onRow={rowAttributes}
-              onChange={view ? onViewChange : onChange}
-              styles={{ header: { row }, body: { row } }}
-            />
+            <ReorderRows
+              keys={reorder ? (pageRows ?? []).map(rowKey) : null}
+              onMove={(from, to) => reorder?.onMove(from, to)}
+            >
+              <Table<T>
+                components={reorder ? { body: { row: ReorderRow } } : undefined}
+                rowKey={rowKey}
+                rowSelection={
+                  bulk
+                    ? {
+                        selectedRowKeys: selected.map(rowKey),
+                        onChange: (keys) => setSelectedKeys(keys),
+                        getCheckboxProps: () => ({ 'aria-label': t('shell.table.selectRow') }),
+                        fixed: room.scrolls,
+                        onCell: () => ({ style: staysRoom }),
+                      }
+                    : undefined
+                }
+                columns={antColumns}
+                expandable={
+                  details
+                    ? {
+                        expandedRowKeys: openRows,
+                        expandedRowRender: (row) => (
+                          <div style={{ padding: `${tokens.spacing.xs}px ${cellPadding}px` }}>{details(row)}</div>
+                        ),
+                        rowExpandable: (row) => details(row) != null,
+                        showExpandColumn: false,
+                      }
+                    : undefined
+                }
+                showHeader={!headless}
+                // The table moves columns under their row first. Only what stays still and does not fit scrolls sideways.
+                scroll={{ x: true }}
+                // Ant Design otherwise switches to a fixed layout once a column is fixed.
+                tableLayout="auto"
+                dataSource={pageRows as T[] | undefined}
+                loading={loading}
+                // The table gives the space that EmptyState no longer keeps, so an empty table keeps its height.
+                locale={{
+                  emptyText: (
+                    <div style={{ padding: `${tokens.spacing.xl}px ${tokens.spacing.xs}px` }}>
+                      <EmptyState text={emptyText} />
+                    </div>
+                  ),
+                }}
+                pagination={
+                  paging
+                    ? {
+                        current: paging.current,
+                        pageSize: paging.pageSize,
+                        total: paging.total,
+                        showSizeChanger: picker,
+                        hideOnSinglePage: !picker,
+                        itemRender: paginationItems(paging.current, t),
+                        // A shared widget keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
+                        style: { marginBottom: 0 },
+                        showTotal: (all, [from, to]) =>
+                          t('shell.table.range')
+                            .replace('{from}', number.format(from))
+                            .replace('{to}', number.format(to))
+                            .replace('{total}', number.format(all)),
+                        ...(picker ? { pageSizeOptions: sizes } : {}),
+                      }
+                    : false
+                }
+                onRow={rowAttributes}
+                onChange={view ? onViewChange : onChange}
+                styles={{ header: { row }, body: { row } }}
+              />
+            </ReorderRows>
           </ConfigProvider>
         </>
       )}
