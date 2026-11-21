@@ -26,7 +26,7 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
   const warningBorder = { colorWarning: colour.warningText, colorWarningBorderHover: colour.warningText }
   const fieldBorder = { ...errorBorder, ...warningBorder }
   const algorithm = [mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, keepLink]
-  // The tint Ant Design gives a selected item, which `selectedItemTint` reads from this theme too.
+  // The tint Ant Design gives a selected item, which `useSelectedItemTint` reads from the theme in use.
   const selectedTint = theme.getDesignToken({ algorithm, token: { colorPrimary: seed('primary') } }).controlItemBgActive
   return {
     algorithm,
@@ -223,9 +223,12 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
   ].join('\n')
 }
 
-/** The tint Ant Design gives a selected item. Dropdown menus draw their selected item on it, so Axis reads it here. */
-export function selectedItemTint(mode: ThemeMode): string {
-  return theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
+/**
+ * The tint Ant Design gives a selected item in the theme in use, which follows the page's token values. Dropdown menus
+ * draw their selected item on it.
+ */
+export function useSelectedItemTint(): string {
+  return theme.useToken().token.controlItemBgActive
 }
 
 /**
