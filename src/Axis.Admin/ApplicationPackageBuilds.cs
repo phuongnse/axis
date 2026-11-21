@@ -58,7 +58,8 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
 
     /// <summary>
     /// Sends the files of the package <paramref name="package"/> of <paramref name="files"/> to the host as a <c>test</c>, and returns the
-    /// outcome of each test the host ran. A refused or unanswered test returns its diagnostics and no test. A package with no file
+    /// outcome of each test the host ran and the lines the host wrote. A refused test returns its diagnostics, no test and the lines of the
+    /// build of its copy. An unanswered test returns its diagnostics, no test and no line. A package with no file
     /// is sent too, and the host refuses it at its manifest. A customer-hosted package is sent too, for the same reason.
     /// </summary>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
@@ -71,9 +72,9 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
             ?? new Dictionary<string, byte[]>(StringComparer.Ordinal);
         return await RunnerProtocol.AskAsync(host, port, new TestMessage(own), wait, cancellationToken) switch
         {
-            TestedMessage tested => new PackageTestResult([], tested.Tests),
-            RefusedMessage refused => new PackageTestResult([.. Refusals(package, refused)], []),
-            _ => new PackageTestResult([NoAnswer(package, "test", "its tests did not run")], []),
+            TestedMessage tested => new PackageTestResult([], tested.Tests, tested.Output ?? []),
+            RefusedMessage refused => new PackageTestResult([.. Refusals(package, refused)], [], refused.Output ?? []),
+            _ => new PackageTestResult([NoAnswer(package, "test", "its tests did not run")], [], []),
         };
     }
 
@@ -127,8 +128,11 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
 /// <summary>The diagnostics of the builds of a snapshot's packages, and the files of the packages that were built.</summary>
 internal sealed record PackageBuildResult(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyDictionary<string, byte[]> Files);
 
-/// <summary>The diagnostics of the test of one package and the outcome of each test that ran. A refused or unanswered test has no outcome.</summary>
-internal sealed record PackageTestResult(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<PackageTestOutcome> Tests);
+/// <summary>
+/// The diagnostics of the test of one package, the outcome of each test that ran and the lines the host wrote. A refused or unanswered test has no
+/// outcome, and only a refused one has lines, those of the build of its copy.
+/// </summary>
+internal sealed record PackageTestResult(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<PackageTestOutcome> Tests, IReadOnlyList<string> Output);
 
 /// <summary>The diagnostics of the build of one package and the lines the host wrote. A package that built has no diagnostic.</summary>
 internal sealed record PackageBuildCheck(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<string> Output);
