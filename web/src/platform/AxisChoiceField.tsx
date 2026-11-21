@@ -28,6 +28,7 @@ type FormMode = Shared & {
   value?: never
   onChange?: never
   required?: never
+  hideLabel?: never
 }
 
 type OwnMode = Shared & {
@@ -40,6 +41,11 @@ type OwnMode = Shared & {
   onChange: (value: string) => void
   /** Marks the field required, as for {@link AxisField}. The screen checks the choice. */
   required?: boolean
+  /**
+   * Proposed, #3264: hides the label from the eye, as for {@link AxisField}, for a choice that a group's title already
+   * names, such as the Value group's way the value comes from. It still names the choice.
+   */
+  hideLabel?: boolean
 }
 
 function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
@@ -81,7 +87,7 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
   if (isOwnMode(props)) {
     const { value, onChange, required } = props
     return (
-      <AxisField label={label} help={help} required={required}>
+      <AxisField label={label} help={help} required={required} hideLabel={props.hideLabel}>
         <Radio.Group
           aria-label={label}
           name={groupName}

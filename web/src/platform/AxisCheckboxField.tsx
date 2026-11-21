@@ -1,5 +1,9 @@
 import { Checkbox, Switch, type FormItemProps } from 'antd'
+import { useId } from 'react'
+import { fieldClass } from './antTheme'
 import { AxisField, type AxisFieldStatus } from './AxisField'
+import { requiredMark } from './requiredMark'
+import { useDesignTokens } from './themeMode'
 
 type Shared = {
   label: string
@@ -54,6 +58,18 @@ export function AxisCheckboxField(props: FormMode | OwnMode) {
   const { label, help, kind = 'checkbox', disabled } = props
   if (isOwnMode(props)) {
     const { checked, onChange, loading, required, hideLabel } = props
+    if (kind === 'checkbox' && hideLabel !== true) {
+      return (
+        <LabelledCheckbox
+          label={label}
+          help={help}
+          required={required === true}
+          checked={checked}
+          disabled={disabled}
+          onChange={onChange}
+        />
+      )
+    }
     return (
       <AxisField label={label} help={help} required={required} hideLabel={hideLabel}>
         {kind === 'switch' ? (
@@ -77,5 +93,56 @@ export function AxisCheckboxField(props: FormMode | OwnMode) {
     >
       {kind === 'switch' ? <Switch disabled={disabled} /> : <Checkbox disabled={disabled} />}
     </AxisField>
+  )
+}
+
+/**
+ * Proposed, #3264: a checkbox with its label on its right, the way a box is read, and its help under the label, in line
+ * with the label's text, see docs/reference/actions-and-controls.md#fields. The label names the box and the help
+ * describes it. A field of a form takes the same look in the build.
+ */
+function LabelledCheckbox({
+  label,
+  help,
+  required,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string
+  help: string
+  required: boolean
+  checked: boolean
+  disabled?: boolean
+  onChange: (checked: boolean) => void
+}) {
+  const { colour, spacing } = useDesignTokens()
+  const helpId = `${useId()}-help`
+  return (
+    <div className={fieldClass}>
+      <Checkbox
+        checked={checked}
+        disabled={disabled}
+        aria-describedby={help === '' ? undefined : helpId}
+        aria-required={required || undefined}
+        onChange={(event) => onChange(event.target.checked)}
+      >
+        <span style={{ fontWeight: 500, color: colour.textMuted }}>{requiredMark(label, { required })}</span>
+      </Checkbox>
+      {help !== '' && (
+        // In line with the label's text: the box is 16px wide and Ant Design sets its text 8px after it.
+        <div
+          id={helpId}
+          style={{
+            fontSize: 12,
+            lineHeight: '20px',
+            color: colour.textMuted,
+            paddingInlineStart: 16 + spacing.xs,
+          }}
+        >
+          {help}
+        </div>
+      )}
+    </div>
   )
 }

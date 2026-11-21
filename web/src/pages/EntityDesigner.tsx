@@ -40,6 +40,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useTableView } from '../platform/useTableView'
 import { LabelTexts } from './LabelTexts'
+import { LabelTextsContext } from './labelTextsContext'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
 import { PlatformContext } from './context'
 import { Expression } from './ProcessFields'
@@ -61,8 +62,10 @@ const drawerGroups: {
   settings: (FieldSetting | [FieldSetting, FieldSetting])[]
 }[] = [
   { name: 'type', settings: ['target', 'values', 'valueLabels', 'currency', ['precision', 'scale'], 'maxLength'] },
-  { name: 'value', settings: ['default', 'userId', 'expression', 'sequence', 'match'] },
-  { name: 'validation', settings: ['required', 'unique', 'minLength', ['min', 'max'], 'maxSize', 'accept'] },
+  // Proposed, #3264: Required and Unique sit in Value, right under the way the value comes from, as they hold for an
+  // entered value, so they show near the top as other platforms show them.
+  { name: 'value', settings: ['required', 'unique', 'default', 'userId', 'expression', 'sequence', 'match'] },
+  { name: 'validation', settings: ['minLength', ['min', 'max'], 'maxSize', 'accept'] },
   { name: 'searchPrivacy', settings: ['searchable', 'sensitive', 'exactLookup'] },
 ]
 
@@ -819,6 +822,26 @@ function fieldTypeChoices(t: (key: string) => string) {
   }))
 }
 
+/**
+ * A field's name made from its label, such as "Amount with tax" to `amountWithTax`: its letters without their marks,
+ * "đ" as "d", its words joined in camel case, starting with a letter, as a field's name must.
+ */
+function nameFromLabel(label: string): string {
+  const words = label
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .split(/[^A-Za-z0-9]+/)
+    .filter((word) => word !== '')
+  const joined = words
+    .map((word, position) =>
+      position === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+    )
+    .join('')
+  return joined.replace(/^[0-9]+/, '')
+}
+
 /** `list` with its item at `from` moved to `to`, the items between them shifting by one. */
 function moved<T>(list: readonly T[], from: number, to: number): T[] {
   const next = [...list]
@@ -1043,6 +1066,24 @@ const FieldDrawer = memo(function FieldDrawer({
   const name = text(content.name)
   const type = text(content.type)
   const pointer = `/fields/${index}`
+  const author = useContext(PlatformContext)?.current.locale ?? 'en'
+  // A new field takes its name from its label until the name is changed by hand, as Dataverse and ServiceNow make a
+  // column's name from its display name.
+  const [nameTouched, setNameTouched] = useState(false)
+  const labelTexts = useContext(LabelTextsContext)
+  const namingTexts = useMemo(
+    () =>
+      labelTexts === null || onAdd === undefined || nameTouched
+        ? labelTexts
+        : {
+            ...labelTexts,
+            onTextsChange: (at: string, key: string, texts: Record<string, string>) => {
+              labelTexts.onTextsChange(at, key, texts)
+              onChange(`${pointer}/name`, nameFromLabel(texts[author] ?? texts.en ?? ''))
+            },
+          },
+    [labelTexts, onAdd, nameTouched, onChange, pointer, author],
+  )
   // The drawer's root, set once its content has drawn, so the focus effect below runs after the drawer has opened.
   const [root, setRoot] = useState<HTMLElement | null>(null)
   const wasOpen = useRef(false)
@@ -1108,21 +1149,28 @@ const FieldDrawer = memo(function FieldDrawer({
                   )}
                 />
               )}
-              <AxisFieldGroup {...groupTexts(t, 'fields.group.general')}>
+              <AxisFieldGroup heading {...groupTexts(t, 'fields.group.general')}>
                 <Flex vertical gap="middle">
+                  {/* Proposed, #3264: the label first, typed in words with its translations as the entity's label
+                      is, then the name, which a new field takes from its label until the name is changed by hand. */}
+                  <div data-testid={`studio-field-${pointer}/label`}>
+                    <AxisFieldGroup {...groupTexts(t, 'fields.label')}>
+                      <LabelTextsContext.Provider value={namingTexts}>
+                        <LabelTexts pointer={`${pointer}/label`} value={content.label} onChange={onChange} />
+                      </LabelTextsContext.Provider>
+                    </AxisFieldGroup>
+                  </div>
                   <div data-testid={`studio-field-${pointer}/name`}>
                     <AxisField {...fieldTexts(t, 'fields.name')} required>
-                      <Input value={name} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
+                      <Input
+                        value={name}
+                        onChange={(event) => {
+                          setNameTouched(true)
+                          onChange(`${pointer}/name`, event.target.value)
+                        }}
+                      />
                     </AxisField>
                   </div>
-                  <AxisField {...fieldTexts(t, 'fields.label')}>
-                    <FieldLabel
-                      name={fieldTexts(t, 'fields.label').label}
-                      pointer={`${pointer}/label`}
-                      value={content.label}
-                      onChange={onChange}
-                    />
-                  </AxisField>
                   <div data-testid={`studio-field-${pointer}/type`}>
                     <AxisField {...fieldTexts(t, 'fields.type')} required>
                       <Select
@@ -1138,14 +1186,11 @@ const FieldDrawer = memo(function FieldDrawer({
                       />
                     </AxisField>
                   </div>
-                  <AxisField {...fieldTexts(t, 'fields.helpText')}>
-                    <FieldLabel
-                      name={fieldTexts(t, 'fields.helpText').label}
-                      pointer={`${pointer}/help`}
-                      value={content.help}
-                      onChange={onChange}
-                    />
-                  </AxisField>
+                  <div data-testid={`studio-field-${pointer}/help`}>
+                    <AxisFieldGroup {...groupTexts(t, 'fields.helpText')}>
+                      <LabelTexts pointer={`${pointer}/help`} value={content.help} onChange={onChange} />
+                    </AxisFieldGroup>
+                  </div>
                 </Flex>
               </AxisFieldGroup>
               <Settings
@@ -1163,56 +1208,6 @@ const FieldDrawer = memo(function FieldDrawer({
         </PartBoundary>
       </SidePanel>
     )
-  )
-})
-
-/** The text key picker of a field's label or help, named `name`. Clearing it removes the text. */
-const FieldLabel = memo(function FieldLabel({
-  name,
-  id,
-  'aria-describedby': describedBy,
-  pointer,
-  value,
-  onChange,
-}: {
-  name: string
-  id?: string
-  'aria-describedby'?: string
-  pointer: string
-  value: unknown
-  onChange: ChangeHandler
-}) {
-  const names = useContext(StudioNamesContext)
-  const key = isContent(value) && typeof value.textKey === 'string' ? value.textKey : undefined
-
-  return (
-    <div data-testid={`studio-field-${pointer}`}>
-      {names === undefined ? (
-        <Input
-          aria-label={name}
-          id={id}
-          aria-describedby={describedBy}
-          value={text(key)}
-          onChange={(event) =>
-            event.target.value === ''
-              ? onChange(pointer, undefined)
-              : onChange(`${pointer}/textKey`, event.target.value)
-          }
-        />
-      ) : (
-        <ReferencePicker
-          name={name}
-          id={id}
-          aria-describedby={describedBy}
-          value={key}
-          required={false}
-          options={referenceOptions(names, 'text', undefined, pointer)}
-          onChange={(next) =>
-            next === undefined ? onChange(pointer, undefined) : onChange(`${pointer}/textKey`, next)
-          }
-        />
-      )}
-    </div>
   )
 })
 
@@ -1260,6 +1255,13 @@ function Settings({
         )
 
   const settingTexts = (setting: FieldSetting) => fieldTexts(t, `fields.${setting}`)
+  // Search and privacy is seldom changed, so it starts folded and says which of its settings are on.
+  const [privacyOpen, setPrivacyOpen] = useState(false)
+  const privacyOn = (['searchable', 'sensitive', 'exactLookup'] as const).filter((setting) => field[setting] === true)
+  const privacyState =
+    privacyOn.length === 0
+      ? t('shell.studio.field.entity.fields.group.searchPrivacy.none')
+      : privacyOn.map((setting) => settingTexts(setting).label).join(', ')
 
   function number(setting: 'maxLength' | 'minLength' | 'precision' | 'scale' | 'maxSize') {
     return (
@@ -1272,12 +1274,11 @@ function Settings({
     )
   }
 
-  /** The yes-or-no setting `setting`: a switch for searchable, a checkbox for the others. */
+  /** The yes-or-no setting `setting`, a checkbox, as every yes-or-no setting of the drawer is. */
   function flag(setting: 'required' | 'unique' | 'userId' | 'sensitive' | 'exactLookup' | 'searchable') {
     return (
       <AxisCheckboxField
         {...settingTexts(setting)}
-        kind={setting === 'searchable' ? 'switch' : 'checkbox'}
         checked={field[setting] === true}
         onChange={(checked) => {
           if (setting === 'sensitive' && !checked && Object.hasOwn(field, 'exactLookup')) {
@@ -1476,13 +1477,21 @@ function Settings({
         return (
           <AxisFieldGroup
             key={group}
+            heading
             {...groupTexts(t, group === 'type' ? `fields.group.type.${type}` : `fields.group.${group}`)}
             action={addValidation}
+            fold={
+              group === 'searchPrivacy'
+                ? { open: privacyOpen, onToggle: () => setPrivacyOpen((open) => !open), state: privacyState }
+                : undefined
+            }
           >
             <Flex vertical gap="small" style={{ minWidth: 240 }}>
               {choice && (
                 <AxisChoiceField
                   {...fieldTexts(t, 'fields.valueSource')}
+                  // The group's title, Value, names the choice to the eye.
+                  hideLabel
                   value={valueSourceOf(field)}
                   options={sources.map((source) => ({
                     value: source,
