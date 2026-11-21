@@ -937,7 +937,7 @@ const instanceDetail: InstanceDetail = {
   startedBy: { kind: 'person', name: currentUser.displayName, id: currentUser.id, via: 'request.submit' },
   input: null,
   result: null,
-  studio: { app: application, resource: '5d1e0000-0000-4000-8000-000000000009' },
+  studio: null,
   graph: {
     start: 'checkBudget',
     steps: [
