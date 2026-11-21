@@ -145,7 +145,7 @@ wrong form show the not-found page, and the instance is not requested.
   operation are plain text, see [opening things](actions-and-controls.md#opening-things). A fact the run always has
   reads Not set while empty, Ended and Went to included, see [fields](actions-and-controls.md#fields).
 
-- **Input and Output** _(planned)_. Both are terms, each name above its value, and a value's table is `ValueTable`.
+- **Input and Output**. Both are terms, each name above its value, and a value's table is `ValueTable`.
   A JSON body is a `BodyView`. Hidden values follow [values and masking](process-inspection.md#values-and-masking)
   and [call input kept](process-inspection.md#call-input-kept).
   - Input: a connector call's Request, its method, then `spacing-xs`, then its address on one line, then Query
@@ -158,7 +158,7 @@ wrong form show the not-found page, and the instance is not requested.
 
   A step that makes nothing has no Output tab.
 
-- **Attempts** _(planned)_. One `compact` table, its columns #, Result (a `StatusTag`), HTTP and Duration, newest
+- **Attempts**. One `compact` table, its columns #, Result (a `StatusTag`), HTTP and Duration, newest
   first. A row folds open through `details` to its Started, Trace ID, error and answer. The tab shows the attempts
   made, never the step's retry policy, which is the author's setting. A call with no attempts shows "No attempts
   yet." in place of the table. An empty cell shows `EmptyDash`.
