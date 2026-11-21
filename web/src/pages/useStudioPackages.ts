@@ -25,9 +25,9 @@ export interface PackageOperation {
 
 /**
  * One package folder under `packages/`. `label`, `language` and `version` come from its manifest. A package whose manifest is
- * missing or is not valid JSON has its id as the label, and no language or version. `files` are the paths in the package.
- * `operations` are the manifest's operations that have a name, each with the input fields that have a name and a type,
- * and none when the manifest lists none.
+ * missing or is not valid JSON has its id as the label, and no language or version. `files` are the paths in the package, and
+ * `versions` has the version that the list gave for each of them. `operations` are the manifest's operations that have a
+ * name, each with the input fields that have a name and a type, and none when the manifest lists none.
  */
 export interface PackageRow {
   id: string
@@ -35,6 +35,7 @@ export interface PackageRow {
   language: string | null
   version: string | null
   files: string[]
+  versions: Record<string, string>
   operations: PackageOperation[]
 }
 
@@ -101,8 +102,10 @@ async function loadRows(
   signal: AbortSignal,
 ): Promise<PackageRow[]> {
   const filesOf = new Map<string, string[]>()
+  const versionsOf = new Map<string, Record<string, string>>()
   for (const item of items) {
     filesOf.set(item.package, [...(filesOf.get(item.package) ?? []), item.path])
+    versionsOf.set(item.package, { ...versionsOf.get(item.package), [item.path]: item.version })
   }
   return Promise.all(
     [...filesOf.keys()].toSorted().map(async (id) => {
@@ -114,6 +117,7 @@ async function loadRows(
         language: manifestText(manifest, 'language'),
         version: manifestText(manifest, 'version'),
         files: files.toSorted(),
+        versions: versionsOf.get(id)!,
         operations: manifestOperations(manifest),
       }
     }),

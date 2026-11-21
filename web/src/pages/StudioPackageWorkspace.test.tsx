@@ -1,6 +1,6 @@
 import { EditorView } from '@codemirror/view'
 import { ConfigProvider } from 'antd'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,7 +11,9 @@ import { ThemeModeProvider } from '../platform/theme'
 import { StudioPackageWorkspace } from './StudioPackageWorkspace'
 
 const files = '/api/studio/apps/Shop/package-files'
-const fileRoute = (path: string) => `/api/studio/apps/Shop/packages/tools/files/${path}`
+const fileRoutePrefix = '/api/studio/apps/Shop/packages/tools/files/'
+const fileRoute = (path: string) => `${fileRoutePrefix}${path}`
+const moveRoute = '/api/studio/apps/Shop/packages/tools/move'
 const contents: Record<string, string> = {
   'src/b.ts': 'const b = 1',
   'src/a.cs': 'class A {}',
@@ -67,6 +69,9 @@ const failedBuild = {
   diagnostics: [problem('packages/tools/lib/x.py', { line: 2, column: 1 })],
 }
 
+/** The requests of the last stubbed package that are not reads: the explorer's creates, moves and deletes. */
+const writesSent = () => requests.filter((call) => call.method !== 'GET')
+
 const testRoute = '/api/studio/apps/Shop/test'
 const queuedTest = { id: 't1', application: 'Shop', kind: 'test', status: 'queued', package: 'tools', output: [] }
 const failedTest = {
@@ -90,15 +95,16 @@ const failedTest = {
 }
 
 /**
- * Stubs a package `tools` with five files, and answers a file's read from `contents`. A write answers
+ * Stubs a package `tools` with five files, and answers a file's read from a copy of `contents` that moves, deletes and
+ * creates change, and the list of its files. A move answers `{ diagnostics: [] }`, and a delete too. A write answers
  * `{ version: 'new-<path>' }` unless `writes` has a response for its path. The writes are recorded in `puts`. Each write
  * and each build post is also recorded in `calls`, in order, as `PUT <path>` and `POST build <body>`. A build post answers
  * the queued build `b1`, and its read answers `failedBuild` unless `readBuild` answers otherwise. A test post is
  * recorded as `POST test <body>` and answers the queued package test `t1`, and its read answers `failedTest` unless
- * `readTest` answers otherwise. The package's run
- * inputs start as `saved` at version `v0`, or have no version before the first save, and a write with a wrong version
+ * `readTest` answers otherwise. A move answers `moveStatus` with a problem when it is not 200, and moves nothing. The
+ * package's run inputs start as `saved` at version `v0`, or have no version before the first save, and a write with a wrong version
  * answers `409`. A run answers `202`, and its request has ended with the run `greet`. Every request is recorded in
- * `requests`.
+ * `requests`, and `writesSent` has those that are not reads.
  */
 function stubPackage(
   writes: Record<string, () => Response> = {},
@@ -106,8 +112,10 @@ function stubPackage(
   readBuild: () => Response = () => json(failedBuild),
   saved: StudioRunInput[] | null = null,
   readTest: () => Response = () => json(failedTest),
+  moveStatus = 200,
 ) {
   const puts: { path: string; ifMatch: string | null; body: { content: string } }[] = []
+  const store = { ...contents }
   let stored = { items: saved ?? [], version: saved === null ? null : 0 }
   requests = []
   vi.stubGlobal(
@@ -172,10 +180,29 @@ function stubPackage(
         return readTest()
       }
       if (input === files) {
-        return json({ items: Object.keys(contents).map((path) => ({ package: 'tools', path, version: `v-${path}` })) })
+        return json({ items: Object.keys(store).map((path) => ({ package: 'tools', path, version: `v-${path}` })) })
       }
-      const path = Object.keys(contents).find((candidate) => input === fileRoute(candidate))
-      if (path === undefined) {
+      if (input === moveRoute) {
+        const request = { body: JSON.parse(init?.body as string) }
+        if (moveStatus !== 200) {
+          return json({ title: 'Changed.' }, moveStatus)
+        }
+        for (const { from, to } of (request.body as { moves: { from: string; to: string }[] }).moves) {
+          store[to] = store[from]
+          delete store[from]
+        }
+        return json({ diagnostics: [] })
+      }
+      const path = input.startsWith(fileRoutePrefix) ? input.slice(fileRoutePrefix.length) : undefined
+      if (path !== undefined && init?.method === 'PUT' && new Headers(init.headers).get('If-None-Match') === '*') {
+        store[path] = (JSON.parse(init.body as string) as { content: string }).content
+        return json({ version: `v-${path}`, diagnostics: [] })
+      }
+      if (path !== undefined && init?.method === 'DELETE') {
+        delete store[path]
+        return json({ diagnostics: [] })
+      }
+      if (path === undefined || !(path in store)) {
         return new Response(null, { status: 404 })
       }
       if (init?.method === 'PUT') {
@@ -187,7 +214,7 @@ function stubPackage(
         })
         return writes[path]?.() ?? json({ version: `new-${path}`, diagnostics: [] })
       }
-      return json({ package: 'tools', path, version: `v-${path}`, content: contents[path] })
+      return json({ package: 'tools', path, version: `v-${path}`, content: store[path] })
     }),
   )
   return puts
@@ -484,6 +511,296 @@ describe('StudioPackageWorkspace', () => {
 
       expect(screen.queryByTestId('studio-package-save-bar')).not.toBeInTheDocument()
       expect(puts).toEqual([])
+    })
+  })
+
+  describe('the explorer’s menus', () => {
+    const tree = () => screen.getByTestId('studio-package-tree')
+    const menuNames = async () => (await screen.findAllByRole('menuitem')).map((item) => item.textContent)
+    const filesPane = () => screen.getByRole('region', { name: 'Files' })
+    /** Opens a node's menu with a right click and chooses `item`. */
+    async function choose(node: string, item: string) {
+      fireEvent.contextMenu(within(tree()).getByText(node, { exact: true }))
+      await userEvent.click(await screen.findByRole('menuitem', { name: item }))
+    }
+    /** Types `name` in the open name dialog and sends it. */
+    async function submitName(name: string, button: string) {
+      const dialog = await screen.findByRole('dialog')
+      const field = within(dialog).getByRole('textbox')
+      await userEvent.clear(field)
+      await userEvent.type(field, name)
+      await userEvent.click(within(dialog).getByRole('button', { name: button }))
+    }
+
+    it('offers New file…, New folder…, Rename…, Delete… and Copy path on a right click, and Rename… on F2 with the name filled in', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      fireEvent.contextMenu(within(tree()).getByText('src', { exact: true }))
+      expect(await menuNames()).toEqual(['New file…', 'New folder…', 'Rename…', 'Delete…', 'Copy path'])
+      await userEvent.keyboard('{Escape}')
+
+      await userEvent.click(within(tree()).getByText('src', { exact: true }))
+      fireEvent.keyDown(tree(), { key: 'F2' })
+
+      const dialog = await screen.findByRole('dialog', { name: 'Rename src' })
+      expect(within(dialog).getByRole('textbox')).toHaveValue('src')
+    })
+
+    it('opens the node’s menu on Shift+F10 and on the menu key', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+      await userEvent.click(within(tree()).getByText('adapter.py', { exact: true }))
+
+      fireEvent.keyDown(tree(), { key: 'F10', shiftKey: true })
+      expect(await menuNames()).toHaveLength(5)
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('menuitem')).not.toBeInTheDocument())
+
+      fireEvent.keyDown(tree(), { key: 'ContextMenu' })
+      expect(await menuNames()).toHaveLength(5)
+    })
+
+    it('has New and Refresh in the title row with the developer role, and each a name as its tooltip', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      expect(
+        within(filesPane())
+          .getAllByRole('button')
+          .map((button) => button.getAttribute('aria-label')),
+      ).toEqual(['New', 'Refresh'])
+      await userEvent.click(within(filesPane()).getByRole('button', { name: 'New' }))
+      expect(await menuNames()).toEqual(['New file…', 'New folder…'])
+    })
+
+    it('offers only Copy path and Refresh without the developer role, and F2 does nothing', async () => {
+      stubPackage()
+      renderWorkspace(false)
+      await screen.findByTestId('studio-package-tree')
+
+      expect(
+        within(filesPane())
+          .getAllByRole('button')
+          .map((button) => button.getAttribute('aria-label')),
+      ).toEqual(['Refresh'])
+      fireEvent.contextMenu(within(tree()).getByText('src', { exact: true }))
+      expect(await menuNames()).toEqual(['Copy path'])
+      await userEvent.keyboard('{Escape}')
+
+      await userEvent.click(within(tree()).getByText('adapter.py', { exact: true }))
+      fireEvent.keyDown(tree(), { key: 'F2' })
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('copies packages/<id>/<path> on Copy path', async () => {
+      stubPackage()
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+      renderWorkspace(false)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('a.cs', 'Copy path')
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith('packages/tools/src/a.cs'))
+    })
+
+    it('reads the list again on Refresh', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+      const listed = () => vi.mocked(fetch).mock.calls.filter(([url]) => url === files).length
+      const before = listed()
+
+      await userEvent.click(
+        within(screen.getByRole('region', { name: 'Files' })).getByRole('button', { name: 'Refresh' }),
+      )
+
+      await waitFor(() => expect(listed()).toBe(before + 1))
+    })
+
+    it('renames a folder with one move that lists each of its files with its version, and shows them under the new name', async () => {
+      stubPackage()
+      const onWritten = renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('src', 'Rename…')
+      await submitName('code', 'Rename')
+
+      await waitFor(() =>
+        expect(treeNames()).toEqual(['code', 'a.cs', 'b.ts', 'lib', 'x.py', 'adapter.py', 'axis-package.json']),
+      )
+      expect(writesSent()).toHaveLength(1)
+      expect(writesSent()[0].method).toBe('POST')
+      expect(writesSent()[0].url).toBe(moveRoute)
+      expect(writesSent()[0].body).toEqual({
+        moves: [
+          { from: 'src/a.cs', to: 'code/a.cs', version: 'v-src/a.cs' },
+          { from: 'src/b.ts', to: 'code/b.ts', version: 'v-src/b.ts' },
+        ],
+      })
+      expect(onWritten).toHaveBeenCalledWith([])
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    })
+
+    it('keeps the unsaved text of an open file that moves, under its new path', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+      typeAtStart(await openFile('b.ts', 'src/b.ts'))
+      await screen.findAllByTestId('studio-package-unsaved')
+
+      await choose('src', 'Rename…')
+      await submitName('code', 'Rename')
+
+      const editor = await screen.findByRole('textbox', { name: 'code/b.ts' })
+      expect(EditorView.findFromDOM(editor)!.state.doc.toString()).toBe('xconst b = 1')
+      expect(writesSent()[0].body).toEqual({
+        moves: [
+          { from: 'src/a.cs', to: 'code/a.cs', version: 'v-src/a.cs' },
+          { from: 'src/b.ts', to: 'code/b.ts', version: 'v-src/b.ts' },
+        ],
+      })
+      expect(
+        within(screen.getByRole('tab', { name: /b\.ts/ })).getByTestId('studio-package-unsaved'),
+      ).toBeInTheDocument()
+    })
+
+    it('renames a file with one move', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('adapter.py', 'Rename…')
+      await submitName('a.py', 'Rename')
+
+      await waitFor(() => expect(treeNames()).toContain('a.py'))
+      expect(writesSent()[0].body).toEqual({ moves: [{ from: 'adapter.py', to: 'a.py', version: 'v-adapter.py' }] })
+    })
+
+    it('says in the dialog that the name is taken or a file changed on a 409, and reads the list again', async () => {
+      stubPackage({}, [], undefined, null, undefined, 409)
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+      const listed = () => vi.mocked(fetch).mock.calls.filter(([url]) => url === files).length
+      const before = listed()
+
+      await choose('src', 'Rename…')
+      await submitName('code', 'Rename')
+
+      expect(await within(await screen.findByRole('dialog')).findByText(/This name is taken/)).toBeInTheDocument()
+      await waitFor(() => expect(listed()).toBe(before + 1))
+      expect(treeNames()).toContain('src')
+    })
+
+    it('says the name is taken for a folder renamed onto an existing folder, and sends nothing', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('src', 'Rename…')
+      await submitName('lib', 'Rename')
+
+      expect(await within(await screen.findByRole('dialog')).findByText(/This name is taken/)).toBeInTheDocument()
+      expect(writesSent()).toEqual([])
+      expect(treeNames()).toContain('src')
+    })
+
+    it('shows the problem in the dialog for a refused name and sends nothing', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('adapter.py', 'Rename…')
+      await submitName('a/b.py', 'Rename')
+
+      expect(await within(await screen.findByRole('dialog')).findByText(/This name is not allowed/)).toBeInTheDocument()
+      expect(writesSent()).toEqual([])
+    })
+
+    it('adds an empty folder with New folder…, and New file… in it creates the file with If-None-Match', async () => {
+      stubPackage()
+      const onWritten = renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(within(screen.getByRole('region', { name: 'Files' })).getByRole('button', { name: 'New' }))
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'New folder…' }))
+      await submitName('lib2', 'Create')
+
+      await waitFor(() => expect(treeNames()).toContain('lib2'))
+      expect(writesSent()).toEqual([])
+
+      await choose('lib2', 'New file…')
+      await submitName('x.ts', 'Create')
+
+      await waitFor(() => expect(writesSent()).toHaveLength(1))
+      expect(writesSent()[0].method).toBe('PUT')
+      expect(writesSent()[0].url).toBe(fileRoute('lib2/x.ts'))
+      expect(writesSent()[0].headers.get('If-None-Match')).toBe('*')
+      expect(writesSent()[0].body).toEqual({ content: '' })
+      expect(onWritten).toHaveBeenCalledWith([])
+      expect(await screen.findByRole('textbox', { name: 'lib2/x.ts' })).toBeInTheDocument()
+      await waitFor(() => expect(treeNames()).toContain('x.ts'))
+    })
+
+    it('refuses a new folder whose name is taken in the dialog', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('lib', 'New folder…')
+      await submitName('x.py', 'Create')
+
+      expect(await within(await screen.findByRole('dialog')).findByText(/This name is taken/)).toBeInTheDocument()
+    })
+
+    it('asks before Delete…, then deletes each file of the folder with its version and closes their tabs', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+      await openFile('b.ts', 'src/b.ts')
+
+      await choose('src', 'Delete…')
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('Delete the folder src and the 2 files in it?')).toBeInTheDocument()
+      expect(writesSent()).toEqual([])
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+      await waitFor(() => expect(writesSent()).toHaveLength(2))
+      expect(writesSent().map((request) => [request.method, request.url, request.headers.get('If-Match')])).toEqual([
+        ['DELETE', fileRoute('src/a.cs'), '"v-src/a.cs"'],
+        ['DELETE', fileRoute('src/b.ts'), '"v-src/b.ts"'],
+      ])
+      await waitFor(() => expect(screen.queryByRole('tab', { name: /b\.ts/ })).not.toBeInTheDocument())
+      await waitFor(() => expect(treeNames()).not.toContain('src'))
+    })
+
+    it('asks about a folder of one file in the singular', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('lib', 'Delete…')
+
+      expect(
+        within(await screen.findByRole('dialog')).getByText('Delete the folder lib and its 1 file?'),
+      ).toBeInTheDocument()
+    })
+
+    it('sends nothing when Delete… is cancelled', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('adapter.py', 'Delete…')
+      await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }))
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(writesSent()).toEqual([])
+      expect(treeNames()).toContain('adapter.py')
     })
   })
 
