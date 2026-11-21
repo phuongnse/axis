@@ -571,15 +571,14 @@ export function AxisTable<T extends object>({
               ) : (
                 content
               )
-            const cell =
-              lines.length === 0 ? (
-                own
-              ) : (
-                <>
-                  {own}
-                  <MovedCells lines={lines} width={room.lineWidth} />
-                </>
-              )
+            // One shape whether or not cells moved under it, so a change of room keeps the cell's content, and its
+            // focus, in place.
+            const cell = (
+              <>
+                {own}
+                {lines.length > 0 && <MovedCells lines={lines} width={room.lineWidth} />}
+              </>
+            )
             // The fold sits before the first cell's content, for a row that has details.
             if (position !== 0 || details === undefined || details(row) == null) {
               return cell
