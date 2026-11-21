@@ -149,7 +149,8 @@ function safeJustify(justify: FlexProps['justify']): CSSProperties['justifyConte
  * filled shape. The row wraps. A row with `fold` keeps one line instead: it draws `children`, then the `fold` actions
  * as secondary buttons, then `end`. When its content is wider than the row, the `fold` actions become the entries of
  * one "…" icon menu named More actions, in their order. They are buttons again when the row is as wide as the content
- * was before it folded.
+ * was before it folded. With `outlined`, the row keeps those buttons outlined, as a bar at the foot of one pane does,
+ * because it has no `finish` button beside them.
  */
 export function AxisActionRow({
   children,
@@ -157,12 +158,14 @@ export function AxisActionRow({
   end,
   justify,
   align,
+  outlined,
 }: {
   children?: ReactNode
   fold?: AxisFoldAction[]
   end?: ReactNode
   justify?: FlexProps['justify']
   align?: FlexProps['align']
+  outlined?: boolean
 }) {
   const t = useText()
   const rowRef = useRef<HTMLDivElement>(null)
@@ -216,7 +219,7 @@ export function AxisActionRow({
       }
     : { wrap: true }
   return (
-    <ActionRowContext.Provider value={true}>
+    <ActionRowContext.Provider value={!outlined}>
       <Flex gap="small" justify={justify} align={align} {...rowProps}>
         {children}
         {fold &&

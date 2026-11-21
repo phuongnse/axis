@@ -49,6 +49,12 @@ export interface CodeEditorProps {
    */
   boundary?: RefObject<HTMLElement | null>
   /**
+   * As tall as its text, with no scroll or border of its own, so the pane around it scrolls once, see
+   * docs/reference/actions-and-controls.md#scroll-areas. An editor an author types in keeps a minimum height. Not with
+   * `fill`: when both are set, `grow` wins.
+   */
+  grow?: boolean
+  /**
    * Checks the text and marks each problem at its place. It is read when the editor is built: an editor built without it
    * never checks.
    */
@@ -89,6 +95,7 @@ export default function CodeEditor({
   readOnly = false,
   fill = false,
   boundary,
+  grow = false,
   lint,
   onProblems,
   onCursor,
@@ -106,7 +113,7 @@ export default function CodeEditor({
     phrases: new Compartment(),
   }))
   const selectedTint = useSelectedItemTint()
-  const theme = editorTheme(tokens, mode, selectedTint)
+  const theme = editorTheme(tokens, mode, selectedTint, !grow ? 'scroll' : readOnly ? 'grow' : 'growEditable')
   const phrases = useMemo(() => codePhrases(t), [t])
   const latest = useRef({ onChange, value, findTexts, theme, language, readOnly, phrases, lint, onProblems, onCursor })
 
@@ -242,9 +249,14 @@ export default function CodeEditor({
     },
   }))
 
-  const height = useFillHeight(hostRef, fill, boundary)
+  const height = useFillHeight(hostRef, fill && !grow, boundary)
 
-  return <div ref={hostRef} style={fill ? { height } : undefined} />
+  return (
+    <div
+      ref={hostRef}
+      style={grow ? { display: 'flex', flexDirection: 'column', flex: '1 0 auto' } : fill ? { height } : undefined}
+    />
+  )
 }
 
 function languageExtension(language: FileLanguage) {
@@ -276,15 +288,27 @@ function codePhrases(t: (key: string) => string) {
   })
 }
 
-const editorTheme = sharedTheme((tokens, mode, selectedTint: string) => {
+/** How the editor's height follows its text: it scrolls in itself, or grows with the text, with a minimum height when editable. */
+type EditorHeight = 'scroll' | 'grow' | 'growEditable'
+
+/** The least height of an editable editor that grows, in lines, which leaves room to type a small input. */
+const growMinimumLines = 5
+
+const editorTheme = sharedTheme((tokens, mode, selectedTint: string, height: EditorHeight) => {
   const { colour, spacing, radius, type } = tokens
+  const grows = height !== 'scroll'
   return [
+    // CodeMirror gives the theme listed first precedence, so the growing editor's own rules go before the shared look.
+    grows ? EditorView.theme({ '&': { borderWidth: 0, borderRadius: 'unset' } }) : [],
     codeEditorTheme(tokens, mode),
     EditorView.theme({
-      '&': { height: '100%' },
+      '&': grows ? { height: 'auto', flex: '1 0 auto' } : { height: '100%' },
       // A scroll area stops at its end, so the page does not scroll,
-      // see docs/reference/actions-and-controls.md#scroll-areas.
-      '.cm-scroller': { overflow: 'auto', overscrollBehavior: 'contain' },
+      // see docs/reference/actions-and-controls.md#scroll-areas. A growing editor has none, its pane scrolls.
+      '.cm-scroller': grows
+        ? { overflowX: 'auto', overflowY: 'hidden', overscrollBehavior: 'auto' }
+        : { overflow: 'auto', overscrollBehavior: 'contain' },
+      ...(height === 'growEditable' ? { '.cm-content, .cm-gutter': { minHeight: `${growMinimumLines}lh` } } : {}),
       '.cm-content': { padding: `${spacing.sm}px 0` },
       '.cm-line': { paddingInline: `${spacing.sm}px` },
       '.cm-gutters': {

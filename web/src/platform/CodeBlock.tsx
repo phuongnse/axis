@@ -3,11 +3,22 @@ import { useDesignTokens } from './themeMode'
 
 /**
  * Text to read as it is, in the code font, such as read-only JSON or a body that is not JSON. A `null` text shows the em
- * dash. The block scrolls sideways only, see docs/reference/actions-and-controls.md#scroll-areas. With `plain` it has no
- * border, radius or background, only the inset of a pane of a workspace, as a log fills its region. Shared widgets are in
+ * dash. The block scrolls sideways only, unless `wrap` wraps its long lines, as a log's are, see
+ * docs/reference/actions-and-controls.md#scroll-areas. With `plain` it has no border, radius or background, only the
+ * inset of a pane of a workspace, as a log fills its region. Shared widgets are in
  * docs/reference/shared-widgets.md#which-widget.
  */
-export function CodeBlock({ text, testId, plain }: { text: string | null; testId?: string; plain?: boolean }) {
+export function CodeBlock({
+  text,
+  testId,
+  wrap,
+  plain,
+}: {
+  text: string | null
+  testId?: string
+  wrap?: boolean
+  plain?: boolean
+}) {
   const { colour, radius, spacing, type } = useDesignTokens()
   return (
     <pre
@@ -15,7 +26,7 @@ export function CodeBlock({ text, testId, plain }: { text: string | null; testId
       style={{
         margin: 0,
         padding: plain ? spacing.md : spacing.sm,
-        overflowX: 'auto',
+        ...(wrap ? { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } : { overflowX: 'auto' }),
         fontFamily: type.codeFontFamily,
         ...(plain
           ? {}

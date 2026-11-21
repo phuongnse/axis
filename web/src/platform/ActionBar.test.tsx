@@ -89,6 +89,42 @@ describe('ActionBar', () => {
   })
 })
 
+describe('ActionBar with pane', () => {
+  const barOf = (button: HTMLElement) => button.closest<HTMLElement>('[data-action-bar]')!
+
+  it('draws a main action as an outlined button at the pane inset', () => {
+    renderIn(<ActionBar pane end={<AxisButton role="main">Run</AxisButton>} />)
+
+    const button = screen.getByRole('button', { name: 'Run' })
+    expect(button).toHaveClass('ant-btn-variant-outlined')
+    expect(button).not.toHaveClass('ant-btn-variant-text')
+    expect(barOf(button).getAttribute('style')).toContain('padding-inline: 16px')
+  })
+
+  it('draws a main action as a text button at the page inset without it', () => {
+    renderIn(<ActionBar end={<AxisButton role="main">Run</AxisButton>} />)
+
+    const button = screen.getByRole('button', { name: 'Run' })
+    expect(button).toHaveClass('ant-btn-variant-text')
+    expect(button).not.toHaveClass('ant-btn-variant-outlined')
+    expect(barOf(button).getAttribute('style')).toContain('padding-inline: 24px')
+  })
+
+  it('keeps the outline of the start and the fold actions too', () => {
+    fakeWidths(500, 400)
+    renderIn(
+      <ActionBar
+        pane
+        start={<AxisButton role="secondary">Start</AxisButton>}
+        fold={[{ key: 'validate', labelKey: 'test.validate', onClick: () => {} }]}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Start' })).not.toHaveClass('ant-btn-variant-text')
+    expect(screen.getByRole('button', { name: 'Validate' })).not.toHaveClass('ant-btn-variant-text')
+  })
+})
+
 describe('SaveBar in an ActionBar', () => {
   const renderSaveBar = (busy: boolean) =>
     renderIn(
