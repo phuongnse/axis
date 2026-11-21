@@ -325,6 +325,55 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             return StudioDraftOutcome<bool>.Of(true);
         }, ct);
 
+    /// <summary>
+    /// Commits the move of the package files of <paramref name="moves"/>, full paths under <c>packages/</c>, to the draft as one commit
+    /// named by <see cref="StudioWrites.MoveSummary"/>. It refuses as <see cref="StudioWriteRefusal.Stale"/> when a <c>from</c> is
+    /// missing from the draft or has another version, and as <see cref="StudioWriteRefusal.Exists"/> when a <c>to</c> is a folder,
+    /// has a file in its way or is a file that no move takes away. A <c>to</c> may be another move's <c>from</c>. The draft records
+    /// the version each file has on <c>main</c> on its first use.
+    /// </summary>
+    public Task<StudioDraftOutcome<bool>> MovePackageFilesAsync(
+        string id, string package, IReadOnlyList<(string From, string To, string Version)> moves, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, tip) =>
+        {
+            var froms = new HashSet<string>(moves.Select(move => move.From), StringComparer.Ordinal);
+            var contents = new List<byte[]>();
+            foreach (var (from, _, version) in moves)
+            {
+                if (tip.Tree[from]?.Target is not Blob blob
+                    || !string.Equals(StudioWrites.Unquote(version), Version(Content(blob)), StringComparison.Ordinal))
+                {
+                    return StudioDraftOutcome<bool>.Refused(StudioWriteRefusal.Stale);
+                }
+
+                contents.Add(Content(blob));
+            }
+
+            foreach (var (_, to, _) in moves)
+            {
+                var current = tip.Tree[to];
+                if (current?.Target is Tree || FileInTheWay(tip.Tree, to) || (current is not null && !froms.Contains(to)))
+                {
+                    return StudioDraftOutcome<bool>.Refused(StudioWriteRefusal.Exists);
+                }
+            }
+
+            RememberFiles(git, draft, moves.Select(move => move.From).Concat(moves.Select(move => move.To)));
+            var definition = TreeDefinition.From(tip.Tree);
+            foreach (var move in moves)
+            {
+                definition.Remove(move.From);
+            }
+
+            for (var i = 0; i < moves.Count; i++)
+            {
+                definition.Add(moves[i].To, CreateBlob(git, contents[i]), Mode.NonExecutableFile);
+            }
+
+            Commit(git, draft, tip, definition, StudioWrites.MoveSummary(package, moves));
+            return StudioDraftOutcome<bool>.Of(true);
+        }, ct);
+
     /// <summary>Deletes the draft's branch and its record.</summary>
     public Task<StudioDraftOutcome<bool>> DropAsync(string id, CancellationToken ct) =>
         InDraftAsync(id, (git, draft, _) =>
@@ -584,15 +633,25 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     }
 
     // As Remember, for a package file by its path.
-    private static void RememberFile(Repository git, StudioDraft draft, string file)
+    private static void RememberFile(Repository git, StudioDraft draft, string file) => RememberFiles(git, draft, [file]);
+
+    // Records, in one save, the version each of the package files has on main that the draft has not recorded yet.
+    private static void RememberFiles(Repository git, StudioDraft draft, IEnumerable<string> files)
     {
-        if (draft.PackageFiles.ContainsKey(file))
+        var missing = files.Where(file => !draft.PackageFiles.ContainsKey(file)).Distinct(StringComparer.Ordinal).ToList();
+        if (missing.Count == 0)
         {
             return;
         }
 
         var main = git.Refs[Main]?.ResolveToDirectReference().Target as Commit;
-        Save(git, draft with { PackageFiles = new Dictionary<string, string?>(draft.PackageFiles, StringComparer.Ordinal) { [file] = PackageFileVersion(main, file) } });
+        var versions = new Dictionary<string, string?>(draft.PackageFiles, StringComparer.Ordinal);
+        foreach (var file in missing)
+        {
+            versions[file] = PackageFileVersion(main, file);
+        }
+
+        Save(git, draft with { PackageFiles = versions });
     }
 
     // The version of the package file on the commit, or null when the commit or the file is missing.

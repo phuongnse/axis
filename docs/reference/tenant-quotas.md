@@ -84,8 +84,8 @@ nothing:
 - **`storage`.** Once the last sample is at or over the quota, these are refused: a record create or
   update through the record API, an import, an inbound endpoint call that writes, a file upload, a
   save, reset or undo in Studio, a [package file](studio-packages.md#the-authoring-api) save, a publish and the author's [accept](authoring-requests.md#accepting)
-  of a draft, which writes the draft as a revision. A delete is never refused, a package file delete included, and neither is a change of an
-  [application setting](authoring.md#application-settings), which stores one flag. Process steps, task completions and saves,
+  of a draft, which writes the draft as a revision. A delete is never refused, a package file delete included, and neither is a package file move, which adds no bytes,
+  nor a change of an [application setting](authoring.md#application-settings), which stores one flag. Process steps, task completions and saves,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
   tenant writes in one sampling interval. The server reads the last sample on each such write. A
   tenant with no sample yet is not refused, and neither is a write when the platform database cannot
