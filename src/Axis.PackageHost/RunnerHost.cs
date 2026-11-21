@@ -33,7 +33,9 @@ namespace Axis.PackageHost;
 /// So may a <c>start</c> with files.
 /// The host writes its files into a temporary copy and runs the checks of <see cref="PackageChecks"/> on it, with the manifest read
 /// as metadata only and with <paramref name="configuration"/> for the settings of pip and Trivy. It answers <c>built</c> with
-/// the files of the built copy, without symbolic links, or <c>refused</c> with each problem, then closes the connection. It
+/// the files of the built copy, without symbolic links, or <c>refused</c> with each problem, then closes the connection. A problem names its
+/// <c>line</c> and <c>column</c> when it has a place in its file, and both answers carry <c>output</c>, the lines of the steps that passed
+/// and, for <c>refused</c>, each problem's message. It
 /// writes nothing under the extensions folder, starts no runner and deletes its copies whatever the answer. A path that is not
 /// a relative path inside the package is refused before anything is written. A build that cannot run is logged, and the
 /// connection closes with no answer.
@@ -330,7 +332,7 @@ internal sealed partial class RunnerHost(
         BuildCopyAsync(build.Files, socket, async outcome =>
         {
             var built = await ReadFilesAsync(outcome.Folder!);
-            await RunnerProtocol.WriteAsync(socket, new BuiltMessage(built), _stopping.Token);
+            await RunnerProtocol.WriteAsync(socket, new BuiltMessage(built, outcome.Output), _stopping.Token);
             LogBuilt(outcome.Manifest!.Id, outcome.Manifest.Version);
         });
 
@@ -346,7 +348,7 @@ internal sealed partial class RunnerHost(
             if (manifest.Language != PackageLanguage.Python)
             {
                 var language = manifest.Language == PackageLanguage.Node ? "node" : "csharp";
-                await AnswerRefusedAsync(socket, [new BuildProblem(PackageCatalog.ManifestFileName, $"The tests of a '{language}' package do not run yet. Only a Python package's tests run.")]);
+                await AnswerRefusedAsync(socket, [new BuildProblem(PackageCatalog.ManifestFileName, $"The tests of a '{language}' package do not run yet. Only a Python package's tests run.")], outcome.Output);
                 return;
             }
 
@@ -360,7 +362,7 @@ internal sealed partial class RunnerHost(
 
             if (run.Refusal is not null)
             {
-                await AnswerRefusedAsync(socket, [new BuildProblem(PackageCatalog.ManifestFileName, run.Refusal)]);
+                await AnswerRefusedAsync(socket, [new BuildProblem(PackageCatalog.ManifestFileName, run.Refusal)], outcome.Output);
                 return;
             }
 
@@ -377,7 +379,7 @@ internal sealed partial class RunnerHost(
     {
         if (BadPaths(files.Keys) is { Count: > 0 } badPaths)
         {
-            await AnswerRefusedAsync(socket, badPaths);
+            await AnswerRefusedAsync(socket, badPaths, []);
             return;
         }
 
@@ -386,7 +388,7 @@ internal sealed partial class RunnerHost(
         {
             if (!Write(files, copy, out var unwritable))
             {
-                await AnswerRefusedAsync(socket, unwritable);
+                await AnswerRefusedAsync(socket, unwritable, []);
                 return;
             }
 
@@ -399,7 +401,10 @@ internal sealed partial class RunnerHost(
 
             if (outcome.Problems.Count > 0)
             {
-                await AnswerRefusedAsync(socket, [.. outcome.Problems.Select(problem => new BuildProblem(problem.File, problem.Message))]);
+                await AnswerRefusedAsync(
+                    socket,
+                    [.. outcome.Problems.Select(problem => new BuildProblem(problem.File, problem.Message, problem.Line, problem.Column))],
+                    outcome.Output);
                 return;
             }
 
@@ -423,9 +428,10 @@ internal sealed partial class RunnerHost(
         }
     }
 
-    private async Task AnswerRefusedAsync(Stream socket, List<BuildProblem> problems)
+    /// <summary>Answers <c>refused</c>, with <paramref name="steps"/>, the lines of the steps that passed, and then each problem's message as its <c>output</c>.</summary>
+    private async Task AnswerRefusedAsync(Stream socket, List<BuildProblem> problems, IEnumerable<string> steps)
     {
-        await RunnerProtocol.WriteAsync(socket, new RefusedMessage(problems), _stopping.Token);
+        await RunnerProtocol.WriteAsync(socket, new RefusedMessage(problems, [.. steps, .. problems.Select(problem => problem.Message)]), _stopping.Token);
         LogBuildRefused(problems.Count);
     }
 

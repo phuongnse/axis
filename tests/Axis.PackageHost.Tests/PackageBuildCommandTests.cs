@@ -190,6 +190,20 @@ public sealed class PackageBuildCommandTests
     }
 
     [Fact]
+    public async Task A_python_source_with_a_syntax_error_is_refused_at_its_file_and_line_before_the_install_and_the_scan()
+    {
+        using var test = BuildTest.Python(NoFindings);
+        File.WriteAllText(Path.Combine(test.Source, "adapter.py"), "value = 1\nvalue = = 2\n");
+
+        var (exitCode, output) = await test.RunAsync();
+
+        Assert.Equal(PackageBuildCommand.Refused, exitCode);
+        Assert.Contains("adapter.py:2:", output);
+        Assert.DoesNotContain(test.Source, output);
+        test.AssertNothingWrittenAndNoScan();
+    }
+
+    [Fact]
     public async Task A_requirement_without_a_hash_is_refused_before_the_install()
     {
         using var test = BuildTest.Python(NoFindings, _ => "axis-fixture-dependency==1.0.0\n");
