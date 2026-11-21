@@ -127,7 +127,7 @@ function OwnField({ label, help, required, hideLabel, children }: OwnFieldProps)
   const ownId = useId()
   const id = children.props.id ?? ownId
   return (
-    <div>
+    <div className="axis-field">
       <label
         htmlFor={id}
         style={
@@ -159,6 +159,7 @@ function FormField({
   return (
     // The theme keeps no margin below the field. The form gives the gap, see docs/reference/shared-widgets.md#the-rule.
     <Form.Item
+      className="axis-field"
       name={name}
       label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{label}</span>}
       required={requiredMessage !== undefined}

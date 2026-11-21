@@ -826,8 +826,11 @@ function MovedCells({
   )
 }
 
-/** A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. */
-function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold: boolean }) {
+/**
+ * A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. Proposed, #3264: an item of a
+ * list that is not a table, such as an entity's validation, takes it too, so an item's actions look as a row's do.
+ */
+export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold: boolean }) {
   const t = useText()
   if (actions === null || actions.length === 0) {
     return null

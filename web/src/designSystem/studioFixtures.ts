@@ -818,7 +818,10 @@ function expressionPath(init?: RequestInit): string | undefined {
   return (JSON.parse(init.body) as { path?: string }).path
 }
 
-/** The Request entity of the Entity with expressions state: Typical's fields, a computed amount with tax and a validation. */
+/**
+ * The Request entity of the Entity with expressions state: Typical's fields, a computed amount with tax, a validation and
+ * an index, so the Validations and Indexes sections show an item each.
+ */
 function expressionEntityResource(): StudioResource {
   const typical = entityResource(typicalFolder, 0)
   return {
@@ -844,6 +847,7 @@ function expressionEntityResource(): StudioResource {
           field: 'amount',
         },
       ],
+      indexes: [{ name: 'index1', fields: ['title', 'amount'] }],
     },
   }
 }

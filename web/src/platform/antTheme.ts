@@ -220,6 +220,12 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
     `.ant-alert.ant-alert-success .ant-alert-icon { color: ${colour.successText}; }`,
     `.ant-alert.ant-alert-warning .ant-alert-icon { color: ${colour.warningText}; }`,
     `.ant-alert.ant-alert-error .ant-alert-icon { color: ${colour.dangerText}; }`,
+    // Proposed, #3264 and #4888: every field of a region is as wide as the others, see
+    // docs/reference/shell.md#layout, so a field's select, number or date input fills it as a text box does. A select
+    // with an action joined after it fills the field with the action, see docs/reference/actions-and-controls.md#fields.
+    '.axis-field .ant-select, .axis-field .ant-input-number, .axis-field .ant-picker { width: 100%; }',
+    '.axis-field .ant-space-compact { display: flex; width: 100%; }',
+    '.axis-field .ant-space-compact > .ant-select { flex: 1; width: auto; min-width: 0; }',
   ].join('\n')
 }
 
