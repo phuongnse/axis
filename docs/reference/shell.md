@@ -440,8 +440,9 @@ to the frame shows in every state. How previews work is in
 - **The identity provider's pages are the theme's own.** `identitySignIn` is built from fixtures
   through the shared sign-in components in `web/src/identitySignIn/`. Its states from Two-step
   verification to Error are the same components that the theme draws.
-- **A frame is a screen.** A shell preview draws the shell in a frame exactly as tall as its height, and
-  the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
+- **A frame is a screen.** A shell preview draws the shell in a frame that fills the window down to the canvas's
+  padding and is never shorter than the state's height. The page scrolls inside it as in a window, so a dialog
+  opens in the middle of what shows.
 - **The State control.** `shell`, `signIn` and `identitySignIn` show one state at a time under a State
   control, as `studio` does, and `&state=<slug>` opens one.
 - **Account states.** The `shell` preview gains Account page, the platform's `/account` on its

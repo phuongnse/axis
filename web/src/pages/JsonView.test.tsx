@@ -200,4 +200,12 @@ describe('jsonViewHeight', () => {
   it('does not go under the least height in a tiny window', () => {
     expect(jsonViewHeight({ windowHeight: 300, top: 200, footerHeight: 48, below: 90, gap: 16 })).toBe(minHeight)
   })
+
+  it('does not go under a given least height in a short window', () => {
+    expect(jsonViewHeight({ windowHeight: 300, top: 200, footerHeight: 0, below: 26, gap: 0, least: 640 })).toBe(640)
+  })
+
+  it('fills the window below the top, less the space below, with no footer and no gap', () => {
+    expect(jsonViewHeight({ windowHeight: 1100, top: 92, footerHeight: 0, below: 26, gap: 0, least: 640 })).toBe(982)
+  })
 })

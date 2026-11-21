@@ -856,7 +856,7 @@ const framedPreviews: Record<
 for (const [name, { captions, pickedInState }] of Object.entries(
   framedPreviews,
 )) {
-  test(`the ${name} preview draws each state in a frame exactly as tall as its height, with the page scrolling inside it, in light mode`, async ({
+  test(`the ${name} preview draws each state in a frame that --shell-min-height fills, with the page scrolling inside it, in light mode`, async ({
     page,
   }) => {
     const recording = await openHarness(page, `?preview=${name}&mode=light`, {
@@ -947,6 +947,62 @@ test("a dialog opened in the scrolled entity state of studio shows inside the fr
   expect(await screen.evaluate((element) => element.scrollTop)).toBeGreaterThan(
     0,
   );
+  expect(recording.errors).toEqual([]);
+});
+
+/** studio's Entity state, whose `frameHeight` in previews.tsx is the least height of its frame. */
+const studioEntityLeastHeight = 640;
+
+test("a framed studio state fills the window, never less than its height, and follows a resize", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 1100 });
+  const recording = await openHarness(
+    page,
+    "?preview=studio&mode=light&state=entity",
+    { sandboxed: true, frameWidth: 992 },
+  );
+  const state = figure(page.frameLocator("iframe"), "Entity");
+  const frame = state.locator(":scope > div");
+  const screen = state.locator(":scope > div > :first-child");
+  await expect(screen).toBeVisible();
+
+  // The space under the frame, less the canvas's padding, which the figure's parent draws. It is 0 when the frame
+  // reaches the canvas's padding from the window's bottom edge.
+  const gapUnderFrame = () =>
+    frame.evaluate((element) => {
+      const win = element.ownerDocument.defaultView!;
+      const padding = parseFloat(
+        getComputedStyle(element.closest("figure")!.parentElement!)
+          .paddingBottom,
+      );
+      return win.innerHeight - element.getBoundingClientRect().bottom - padding;
+    });
+  const screenHeight = async () => (await screen.boundingBox())?.height ?? 0;
+
+  await expect
+    .poll(async () => Math.abs(await gapUnderFrame()))
+    .toBeLessThanOrEqual(1);
+  expect(
+    await screen.evaluate(
+      (element) => element.scrollHeight > element.clientHeight,
+    ),
+  ).toBe(true);
+  expect(
+    await screen.evaluate((element) => getComputedStyle(element).overflowY),
+  ).toBe("auto");
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect
+    .poll(async () => Math.abs(await gapUnderFrame()))
+    .toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await expect
+    .poll(async () =>
+      Math.abs((await screenHeight()) - studioEntityLeastHeight),
+    )
+    .toBeLessThanOrEqual(0.5);
   expect(recording.errors).toEqual([]);
 });
 
