@@ -31,6 +31,10 @@
       "type": "object",
       "additionalProperties": { "type": "string", "contentEncoding": "base64" }
     },
+    "output": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
     "start": {
       "type": "object",
       "additionalProperties": false,
@@ -143,7 +147,8 @@
       "required": ["type", "files"],
       "properties": {
         "type": { "const": "built" },
-        "files": { "$ref": "#/$defs/files" }
+        "files": { "$ref": "#/$defs/files" },
+        "output": { "$ref": "#/$defs/output" }
       }
     },
     "test": {
@@ -200,10 +205,13 @@
             "required": ["file", "message"],
             "properties": {
               "file": { "type": "string" },
-              "message": { "type": "string" }
+              "message": { "type": "string" },
+              "line": { "type": "integer", "minimum": 1 },
+              "column": { "type": "integer", "minimum": 1 }
             }
           }
-        }
+        },
+        "output": { "$ref": "#/$defs/output" }
       }
     }
   }

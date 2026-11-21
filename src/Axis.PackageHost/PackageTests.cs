@@ -115,7 +115,7 @@ internal static class PackageTests
                     column = columnValue;
                 }
 
-                outcomes.Add(new PackageTestOutcome(name, outcome, message is null ? null : OutputLines.Cut(message, MaxMessage), durationMs, file, lineNumber, column));
+                outcomes.Add(new PackageTestOutcome(name, outcome, message is null ? null : Cut(message), durationMs, file, lineNumber, column));
             }
 
             return outcomes;
@@ -125,6 +125,9 @@ internal static class PackageTests
             return null;
         }
     }
+
+    /// <summary>Cuts the message at <see cref="MaxMessage"/> characters, and never between the two halves of a surrogate pair.</summary>
+    internal static string Cut(string message) => OutputLines.Cut(message, MaxMessage);
 
     private static string LoadScript()
     {

@@ -80,14 +80,23 @@ public sealed record SandboxMessage(bool? Gvisor = null) : RunnerMessage;
 /// </summary>
 public sealed record BuildMessage(Dictionary<string, byte[]> Files) : RunnerMessage;
 
-/// <summary>The host built the package. <paramref name="Files"/> holds every file of the built package, as in <see cref="BuildMessage"/>.</summary>
-public sealed record BuiltMessage(Dictionary<string, byte[]> Files) : RunnerMessage;
+/// <summary>
+/// The host built the package. <paramref name="Files"/> holds every file of the built package, as in <see cref="BuildMessage"/>.
+/// <paramref name="Output"/> holds the lines that the build steps wrote, one for each step that passed.
+/// </summary>
+public sealed record BuiltMessage(Dictionary<string, byte[]> Files, IReadOnlyList<string>? Output = null) : RunnerMessage;
 
-/// <summary>The host refused the package. Each of <paramref name="Problems"/> names a file and says what is wrong.</summary>
-public sealed record RefusedMessage(IReadOnlyList<BuildProblem> Problems) : RunnerMessage;
+/// <summary>
+/// The host refused the package. Each of <paramref name="Problems"/> names a file and says what is wrong. <paramref name="Output"/> holds
+/// the lines that the build steps wrote: one for each step that passed, then the message of each problem.
+/// </summary>
+public sealed record RefusedMessage(IReadOnlyList<BuildProblem> Problems, IReadOnlyList<string>? Output = null) : RunnerMessage;
 
-/// <summary>One problem of a refused build: the <paramref name="File"/> it is about and its <paramref name="Message"/>.</summary>
-public sealed record BuildProblem(string File, string Message);
+/// <summary>
+/// One problem of a refused build: the <paramref name="File"/> it is about and its <paramref name="Message"/>. <paramref name="Line"/>
+/// and <paramref name="Column"/> count from 1 and are <see langword="null"/> for a problem that has no place in the file.
+/// </summary>
+public sealed record BuildProblem(string File, string Message, int? Line = null, int? Column = null);
 
 /// <summary>
 /// A caller asks the package host to build the package whose files are in <paramref name="Files"/>, as for <see cref="BuildMessage"/>,

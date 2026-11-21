@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="axis_test_runner.py" LogicalName="Axis.PackageHost.axis_test_runner.py" />
+    <EmbeddedResource Include="axis_syntax_check.py" LogicalName="Axis.PackageHost.axis_syntax_check.py" />
   </ItemGroup>
 
   <ItemGroup>

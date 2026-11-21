@@ -121,10 +121,10 @@ implements the operation context over it.
 | `stop` | The worker | None |
 | `sandbox` | The worker, to the host, and the host's answer | None in the question. `gvisor`, a boolean, in the answer |
 | `build` | A caller, to the host | `files`, mapping each relative path of the package, written with `/`, to its content in base64 |
-| `built` | The host | `files`, as in `build`, for every file of the built package |
+| `built` | The host | `files`, as in `build`, for every file of the built package, and `output`, the lines the build steps wrote |
 | `test` | A caller, to the host | `files`, as in `build` |
 | `tested` | The host | `tests`, each with the `name` of the test, its `outcome`, `passed` or `failed`, its `message`, the last line of a failed test's traceback cut at 1000 characters, or null, and its `durationMs`, a whole number. A failed test with a place also has its `file`, a path in the package written with `/`, and its `line` and `column`, counted from 1. `output`, the last 1000 lines that the tests wrote, each cut at 1000 characters |
-| `refused` | The host | `problems`, each with the `file` it is about and a `message` |
+| `refused` | The host | `problems`, each with the `file` it is about, a `message` and, when the problem has a place in the file, a `line` and a `column` counted from 1, and `output`, the lines the build steps wrote |
 
 - **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection is neither encrypted nor
   authenticated, and a `run` carries binding secrets, so only the operator's runner network protects it. The host listens on port
@@ -154,17 +154,21 @@ implements the operation context over it.
   already holds `gvisor` closes the connection without an answer.
 - **Build.** A `build` may be the first line of a connection instead of a `start`. It may be longer than the other first lines, as
   may a `start` with `files`, up to the limit in `RunnerHost`, because a package with a wheel needs megabytes, and a longer line
-  closes the connection. The host writes the files into a temporary copy and runs steps 1, 2, 4 and 5 of [building a
+  closes the connection. The host writes the files into a temporary copy and runs steps 1, 2, 4, 5 and 6 of [building a
   package](extension-packages.md#building-a-package) on it, reading the manifest as metadata only, so no package code runs in the host. It answers
   `built` with every file of the built copy, or `refused` with each problem. Then it closes the connection. The `message` of a
   problem is the line that the `build` command prints for it. Its `file` is `axis-package.json` for a manifest problem and the
-  manifest's lock file for a lock file, install or scan problem. A path that is empty, absolute, holds `\` or an empty, `.` or `..`
+  manifest's lock file for a lock file, install or scan problem. For a Python source that does not compile, it is the `.py` path
+  of the file, and the problem has its `line` and `column`. A problem at the manifest or the lock file has neither. The `output`
+  of both answers is one line for each step that passed and, for `refused`, then the `message` of each problem. The host writes
+  those lines itself, so none holds an absolute path or pip's or Trivy's output. A path that is empty, absolute, holds `\` or an empty, `.` or `..`
   segment is refused, naming the path, before the host writes anything. The `built` answer leaves out symbolic links, because one
   could point outside the copy. The host writes nothing to `Extensions:Path` and deletes its copy whatever the answer. A build that
   cannot run, such as a pip or Trivy that cannot start, is the operator's problem and not the author's, so the host logs why and
   closes the connection with no answer.
 - **Test.** A `test` may be the first line of a connection instead of a `start`. Its line limit and its path rules are those of
-  `build`. The host builds the package exactly as for a `build`, and a build that fails answers `refused` and runs no test. Then it
+  `build`. The host builds the package exactly as for a `build`, and a build that fails answers `refused`, with the same `problems`
+  and `output`, and runs no test. Then it
   runs the tests of a `python` package in the built copy. A `csharp` or `node` package answers `refused` with one problem at
   `axis-package.json`, saying that its tests do not run yet. The tests are the files that the caller sent whose name matches
   `test_*.py`, in any folder, and the standard library's `unittest` loads and runs them. The host runs them with the
