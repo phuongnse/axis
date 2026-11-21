@@ -454,8 +454,16 @@ const Fields = memo(function Fields({
   }, [])
 
   /** Opens the drawer of the field at `index`, and adds its name to the address as a history entry. */
+  /**
+   * Proposed, #3264: the new field that Add field opens in the side panel, held there and not in the draft until Add
+   * field puts it in, so Cancel adds nothing. `null` while no new field is open.
+   */
+  const [staged, setStaged] = useState<Record<string, unknown> | null>(null)
+
   const openDrawer = useCallback(
     (index: number) => {
+      // One side panel shows at a time, so a field opened from the table takes the place of a new field's panel.
+      setStaged(null)
       setDrawer({ index, open: true })
       writeField(fieldName(latest.current.fields?.[index]), false)
     },
@@ -517,7 +525,10 @@ const Fields = memo(function Fields({
     if (drawerOpen || returnFocus.current === null) {
       return
     }
-    document.querySelector<HTMLElement>(`[data-testid="studio-field-/fields/${returnFocus.current}"] button`)?.focus()
+    // The name is the row's link, or its button while it has no name; the row's drag handle comes before it.
+    document
+      .querySelector<HTMLElement>(`[data-testid="studio-field-/fields/${returnFocus.current}"] [data-field-name]`)
+      ?.focus()
     returnFocus.current = null
   }, [drawerOpen])
 
@@ -594,16 +605,12 @@ const Fields = memo(function Fields({
     )
   }, [])
 
-  /**
-   * Proposed, #3264: the new field that Add field opens in the side panel, held there and not in the draft until Add
-   * field puts it in, so Cancel adds nothing. `null` while no new field is open.
-   */
-  const [staged, setStaged] = useState<Record<string, unknown> | null>(null)
-
   function addField() {
     // An open field's panel gives way to the new field's, as one side panel shows at a time.
+    // The new field's panel takes the place of an open field's, and the focus goes into it, not back to the row.
     if (latest.current.shown !== null) {
-      closeDrawer()
+      setDrawer((current) => current && { ...current, open: false })
+      writeField(null, false)
     }
     setStaged({ name: '', type: 'text' })
   }
@@ -871,6 +878,7 @@ const NameCell = memo(function NameCell({
       {/* A read-only designer turns its inputs off, but its name still opens the drawer. */}
       {name ? (
         <Link
+          data-field-name
           to={{ search: `?${fieldAddress(searchParams, name)}` }}
           onClick={(event) => {
             // A click with a modifier or another button opens the address as the browser does, such as in a new tab.
@@ -884,7 +892,7 @@ const NameCell = memo(function NameCell({
           {name}
         </Link>
       ) : (
-        <AxisButton role="subtle" size="small" disabled={false} onClick={() => onOpen(index)}>
+        <AxisButton role="subtle" size="small" data-field-name disabled={false} onClick={() => onOpen(index)}>
           {t('shell.studio.entity.unnamedField')}
         </AxisButton>
       )}
@@ -1072,12 +1080,12 @@ const FieldDrawer = memo(function FieldDrawer({
               <AxisButton role="secondary" onClick={onClose}>
                 {t('shell.studio.cancel')}
               </AxisButton>
-              <AxisButton role="finish" onClick={onAdd}>
+              <AxisButton role="main" onClick={onAdd}>
                 {t('shell.studio.entity.addField')}
               </AxisButton>
             </>
           ) : (
-            <AxisButton role="finish" onClick={onClose}>
+            <AxisButton role="main" onClick={onClose}>
               {t('shell.studio.entity.fieldPanel.done')}
             </AxisButton>
           )

@@ -313,6 +313,7 @@ export function AxisButton(props: AxisButtonProps) {
       ) : (
         <Button
           {...body}
+          color={danger ? 'danger' : 'primary'}
           variant="outlined"
           disabled={disabled}
           style={{ ...outline(danger ? colour.dangerText : colour.primaryText), ...style }}
