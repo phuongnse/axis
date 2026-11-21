@@ -845,9 +845,9 @@ public sealed class PackageHostTests : IAsyncLifetime
 
                 from adapter import greet
 
-
                 class SampleTests(unittest.TestCase):
                     def test_greets(self):
+                        print('hello from test')
                         self.assertEqual(greet({'name': 'Axis'}, None), {'greeting': 'Hello, Axis'})
 
                     def test_fails(self):
@@ -863,9 +863,18 @@ public sealed class PackageHostTests : IAsyncLifetime
         var passed = Assert.Single(tested.Tests, test => test.Name == "test_sample.SampleTests.test_greets");
         Assert.Equal(PackageTestOutcome.Passed, passed.Outcome);
         Assert.Null(passed.Message);
+        Assert.True(passed.DurationMs >= 0);
+        Assert.Null(passed.File);
+        Assert.Null(passed.Line);
+        Assert.Null(passed.Column);
         var failed = Assert.Single(tested.Tests, test => test.Name == "test_sample.SampleTests.test_fails");
         Assert.Equal(PackageTestOutcome.Failed, failed.Outcome);
         Assert.StartsWith("AssertionError", failed.Message, StringComparison.Ordinal);
+        Assert.True(failed.DurationMs >= 0);
+        Assert.Equal("test_sample.py", failed.File);
+        Assert.Equal(11, failed.Line);
+        Assert.Equal(9, failed.Column);
+        Assert.Contains("hello from test", tested.Output!);
         Assert.Contains("Tested package python-test-package 1.0.0.", _log.Messages);
         Assert.Null(await connection.ReceiveAsync());
     }

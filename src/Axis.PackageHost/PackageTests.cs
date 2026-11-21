@@ -19,11 +19,11 @@ internal static class PackageTests
     private static readonly string _script = LoadScript();
 
     /// <summary>
-    /// What the run came to: the <paramref name="Tests"/> that ran, or the <paramref name="Refusal"/> that the author causes by a test
+    /// What the run came to: the <paramref name="Tests"/> that ran and the <paramref name="Output"/> lines they wrote, or the <paramref name="Refusal"/> that the author causes by a test
     /// that runs too long or ends the process without a result, or the <paramref name="SetupError"/> that stopped the run, which is the
     /// operator's problem and not the author's.
     /// </summary>
-    public sealed record Run(IReadOnlyList<PackageTestOutcome>? Tests, string? Refusal, string? SetupError);
+    public sealed record Run(IReadOnlyList<PackageTestOutcome>? Tests, string? Refusal, string? SetupError, IReadOnlyList<string>? Output = null);
 
     /// <summary>
     /// Runs the test files, paths relative to <paramref name="folder"/> that use <c>/</c>, and stops them after <paramref name="limit"/>, which
@@ -58,7 +58,7 @@ internal static class PackageTests
         }
 
         return Parse(result.Output) is { } tests
-            ? new Run(tests, null, null)
+            ? new Run(tests, null, null, OutputLines.Of(result.Error))
             : new Run(null, "The package's tests ended without reporting their outcomes.", null);
     }
 
@@ -93,7 +93,29 @@ internal static class PackageTests
                 }
 
                 var message = outcome == PackageTestOutcome.Passed ? null : test.GetProperty("message").GetString();
-                outcomes.Add(new PackageTestOutcome(name, outcome, message is null ? null : Cut(message)));
+                if (!test.TryGetProperty("durationMs", out var duration) || !duration.TryGetInt64(out var durationMs) || durationMs < 0)
+                {
+                    return null;
+                }
+
+                string? file = null;
+                int? lineNumber = null;
+                int? column = null;
+                if (outcome == PackageTestOutcome.Failed && test.TryGetProperty("file", out var place))
+                {
+                    if (place.ValueKind != JsonValueKind.String
+                        || !test.TryGetProperty("line", out var lineElement) || !lineElement.TryGetInt32(out var lineValue) || lineValue < 1
+                        || !test.TryGetProperty("column", out var columnNumber) || !columnNumber.TryGetInt32(out var columnValue) || columnValue < 1)
+                    {
+                        return null;
+                    }
+
+                    file = place.GetString();
+                    lineNumber = lineValue;
+                    column = columnValue;
+                }
+
+                outcomes.Add(new PackageTestOutcome(name, outcome, message is null ? null : Cut(message), durationMs, file, lineNumber, column));
             }
 
             return outcomes;
@@ -105,15 +127,7 @@ internal static class PackageTests
     }
 
     /// <summary>Cuts the message at <see cref="MaxMessage"/> characters, and never between the two halves of a surrogate pair.</summary>
-    internal static string Cut(string message)
-    {
-        if (message.Length <= MaxMessage)
-        {
-            return message;
-        }
-
-        return message[..(char.IsHighSurrogate(message[MaxMessage - 1]) ? MaxMessage - 1 : MaxMessage)];
-    }
+    internal static string Cut(string message) => OutputLines.Cut(message, MaxMessage);
 
     private static string LoadScript()
     {

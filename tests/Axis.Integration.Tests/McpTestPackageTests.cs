@@ -105,9 +105,15 @@ public sealed class McpTestPackageTests(KeycloakFixture keycloak, PostgreSqlFixt
         var passed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsCase.test_passes")!;
         Assert.Equal("passed", passed["outcome"]!.GetValue<string>());
         Assert.Null(passed["message"]);
+        Assert.True(passed["durationMs"]!.GetValue<long>() >= 0);
+        Assert.Null(passed["file"]);
         var failed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsCase.test_fails")!;
         Assert.Equal("failed", failed["outcome"]!.GetValue<string>());
         Assert.StartsWith("AssertionError", failed["message"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.True(failed["durationMs"]!.GetValue<long>() >= 0);
+        Assert.Equal("test_tools.py", failed["file"]!.GetValue<string>());
+        Assert.Equal(9, failed["line"]!.GetValue<int>());
+        Assert.Equal(9, failed["column"]!.GetValue<int>());
         Assert.Equal([("tools", "1.0.0")], host.Tests());
 
         // Only a package test of this draft and this package is answered. Anything else is an unknown request.
