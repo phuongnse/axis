@@ -180,8 +180,9 @@ implements the operation context over it.
   `test_sample.SampleTests.test_fails`. A skipped test is left out, an expected failure is `passed` and an unexpected success is
   `failed`. Each test has `durationMs`, the whole milliseconds it took. A failed test has `file`, `line` and `column`, where it failed:
   the last frame of its traceback inside the built copy, as a path in the package such as `test_sample.py`. The column is 1 when
-  Python gives none, and a failure with no such frame, such as an unexpected success, or one raised only inside a dependency
-  that pip installed into the copy, has no place. `output` holds the last 1000 lines that the tests wrote to the console, each cut
+  Python gives none, and a failure with no such frame, such as an unexpected success, has no place. A failure raised inside a
+  dependency that pip installed into the copy has the dependency's file as its place, such as `phonenumbers/util.py`, which is
+  not in the working folder. `output` holds the last 1000 lines that the tests wrote to the console, each cut
   at 1000 characters. A `tested` from a host that predates these fields lacks them, and a reader treats them as optional. A run that ends with no valid result, such as a test that exits the process, answers `refused` at `axis-package.json`. A
   run that cannot start is the operator's problem and gets no answer, as for a `build`. The host logs `Tested package <id>
   <version>.` and deletes its copies whatever the answer. The tests run the author's code in the host's own container, so a caller
