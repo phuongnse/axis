@@ -665,6 +665,19 @@ describe('StudioPackageWorkspace', () => {
       expect(treeNames()).toContain('src')
     })
 
+    it('says the name is taken for a folder renamed onto an existing folder, and sends nothing', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('src', 'Rename…')
+      await submitName('lib', 'Rename')
+
+      expect(await within(await screen.findByRole('dialog')).findByText(/This name is taken/)).toBeInTheDocument()
+      expect(writesSent()).toEqual([])
+      expect(treeNames()).toContain('src')
+    })
+
     it('shows the problem in the dialog for a refused name and sends nothing', async () => {
       stubPackage()
       renderWorkspace(true)
@@ -732,6 +745,18 @@ describe('StudioPackageWorkspace', () => {
       ])
       await waitFor(() => expect(screen.queryByRole('tab', { name: /b\.ts/ })).not.toBeInTheDocument())
       await waitFor(() => expect(treeNames()).not.toContain('src'))
+    })
+
+    it('asks about a folder of one file in the singular', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await choose('lib', 'Delete…')
+
+      expect(
+        within(await screen.findByRole('dialog')).getByText('Delete the folder lib and its 1 file?'),
+      ).toBeInTheDocument()
     })
 
     it('sends nothing when Delete… is cancelled', async () => {

@@ -248,12 +248,13 @@ export function StudioPackageExplorer({
         before === null ? before : keyOf({ ...entryOf(before), path: remap(entryOf(before).path) }),
       )
     }
+    // The server refuses only a file as the target, so a folder with that name would merge.
+    if (taken(to)) {
+      return nameTaken()
+    }
     const paths = node.isFolder ? filesUnder(node.path) : [node.path]
     if (paths.length === 0) {
       // An empty folder that only the explorer knows.
-      if (taken(to)) {
-        return nameTaken()
-      }
       remapState()
       return { ok: true }
     }
@@ -530,7 +531,10 @@ export function StudioPackageExplorer({
           deleting === null
             ? ''
             : deletingCount > 0
-              ? fillText(t('shell.studio.packages.deleteFolder'), { folder: deleting.path, count: deletingCount })
+              ? fillText(t(`shell.studio.packages.deleteFolder${deletingCount === 1 ? 'One' : 'Many'}`), {
+                  folder: deleting.path,
+                  count: deletingCount,
+                })
               : fillText(t('shell.studio.packages.deleteFile'), { file: deleting.path })
         }
         okText={t('shell.studio.packages.deleteOk')}
