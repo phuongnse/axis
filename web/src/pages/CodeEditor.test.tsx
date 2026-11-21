@@ -77,6 +77,20 @@ function selectedMatchBackground() {
   return backgrounds.at(-1)
 }
 
+/**
+ * The value that wins in the cascade for a property of an element of the editor: the last rule that matches and sets it.
+ * jsdom's computed style drops the editor's rules, so the test reads the rules, as `selectedMatchBackground` does.
+ */
+function winningRule(element: Element, property: string) {
+  const rules = Array.from(document.styleSheets).flatMap((sheet) => Array.from(sheet.cssRules))
+  const styleRules = rules.filter((rule): rule is CSSStyleRule => 'selectorText' in rule)
+  return styleRules
+    .filter((rule) => element.matches(rule.selectorText))
+    .map((rule) => rule.style.getPropertyValue(property))
+    .filter(Boolean)
+    .at(-1)
+}
+
 describe('CodeEditor', () => {
   it('accepts typing and reports it', () => {
     const onChange = vi.fn()
@@ -208,6 +222,52 @@ describe('CodeEditor', () => {
 
         const tint = theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
         expect(selectedMatchBackground()).toBe(asStyled(tint))
+      })
+    })
+
+    describe('with grow', () => {
+      const parts = () => ({
+        editor: document.querySelector('.cm-editor')!,
+        scroller: document.querySelector('.cm-scroller')!,
+        content: document.querySelector('.cm-content')!,
+        host: screen.getByRole('textbox', { name: 'Code' }).closest('.cm-editor')!.parentElement!,
+      })
+
+      it('is as tall as its text, with no border and no up-and-down scroll of its own', () => {
+        renderEditor({ grow: true })
+
+        const { editor, scroller } = parts()
+        expect(winningRule(editor, 'height')).toBe('auto')
+        expect(winningRule(editor, 'border-width')).toBe('0px')
+        expect(winningRule(scroller, 'overflow-y')).toBe('hidden')
+        expect(winningRule(scroller, 'overflow')).toBeUndefined()
+        expect(winningRule(scroller, 'overscroll-behavior')).not.toBe('contain')
+      })
+
+      it('keeps its height, border and scroll without grow', () => {
+        renderEditor()
+
+        const { editor, scroller } = parts()
+        expect(winningRule(editor, 'height')).toBe('100%')
+        expect(winningRule(editor, 'border-width')).toBe('1px')
+        expect(winningRule(scroller, 'overflow')).toBe('auto')
+      })
+
+      it('has a minimum height when editable, and none when read-only', () => {
+        const { rerender } = renderEditor({ grow: true })
+        expect(winningRule(parts().content, 'min-height')).toBe('5lh')
+
+        rerender({ grow: true, readOnly: true })
+        expect(winningRule(parts().content, 'min-height')).not.toBe('5lh')
+
+        rerender({ grow: true, readOnly: false })
+        expect(winningRule(parts().content, 'min-height')).toBe('5lh')
+      })
+
+      it('leaves no fixed height on the host when fill is set too', () => {
+        renderEditor({ grow: true, fill: true })
+
+        expect(parts().host.style.height).toBe('')
       })
     })
 

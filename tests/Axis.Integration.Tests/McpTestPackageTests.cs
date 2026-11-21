@@ -25,6 +25,7 @@ namespace Axis.Integration.Tests;
 /// The Keycloak user <c>author</c> holds the publisher role, so a test makes it the developer role with <c>Studio:DeveloperRole</c> to
 /// allow the tool, and any other role name to refuse it. The tests use a stub shell script for Trivy, so they are skipped on Windows.
 /// </summary>
+[Collection(PackageBuilds.Name)]
 [UnsupportedOSPlatform("windows")]
 public sealed class McpTestPackageTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {

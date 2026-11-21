@@ -1,7 +1,7 @@
 namespace Axis.Configuration.Storage;
 
 /// <summary>
-/// A request to validate, publish, roll back, test or accept a draft of an application, stored by the server and run by the
+/// A request to validate, publish, roll back, test, build, run or accept a draft of an application, stored by the server and run by the
 /// publisher. The server only inserts a row. The publisher changes its status and lease.
 /// </summary>
 public sealed class PublishRequest
@@ -11,7 +11,7 @@ public sealed class PublishRequest
     /// <summary>The <c>id</c> of the application manifest.</summary>
     public required Guid ApplicationId { get; init; }
 
-    /// <summary><c>validate</c>, <c>publish</c>, <c>activate</c>, <c>test</c> or <c>accept</c>.</summary>
+    /// <summary><c>validate</c>, <c>publish</c>, <c>activate</c>, <c>test</c>, <c>build</c>, <c>run</c> or <c>accept</c>.</summary>
     public required string Kind { get; init; }
 
     /// <summary><c>queued</c>, <c>running</c>, <c>succeeded</c> or <c>failed</c>.</summary>
@@ -54,7 +54,7 @@ public sealed class PublishRequest
     /// <summary>For a <c>test</c>, the result of each scenario as a JSON array. Null until the request ends.</summary>
     public string? ScenarioResults { get; init; }
 
-    /// <summary>For a <c>test</c> of one application package, the id of the package. Null for other requests.</summary>
+    /// <summary>For a <c>test</c>, <c>build</c> or <c>run</c> of one application package, the id of the package. Null for other requests.</summary>
     public string? Package { get; init; }
 
     /// <summary>
@@ -64,10 +64,22 @@ public sealed class PublishRequest
     public string? PackageTests { get; init; }
 
     /// <summary>
-    /// For a <c>build</c>, the lines the package host wrote as a JSON array of strings, empty when it wrote none. Null until the request
+    /// For a <c>build</c>, <c>test</c> or <c>run</c>, the lines the package host wrote as a JSON array of strings, empty when it wrote none. Null until the request
     /// ends, and for other requests.
     /// </summary>
     public string? Output { get; init; }
+
+    /// <summary>For a <c>run</c>, the name of the package operation to call. Null for other requests.</summary>
+    public string? Operation { get; init; }
+
+    /// <summary>For a <c>run</c>, the input of the operation as a JSON object. Null for other requests.</summary>
+    public string? Input { get; init; }
+
+    /// <summary>
+    /// For a <c>run</c>, the call's result as a JSON object of <c>operation</c>, <c>outcome</c>, <c>output</c>, <c>error</c> (<c>code</c> and
+    /// <c>message</c>, or null) and <c>durationMs</c>. Null until the request ends, and when the build was refused or unanswered, and for other requests.
+    /// </summary>
+    public string? Run { get; init; }
 
     /// <summary>For an <c>accept</c>, the id of the draft to apply. Null for other kinds.</summary>
     public Guid? DraftId { get; init; }

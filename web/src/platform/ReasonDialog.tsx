@@ -30,6 +30,8 @@ interface ReasonDialogProps {
   tooLongMessage?: string
   /** The most characters the text takes. Defaults to 500. */
   maxLength?: number
+  /** The text the field starts with, such as the current name in a rename. Defaults to empty. */
+  initialValue?: string
   /** The width of the dialog, as a size token of the dialog. Defaults to `small`. */
   size?: 'small' | 'medium'
   /** What the dialog shows when the command fails with no answer from the server. */
@@ -55,6 +57,7 @@ export function ReasonDialog({
   requiredMessage,
   tooLongMessage,
   maxLength = 500,
+  initialValue,
   size: dialogSize = 'small',
   failedText,
 }: ReasonDialogProps) {
@@ -98,7 +101,7 @@ export function ReasonDialog({
     >
       <Flex vertical gap="middle">
         {children}
-        <Form form={form} layout="vertical" requiredMark={requiredMark}>
+        <Form form={form} layout="vertical" requiredMark={requiredMark} initialValues={{ reason: initialValue }}>
           <AxisField
             name="reason"
             label={label ?? t('shell.inspector.commands.reason')}

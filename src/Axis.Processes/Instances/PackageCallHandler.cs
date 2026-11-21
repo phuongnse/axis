@@ -327,7 +327,7 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         // The bindings are resolved before the operation runs, so a missing one leaves nothing run.
-        if (!TryResolveBindings(item, target, out var urls, out var secrets, out var bindingError))
+        if (!PackageBindings.TryResolve(target.Operation.Capabilities, item.TenantId, bindings, settings.AllowHttp, out var urls, out var secrets, out var bindingError))
         {
             return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Retryable, bindingError, true, null, cancellationToken);
         }
@@ -464,51 +464,6 @@ internal sealed partial class PackageCallHandler(
         }
 
         return values;
-    }
-
-    /// <summary>
-    /// Resolves the <c>url</c> and <c>secret</c> bindings the operation declares for the current
-    /// tenant. Returns <see langword="false"/> with the error when a binding is
-    /// missing or of the wrong kind, or when a URL is not <c>https</c> and the host does not allow
-    /// <c>http</c>. The error never holds a binding's value.
-    /// </summary>
-    private bool TryResolveBindings(
-        ClaimedWorkItem item,
-        Target target,
-        out Dictionary<string, Uri> urls,
-        out Dictionary<string, Func<string>> secrets,
-        [NotNullWhen(false)] out string? error)
-    {
-        var capabilities = target.Operation.Capabilities;
-        urls = new Dictionary<string, Uri>(StringComparer.OrdinalIgnoreCase);
-        secrets = new Dictionary<string, Func<string>>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            foreach (var name in capabilities.Urls)
-            {
-                var value = bindings.Resolve(name).Value;
-                if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && !settings.AllowHttp))
-                {
-                    error = $"Tenant '{item.TenantId}' binding '{name}' is not an https URL. Only Development allows http.";
-                    return false;
-                }
-
-                urls[name] = uri;
-            }
-
-            foreach (var name in capabilities.Secrets)
-            {
-                secrets[name] = bindings.ResolveSecret(name).Reveal;
-            }
-        }
-        catch (InvalidOperationException exception)
-        {
-            error = exception.Message;
-            return false;
-        }
-
-        error = null;
-        return true;
     }
 
     /// <summary>
@@ -935,14 +890,21 @@ internal sealed partial class PackageCallHandler(
         instance is { State: ProcessStarts.Waiting } && instance.Step == call.Step && instance.Revision == attempt.Revision;
 
     /// <summary>
+    /// The CPU seconds that one call counts in the tenant's package run time, see docs/reference/tenant-quotas.md#package-run-time-a-day. They are
+    /// <paramref name="cpuMilliseconds"/> rounded up, or without them the time since <paramref name="sent"/>, rounded up too.
+    /// </summary>
+    internal static long RunTimeSeconds(long? cpuMilliseconds, long sent) =>
+        cpuMilliseconds is { } milliseconds
+            ? (milliseconds + 999) / 1000
+            : (long)Math.Ceiling(Stopwatch.GetElapsedTime(sent).TotalSeconds);
+
+    /// <summary>
     /// Adds the CPU seconds of one call to the tenant's package run time. The seconds are <paramref name="cpuMilliseconds"/> rounded up, or without
-    /// them the time since <paramref name="sent"/>, rounded up too.
+    /// them the time since <paramref name="sent"/>, rounded up too, see <see cref="RunTimeSeconds"/>.
     /// </summary>
     private async Task CountRunTimeAsync(IPackageRunTime runTime, string tenant, long? cpuMilliseconds, long sent, CancellationToken cancellationToken)
     {
-        var seconds = cpuMilliseconds is { } milliseconds
-            ? (milliseconds + 999) / 1000
-            : (long)Math.Ceiling(Stopwatch.GetElapsedTime(sent).TotalSeconds);
+        var seconds = RunTimeSeconds(cpuMilliseconds, sent);
         try
         {
             await runTime.AddAsync(tenant, seconds, cancellationToken);

@@ -17,6 +17,8 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
     /// <summary>How long the publisher waits for the host's answer to one package.</summary>
     public static readonly TimeSpan Wait = TimeSpan.FromMinutes(5);
 
+    private static readonly IReadOnlyDictionary<string, byte[]> _none = new Dictionary<string, byte[]>();
+
     /// <summary>
     /// Builds the packages of <paramref name="files"/> one at a time, in id order, and returns the diagnostics of all of them and the files of each
     /// built package, keyed by <c>packages/&lt;id&gt;/&lt;path&gt;</c>. A file directly under
@@ -80,8 +82,8 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
 
     /// <summary>
     /// Sends the files of the package <paramref name="package"/> of <paramref name="files"/> to the host as a <c>build</c> and returns the
-    /// diagnostics of a refused or unanswered build and the lines the host wrote. It keeps no built file, so nothing is released, see
-    /// docs/reference/studio-packages.md#the-authoring-api. A package with no file is sent too, and the host refuses it at its manifest.
+    /// diagnostics of a refused or unanswered build, the lines the host wrote and the files of a built package, which a <c>build</c> request ignores,
+    /// so nothing is released, see docs/reference/studio-packages.md#the-authoring-api. A <c>run</c> request starts its runner from them. A package with no file is sent too, and the host refuses it at its manifest.
     /// </summary>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public async Task<PackageBuildCheck> BuildPackageAsync(IReadOnlyList<ResourceContent> files, string package, CancellationToken cancellationToken)
@@ -93,9 +95,9 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
             ?? new Dictionary<string, byte[]>(StringComparer.Ordinal);
         return await RunnerProtocol.AskAsync(host, port, new BuildMessage(own), wait, cancellationToken) switch
         {
-            BuiltMessage built => new PackageBuildCheck([], built.Output ?? []),
-            RefusedMessage refused => new PackageBuildCheck([.. Refusals(package, refused)], refused.Output ?? []),
-            _ => new PackageBuildCheck([NoAnswer(package, "build", "it was not built")], []),
+            BuiltMessage built => new PackageBuildCheck([], built.Output ?? [], built.Files),
+            RefusedMessage refused => new PackageBuildCheck([.. Refusals(package, refused)], refused.Output ?? [], _none),
+            _ => new PackageBuildCheck([NoAnswer(package, "build", "it was not built")], [], _none),
         };
     }
 
@@ -134,5 +136,8 @@ internal sealed record PackageBuildResult(IReadOnlyList<Diagnostic> Diagnostics,
 /// </summary>
 internal sealed record PackageTestResult(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<PackageTestOutcome> Tests, IReadOnlyList<string> Output);
 
-/// <summary>The diagnostics of the build of one package and the lines the host wrote. A package that built has no diagnostic.</summary>
-internal sealed record PackageBuildCheck(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<string> Output);
+/// <summary>
+/// The diagnostics of the build of one package, the lines the host wrote and the <paramref name="Files"/> of the built package, keyed by path inside
+/// the package. A package that built has no diagnostic, and a refused or unanswered build has no file.
+/// </summary>
+internal sealed record PackageBuildCheck(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<string> Output, IReadOnlyDictionary<string, byte[]> Files);

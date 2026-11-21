@@ -231,6 +231,8 @@ internal static class McpPackageFileTools
             folder: null,
             client: null,
             package,
+            operation: null,
+            input: null,
             ct);
         return (new McpPackageTestRun(id.ToString("D"), "queued", McpWriteTools.EmptyList(), McpWriteTools.EmptyList()), null);
     }

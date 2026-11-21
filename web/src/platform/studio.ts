@@ -694,6 +694,70 @@ export async function createStudioPackageFile(
   return { status: 'created', version: body.version, diagnostics: body.diagnostics }
 }
 
+/** What moving package files answers: the folder's diagnostics, or that a file changed or a new path is taken (`conflict`), or that a path or the body is refused (`invalid`). */
+export type MovePackageFilesResult =
+  { status: 'moved'; diagnostics: StudioDiagnostic[] } | { status: 'conflict' } | { status: 'invalid' }
+
+/**
+ * Moves files of an application's package as one revision, each with the version it was read at, see
+ * docs/reference/studio-packages.md#the-authoring-api. A 409 and a 400 write nothing. A 401 shows the sign-in prompt and
+ * throws, as any other failure does.
+ */
+export async function moveStudioPackageFiles(
+  application: string,
+  pkg: string,
+  moves: readonly { from: string; to: string; version: string }[],
+): Promise<MovePackageFilesResult> {
+  const route = `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(pkg)}/move`
+  const response = await studioFetch(route, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ moves }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (response.status === 400) {
+    return { status: 'invalid' }
+  }
+  if (!response.ok) {
+    throw new Error(`Posting '${route}' failed with status ${response.status}.`)
+  }
+  return { status: 'moved', diagnostics: ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics }
+}
+
+/** What deleting a package file answers: the folder's diagnostics, or that the file changed since (`conflict`) or is gone (`missing`). */
+export type DeletePackageFileResult =
+  { status: 'deleted'; diagnostics: StudioDiagnostic[] } | { status: 'conflict' } | { status: 'missing' }
+
+/**
+ * Deletes one file of an application's package, with the version it was read at in `If-Match`, see
+ * docs/reference/studio-packages.md#the-authoring-api. A 409 and a 404 write nothing. A 401 shows the sign-in prompt and
+ * throws, as any other failure does.
+ */
+export async function deleteStudioPackageFile(
+  application: string,
+  pkg: string,
+  path: string,
+  version: string,
+): Promise<DeletePackageFileResult> {
+  const route = packageFilePath(application, pkg, path)
+  const response = await studioFetch(route, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (response.status === 404) {
+    return { status: 'missing' }
+  }
+  if (!response.ok) {
+    throw new Error(`Deleting '${route}' failed with status ${response.status}.`)
+  }
+  return {
+    status: 'deleted',
+    diagnostics: ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics,
+  }
+}
+
 /** What saving a package file answers: the file's new version and the folder's diagnostics, or that the file changed since. */
 export type SavePackageFileResult =
   { status: 'saved'; version: string; diagnostics: StudioDiagnostic[] } | { status: 'conflict' }
@@ -728,6 +792,80 @@ export async function saveStudioPackageFile(
   }
   const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
   return { status: 'saved', version: body.version, diagnostics: body.diagnostics }
+}
+
+/** One named input of a package's operation, kept with the application, see docs/reference/studio-packages.md#the-authoring-api. */
+export interface StudioRunInput {
+  name: string
+  operation: string
+  input: unknown
+}
+
+/** A package's saved run inputs with the version they were read at, or `null` before the first save. */
+export interface StudioRunInputs {
+  items: StudioRunInput[]
+  version: string | null
+}
+
+function runInputsPath(application: string, pkg: string): string {
+  return `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(pkg)}/run-inputs`
+}
+
+/**
+ * Reads a package's saved run inputs, see docs/reference/studio-packages.md#the-authoring-api. The version is the `ETag`
+ * without its quotes, and `null` before the first save, which has none. A 401 shows the sign-in prompt and throws, as
+ * any other failure does.
+ */
+export async function fetchStudioRunInputs(
+  application: string,
+  pkg: string,
+  signal?: AbortSignal,
+): Promise<StudioRunInputs> {
+  const path = runInputsPath(application, pkg)
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  const etag = response.headers.get('ETag')
+  const { items } = (await response.json()) as { items: StudioRunInput[] }
+  return { items, version: etag === null ? null : etag.replace(/^"|"$/g, '') }
+}
+
+/** What replacing a package's saved run inputs answers: the new version, or that the inputs changed since. */
+export type SaveRunInputsResult = { status: 'saved'; version: string } | { status: 'conflict' }
+
+/**
+ * Replaces a package's saved run inputs. With the version they were read at it sends `If-Match`, and with `null`, as
+ * before the first save, `If-None-Match: *`, see docs/reference/studio-packages.md#the-authoring-api. A 409 means they
+ * changed since, and nothing was written. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in
+ * prompt and throws, as any other failure does.
+ */
+export async function saveStudioRunInputs(
+  application: string,
+  pkg: string,
+  items: readonly StudioRunInput[],
+  version: string | null,
+): Promise<SaveRunInputsResult> {
+  const path = runInputsPath(application, pkg)
+  const response = await studioFetch(path, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(version === null ? { 'If-None-Match': '*' } : { 'If-Match': `"${version}"` }),
+    },
+    body: JSON.stringify({ items }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (!response.ok) {
+    throw new Error(`Saving '${path}' failed with status ${response.status}.`)
+  }
+  return { status: 'saved', version: ((await response.json()) as { version: string }).version }
 }
 
 /**
@@ -1304,14 +1442,44 @@ export interface StudioSkippedScenarioResult {
 }
 
 /**
+ * What a `run` request ends with, see docs/reference/studio-packages.md#the-authoring-api. `outcome` is `succeeded` or
+ * `failed`, and `error` is set for a failed run only.
+ */
+export interface StudioRunResult {
+  operation: string
+  outcome: string
+  output: unknown
+  error: { code: string; message: string } | null
+  durationMs: number
+}
+
+/**
+ * One test of a package's `test` request, see docs/reference/studio-packages.md#the-authoring-api. `outcome` is `passed`
+ * or `failed`. `durationMs` is there when the host sent it. `file`, `line` and `column` are there for a failed test with
+ * a place, and `file` is a path inside the package.
+ */
+export interface StudioPackageTestResult {
+  name: string
+  outcome: 'passed' | 'failed'
+  message: string | null
+  durationMs?: number
+  file?: string
+  line?: number
+  column?: number
+}
+
+/**
  * A request, as `GET /api/studio/apps/{application}/requests/{id}` answers. The diagnostics are empty until it ends.
  * `scenarios` holds the stored results of a `test`, `publish` or `validate`, and is `null` when none were stored. For a
- * `test` it is empty until the request ends.
+ * `test` it is empty until the request ends. A `build` or a `test` of one package names it in `package`, and its `output` is
+ * the lines the host wrote. A package `test` holds its results in `packageTests` and has no `scenarios`, see
+ * docs/reference/studio-packages.md#the-authoring-api. A `run` ends with `run` and with `output`, the
+ * lines the package host wrote.
  */
 export interface StudioRequest {
   id: string
   application: string
-  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept'
+  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept' | 'build' | 'run'
   target: 'tenant' | 'preview'
   status: StudioRequestStatus
   label: string | null
@@ -1319,6 +1487,10 @@ export interface StudioRequest {
   releaseId: string | null
   diagnostics: StudioDiagnostic[]
   scenarios: (StudioScenarioResult | StudioSkippedScenarioResult)[] | null
+  package?: string | null
+  packageTests?: StudioPackageTestResult[] | null
+  run?: StudioRunResult | null
+  output?: string[] | null
 }
 
 /**
@@ -1503,6 +1675,35 @@ export async function testStudioApp(application: string, scenarios?: string[]): 
   return (await response.json()) as StudioRequest
 }
 
+/**
+ * Sends a build request, which builds the package `pkg` of the working folder and publishes no release. It answers at
+ * once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export function buildStudioPackage(application: string, pkg: string): Promise<StudioRequest> {
+  return postPackageRequest(application, 'build', pkg)
+}
+
+/**
+ * Sends a test request, which tests the package `pkg` of the working folder. It answers at once with the queued request.
+ * A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export function testStudioPackage(application: string, pkg: string): Promise<StudioRequest> {
+  return postPackageRequest(application, 'test', pkg)
+}
+
+async function postPackageRequest(application: string, route: 'build' | 'test', pkg: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/${route}`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ package: pkg }),
+  })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
 /** Sends a preview request, which publishes the folder to the preview tenant. It answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function previewStudioApp(application: string): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/preview`
@@ -1545,6 +1746,31 @@ export async function publishStudioApp(application: string, details: PublishDeta
   if (details.note) {
     body.note = details.note
   }
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/**
+ * Queues a run of one operation of a package's working files, see
+ * docs/reference/studio-packages.md#the-authoring-api. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows
+ * the sign-in prompt and throws, as any other failure does.
+ */
+export async function runStudioPackage(
+  application: string,
+  body: { package: string; operation: string; input: unknown },
+): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/run`
   const response = await studioFetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

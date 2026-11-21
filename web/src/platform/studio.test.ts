@@ -7,6 +7,8 @@ import {
   changeRows,
   checkStudioExpression,
   createStudioPackageFile,
+  deleteStudioPackageFile,
+  moveStudioPackageFiles,
   saveStudioPackageFile,
   fetchStudioPackageFile,
   fetchAuthoringRequestDiff,
@@ -840,6 +842,57 @@ describe('package files', () => {
     const refused = await createStudioPackageFile('Shop', 'tools', 'a', '').catch((reason: unknown) => reason)
     expect(refused).toBeInstanceOf(Error)
     expect(refused).not.toBeInstanceOf(QuotaRefusedError)
+  })
+
+  it('moves files with one POST of the moves, and answers the diagnostics', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(problem(200, { diagnostics: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const moves = [{ from: 'src/a.cs', to: 'code/a.cs', version: 'v1' }]
+
+    expect(await moveStudioPackageFiles('Shop', 'tools', moves)).toEqual({ status: 'moved', diagnostics: [] })
+
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/api/studio/apps/Shop/packages/tools/move')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body as string)).toEqual({ moves })
+  })
+
+  it('answers conflict on a 409 and invalid on a 400 when it moves, and throws any other failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(problem(409, { title: 'Changed.' }))
+        .mockResolvedValueOnce(problem(400, { title: 'Not a path.' }))
+        .mockResolvedValueOnce(problem(403, { title: 'No.' })),
+    )
+    const moves = [{ from: 'a', to: 'b', version: 'v1' }]
+
+    expect(await moveStudioPackageFiles('Shop', 'tools', moves)).toEqual({ status: 'conflict' })
+    expect(await moveStudioPackageFiles('Shop', 'tools', moves)).toEqual({ status: 'invalid' })
+    await expect(moveStudioPackageFiles('Shop', 'tools', moves)).rejects.toBeInstanceOf(Error)
+  })
+
+  it('deletes a file with the quoted version in If-Match, and answers conflict, missing or the diagnostics', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(problem(200, { diagnostics: [] }))
+      .mockResolvedValueOnce(problem(409, { title: 'Changed.' }))
+      .mockResolvedValueOnce(problem(404, { title: 'Gone.' }))
+      .mockResolvedValueOnce(problem(403, { title: 'No.' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await deleteStudioPackageFile('Shop', 'tools', 'src/My File.cs', 'v1')).toEqual({
+      status: 'deleted',
+      diagnostics: [],
+    })
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/api/studio/apps/Shop/packages/tools/files/src/My%20File.cs')
+    expect(init.method).toBe('DELETE')
+    expect(new Headers(init.headers).get('If-Match')).toBe('"v1"')
+    expect(await deleteStudioPackageFile('Shop', 'tools', 'a', 'v1')).toEqual({ status: 'conflict' })
+    expect(await deleteStudioPackageFile('Shop', 'tools', 'a', 'v1')).toEqual({ status: 'missing' })
+    await expect(deleteStudioPackageFile('Shop', 'tools', 'a', 'v1')).rejects.toBeInstanceOf(Error)
   })
 
   it('saves a file with the quoted version in If-Match and the content as JSON, and answers its new version', async () => {

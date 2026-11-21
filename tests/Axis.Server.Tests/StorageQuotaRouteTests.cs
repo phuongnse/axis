@@ -60,6 +60,9 @@ public sealed class StorageQuotaRouteTests
         "DELETE /api/apps/{app}/entities/{entity}/records/{id}",
         "DELETE /api/apps/{app}/entities/{module}/{entity}/records/{id}",
 
+        // A package file move adds no bytes, so it goes on over the quota, see docs/reference/tenant-quotas.md#refusals.
+        "POST /api/studio/apps/{application}/packages/{package}/move",
+
         // Sessions, sign-out and form state hold no tenant data that the quota counts.
         "DELETE /api/me/sessions",
         "DELETE /api/me/sessions/{id}",
@@ -176,10 +179,11 @@ public sealed class StorageQuotaRouteTests
         // An application setting is one flag, and a publisher can still turn it off over the quota.
         "PUT /api/studio/apps/{application}/settings",
 
-        // Validate, preview, test, build and activate store a request and go on over the quota.
+        // Validate, preview, test, build, run and activate store a request and go on over the quota.
         "POST /api/studio/apps/{application}/build",
         "POST /api/studio/apps/{application}/preview",
         "POST /api/studio/apps/{application}/releases/{id}/activate",
+        "POST /api/studio/apps/{application}/run",
         "POST /api/studio/apps/{application}/test",
         "POST /api/studio/apps/{application}/validate",
 

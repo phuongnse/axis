@@ -488,22 +488,26 @@ describe('the Axis Helm chart', () => {
       assert.match(node, /memory: 1Gi\n/)
     })
 
-    test('admits worker and publisher pods on TCP 5310 and sends only to worker pods', () => {
+    test('admits worker and publisher pods on TCP 5310 and sends to worker pods, and to publisher pods on TCP 5311 only', () => {
       const policy = find(renderOk(...on), 'NetworkPolicy', name)
       assert.match(policy, /podSelector:\n\s+matchLabels:\n\s+app\.kubernetes\.io\/name: axis\n\s+app\.kubernetes\.io\/instance: axis\n\s+app\.kubernetes\.io\/component: application-package-host\n/)
       assert.match(policy, /policyTypes:\n\s+- Ingress\n\s+- Egress\n/)
       const selector = (component) => `- podSelector:\\n\\s+matchLabels:\\n\\s+app\\.kubernetes\\.io/name: axis\\n\\s+app\\.kubernetes\\.io/instance: axis\\n\\s+app\\.kubernetes\\.io/component: ${component}\\n`
       const [ingress, egress] = policy.split(/^  egress:$/m)
-      assert.equal(policy.match(/- from:/g)?.length, 1)
-      assert.equal(policy.match(/- to:/g)?.length, 1)
+      assert.equal(ingress.match(/- from:/g)?.length, 1)
+      assert.equal(egress.match(/- to:/g)?.length, 2)
       assert.equal(ingress.match(/- podSelector:/g)?.length, 2)
       assert.match(ingress, new RegExp(`- from:\\n\\s+${selector('worker')}\\s+${selector('publisher')}`))
-      // The egress rule names the worker only. A reply to a publisher call needs no rule.
-      assert.equal(egress.match(/- podSelector:/g)?.length, 1)
-      assert.match(egress, new RegExp(`- to:\\n\\s+${selector('worker')}`))
-      assert.doesNotMatch(egress, /component: publisher/)
-      assert.equal(policy.match(/port: /g)?.length, 1)
-      assert.match(policy, /ports:\n\s+- protocol: TCP\n\s+port: 5310\n/)
+      assert.match(ingress, /ports:\n\s+- protocol: TCP\n\s+port: 5310\n/)
+      // The first egress rule names the worker only and has no ports, so it covers any port of a worker pod.
+      assert.equal(egress.match(/- podSelector:/g)?.length, 2)
+      const [toWorker, toPublisher] = egress.split(/^    - to:$/m).slice(1)
+      assert.match(toWorker, new RegExp(`^\\n\\s+${selector('worker')}\\s*$`))
+      assert.doesNotMatch(toWorker, /component: publisher|ports:/)
+      // The second names the publisher only, on the proxy port only.
+      assert.match(toPublisher, new RegExp(`^\\n\\s+${selector('publisher')}\\s+ports:\\n\\s+- protocol: TCP\\n\\s+port: 5311\\n\\s*$`))
+      assert.doesNotMatch(toPublisher, /component: worker/)
+      assert.equal(policy.match(/port: /g)?.length, 2)
       assert.doesNotMatch(policy, /ipBlock|namespaceSelector|port: 53\b/)
     })
 

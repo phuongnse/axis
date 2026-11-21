@@ -80,16 +80,22 @@ describe('the text reload of the design-system dev server', () => {
   it(
     'reloads the open page when a platform text changes',
     async () => {
-      await vi.waitFor(() => {
-        expect(Object.keys(server.watcher.getWatched())).toContain(textsFolder)
-      })
+      await vi.waitFor(
+        () => {
+          expect(Object.keys(server.watcher.getWatched())).toContain(textsFolder)
+        },
+        { timeout },
+      )
       // The change is announced to the watcher only, so the real en.json stays as it is.
       const send = vi.spyOn(server.environments.client.hot, 'send')
       try {
         server.watcher.emit('change', resolve(textsFolder, 'en.json'))
-        await vi.waitFor(() => {
-          expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'full-reload' }))
-        })
+        await vi.waitFor(
+          () => {
+            expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'full-reload' }))
+          },
+          { timeout },
+        )
       } finally {
         send.mockRestore()
       }

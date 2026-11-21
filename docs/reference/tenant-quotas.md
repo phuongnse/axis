@@ -84,8 +84,8 @@ nothing:
 - **`storage`.** Once the last sample is at or over the quota, these are refused: a record create or
   update through the record API, an import, an inbound endpoint call that writes, a file upload, a
   save, reset or undo in Studio, a [package file](studio-packages.md#the-authoring-api) save, a publish and the author's [accept](authoring-requests.md#accepting)
-  of a draft, which writes the draft as a revision. A delete is never refused, a package file delete included, and neither is a change of an
-  [application setting](authoring.md#application-settings), which stores one flag. Process steps, task completions and saves,
+  of a draft, which writes the draft as a revision. A delete is never refused, a package file delete included, and neither is a package file move, which adds no bytes,
+  nor a change of an [application setting](authoring.md#application-settings), which stores one flag. Process steps, task completions and saves,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
   tenant writes in one sampling interval. The server reads the last sample on each such write. A
   tenant with no sample yet is not refused, and neither is a write when the platform database cannot
@@ -222,7 +222,8 @@ In a cell the worker counts each email it sends for a tenant, and holds an email
 
 In a cell the worker counts the CPU seconds that the runners of a tenant's
 [application packages](package-runners.md#an-applications-packages) use, against the tenant's
-`packageCpuSecondsPerDay`. Outside a cell nothing is counted or held.
+`packageCpuSecondsPerDay`, and the publisher counts those of a run from Studio. Outside a cell nothing is
+counted or held.
 
 - **Counting.** After each call the worker adds the runner's CPU seconds for that call, rounded up, to
   the counter `packageCpuSeconds` in `platform.tenant_daily_counters`, see [emails a day](#emails-a-day).
@@ -244,8 +245,13 @@ In a cell the worker counts the CPU seconds that the runners of a tenant's
 - **Customer-hosted packages** _(planned for M37)_. The calls to a
   [customer-hosted](package-runners.md#customer-hosted-runners) package are neither counted nor held,
   because they use no CPU of Axis.
-- **A run from Studio** _(planned for M37)_. A [run](studio-packages.md#the-authoring-api) of one operation from
-  Studio's package workspace counts its CPU seconds against `packageCpuSecondsPerDay`, as a call does.
+- **A run from Studio.** In a cell, the publisher adds the CPU seconds of a [run](studio-packages.md#the-authoring-api)
+  request's call to the day's `packageCpuSeconds`, counted and rounded as under Counting, including the
+  seconds from the `run` to its end when the `usage` line does not come. A run that reaches no runner counts
+  nothing, such as one with a refused build, an unknown operation, a bad input or a missing binding. A run
+  is never held or refused at the quota, even at 0. A count that fails writes one line for the tenant to
+  the publisher's error output, and the run still ends. Outside a cell the publisher counts nothing. The
+  stored `run` holds no CPU time.
 - **Refused.** While the quota is 0, turning the tenant's
   [switch](user-administration.md#application-packages) on and a publish of an application that holds an
   application's package answer the quota's `403`, see [refusals](#refusals).

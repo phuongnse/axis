@@ -600,7 +600,7 @@ internal static class StudioAuthoringRequestEndpoints
         var id = Guid.CreateVersion7();
         await StudioPublishEndpoints.InsertRequestAsync(
             connection, id, "accept", applicationId, "tenant", snapshot: null, releaseId: null, label: null, note: null, user.Id, scenarioNames: null, draftId,
-            folder: application, client: "studio", package: null, cancellationToken);
+            folder: application, client: "studio", package: null, operation: null, input: null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var response = await StudioPublishEndpoints.ReadResponseAsync(connection, applicationId, id, name, cancellationToken);

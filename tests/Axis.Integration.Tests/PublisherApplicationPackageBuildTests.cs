@@ -22,6 +22,7 @@ namespace Axis.Integration.Tests;
 /// A <c>test</c> that names a package sends only that package to the host as a <c>test</c> and stores each test's outcome.
 /// The tests use a stub shell script for Trivy, so they are skipped on Windows.
 /// </summary>
+[Collection(PackageBuilds.Name)]
 [UnsupportedOSPlatform("windows")]
 public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {

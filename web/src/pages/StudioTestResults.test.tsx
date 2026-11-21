@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
-import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
+import type {
+  StudioPackageTestResult,
+  StudioRequest,
+  StudioScenarioResult,
+  StudioSkippedScenarioResult,
+} from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
 import { emptyDescription } from '../test/antd'
 import { StudioTestResults } from './StudioTestResults'
@@ -46,15 +51,31 @@ function request(overrides: Partial<StudioRequest>): StudioRequest {
   }
 }
 
-function renderResults(value: StudioRequest, onSelect = vi.fn()) {
+function renderResults(
+  value: StudioRequest,
+  onSelect = vi.fn(),
+  extra: { onOpenFile?: (file: string, line?: number) => void; titled?: boolean } = {},
+) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioTestResults request={value} onSelect={onSelect} />
+        <StudioTestResults request={value} onSelect={onSelect} {...extra} />
       </TextProvider>
     </ThemeModeProvider>,
   )
   return { section: screen.getByTestId('studio-test-results'), onSelect }
+}
+
+const passingTest: StudioPackageTestResult = { name: 'test_adds', outcome: 'passed', message: null, durationMs: 1234 }
+
+const failingTest: StudioPackageTestResult = {
+  name: 'test_greets',
+  outcome: 'failed',
+  message: 'AssertionError: Hello Ada != Hi Ada',
+  durationMs: 30,
+  file: 'lib/x.py',
+  line: 3,
+  column: 5,
 }
 
 afterEach(() => localStorage.clear())
@@ -136,6 +157,64 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(section).toHaveAttribute('data-status', 'failed')
     expect(emptyDescription('No scenario ran. See the problems.')).toBeInTheDocument()
     expect(screen.queryAllByTestId('studio-test-result')).toHaveLength(0)
+  })
+})
+
+describe('StudioTestResults of a package test', () => {
+  const packageTest = (overrides: Partial<StudioRequest> = {}) =>
+    request({ status: 'failed', package: 'tools', packageTests: [passingTest, failingTest], ...overrides })
+
+  it('shows a row a test with its result, name, duration and message, and the failed place opens its line', async () => {
+    const onOpenFile = vi.fn()
+    renderResults(packageTest(), vi.fn(), { onOpenFile })
+
+    const [passed, failed] = screen.getAllByTestId('studio-test-result')
+    expect(passed).toHaveAttribute('data-outcome', 'passed')
+    expect(passed).toHaveTextContent('test_adds')
+    expect(passed).toHaveTextContent('1.2 sec')
+    expect(within(passed).getByText('passed').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
+    expect(within(passed).queryByRole('button')).not.toBeInTheDocument()
+    expect(failed).toHaveAttribute('data-outcome', 'failed')
+    expect(failed).toHaveTextContent('test_greets')
+    expect(failed).toHaveTextContent('< 1 sec')
+    expect(failed).toHaveTextContent('AssertionError: Hello Ada != Hi Ada')
+    expect(within(failed).getByText('failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
+
+    await userEvent.click(within(failed).getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+    expect(onOpenFile).toHaveBeenCalledWith('packages/tools/lib/x.py', 3)
+  })
+
+  it('shows the place as plain text without onOpenFile, and no duration or place that the host did not send', () => {
+    renderResults(
+      packageTest({
+        packageTests: [{ name: 'test_old', outcome: 'failed', message: 'Boom', file: 'lib/x.py' }],
+      }),
+    )
+
+    const row = screen.getByTestId('studio-test-result')
+    expect(within(row).getByText('packages/tools/lib/x.py')).toBeVisible()
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument()
+    expect(row).not.toHaveTextContent('sec')
+  })
+
+  it('draws the heading unless titled is off', () => {
+    const { section } = renderResults(packageTest())
+    expect(within(section).getByRole('heading', { name: 'Test results' })).toBeInTheDocument()
+  })
+
+  it('has no heading when titled is off', () => {
+    const { section } = renderResults(packageTest(), vi.fn(), { titled: false })
+    expect(within(section).queryByRole('heading')).not.toBeInTheDocument()
+  })
+
+  it('says no test ran when an ended run has none', () => {
+    renderResults(packageTest({ packageTests: [] }))
+    expect(emptyDescription('No test ran. See the problems.')).toBeInTheDocument()
+  })
+
+  it('shows a running package test as pending', () => {
+    const { section } = renderResults(packageTest({ status: 'running', packageTests: null }))
+    expect(section).toHaveTextContent('The results show when the run ends.')
   })
 })
 
