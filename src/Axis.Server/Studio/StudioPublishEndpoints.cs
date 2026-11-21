@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Data.Profiles;
@@ -35,9 +36,13 @@ namespace Axis.Server.Studio;
 /// <c>tenant</c>, a snapshot and the scenario names, and answers as <c>publish</c> does. It does not check <c>Studio:Tests</c>.
 /// The manifest check (409) comes before the body. A body is optional. It must be <c>application/json</c> (415) and a JSON
 /// object with only <c>scenarios</c>, a list of strings (400). No body, no list and an empty list store no names, which
-/// means every scenario. The publisher runs it. The status route answers
+/// means every scenario. The publisher runs it. <c>POST /api/studio/apps/{application}/build</c> stores a <c>build</c> request of one
+/// package of the working folder, with the snapshot, and answers as <c>publish</c> does. It needs the developer role and the tenant's
+/// application packages switch, checked after the author role (403), and then the manifest check (409). The body must be
+/// <c>application/json</c> (415) and exactly <c>{ "package": "&lt;id&gt;" }</c> with a string (400). A package with no file in the folder answers 404.
+/// It checks no quota, as a <c>test</c> does not. The publisher sends the package to the host and releases nothing. The status route answers
 /// <c>scenarios</c> for a <c>test</c>, an empty list until it ends. For a <c>publish</c> or <c>validate</c> it answers the
-/// stored contract scenario results, and null when none were stored.
+/// stored contract scenario results, and null when none were stored. It answers <c>output</c> for a <c>build</c>.
 /// </summary>
 internal static class StudioPublishEndpoints
 {
@@ -51,6 +56,7 @@ internal static class StudioPublishEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync).WithRateLimit(Partition.Publishing).WithStorageQuota();
         endpoints.MapPost("/api/studio/apps/{application}/preview", PreviewAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/test", TestAsync).WithRateLimit(Partition.Publishing);
+        endpoints.MapPost("/api/studio/apps/{application}/build", BuildAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/releases/{id}/activate", ActivateAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapGet("/api/studio/apps/{application}/requests/{id}", GetRequestAsync);
     }
@@ -213,6 +219,69 @@ internal static class StudioPublishEndpoints
         return await StoreAsync("test", application, folder, label: null, note: null, httpContext, database, writeLock, scenarioNames: scenarioNames);
     }
 
+    // Builds one package of the working folder without a publish, see docs/reference/studio-packages.md#the-authoring-api. The checks
+    // follow the authoring API's order. The body is exactly { package }, and the package must have a file in the working folder.
+    private static async Task<IResult> BuildAsync(
+        string application, HttpContext httpContext, StudioOptions options, TenantDatabase database, IStudioWriteLock writeLock)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options, developer: true);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        if (StudioFolder.ReadManifest(folder) is not { Id: not null })
+        {
+            return NoManifestIdProblem();
+        }
+
+        var request = httpContext.Request;
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+        }
+
+        string package;
+        try
+        {
+            var body = await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted) as JsonObject
+                ?? throw new JsonException();
+            if (!TryReadPackage(body, out package))
+            {
+                return BadBuildBody();
+            }
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        {
+            return BadBuildBody();
+        }
+
+        if (StudioPackageFiles.File(package, PackageCatalog.ManifestFileName) is null
+            || !StudioPackageFiles.List(folder).Any(item => item.Package == package))
+        {
+            return StudioEndpoints.NotFound(StudioPackageFileEndpoints.NoPackage);
+        }
+
+        return await StoreAsync("build", application, folder, label: null, note: null, httpContext, database, writeLock, package: package);
+    }
+
+    // Only package, a string.
+    private static bool TryReadPackage(JsonObject body, out string package)
+    {
+        package = "";
+        if (body.Count != 1 || body["package"] is not JsonValue json || !json.TryGetValue<string>(out var text))
+        {
+            return false;
+        }
+
+        package = text;
+        return true;
+    }
+
+    private static IResult BadBuildBody() =>
+        StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid build request.");
+
     // Only scenarios, a list of strings. An empty list means every scenario, like no list.
     private static bool TryReadScenarios(JsonObject body, out string? scenarioNames)
     {
@@ -286,7 +355,8 @@ internal static class StudioPublishEndpoints
         TenantDatabase database,
         IStudioWriteLock writeLock,
         string target = "tenant",
-        string? scenarioNames = null)
+        string? scenarioNames = null,
+        string? package = null)
     {
         if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
         {
@@ -305,7 +375,7 @@ internal static class StudioPublishEndpoints
             return StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable);
         }
 
-        return await InsertAsync(kind, application, manifest.Name, applicationId, SnapshotJson(files), releaseId: null, label, note, user, database, cancellationToken, target, scenarioNames);
+        return await InsertAsync(kind, application, manifest.Name, applicationId, SnapshotJson(files), releaseId: null, label, note, user, database, cancellationToken, target, scenarioNames, package);
     }
 
     /// <summary>The JSON a request stores as its snapshot: each file's path, version and text.</summary>
@@ -331,19 +401,21 @@ internal static class StudioPublishEndpoints
         TenantDatabase database,
         CancellationToken cancellationToken,
         string target = "tenant",
-        string? scenarioNames = null)
+        string? scenarioNames = null,
+        string? package = null)
     {
         var id = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         var requestedAt = await InsertRequestAsync(
-            connection, id, kind, applicationId, target, snapshot, releaseId, label, note, user.Id, scenarioNames, draftId: null, folder: null, client: null, package: null, cancellationToken);
+            connection, id, kind, applicationId, target, snapshot, releaseId, label, note, user.Id, scenarioNames, draftId: null, folder: null, client: null, package, cancellationToken);
 
         // The name is the one in the user's profile, else the session's, as GET answers it.
         var names = await UserProfiles.FindDisplayNamesAsync(connection, [user.Id], cancellationToken);
         var response = new StudioPublishRequestResponse(
             id.ToString("D"), name ?? application, kind, target, "queued", label, note, user.Id, names.GetValueOrDefault(user.Id) ?? user.DisplayName, requestedAt,
             null, null, releaseId?.ToString("D"), JsonDocument.Parse("[]").RootElement.Clone(),
-            kind == "test" ? JsonDocument.Parse("[]").RootElement.Clone() : null);
+            kind == "test" ? JsonDocument.Parse("[]").RootElement.Clone() : null,
+            kind == "build" ? JsonDocument.Parse("[]").RootElement.Clone() : null);
         return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
     }
 
@@ -399,7 +471,7 @@ internal static class StudioPublishEndpoints
     {
         await using var command = new NpgsqlCommand(
             """
-            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text, target, scenario_results::text, requested_by_name, draft_id, package, package_tests::text
+            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text, target, scenario_results::text, requested_by_name, draft_id, package, package_tests::text, output::text
             FROM axis.publish_requests
             WHERE id = @id AND application_id = @application
             """,
@@ -424,7 +496,8 @@ internal static class StudioPublishEndpoints
                 reader.IsDBNull(12) ? null : reader.GetString(12),
                 reader.IsDBNull(13) ? null : reader.GetGuid(13),
                 reader.IsDBNull(14) ? null : reader.GetString(14),
-                reader.IsDBNull(15) ? null : reader.GetString(15))
+                reader.IsDBNull(15) ? null : reader.GetString(15),
+                reader.IsDBNull(16) ? null : reader.GetString(16))
             : null;
     }
 
@@ -464,6 +537,7 @@ internal static class StudioPublishEndpoints
         using var scenarios = stored.Kind == "test"
             ? JsonDocument.Parse(stored.ScenarioResults ?? "[]")
             : stored.ScenarioResults is null ? null : JsonDocument.Parse(stored.ScenarioResults);
+        using var output = stored.Kind == "build" ? JsonDocument.Parse(stored.Output ?? "[]") : null;
         var response = new StudioPublishRequestResponse(
             requestId.ToString("D"),
             name,
@@ -479,7 +553,8 @@ internal static class StudioPublishEndpoints
             stored.FinishedAt,
             stored.ReleaseId?.ToString("D"),
             diagnostics.RootElement.Clone(),
-            scenarios?.RootElement.Clone());
+            scenarios?.RootElement.Clone(),
+            output?.RootElement.Clone());
 
         var names = await UserProfiles.FindDisplayNamesAsync(connection, [stored.RequestedBy], cancellationToken);
         return response with { RequestedByName = names.GetValueOrDefault(stored.RequestedBy) ?? stored.RequestedByName };
@@ -490,8 +565,8 @@ internal static class StudioPublishEndpoints
 
 /// <summary>
 /// A row of <c>axis.publish_requests</c> as <see cref="StudioPublishEndpoints.FindRequestAsync"/> reads it, without its snapshot.
-/// <c>Diagnostics</c>, <c>ScenarioResults</c> and <c>PackageTests</c> are the stored JSON text, null when none were stored.
-/// <c>Package</c> is the package a <c>test</c> tests, null for a scenario test and for every other kind.
+/// <c>Diagnostics</c>, <c>ScenarioResults</c>, <c>PackageTests</c> and <c>Output</c> are the stored JSON text, null when none were stored.
+/// <c>Package</c> is the package a <c>test</c> tests or a <c>build</c> builds, null for a scenario test and for every other kind.
 /// </summary>
 internal sealed record StoredPublishRequest(
     string Kind,
@@ -509,13 +584,15 @@ internal sealed record StoredPublishRequest(
     string? RequestedByName,
     Guid? DraftId,
     string? Package,
-    string? PackageTests);
+    string? PackageTests,
+    string? Output);
 
 /// <summary>
 /// A publish request as the authoring API shows it. <c>Application</c> is the manifest name, <c>Target</c> is
 /// <c>tenant</c> or <c>preview</c> and <c>Diagnostics</c> is empty until the request ends. <c>Scenarios</c> holds the stored
 /// results of a <c>test</c>, <c>publish</c> or <c>validate</c>, and is null when none were stored. For a <c>test</c> it is
-/// empty until the request ends. <c>RequestedByName</c> is the name in the requesting user's profile, else the one stored
+/// empty until the request ends. <c>Output</c> holds the lines the package host wrote for a <c>build</c>, an empty list until the request
+/// ends, and is null for every other kind. <c>RequestedByName</c> is the name in the requesting user's profile, else the one stored
 /// with the request, else null.
 /// </summary>
 internal sealed record StudioPublishRequestResponse(
@@ -533,4 +610,5 @@ internal sealed record StudioPublishRequestResponse(
     DateTimeOffset? FinishedAt,
     string? ReleaseId,
     JsonElement Diagnostics,
-    JsonElement? Scenarios);
+    JsonElement? Scenarios,
+    JsonElement? Output);

@@ -36,6 +36,8 @@ namespace Axis.Server.Studio;
 /// </summary>
 internal static class StudioPackageFileEndpoints
 {
+    internal const string NoPackage = "The application has no package with this id.";
+
     internal const string NoPackageFile = "The application has no package file at this path.";
 
     internal const string BadPath = "The package or the path is not a plain file path under packages/.";

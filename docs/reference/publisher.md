@@ -13,7 +13,7 @@ runs until it is stopped. It has no HTTP endpoint and listens on no port, so not
 The `axis-admin` image runs it. Both production installs start one, see
 [installation](installation.md), and `scripts/dev.sh`, the Docker Compose file in the repository root
 and the E2E script each start one too. It runs `publish`, `validate`,
-[`activate`](authoring-publishing.md#publishing), `accept` and `test` requests under both tenancy sources, and `publish`
+[`activate`](authoring-publishing.md#publishing), `accept`, `test` and `build` requests under both tenancy sources, and `publish`
 requests with the target `preview`, see [preview requests](#preview-requests).
 
 One process runs these loops:
@@ -21,7 +21,7 @@ One process runs these loops:
 | Loop         | What it does                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Requests     | Claims and runs `publish`, `validate`, `activate` and `accept` requests, see [claiming](#claiming). Only this loop reads the tenants again.                                                                                                                                                                                                                                                      |
-| Tests        | Claims and runs `test` requests, which run an application's [test scenarios](test-scenarios.md) from Studio, see [test](authoring-publishing.md#test).                                                                                                                                                                                                                                                      |
+| Tests        | Claims and runs `test` requests, which run an application's [test scenarios](test-scenarios.md) from Studio, and `build` requests, see [test](authoring-publishing.md#test) and [build](authoring-publishing.md#build).                                                                                                                                                                                                                                                  |
 | Jobs         | Under `Tenancy:Source=directory`, runs the jobs of `platform.jobs`, see [provisioning API](tenant-lifecycle.md#provisioning-api). It claims each job with a lease, runs one job at a time for each tenant and lets a running job finish when it is stopped. A job that it ends writes one [platform audit record](tenant-setting-commands.md#platform-audit-records) that names the job's actor. |
 | Host checks  | Checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS every `Cell:HostCheckInterval`, `00:10:00` by default, and adds a verified host to its tenant. It also creates the host's cert-manager `Certificate` when `Cell:HostCertificateIssuer` is set, and the host's Ingress when `Cell:HostRouteService` is set. The record of that add is named `tenant host verify` and names the operator or the tenant administrator who asked for the host.                     |
 | Export sweep | Runs only when the `Cell:ExportStorage` settings are set. Every hour it deletes each ZIP under `exports/` in that bucket that was stored more than 7 days ago, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant), and writes one line for each deletion. A failed round writes one line, and the next round tries again.                                                          |
@@ -85,13 +85,13 @@ publisher. The `directory` source writes neither line.
 
 Each poll round, for each served tenant, the requests loop claims the oldest `queued` `publish`,
 `validate`, `activate` or `accept` request with `FOR UPDATE SKIP LOCKED`, and the tests loop does the same for
-`test` requests. A claim sets the request `running`, `claimed_by` to the publisher's own name and
+`test` and `build` requests. A claim sets the request `running`, `claimed_by` to the publisher's own name and
 `lease_until`, and adds 1 to `claims`. A `running` request whose lease has run out is claimed the same
 way.
 
-- **Test requests.** `test` requests form their own queue for each tenant and application. At most
-  one runs at a time, oldest first, independent of the other kinds. A `test` does not wait behind a
-  running `publish`, `validate`, `activate` or `accept`, and none of them waits behind a `test`, so a long test
+- **Test requests.** `test` and `build` requests form their own queue for each tenant and application. At most
+  one of them runs at a time, oldest first, independent of the other kinds. A `test` or `build` does not wait behind a
+  running `publish`, `validate`, `activate` or `accept`, and none of them waits behind a `test` or `build`, so a long test
   holds up no publish. The claim that skips an application with a `running` request therefore counts
   only the requests of the same queue.
 - **Target.** A request with target `tenant` is claimed as above. A request with target `preview` is
@@ -206,6 +206,11 @@ tenant's schema role unless it says otherwise.
    diagnostic, `<tenant> package failed: <code> <message>`, then stores the outcomes in
    `package_tests` and the status over the tenant's schema role.
 
+   A `build` request runs only the step `build`. It sends the named package to `application-package-host` as a
+   `build`, see [build](authoring-publishing.md#build), and stores no release and no audit record. It writes
+   `<tenant> build ok` or, for each diagnostic, `<tenant> build failed: <code> <message>`, then stores `output` and
+   the status over the tenant's schema role. It needs no scenario server.
+
 8. For `accept`: the steps are `draft`, `version`, `contracts`, `validate`, `test` and `accept`, in the order
    of [accepting a draft](revisions-and-drafts.md#accepting-a-draft), and the publisher holds the
    folder's write lock from `draft` to `accept`. It reads the folder named by `Studio:Folders` and
@@ -279,10 +284,10 @@ because it is stored on the request.
   tenant that has a realm, so it must reach it and trust its certificate.
 - **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the request it is
   running, then exits. A `publish`, `validate`, `activate` or `accept` finishes first, and so do the contract
-  scenarios of a `publish`, `validate` or `accept`, and the test scenarios of an `accept`. A running `test` request is the exception, because a test
+  scenarios of a `publish`, `validate` or `accept`, and the test scenarios of an `accept`. A running `test` or `build` request is the exception, because a test
   may run for 10 minutes, which is longer than the stop grace period of both installs: the publisher
   stops it at once, the running scenario fails, its scenario database is dropped, and the request
-  ends `failed` with `AXC0220`. The step writes `<tenant> test failed: AXC0220 …`.
+  ends `failed` with `AXC0220`. The step writes `<tenant> test failed: AXC0220 …`, or `<tenant> build failed: AXC0220 …` for a `build`.
 - **A stop mid-request.** It leaves a lease that runs out, and another publisher then claims the
   request again. So the platform's shutdown grace period must be longer than the longest `publish`,
   `validate`, `activate` or `accept`, or the request is claimed twice.

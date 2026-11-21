@@ -302,6 +302,10 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("note");
 
+                    b.Property<string>("Output")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("output");
+
                     b.Property<string>("Package")
                         .HasColumnType("text")
                         .HasColumnName("package");
