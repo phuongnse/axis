@@ -1,5 +1,6 @@
-import { Button, Flex, Form, Input, Modal } from 'antd'
+import { Flex, Form, Input, Modal } from 'antd'
 import { useContext, useEffect, useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { requiredMark } from '../platform/requiredMark'
 import { StartFromField } from '../platform/StartFromField'
@@ -22,7 +23,7 @@ type Problem = 'exists' | 'invalid' | 'failed'
 type Values = { name: string; template: string }
 
 /**
- * The New application… button and its dialog. The button is the solid main button with `primary`. The dialog asks for a name and for Blank or an installed template, and
+ * The New application… button and its dialog. The button is the main button with `primary`, and a secondary button otherwise. The dialog asks for a name and for Blank or an installed template, and
  * shows each template's title and description in the UI locale, with `en` as the fallback. A built-in template keeps the
  * server's order and carries a "Built in" tag after its title. The name is marked required and both fields have help, see
  * [New application](docs/reference/studio.md#new-application). Create is on until a create runs. A click with the name
@@ -111,10 +112,9 @@ export function StudioNewApplication({
   return (
     <>
       {!controlled && (
-        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-        <Button type={primary ? 'primary' : 'default'} onClick={() => setOpen(true)}>
+        <AxisButton role={primary ? 'main' : 'secondary'} onClick={() => setOpen(true)}>
           {t('shell.studio.newApplication.button')}
-        </Button>
+        </AxisButton>
       )}
       <Modal
         open={open}

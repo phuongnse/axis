@@ -1,5 +1,6 @@
-import { Button, Dropdown, type MenuProps } from 'antd'
+import { Dropdown, type MenuProps } from 'antd'
 import { useContext, useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { Chevron } from '../platform/Chevron'
 import { useShellSidebar } from '../platform/shellSidebarContext'
 import { ShellNavigation, type ShellNavigationEntry, type ShellNavigationGroup } from '../platform/ShellNavigation'
@@ -78,9 +79,8 @@ export function StudioSidebar({
             },
           }}
         >
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button
-            type="text"
+          <AxisButton
+            role="plain"
             block
             data-testid="studio-application-row"
             aria-label={collapsed ? title : undefined}
@@ -104,7 +104,7 @@ export function StudioSidebar({
                 <Chevron />
               </>
             )}
-          </Button>
+          </AxisButton>
         </Dropdown>
       </div>
       {canCreate && <StudioNewApplication open={creating} onOpenChange={setCreating} onCreated={onCreated} />}

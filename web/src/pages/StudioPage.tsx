@@ -1,8 +1,8 @@
-import { Button, Flex, Result, Typography } from 'antd'
+import { Flex, Result, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
-import { AxisActionRow } from '../platform/AxisButton'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { PageActions, PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { TermList } from '../platform/TermList'
@@ -689,16 +689,17 @@ function StudioWorkspace() {
                       {((canTest && selected.kind === 'scenario' && selected.name) ||
                         selected.kind !== 'application') && (
                         <PageActions>
-                          <AxisActionRow align="center">
+                          {/* A page's action keeps its outline, see docs/reference/actions-and-controls.md#buttons. */}
+                          <AxisActionRow align="center" outlined>
                             {canTest && selected.kind === 'scenario' && selected.name && (
-                              // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                              <Button
+                              <AxisButton
+                                role="secondary"
                                 data-testid="studio-run-scenario"
                                 disabled={requestBusy || reconnecting}
                                 onClick={() => publishing.current?.runTests([selected.name!])}
                               >
                                 {t('shell.studio.runScenario')}
-                              </Button>
+                              </AxisButton>
                             )}
                             {selected.kind !== 'application' && (
                               <StudioResourceMenu

@@ -1,4 +1,4 @@
-import { Button, Flex, Form, Input, Modal, Select, Typography } from 'antd'
+import { Flex, Form, Input, Modal, Select, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
@@ -6,6 +6,7 @@ import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable } from '../platform/AxisTable'
 import { fillText } from '../platform/fillText'
+import { SectionPart } from '../platform/SectionParts'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import { layerMarks, markOf } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
@@ -144,8 +145,8 @@ function Point({ value }: { value: string }) {
     <Flex vertical gap={4} align="flex-start">
       {code}
       {entry === undefined ? (
-        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-        <Button
+        <AxisButton
+          role="secondary"
           size="small"
           data-testid={`studio-contract-relax-${value}`}
           disabled={busy}
@@ -155,16 +156,21 @@ function Point({ value }: { value: string }) {
           }}
         >
           {t('shell.studio.contract.relax')}
-        </Button>
+        </AxisButton>
       ) : (
         <>
           <Typography.Text type="secondary" data-testid={`studio-contract-relaxed-${value}`}>
             {fillText(t('shell.studio.contract.relaxed'), { reason: entry.reason })}
           </Typography.Text>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button size="small" data-testid={`studio-contract-undo-relax-${value}`} disabled={busy} onClick={undo}>
+          <AxisButton
+            role="secondary"
+            size="small"
+            data-testid={`studio-contract-undo-relax-${value}`}
+            disabled={busy}
+            onClick={undo}
+          >
             {t('shell.studio.contract.undoRelax')}
-          </Button>
+          </AxisButton>
         </>
       )}
       {conflict && (
@@ -234,7 +240,9 @@ interface ContractFilter<T> {
 
 /**
  * A table of the contract with a Filter on each column that gives `filter`, kept in the address under `prefix`. It
- * shows every row on one page. A row that `keep` names stays shown under any filter.
+ * shows every row on one page. A row that `keep` names stays shown under any filter. Its `action`, such as Add state,
+ * is a light action on the table's title row, see docs/reference/shell.md#layout. The table shows with its empty message
+ * while it has an `action` and no rows, so the action stays reachable.
  */
 function ContractTable<T extends object>({
   testId,
@@ -243,6 +251,7 @@ function ContractTable<T extends object>({
   rows,
   columns,
   keep,
+  action,
 }: {
   testId: string
   title: string
@@ -255,6 +264,7 @@ function ContractTable<T extends object>({
     filter?: ContractFilter<T>
   }[]
   keep?: (row: T) => boolean
+  action?: React.ReactNode
 }) {
   const t = useText()
   // The signature keeps the fields the same between draws, as `useTableView` needs.
@@ -271,12 +281,11 @@ function ContractTable<T extends object>({
     [signature],
   )
   const { view, setView } = useTableView(fields, recordPageSize, noParameters, false, true, false, prefix)
-  if (rows.length === 0) {
+  if (rows.length === 0 && action === undefined) {
     return null
   }
   return (
-    <Flex vertical gap="small" data-testid={testId}>
-      <Typography.Text strong>{title}</Typography.Text>
+    <SectionPart testId={testId} heading={{ title }} action={action}>
       <AxisTable<{ key: number; row: T }>
         rowKey={(entry) => String(entry.key)}
         emptyText={t('shell.table.empty')}
@@ -298,7 +307,7 @@ function ContractTable<T extends object>({
           }
         })}
       />
-    </Flex>
+    </SectionPart>
   )
 }
 
@@ -506,10 +515,14 @@ function RowName({ name, added, onRemove }: { name: string; added: boolean; onRe
     <Flex gap="small" align="center" wrap>
       {name}
       <LayerMarkLabel mark="added" name={name} />
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button size="small" aria-label={fillText(t('shell.studio.contract.removeName'), { name })} onClick={onRemove}>
+      <AxisButton
+        role="destructive"
+        size="small"
+        aria-label={fillText(t('shell.studio.contract.removeName'), { name })}
+        onClick={onRemove}
+      >
         {t('shell.studio.contract.remove')}
-      </Button>
+      </AxisButton>
     </Flex>
   )
 }
@@ -519,8 +532,9 @@ function RowName({ name, added, onRemove }: { name: string; added: boolean; onRe
  * application's layer applied. It shows its lifecycle in a state diagram, then tables of the states, the transitions,
  * the core validations, the effects and the ceiling entries. Each row shows its named point, the
  * `<entity>/<part>/<name>` handle that a relax entry or a contract scenario names. The module owns the file, so only
- * the application's own states and transitions can be edited: Add state and Add transition open a dialog, a row that the
- * application added shows an Added tag and a Remove button, and the module's own rows show neither. Save sends the whole
+ * the application's own states and transitions can be edited: Add state and Add transition open a dialog from the title
+ * row of their table, and a row that the application added shows an Added tag and a Remove button, and the module's own
+ * rows show neither. Save sends the whole
  * contract to the module save route, which writes the difference as the contract's layer. Removing every added row and
  * saving deletes the layer. An added row has no named point, because a relax entry cannot name it. `diagnostics`, the
  * folder's, are shown when they name the contract's layer, such as `AXC0370` for a transition into a protected state.
@@ -750,6 +764,18 @@ export function StudioModuleContract({
           prefix="states."
           rows={view.states}
           keep={(row) => !savedStates.has(row.name)}
+          action={
+            hasLifecycle ? (
+              <AxisButton
+                role="secondary"
+                data-testid="studio-contract-add-state"
+                disabled={saving || reconnecting}
+                onClick={() => setStateOpen(true)}
+              >
+                {t('shell.studio.contract.addState')}
+              </AxisButton>
+            ) : undefined
+          }
           columns={[
             {
               key: 'name',
@@ -780,24 +806,24 @@ export function StudioModuleContract({
             },
           ]}
         />
-        {hasLifecycle && (
-          <Flex>
-            <AxisButton
-              role="secondary"
-              data-testid="studio-contract-add-state"
-              disabled={saving || reconnecting}
-              onClick={() => setStateOpen(true)}
-            >
-              {t('shell.studio.contract.addState')}
-            </AxisButton>
-          </Flex>
-        )}
         <ContractTable
           testId="studio-contract-transitions"
           title={t('shell.studio.contract.transitions')}
           prefix="transitions."
           rows={view.transitions}
           keep={(row) => !savedTransitions.has(row.name)}
+          action={
+            hasLifecycle ? (
+              <AxisButton
+                role="secondary"
+                data-testid="studio-contract-add-transition"
+                disabled={saving || reconnecting}
+                onClick={() => setTransitionOpen(true)}
+              >
+                {t('shell.studio.contract.addTransition')}
+              </AxisButton>
+            ) : undefined
+          }
           columns={[
             {
               key: 'name',
@@ -841,18 +867,6 @@ export function StudioModuleContract({
             },
           ]}
         />
-        {hasLifecycle && (
-          <Flex>
-            <AxisButton
-              role="secondary"
-              data-testid="studio-contract-add-transition"
-              disabled={saving || reconnecting}
-              onClick={() => setTransitionOpen(true)}
-            >
-              {t('shell.studio.contract.addTransition')}
-            </AxisButton>
-          </Flex>
-        )}
         {layerDiagnostics.length > 0 && (
           <Flex vertical gap="small">
             <Typography.Text strong>{t('shell.studio.contract.diagnostics')}</Typography.Text>
@@ -981,8 +995,11 @@ export function StudioModuleContract({
             data-testid="studio-conflict"
             kind="warning"
             message={t('shell.studio.conflict')}
-            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-            action={<Button onClick={() => void reload()}>{t('shell.studio.reload')}</Button>}
+            action={
+              <AxisButton role="secondary" onClick={() => void reload()}>
+                {t('shell.studio.reload')}
+              </AxisButton>
+            }
           />
         )}
         {saveError !== null && <AxisAlert data-testid="studio-save-error" kind="error" message={saveError} />}

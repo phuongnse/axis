@@ -112,6 +112,43 @@ describe('StudioModuleContract', () => {
     expect(screen.getByText('Checklist/states/closed/initial')).toBeInTheDocument()
   })
 
+  it('draws Add state and Add transition as text buttons on the title rows of their tables', async () => {
+    renderView(
+      new Response(
+        JSON.stringify({ id: 'contract-id', kind: 'contract', name: 'ChecklistContract', content: contract }),
+      ),
+    )
+
+    const states = await screen.findByRole('region', { name: 'States' })
+    const transitions = screen.getByRole('region', { name: 'Transitions' })
+    for (const [table, name] of [
+      [states, 'Add state'],
+      [transitions, 'Add transition'],
+    ] as const) {
+      const add = within(table).getByRole('button', { name })
+      expect(add).toHaveClass('ant-btn-variant-text')
+      expect(add).not.toHaveClass('ant-btn-variant-outlined')
+    }
+  })
+
+  it('shows the Transitions table with its empty message and Add transition while it has no rows', async () => {
+    renderView(
+      new Response(
+        JSON.stringify({
+          id: 'contract-id',
+          kind: 'contract',
+          name: 'ChecklistContract',
+          content: { ...contract, lifecycle: { ...contract.lifecycle, transitions: [] } },
+        }),
+      ),
+    )
+
+    const transitions = await screen.findByTestId('studio-contract-transitions')
+
+    expect(within(transitions).getByText('No records yet.')).toBeInTheDocument()
+    expect(within(transitions).getByRole('button', { name: 'Add transition' })).toBeEnabled()
+  })
+
   it('shows no diagram and no table for a contract without a lifecycle', async () => {
     renderView(
       new Response(

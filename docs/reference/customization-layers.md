@@ -285,7 +285,8 @@ module ([kind lists](studio.md#kind-lists-and-module-resources)), and each opens
   canvas draws the saved page from the [module page route](draft-page-metadata.md), so it changes after
   **Save** or a reset and not while the author types.
 - **Reset.** Each added, changed or removed element has **Reset to module**, which takes it out of the
-  layer with the reset route and keeps the rest of the layer. **Reset all** deletes the layer file with
+  layer with the reset route and keeps the rest of the layer. It is a light text action beside the element's
+  tag, off while the draft has unsaved edits. **Reset all** deletes the layer file with
   the [delete of the layer resource](authoring.md#routes).
 - **Saving writes the difference.** Studio sends the edited resource whole. The authoring API compares
   it with the pinned module version, by the list keys, and writes the layer that holds only the
