@@ -1,3 +1,4 @@
+import { DeleteOutlined } from '@ant-design/icons'
 import {
   ConfigProvider,
   Drawer,
@@ -691,8 +692,8 @@ const Fields = memo(function Fields({
       heading={sectionHeading(t, 'fields')}
       action={
         readOnly ? undefined : (
-          <AxisActionRow>
-            <AxisButton role="main" onClick={() => setAdding(true)}>
+          <AxisActionRow outlined>
+            <AxisButton role="secondary" onClick={() => setAdding(true)}>
               {t('shell.studio.entity.addField')}
             </AxisButton>
           </AxisActionRow>
@@ -1440,9 +1441,9 @@ function Settings({
             {...groupTexts(t, group === 'type' ? `fields.group.type.${type}` : `fields.group.${group}`)}
             action={
               group === 'validation' && canAdd && list !== undefined ? (
-                <AxisActionRow>
+                <AxisActionRow outlined>
                   <AxisButton
-                    role="main"
+                    role="secondary"
                     onClick={() =>
                       onChange('/validations', [
                         ...list,
@@ -1809,9 +1810,9 @@ const Indexes = memo(function Indexes({
       heading={sectionHeading(t, 'indexes')}
       action={
         readOnly ? undefined : (
-          <AxisActionRow>
+          <AxisActionRow outlined>
             <AxisButton
-              role="main"
+              role="secondary"
               onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}
             >
               {t('shell.studio.entity.addIndex')}
@@ -1927,9 +1928,9 @@ const Validations = memo(function Validations({
       heading={sectionHeading(t, 'validations')}
       action={
         readOnly ? undefined : (
-          <AxisActionRow>
+          <AxisActionRow outlined>
             <AxisButton
-              role="main"
+              role="secondary"
               onClick={() =>
                 onChange('/validations', [
                   ...list,
@@ -1998,9 +1999,10 @@ const ValidationRow = memo(function ValidationRow({
           </Typography.Text>
           {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
         </Flex>
-        {/* Proposed, #3264: a validation's actions are its "…" menu, as a table row's are. */}
+        {/* Proposed, #3264 and #4902: a validation's one action, Remove, is an icon button on its title row, as a table
+            row's delete is; a "…" menu never holds one entry. */}
         <RowActions
-          fold
+          fold={false}
           actions={
             readOnly
               ? null
@@ -2008,6 +2010,7 @@ const ValidationRow = memo(function ValidationRow({
                   {
                     key: 'remove',
                     labelKey: 'shell.studio.entity.removeValidation',
+                    icon: <DeleteOutlined />,
                     destructive: true,
                     onClick: () => onChange(pointer, undefined),
                   },
