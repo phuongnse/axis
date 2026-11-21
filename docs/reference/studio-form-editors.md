@@ -48,11 +48,16 @@ row's field keeps its place in the file, and a value that is not an object is le
 
 A form keeps the generic form for its entity, sections and fields, with an
 [expression editor](studio.md#expression-editor) for each `visibleWhen`, `requiredWhen` and `readOnlyWhen`, and
-shows its `steps` as cards. The [form designer](form-designer.md) edits the same draft on a canvas.
+shows its `steps` as rows. The [form designer](form-designer.md) edits the same draft on a canvas.
 
-The cards sit in a part headed Steps. Each step card has a title, a section picker, Move up and Move down, and Add step appends a card. The picker lists the sections that have a `name`, so an unnamed section is
-not offered. Removing the last step removes `steps`, and the form goes back to one page. A condition offers the
-fields that the form lists, because a condition reads only those. A `steps` value that is not a list is left to
-the JSON view.
+The rows sit in a part headed Steps, with no box round them: spacing sets each row apart. Each row has a title and a
+section picker, as wide as its field, and a "…" menu at its top right, the table's
+[row actions](actions-and-controls.md#tables). Add step is a light text button in the part's title row, and it appends
+a row. The picker lists the sections that have a `name`, so an unnamed section is not offered. Removing the last step
+removes `steps`, and the form goes back to one page. A condition offers the fields that the form lists, because a
+condition reads only those. A `steps` value that is not a list is left to the JSON view.
 
-- **Delete step.** Each step card has a Delete step button, which removes that step.
+- **The step menu.** A step's "…" menu holds Move up, Move down and Delete step, in that order. Move up is off on the
+  first step and Move down is off on the last. Delete step is a destructive entry, and it removes that step.
+- **Read-only.** While the tab is read-only, such as while the JSON has an error, the part shows neither Add step nor
+  any step's menu.
