@@ -3064,7 +3064,7 @@
   "shell.studio.packages.name": "Tên",
   "shell.studio.packages.nameHelp": "Chỉ nhập tên, không nhập đường dẫn. Tên không bắt đầu bằng dấu chấm và không có dấu gạch chéo hay xuống dòng.",
   "shell.studio.packages.nameRequired": "Nhập tên.",
-  "shell.studio.packages.create": "Thêm",
+  "shell.studio.packages.create": "Tạo",
   "shell.studio.packages.renameOk": "Đổi tên",
   "shell.studio.packages.nameTaken": "Tên này đã có, hoặc một tệp đã đổi từ lần đọc danh sách. Danh sách được đọc lại.",
   "shell.studio.packages.nameInvalid": "Tên này không dùng được. Tên không để trống, không bắt đầu bằng dấu chấm và không có dấu gạch chéo hay xuống dòng.",
