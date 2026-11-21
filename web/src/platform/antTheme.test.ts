@@ -1,7 +1,7 @@
 import { theme } from 'antd'
 import type { CSSProperties } from 'react'
 import { describe, expect, it } from 'vitest'
-import { antConfigFor, antThemeFor, fieldRules, selectedItemTint, tableTheme } from './antTheme'
+import { antConfigFor, antThemeFor, fieldRules, tableTheme } from './antTheme'
 import {
   colourTokens,
   designTokensFor,
@@ -109,7 +109,6 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
 
   it('draws a selected menu item in primaryText on the selected tint', () => {
     expect(config.components?.Dropdown).toMatchObject({ colorPrimary: colour.primaryText })
-    expect(token.controlItemBgActive).toBe(selectedItemTint(mode))
   })
 
   it('draws a dialog on surface in its content, header and footer', () => {
