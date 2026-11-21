@@ -58,7 +58,7 @@ describe('the icon-only button', () => {
       'light',
       <>
         <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />
-        <AxisButton role="plain">Next</AxisButton>
+        <AxisButton role="subtle">Next</AxisButton>
       </>,
     )
     const button = screen.getByRole('button', { name: 'Add a row' })
@@ -191,7 +191,9 @@ describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', 
         <AxisButton role="finish">Finish</AxisButton>
         <AxisButton role="main">Main</AxisButton>
         <AxisButton role="secondary">Secondary</AxisButton>
-        <AxisButton role="destructive">Destructive</AxisButton>
+        <AxisButton role="secondary" destructive>
+          Destructive
+        </AxisButton>
       </>,
     )
   }
@@ -257,7 +259,7 @@ describe('the text button with a caret', () => {
   it('ends in an aria-hidden down caret and keeps its name', () => {
     renderIn(
       'light',
-      <AxisButton role="plain" caret>
+      <AxisButton role="subtle" caret>
         Account
       </AxisButton>,
     )
@@ -280,7 +282,9 @@ describe.each(['light', 'dark'] as const)('the roles of the button inside an act
         <AxisButton role="finish">Finish</AxisButton>
         <AxisButton role="main">Main</AxisButton>
         <AxisButton role="secondary">Secondary</AxisButton>
-        <AxisButton role="destructive">Destructive</AxisButton>
+        <AxisButton role="secondary" destructive>
+          Destructive
+        </AxisButton>
       </AxisActionRow>,
     )
   }

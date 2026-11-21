@@ -615,7 +615,8 @@ export function AxisTable<T extends object>({
               {bulkActions?.map((action) => (
                 <AxisButton
                   key={action.key}
-                  role={action.destructive ? 'destructive' : 'secondary'}
+                  role="secondary"
+                  destructive={action.destructive}
                   size="small"
                   onClick={() => {
                     action.onClick(selected)

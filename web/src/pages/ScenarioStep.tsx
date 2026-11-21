@@ -131,7 +131,11 @@ export function KeyValueRows({
               value={literalText(values[key])}
               onChange={(event) => onChange(`${pointer}/${pointerSegment(key)}`, parseLiteral(event.target.value))}
             />
-            <AxisButton role="destructive" onClick={() => onChange(`${pointer}/${pointerSegment(key)}`, undefined)}>
+            <AxisButton
+              role="secondary"
+              destructive
+              onClick={() => onChange(`${pointer}/${pointerSegment(key)}`, undefined)}
+            >
               {t('shell.studio.scenario.remove')}
             </AxisButton>
           </Flex>
@@ -541,7 +545,7 @@ export function ScenarioStep({
             <Button disabled={index === steps.length - 1} onClick={() => swap(index + 1)}>
               {t('shell.studio.scenario.moveDown')}
             </Button>
-            <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
+            <AxisButton role="secondary" destructive onClick={() => onChange(pointer, undefined)}>
               {t('shell.studio.scenario.remove')}
             </AxisButton>
           </Flex>

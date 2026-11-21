@@ -77,7 +77,8 @@ export function StudioModulePolicy({
                   <LayerMarkTag layer={layer} list="/grants" index={index} name={grant.name} />
                 )}
                 <AxisButton
-                  role="destructive"
+                  role="secondary"
+                  destructive
                   size="small"
                   disabled={grants.length === 1}
                   onClick={() =>

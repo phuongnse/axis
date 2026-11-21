@@ -1860,7 +1860,7 @@ const ValidationRow = memo(function ValidationRow({
         </>
       )}
       {readOnly ? null : (
-        <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
+        <AxisButton role="secondary" destructive onClick={() => onChange(pointer, undefined)}>
           {t('shell.studio.entity.removeValidation')}
         </AxisButton>
       )}

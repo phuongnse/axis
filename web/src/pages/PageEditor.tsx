@@ -462,7 +462,8 @@ function WidgetRow({
             {t('shell.studio.page.moveDown')}
           </Button>
           <AxisButton
-            role="destructive"
+            role="secondary"
+            destructive
             onClick={() =>
               tree.onChange(
                 listPointer,

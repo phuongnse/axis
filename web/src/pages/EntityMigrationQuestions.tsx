@@ -67,7 +67,7 @@ export function EntityMigrationQuestions({
               {t('shell.studio.cancel')}
             </AxisButton>
           )}
-          <AxisButton role="destructive" onClick={() => answer('drop')}>
+          <AxisButton role="secondary" destructive onClick={() => answer('drop')}>
             {t('shell.studio.entity.migration.dropData')}
           </AxisButton>
           <AxisButton role="finish" onClick={() => answer('keep')}>

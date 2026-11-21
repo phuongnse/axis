@@ -1,8 +1,8 @@
-import { Button, Flex, Result, Typography } from 'antd'
+import { Flex, Result, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
-import { AxisActionRow } from '../platform/AxisButton'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { PageActions, PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { TermList } from '../platform/TermList'
@@ -57,7 +57,6 @@ import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioAskAi } from './StudioAskAi'
 import { StudioProblems } from './StudioProblems'
-import { StudioResourceMenu } from './StudioResourceMenu'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { StudioPublishPage } from './StudioPublishPage'
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
@@ -689,22 +688,28 @@ function StudioWorkspace() {
                       {((canTest && selected.kind === 'scenario' && selected.name) ||
                         selected.kind !== 'application') && (
                         <PageActions>
-                          <AxisActionRow align="center">
+                          {/* Proposed, #4902: no finish button sits beside them, so they keep their outlines, and
+                              one or two actions are buttons, never a "…" menu. */}
+                          <AxisActionRow align="center" outlined>
                             {canTest && selected.kind === 'scenario' && selected.name && (
-                              // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                              <Button
+                              <AxisButton
+                                role="secondary"
                                 data-testid="studio-run-scenario"
                                 disabled={requestBusy || reconnecting}
                                 onClick={() => publishing.current?.runTests([selected.name!])}
                               >
                                 {t('shell.studio.runScenario')}
-                              </Button>
+                              </AxisButton>
                             )}
                             {selected.kind !== 'application' && (
-                              <StudioResourceMenu
+                              <AxisButton
+                                role="secondary"
+                                destructive
                                 disabled={reconnecting}
-                                onDelete={() => editor.current?.askDelete()}
-                              />
+                                onClick={() => editor.current?.askDelete()}
+                              >
+                                {t('shell.studio.delete.button')}
+                              </AxisButton>
                             )}
                           </AxisActionRow>
                         </PageActions>
