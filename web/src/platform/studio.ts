@@ -688,6 +688,42 @@ export async function createStudioPackageFile(
   return { status: 'created', version: body.version, diagnostics: body.diagnostics }
 }
 
+/** What saving a package file answers: the file's new version and the folder's diagnostics, or that the file changed since. */
+export type SavePackageFileResult =
+  { status: 'saved'; version: string; diagnostics: StudioDiagnostic[] } | { status: 'conflict' }
+
+/**
+ * Replaces one file of an application's package, with the version the file was read at in `If-Match`, see
+ * docs/reference/studio-packages.md#a-packages-files. A 409 means the file changed since, and nothing was written. A
+ * quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function saveStudioPackageFile(
+  application: string,
+  pkg: string,
+  path: string,
+  version: string,
+  content: string,
+): Promise<SavePackageFileResult> {
+  const route = packageFilePath(application, pkg, path)
+  const response = await studioFetch(route, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'If-Match': `"${version}"` },
+    body: JSON.stringify({ content }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (!response.ok) {
+    throw new Error(`Saving '${route}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
+  return { status: 'saved', version: body.version, diagnostics: body.diagnostics }
+}
+
 /**
  * One resource of the folder or of a module the application uses, as `GET .../resource-activity` answers it. `titles` and
  * `descriptions` are set for a module resource only, see docs/reference/studio-resource-form.md#resource-activity.

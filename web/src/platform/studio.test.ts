@@ -7,6 +7,7 @@ import {
   changeRows,
   checkStudioExpression,
   createStudioPackageFile,
+  saveStudioPackageFile,
   fetchStudioPackageFile,
   fetchAuthoringRequestDiff,
   fetchStudioExpressionScope,
@@ -839,6 +840,37 @@ describe('package files', () => {
     const refused = await createStudioPackageFile('Shop', 'tools', 'a', '').catch((reason: unknown) => reason)
     expect(refused).toBeInstanceOf(Error)
     expect(refused).not.toBeInstanceOf(QuotaRefusedError)
+  })
+
+  it('saves a file with the quoted version in If-Match and the content as JSON, and answers its new version', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(problem(200, { version: 'v2', diagnostics: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await saveStudioPackageFile('Shop', 'tools', 'src/My File.cs', 'v1', 'text')
+
+    expect(result).toEqual({ status: 'saved', version: 'v2', diagnostics: [] })
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/api/studio/apps/Shop/packages/tools/files/src/My%20File.cs')
+    expect(init.method).toBe('PUT')
+    expect(new Headers(init.headers).get('If-Match')).toBe('"v1"')
+    expect(JSON.parse(init.body as string)).toEqual({ content: 'text' })
+  })
+
+  it('answers conflict on a 409 when it saves, and throws a quota refusal and any other failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(problem(409, { title: 'It changed.' }))
+        .mockResolvedValueOnce(problem(403, { reason: 'quota-exceeded', title: 'Storage is full.' }))
+        .mockResolvedValueOnce(problem(500, { title: 'No.' })),
+    )
+
+    expect(await saveStudioPackageFile('Shop', 'tools', 'a', 'v1', '')).toEqual({ status: 'conflict' })
+    await expect(saveStudioPackageFile('Shop', 'tools', 'a', 'v1', '')).rejects.toBeInstanceOf(QuotaRefusedError)
+    const failed = await saveStudioPackageFile('Shop', 'tools', 'a', 'v1', '').catch((reason: unknown) => reason)
+    expect(failed).toBeInstanceOf(Error)
+    expect(failed).not.toBeInstanceOf(QuotaRefusedError)
   })
 
   it('reads a file as its content and version, and answers null for a file that is not there', async () => {

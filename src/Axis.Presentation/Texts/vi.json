@@ -2984,6 +2984,7 @@
   "shell.studio.packages.readOnly": "Bạn đọc được các tệp này. Để sửa, bạn cần vai trò nhà phát triển.",
   "shell.studio.packages.noFile": "Chưa mở tệp nào.",
   "shell.studio.packages.fileFailed": "Không tải được tệp.",
+  "shell.studio.packages.saveFailed": "Không lưu được {file}.",
   "shell.studio.packages.closeFile": "Đóng {file}",
   "shell.studio.packages.discardFile": "Bỏ thay đổi chưa lưu trong {file}?",
   "shell.studio.packages.cursor": "Dòng {line}, cột {column}",

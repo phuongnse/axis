@@ -2984,6 +2984,7 @@
   "shell.studio.packages.readOnly": "You can read these files. To edit them, you need the developer role.",
   "shell.studio.packages.noFile": "No file is open.",
   "shell.studio.packages.fileFailed": "The file could not be loaded.",
+  "shell.studio.packages.saveFailed": "{file} could not be saved.",
   "shell.studio.packages.closeFile": "Close {file}",
   "shell.studio.packages.discardFile": "Discard the unsaved changes in {file}?",
   "shell.studio.packages.cursor": "Line {line}, column {column}",

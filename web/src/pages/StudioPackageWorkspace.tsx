@@ -1,6 +1,6 @@
 import { CloseOutlined, FileOutlined, FolderOutlined } from '@ant-design/icons'
 import { Flex, Modal, Tabs, Tree, type TreeDataNode } from 'antd'
-import { lazy, Suspense, useContext, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { Chevron } from '../platform/Chevron'
@@ -8,10 +8,17 @@ import { fillText } from '../platform/fillText'
 import { sortByName } from '../platform/listOrder'
 import { PageLayout } from '../platform/PageLayout'
 import { PaneHeader } from '../platform/PaneHeader'
-import { fetchStudioPackageFile } from '../platform/studio'
+import { QuotaRefusedError } from '../platform/quota'
+import { SaveBar } from '../platform/SaveBar'
+import {
+  fetchStudioPackageFile,
+  saveStudioPackageFile,
+  ServerUnreachableError,
+  type StudioDiagnostic,
+} from '../platform/studio'
+import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { useUnsavedChanges } from '../platform/unsavedChanges'
 import { workspaceTabRow } from '../platform/workspaceTabRow'
 import type { CodeCursor } from './CodeEditor'
 import { PlatformContext } from './context'
@@ -110,19 +117,22 @@ function EmptyEditorArea({ boundary }: { boundary: React.RefObject<HTMLElement |
  * A package's workspace, `&view=packages&package=<id>`: the package's label as the heading with its kind and version
  * under it, the explorer's tree of its files on the left, the open files as tabs over the code editor, the status line
  * under them and an empty output panel. An id that names no package shows a warning. Without `canDevelop` the editor is
- * read-only and an info alert says why. The workspace reads the working folder, see
- * docs/reference/studio-packages.md#a-packages-files.
+ * read-only and an info alert says why. With it, Ctrl+S and the save bar save every changed file, one after another, each
+ * with the version it was read at, and `onWritten` hears the last answer's diagnostics. The workspace reads and writes the
+ * working folder, see docs/reference/studio-packages.md#a-packages-files.
  */
 export function StudioPackageWorkspace({
   application,
   packageId,
   folderRevision,
   canDevelop,
+  onWritten,
 }: {
   application: string
   packageId: string
   folderRevision: number
   canDevelop: boolean
+  onWritten: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
   const state = useStudioPackages(application, folderRevision)
@@ -141,11 +151,22 @@ export function StudioPackageWorkspace({
       <AxisAlert data-testid="studio-package-missing" kind="warning" message={t('shell.studio.packages.missing')} />
     )
   }
-  return <Workspace key={row.id} application={application} row={row} canDevelop={canDevelop} />
+  return <Workspace key={row.id} application={application} row={row} canDevelop={canDevelop} onWritten={onWritten} />
 }
 
-function Workspace({ application, row, canDevelop }: { application: string; row: PackageRow; canDevelop: boolean }) {
+function Workspace({
+  application,
+  row,
+  canDevelop,
+  onWritten,
+}: {
+  application: string
+  row: PackageRow
+  canDevelop: boolean
+  onWritten: (diagnostics: StudioDiagnostic[]) => void
+}) {
   const t = useText()
+  const { lost, reconnecting } = useStudioConnection()
   const tokens = useDesignTokens()
   const { colour, spacing, size } = tokens
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -156,13 +177,15 @@ function Workspace({ application, row, canDevelop }: { application: string; row:
   const [files, setFiles] = useState<Record<string, FileState>>({})
   const [cursors, setCursors] = useState<Record<string, CodeCursor>>({})
   const [discarding, setDiscarding] = useState<string | null>(null)
+  const [conflicts, setConflicts] = useState<Record<string, true>>({})
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const isUnsaved = (path: string) => {
     const file = files[path]
     return file !== undefined && file !== 'failed' && file.text !== file.saved
   }
   const unsavedCount = Object.keys(files).filter(isUnsaved).length
-  // Part 3's save bar counts the unsaved files in its place, see docs/reference/studio-packages.md#a-packages-files.
-  useUnsavedChanges(unsavedCount > 0)
+  const saveable = Object.keys(files).some((path) => isUnsaved(path) && !conflicts[path]) && !saving && !reconnecting
 
   const tree = useMemo(() => treeOf(row.files, locale), [row.files, locale])
 
@@ -186,6 +209,22 @@ function Workspace({ application, row, canDevelop }: { application: string; row:
     )
   }
 
+  /** Reads a file again, which drops its unsaved text and its conflict. */
+  const reload = (path: string) =>
+    fetchStudioPackageFile(application, row.id, path).then(
+      (file) => {
+        setFiles((current) => ({
+          ...current,
+          [path]: file === null ? 'failed' : { saved: file.content, text: file.content, version: file.version },
+        }))
+        setConflicts(({ [path]: _dropped, ...rest }) => rest)
+      },
+      (error: unknown) => {
+        console.warn(`Loading '${path}' of the package '${row.id}' failed`, error)
+        setFiles((current) => ({ ...current, [path]: 'failed' }))
+      },
+    )
+
   const closeTab = (path: string) => {
     const index = open.indexOf(path)
     const rest = open.filter((candidate) => candidate !== path)
@@ -199,6 +238,68 @@ function Workspace({ application, row, canDevelop }: { application: string; row:
     closeTab(path)
     requested.current.delete(path)
     setFiles(({ [path]: _dropped, ...rest }) => rest)
+    setConflicts(({ [path]: _dropped, ...rest }) => rest)
+  }
+
+  /**
+   * Saves every open unsaved file that is not in conflict, in the order of the tabs and one after another, as each write
+   * takes the folder's write lock and makes one revision. A 409 marks that file and the run goes on. Any other failure
+   * stops it, as it would fail every file after. See docs/reference/studio-packages.md#a-packages-files.
+   */
+  async function saveAll() {
+    if (!canDevelop || saving || reconnecting) {
+      return
+    }
+    const paths = open.filter((path) => isUnsaved(path) && !conflicts[path])
+    if (paths.length === 0) {
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    let diagnostics: StudioDiagnostic[] | null = null
+    const conflicted: string[] = []
+    let current = ''
+    try {
+      for (const path of paths) {
+        current = path
+        const file = files[path]
+        if (file === undefined || file === 'failed') {
+          continue
+        }
+        const { text } = file
+        const result = await saveStudioPackageFile(application, row.id, path, file.version, text)
+        if (result.status === 'conflict') {
+          conflicted.push(path)
+          setConflicts((before) => ({ ...before, [path]: true }))
+          continue
+        }
+        diagnostics = result.diagnostics
+        // The saved text is the one sent, so what was typed while the save ran keeps the dot.
+        setFiles((before) => {
+          const now = before[path]
+          return now === undefined || now === 'failed'
+            ? before
+            : { ...before, [path]: { ...now, saved: text, version: result.version } }
+        })
+      }
+    } catch (error) {
+      if (error instanceof ServerUnreachableError) {
+        lost()
+      } else if (error instanceof QuotaRefusedError) {
+        setSaveError(error.message)
+      } else {
+        console.warn(`Saving the package '${row.id}' failed`, error)
+        setSaveError(fillText(t('shell.studio.packages.saveFailed'), { file: current }))
+      }
+    } finally {
+      setSaving(false)
+    }
+    if (diagnostics !== null) {
+      onWritten(diagnostics)
+    }
+    if (conflicted.length > 0 && (active === null || !(conflicts[active] || conflicted.includes(active)))) {
+      setActive(conflicted[0])
+    }
   }
 
   const editFile = (path: string, text: string) =>
@@ -212,6 +313,29 @@ function Workspace({ application, row, canDevelop }: { application: string; row:
       const before = current[path]
       return before?.line === cursor.line && before.column === cursor.column ? current : { ...current, [path]: cursor }
     })
+
+  // The latest saveAll, so the key listener below is set up once.
+  const latest = useRef(saveAll)
+  useEffect(() => {
+    latest.current = saveAll
+  })
+  // With the developer role Ctrl+S, or Cmd+S, saves every changed file anywhere on the page and the browser's Save page
+  // stays shut. Without it the browser keeps its key, see docs/reference/studio-packages.md#a-packages-files.
+  useEffect(() => {
+    if (!canDevelop) {
+      return
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 's') {
+        return
+      }
+      event.preventDefault()
+      event.stopPropagation()
+      void latest.current()
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
+  }, [canDevelop])
 
   const rule = `1px solid ${colour.borderSubtle}`
   const cursor = active === null ? undefined : (cursors[active] ?? { line: 1, column: 1 })
@@ -239,6 +363,7 @@ function Workspace({ application, row, canDevelop }: { application: string; row:
       {!canDevelop && (
         <AxisAlert data-testid="studio-package-read-only" kind="info" message={t('shell.studio.packages.readOnly')} />
       )}
+      {saveError !== null && <AxisAlert data-testid="studio-package-save-error" kind="error" message={saveError} />}
       <div
         style={{ display: 'grid', gridTemplateColumns: `${explorerWidth}px minmax(0, 1fr)`, borderTop: rule }}
         data-testid="studio-package-workspace"
@@ -319,20 +444,34 @@ function Workspace({ application, row, canDevelop }: { application: string; row:
                     file === undefined ? null : file === 'failed' ? (
                       <AxisAlert kind="error" message={t('shell.studio.packages.fileFailed')} />
                     ) : (
-                      <Suspense fallback={null}>
-                        <CodeEditor
-                          key={path}
-                          label={path}
-                          value={file.text}
-                          onChange={(text) => editFile(path, text)}
-                          language={fileLanguage(path)}
-                          readOnly={!canDevelop}
-                          fill
-                          boundary={editorColumn}
-                          onCursor={(next) => moveCursor(path, next)}
-                          findTexts={findTexts}
-                        />
-                      </Suspense>
+                      <>
+                        {conflicts[path] && (
+                          <AxisAlert
+                            data-testid="studio-package-conflict"
+                            kind="warning"
+                            message={t('shell.studio.conflict')}
+                            action={
+                              <AxisButton role="secondary" onClick={() => void reload(path)}>
+                                {t('shell.studio.reload')}
+                              </AxisButton>
+                            }
+                          />
+                        )}
+                        <Suspense fallback={null}>
+                          <CodeEditor
+                            key={path}
+                            label={path}
+                            value={file.text}
+                            onChange={(text) => editFile(path, text)}
+                            language={fileLanguage(path)}
+                            readOnly={!canDevelop}
+                            fill
+                            boundary={editorColumn}
+                            onCursor={(next) => moveCursor(path, next)}
+                            findTexts={findTexts}
+                          />
+                        </Suspense>
+                      </>
                     ),
                 }
               })}
@@ -374,6 +513,26 @@ function Workspace({ application, row, canDevelop }: { application: string; row:
         }}
         onCancel={() => setDiscarding(null)}
       />
+      {canDevelop && (
+        <SaveBar
+          data-testid="studio-package-save-bar"
+          saveTestId="studio-package-save"
+          unsaved={unsavedCount > 0}
+          saveable={saveable}
+          busy={saving}
+          onSave={() => void saveAll()}
+          onDiscard={() =>
+            setFiles((current) =>
+              Object.fromEntries(
+                Object.entries(current).map(([path, file]) => [
+                  path,
+                  file === 'failed' ? file : { ...file, text: file.saved },
+                ]),
+              ),
+            )
+          }
+        />
+      )}
     </PageLayout>
   )
 }
