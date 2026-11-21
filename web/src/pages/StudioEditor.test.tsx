@@ -7,6 +7,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
+import { ContentInsetContext } from '../platform/contentInsetContext'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames, StudioResourceItem } from '../platform/studio'
 import { colourTokens } from '../platform/designTokens'
@@ -15,7 +16,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { ShellAsideHost } from '../test/shellAsideHost'
 import { loadKindSchema } from '../platform/studioSchemas'
-import { chooseOption, selectRoot } from '../test/antd'
+import { chooseOption, chooseRowAction, openRowMenu, selectRoot, shownMenu } from '../test/antd'
 import {
   addEntityField,
   entityFieldAction,
@@ -92,23 +93,30 @@ function stub(seed: unknown, patch: () => Response = () => json({ version: 's2',
   return fetchMock
 }
 
-function renderEditor() {
+function renderEditor(inset?: number) {
+  const editor = (
+    <StudioEditor
+      application="Shop"
+      item={resources[0]}
+      resources={resources}
+      path={null}
+      diagnosticPaths={[]}
+      onOpen={vi.fn()}
+      onSaved={vi.fn()}
+      onTextsWritten={vi.fn()}
+      onDeleted={vi.fn()}
+    />
+  )
   render(
     <MemoryRouter>
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <ShellAsideHost>
-            <StudioEditor
-              application="Shop"
-              item={resources[0]}
-              resources={resources}
-              path={null}
-              diagnosticPaths={[]}
-              onOpen={vi.fn()}
-              onSaved={vi.fn()}
-              onTextsWritten={vi.fn()}
-              onDeleted={vi.fn()}
-            />
+            {inset === undefined ? (
+              editor
+            ) : (
+              <ContentInsetContext.Provider value={inset}>{editor}</ContentInsetContext.Provider>
+            )}
           </ShellAsideHost>
         </TextProvider>
       </ThemeModeProvider>
@@ -336,6 +344,23 @@ describe('StudioEditor for a seed', () => {
     renderEditor()
 
     await expectPart('Records', 'records', 'studio-field-/records')
+  })
+
+  it('draws its tab row with the workspace look, reaching the page inset', async () => {
+    stub(seedContent('order', []))
+    renderEditor(16)
+
+    const tabBar = (await screen.findByRole('tab', { name: 'Form' }, slow)).closest('.ant-tabs-nav')
+    expect(tabBar).toHaveStyle({
+      height: '40px',
+      borderBottom: `1px solid ${colourTokens.borderSubtle.light}`,
+      paddingLeft: '16px',
+      paddingRight: '16px',
+      marginLeft: '-16px',
+      marginRight: '-16px',
+      marginTop: '-12px',
+      marginBottom: '16px',
+    })
   })
 })
 
@@ -808,8 +833,9 @@ describe('StudioEditor for an endpoint', () => {
     )
     await chooseOption('note')
     await userEvent.click(
-      within(screen.getByTestId('studio-field-/event/fields/reference')).getByRole('button', { name: 'Remove' }),
+      within(screen.getByTestId('studio-field-/event/fields/reference')).getByRole('button', { name: 'Actions' }),
     )
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
 
     const row = screen.getByTestId('studio-field-/event/fields/note')
     let view: EditorView | null = null
@@ -930,7 +956,7 @@ describe('StudioEditor for a process', () => {
     await openFormTab()
 
     const second = await screen.findByTestId('studio-field-/steps/2/branches/1', {}, slow)
-    await userEvent.click(within(second).getByRole('button', { name: 'Remove branch' }))
+    await chooseRowAction(second, 'Remove branch')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -977,7 +1003,7 @@ describe('StudioEditor for a process', () => {
 
     const card = await screen.findByTestId('studio-step-4', {}, slow)
     expect(card).toHaveTextContent('markApproved')
-    await userEvent.click(within(card).getByRole('button', { name: 'Delete' }))
+    await chooseRowAction(screen.getByTestId('studio-step-actions-4'), 'Delete')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -992,11 +1018,13 @@ describe('StudioEditor for a process', () => {
     renderResource(processItem)
     await openFormTab()
 
-    const first = await screen.findByTestId('studio-step-0', {}, slow)
-    expect(within(first).getByRole('button', { name: 'Move up' })).toBeDisabled()
-    expect(within(screen.getByTestId('studio-step-11')).getByRole('button', { name: 'Move down' })).toBeDisabled()
-    await userEvent.click(within(first).getByRole('button', { name: 'Move down' }))
-    await userEvent.click(within(screen.getByTestId('studio-step-11')).getByRole('button', { name: 'Move up' }))
+    await screen.findByTestId('studio-step-0', {}, slow)
+    const firstMenu = await openRowMenu(screen.getByTestId('studio-step-actions-0'))
+    expect(within(firstMenu).getByRole('menuitem', { name: 'Move up' })).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(within(firstMenu).getByRole('menuitem', { name: 'Move down' }))
+    const lastMenu = await openRowMenu(screen.getByTestId('studio-step-actions-11'))
+    expect(within(lastMenu).getByRole('menuitem', { name: 'Move down' })).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(within(lastMenu).getByRole('menuitem', { name: 'Move up' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -1815,8 +1843,9 @@ describe('StudioEditor for a page', () => {
 
       await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
       await userEvent.click(
-        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Delete' }),
+        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Actions' }),
       )
+      await userEvent.click(within(await shownMenu('Actions')).getByRole('menuitem', { name: 'Delete' }))
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(screen.queryByTestId('studio-widget-/widgets/1')).not.toBeInTheDocument()
@@ -1864,8 +1893,9 @@ describe('StudioEditor for a page', () => {
 
       await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
       await userEvent.click(
-        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Move up' }),
+        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Actions' }),
       )
+      await userEvent.click(within(await shownMenu('Actions')).getByRole('menuitem', { name: 'Move up' }))
       expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('table')
 
       await userEvent.click(undoButton())

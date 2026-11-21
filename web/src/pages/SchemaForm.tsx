@@ -1,4 +1,4 @@
-import { Button, Flex, Input, InputNumber, Select, Typography } from 'antd'
+import { Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { Link } from 'react-router'
 import { createContext, useContext, useState, type ReactElement, type ReactNode } from 'react'
 import { textIn, type StudioCatalog, type StudioFolderRelaxedPoint, type StudioNames } from '../platform/studio'
@@ -19,12 +19,14 @@ import {
 import { getAt, parameterType, referenceOptions, StudioNamesContext, textsOf } from '../platform/studioNames'
 import { studioResourceAddress } from '../platform/studioAddress'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
+import { StatusTag } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { RowActions } from '../platform/AxisTable'
 import { PlatformContext } from './context'
 import { relaxedPointLabel } from './relaxEntries'
 import { BindingSelect, CatalogChoice, ModuleSlots, TimeZoneSelect, VersionRangeInput } from './CatalogControls'
@@ -297,7 +299,7 @@ function SchemaNode({
   addIn?: Element | null
 }) {
   const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const inDialog = useContext(ItemDialogContext)
   const problemAt = useContext(ItemProblemContext)
   const names = useContext(StudioNamesContext)
@@ -328,6 +330,8 @@ function SchemaNode({
   let grouped = false
   // Whether the input draws its own label and help, as the yes-or-no field does.
   let drawsField = false
+  // The action on a group's title row, such as a list's Add.
+  let groupAction: ReactNode = null
   if (unsupported) {
     input = (
       <Typography.Text type="secondary" data-testid="studio-json-only">
@@ -422,7 +426,8 @@ function SchemaNode({
       />
     )
   } else if (isMarkedMap) {
-    grouped = true
+    // The map draws its own group, so its Add can sit on the group's title row.
+    drawsField = true
     input = (
       <MarkedMap
         schema={schema}
@@ -433,6 +438,7 @@ function SchemaNode({
         pointer={pointer}
         path={path}
         name={name}
+        help={help}
         value={value}
         onChange={onChange}
       />
@@ -496,15 +502,17 @@ function SchemaNode({
         typeof element === 'object' && element !== null ? (element as Record<string, unknown>)[keyProperty!] : element
       return typeof key === 'string' ? key : undefined
     }
+    if (!named) {
+      groupAction = (
+        <AxisButton role="secondary" onClick={() => onChange(pointer, [...items, defaultFor(itemSchema, root)])}>
+          {t(inDialog ? 'shell.studio.list.addRow' : 'shell.studio.addItem')}
+        </AxisButton>
+      )
+    }
     input = (
       <Flex vertical gap="small">
         {items.map((item, index) => (
-          <Flex
-            key={index}
-            gap="small"
-            align="flex-start"
-            style={{ border: `1px solid ${colour.border}`, borderRadius: radius.base, padding: spacing.xs }}
-          >
+          <Flex key={index} gap="small" align="flex-start">
             <div style={{ flex: 1 }}>
               {layer !== undefined && keyProperty !== undefined && keyOfItem(item) !== undefined && (
                 <LayerMarkTag layer={layer.designer} list={pointer} index={index} name={keyOfItem(item)!} />
@@ -522,19 +530,20 @@ function SchemaNode({
                 onChange={onChange}
               />
             </div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(`${pointer}/${index}`, undefined)}>{t('shell.studio.removeItem')}</Button>
+            <RowActions
+              fold
+              actions={[
+                {
+                  key: 'remove',
+                  labelKey: 'shell.studio.removeItem',
+                  destructive: true,
+                  onClick: () => onChange(`${pointer}/${index}`, undefined),
+                },
+              ]}
+            />
           </Flex>
         ))}
         {keyProperty !== undefined && <RemovedRows layer={layer!.designer} list={pointer} />}
-        {!named && (
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(pointer, [...items, defaultFor(itemSchema, root)])}>
-              {t(inDialog ? 'shell.studio.list.addRow' : 'shell.studio.addItem')}
-            </Button>
-          </div>
-        )}
       </Flex>
     )
   }
@@ -545,7 +554,7 @@ function SchemaNode({
     named || input === undefined || drawsField ? (
       input
     ) : grouped ? (
-      <AxisFieldGroup title={name} help={help ?? ''}>
+      <AxisFieldGroup title={name} help={help ?? ''} action={groupAction}>
         {input}
       </AxisFieldGroup>
     ) : (
@@ -838,7 +847,6 @@ function ObjectList({
   const catalog = useContext(StudioCatalogContext)
   const relaxed = useContext(StudioRelaxedContext)
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour } = useDesignTokens()
   const [held, setHeld] = useState<Record<string, { pointer: string; texts: Record<string, string> }>>({})
   const kind = root.properties?.kind?.const
   const items = (Array.isArray(value) ? value : []).filter(isRecord)
@@ -897,7 +905,7 @@ function ObjectList({
                     {typeof role === 'string' && role !== '' ? (
                       role
                     ) : (
-                      <span style={{ color: colour.warningText }}>{t('shell.studio.module.notMapped')}</span>
+                      <StatusTag tone="attention">{t('shell.studio.module.notMapped')}</StatusTag>
                     )}
                   </span>
                 )
@@ -1002,7 +1010,8 @@ function ObjectList({
 
 /**
  * A map whose keys name a part, such as the parameters of a data source. Each row has a picker for the key, a box
- * for the value and Remove. Add appends the first name that no row uses.
+ * for the value and a "…" menu with Remove, see docs/reference/studio-resource-form.md#lists-of-objects. Add on the
+ * group's title row appends the first name that no row uses.
  */
 function MarkedMap({
   schema,
@@ -1013,6 +1022,7 @@ function MarkedMap({
   pointer,
   path,
   name,
+  help,
   value,
   onChange,
 }: {
@@ -1024,11 +1034,11 @@ function MarkedMap({
   pointer: string
   path: string
   name: string
+  help?: string
   value: unknown
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
   const map = isRecord(value) ? value : {}
   const entries = Object.entries(map)
   const options = (key: string) => referenceOptions(names, keyMark, rootValue, `${pointer}/${escapeSegment(key)}`)
@@ -1064,56 +1074,63 @@ function MarkedMap({
   }
 
   return (
-    <Flex vertical gap="small">
-      {entries.map(([key, entry], index) => (
-        <Flex
-          key={key}
-          gap="small"
-          align="flex-start"
-          style={{ border: `1px solid ${colour.border}`, borderRadius: radius.base, padding: spacing.xs }}
-        >
-          <ReferencePicker
-            name={`${name} ${index + 1}`}
-            value={key}
-            required
-            options={options(key).filter(
-              (option) =>
-                option.name === key || !entries.some(([other]) => other.toLowerCase() === option.name.toLowerCase()),
-            )}
-            onChange={(to) => rename(key, to)}
-          />
-          <div style={{ flex: 1 }}>
-            <SchemaNode
-              node={valueSchema(key)}
-              root={root}
-              rootValue={rootValue}
-              pointer={`${pointer}/${escapeSegment(key)}`}
-              path={path}
-              name={key}
-              value={entry}
-              required
-              item
-              onChange={onChange}
-            />
-          </div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button onClick={() => onChange(`${pointer}/${escapeSegment(key)}`, undefined)}>
-            {t('shell.studio.removeItem')}
-          </Button>
-        </Flex>
-      ))}
-      <div>
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button
+    <AxisFieldGroup
+      title={name}
+      help={help ?? ''}
+      action={
+        <AxisButton
+          role="secondary"
           disabled={next === undefined}
           onClick={() =>
             next !== undefined && onChange(pointer, { ...map, [next.name]: defaultFor(valueSchema(next.name), root) })
           }
         >
           {t('shell.studio.addItem')}
-        </Button>
-      </div>
-    </Flex>
+        </AxisButton>
+      }
+    >
+      <Flex vertical gap="small">
+        {entries.map(([key, entry], index) => (
+          <Flex key={key} gap="small" align="flex-start">
+            <ReferencePicker
+              name={`${name} ${index + 1}`}
+              value={key}
+              required
+              options={options(key).filter(
+                (option) =>
+                  option.name === key || !entries.some(([other]) => other.toLowerCase() === option.name.toLowerCase()),
+              )}
+              onChange={(to) => rename(key, to)}
+            />
+            <div style={{ flex: 1 }}>
+              <SchemaNode
+                node={valueSchema(key)}
+                root={root}
+                rootValue={rootValue}
+                pointer={`${pointer}/${escapeSegment(key)}`}
+                path={path}
+                name={key}
+                value={entry}
+                required
+                item
+                onChange={onChange}
+              />
+            </div>
+            <RowActions
+              fold
+              actions={[
+                {
+                  key: 'remove',
+                  labelKey: 'shell.studio.removeItem',
+                  destructive: true,
+                  onClick: () => onChange(`${pointer}/${escapeSegment(key)}`, undefined),
+                },
+              ]}
+            />
+          </Flex>
+        ))}
+      </Flex>
+    </AxisFieldGroup>
   )
 }
 

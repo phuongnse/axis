@@ -5,6 +5,7 @@ import {
   attemptOutcomeTone,
   callStateText,
   callStateTone,
+  historyStateRank,
   inspectTarget,
   processTitle,
   runStateText,
@@ -15,6 +16,8 @@ import {
   stepRuns,
   stepTypeText,
   takenTransition,
+  taskStateText,
+  taskStateTone,
   transitionId,
   runParts,
   runProblem,
@@ -125,6 +128,28 @@ describe('the tones and words of a process state', () => {
   })
 
   it.each([
+    ['open', 'attention', 'Open'],
+    ['completed', 'success', 'Completed'],
+    ['cancelled', 'muted', 'Cancelled'],
+    ['expired', 'muted', 'Expired'],
+  ])('gives the task state %s the tone %s and the words %s', (state, tone, words) => {
+    expect(taskStateTone(state)).toBe(tone)
+    expect(taskStateText(t, state)).toBe(words)
+  })
+
+  it('ranks the run states for History: Failed, Waiting, Running, Done, then Cancelled', () => {
+    const states = ['cancelled', 'done', 'running', 'waitingForEvent', 'waitingForPerson', 'failed'] as const
+    expect([...states].sort((a, b) => historyStateRank(a) - historyStateRank(b))).toEqual([
+      'failed',
+      'waitingForEvent',
+      'waitingForPerson',
+      'running',
+      'done',
+      'cancelled',
+    ])
+  })
+
+  it.each([
     ['decision', 'Decision'],
     ['task', 'Task'],
     ['operation', 'Operation'],
@@ -145,6 +170,8 @@ describe('the tones and words of a process state', () => {
     expect(attemptOutcomeText(t, 'timedOut')).toBe('timedOut')
     expect(callStateTone('queued')).toBe('neutral')
     expect(callStateText(t, 'queued')).toBe('queued')
+    expect(taskStateTone('escalated')).toBe('neutral')
+    expect(taskStateText(t, 'escalated')).toBe('escalated')
     expect(stepTypeText(t, 'script')).toBe('script')
   })
 

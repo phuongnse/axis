@@ -12,8 +12,8 @@ import { usePlatform } from './context'
 type InstanceState = InstanceDetail | null | typeof forbidden | 'failed'
 
 /**
- * One instance of the operator console, opened from an entry of Failed work. It shows the same steps, history, tasks
- * and calls as the process inspector, from `GET /api/console/instances/{id}`. The page is outside every site, so it has
+ * One instance of the operator console, opened from an entry of Failed work. It shows the same diagram, history timeline
+ * and data as the process inspector, from `GET /api/console/instances/{id}`. The page is outside every site, so it has
  * no release texts and shows the names of the steps. The detail offers the commands the server lists, which the
  * operator sends to the console routes. It is headed by its process's name, with its state as a tag and Process as its
  * line, through the same heading as a site's instance page, see docs/reference/operator-console.md#views. A user
@@ -45,15 +45,7 @@ export function ConsoleInstancePage() {
   }, [load])
 
   return (
-    <InstanceLayout
-      instance={typeof instance === 'object' && instance !== null ? instance : undefined}
-      title={id}
-      breadcrumb={[
-        { label: t(platform.site.titleKey), to: '/' },
-        { label: t('shell.console.title'), to: '/console' },
-        { label: id },
-      ]}
-    >
+    <InstanceLayout instance={typeof instance === 'object' && instance !== null ? instance : undefined} title={id} band>
       {instance === forbidden && (
         <div data-testid="console-forbidden">
           <Result status="403" title={t('shell.console.forbidden')} />

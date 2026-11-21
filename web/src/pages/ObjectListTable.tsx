@@ -2,9 +2,10 @@ import { DeleteOutlined } from '@ant-design/icons'
 import { Flex, Modal } from 'antd'
 import { useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AxisButton } from '../platform/AxisButton'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn, type ColumnKind } from '../platform/AxisTable'
 import { setAt } from '../platform/jsonPatch'
+import { PartBoundary } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import type { ChangeHandler } from './SchemaForm'
@@ -216,7 +217,8 @@ export function ObjectListTable({
           ],
         }}
       />
-      {addIn && createPortal(addButton, addIn)}
+      {/* The row wraps the button where the portal is made, as context follows the React tree, not the slot's DOM. */}
+      {addIn && createPortal(<AxisActionRow>{addButton}</AxisActionRow>, addIn)}
       <Modal
         open={editing !== null}
         width={large ? size.dialog.large : size.dialog.medium}
@@ -229,21 +231,23 @@ export function ObjectListTable({
         onCancel={cancel}
         destroyOnHidden
       >
-        <div>
-          {editing &&
-            fields(
-              editing.copy,
-              (relative, next) =>
-                setEditing((current) => current && { ...current, copy: setAt(current.copy, relative, next) as Item }),
-              editing.index ?? items.length,
-              (name) =>
-                missing.includes(name) ? (
-                  <div data-item-problem ref={focusFieldOf} style={{ color: colour.dangerText }}>
-                    {t('shell.studio.list.required')}
-                  </div>
-                ) : null,
-            )}
-        </div>
+        <PartBoundary>
+          <div>
+            {editing &&
+              fields(
+                editing.copy,
+                (relative, next) =>
+                  setEditing((current) => current && { ...current, copy: setAt(current.copy, relative, next) as Item }),
+                editing.index ?? items.length,
+                (name) =>
+                  missing.includes(name) ? (
+                    <div data-item-problem ref={focusFieldOf} style={{ color: colour.dangerText }}>
+                      {t('shell.studio.list.required')}
+                    </div>
+                  ) : null,
+              )}
+          </div>
+        </PartBoundary>
       </Modal>
     </>
   )

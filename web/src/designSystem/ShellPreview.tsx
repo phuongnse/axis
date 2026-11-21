@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react'
-import { Route, Routes } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { AccountPage } from '../pages/AccountPage'
-import { HomePage } from '../pages/HomePage'
-import { PageRoute, RecordPageRoute } from '../pages/PageRoute'
 import { PlatformContext, type Platform } from '../pages/context'
-import { PlatformShellRoute } from '../pages/PlatformShellRoute'
-import { SiteRoute } from '../pages/SiteRoute'
-import { StudioPage } from '../pages/StudioPage'
+import { PlatformRoutes } from '../pages/PlatformRoutes'
 import { locale, platformSite } from './fixtures'
 
 const platform: Platform = {
@@ -18,45 +12,11 @@ const platform: Platform = {
   development: true,
 }
 
-/** The shell's own routes over the fixtures: the platform home page, Studio, the account page, and the pages of an application site. */
+/** The platform's own routes over the fixtures, so the preview draws the pages as the app does. */
 export function ShellPreview() {
   return (
     <PlatformContext.Provider value={platform}>
-      <Routes>
-        <Route
-          index
-          element={
-            <PlatformShellRoute>
-              <HomePage />
-            </PlatformShellRoute>
-          }
-        />
-        <Route
-          path="studio"
-          element={
-            <PlatformShellRoute>
-              <StudioPage />
-            </PlatformShellRoute>
-          }
-        />
-        <Route
-          path="account"
-          element={
-            <PlatformShellRoute>
-              <AccountPage />
-            </PlatformShellRoute>
-          }
-        />
-        <Route path=":site" element={<SiteRoute />}>
-          <Route path="records/:entity/:id" element={<RecordPageRoute />} />
-          <Route path="records/:module/:entity/:id" element={<RecordPageRoute />} />
-          <Route path=":page" element={<PageRoute />} />
-          <Route path=":page/new" element={<PageRoute form="new" />} />
-          <Route path=":page/:id" element={<PageRoute form="edit" />} />
-          <Route path=":module/:page/new" element={<PageRoute form="new" />} />
-          <Route path=":module/:page/:id" element={<PageRoute form="edit" />} />
-        </Route>
-      </Routes>
+      <PlatformRoutes />
     </PlatformContext.Provider>
   )
 }

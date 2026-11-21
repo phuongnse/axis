@@ -688,8 +688,7 @@ function StudioWorkspace() {
                       {((canTest && selected.kind === 'scenario' && selected.name) ||
                         selected.kind !== 'application') && (
                         <PageActions>
-                          {/* Proposed, #4902: no finish button sits beside them, so they keep their outlines, and
-                              one or two actions are buttons, never a "…" menu. */}
+                          {/* A page's action keeps its outline, see docs/reference/actions-and-controls.md#buttons. */}
                           <AxisActionRow align="center" outlined>
                             {canTest && selected.kind === 'scenario' && selected.name && (
                               <AxisButton

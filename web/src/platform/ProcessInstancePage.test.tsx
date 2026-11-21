@@ -458,21 +458,53 @@ function renderHistory(search = '') {
   return renderPage(`?tab=history${search === '' ? '' : `&${search.slice(1)}`}`)
 }
 
-/** The address part that filters a table's `field` to `value`, under the table's `prefix`. */
-function filterSearch(prefix: string, field: string, value: string) {
-  const filter = encodeURIComponent(JSON.stringify({ all: [{ field, op: 'eq', value }] }))
-  return `?${prefix}filter=${filter}`
-}
-
-/** The detail text with a second task, as given over the first task's own properties. */
-function detailWithTasks(second: Record<string, unknown>) {
-  const detail = JSON.parse(detailText) as { tasks: Record<string, unknown>[] }
-  detail.tasks.push({ ...detail.tasks[0], id: '0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f02', ...second })
+/**
+ * The detail text with four runs, newest first: `registerPurchase` that is open, `managerApproval` run again on the 12th,
+ * `registerPurchase` that failed after 3 seconds, and the first `managerApproval`.
+ */
+function detailRuns() {
+  const detail = JSON.parse(detailText) as { path: Record<string, unknown>[] }
+  const [first] = detail.path
+  detail.path.push(
+    {
+      ...first,
+      step: 'registerPurchase',
+      startedAt: '2026-10-10T04:00:00.000000Z',
+      finishedAt: '2026-10-10T04:00:03.000000Z',
+      traceId: null,
+      error: 'boom',
+    },
+    {
+      ...first,
+      step: 'managerApproval',
+      startedAt: '2026-10-12T01:00:00.000000Z',
+      finishedAt: '2026-10-12T01:00:00.100000Z',
+      traceId: null,
+    },
+  )
   return JSON.stringify(detail)
 }
 
+/** The address part that keeps `filter`, a node of the record API's filter, under the History table's prefix. */
+function historyFilter(...nodes: Record<string, unknown>[]) {
+  return `?history.filter=${encodeURIComponent(JSON.stringify({ all: nodes }))}`
+}
+
+/** Opens the rows of the run of `step` numbered `number`, from the fold on its History row. */
+async function openRun(step: string, number = 1) {
+  const link = await screen.findByTestId(`inspector-history-step-${step}-${number}`)
+  await userEvent.click(within(link.closest('tr')!).getByRole('button', { name: 'Show the rows in it' }))
+}
+
+/** The runs on the History table's page, as `step-number`, in the order they show. */
+function shownRuns() {
+  return screen
+    .queryAllByTestId(/^inspector-history-step-/)
+    .map((link) => link.getAttribute('data-testid')!.replace('inspector-history-step-', ''))
+}
+
 describe('ProcessInstancePage', () => {
-  it('shows no record fact, the parent in Started by, and the sub-processes by their process title', async () => {
+  it('shows no record fact, the parent in Started by, and the sub-process of a run by its process title', async () => {
     stubApi({ detail: { status: 200, body: detailWithRelatives() } })
 
     renderHistory()
@@ -482,30 +514,38 @@ describe('ProcessInstancePage', () => {
     const parentLink = within(facts).getByTestId('inspector-parent-link')
     expect(parentLink).toHaveTextContent('Purchase request approval')
     expect(parentLink).toHaveAttribute('href', `/e2e/inspector/${parentId}`)
+    expect(screen.queryByTestId(`inspector-subprocess-${childId}`)).not.toBeInTheDocument()
+    await openRun('wait')
     const childLink = await screen.findByTestId(`inspector-subprocess-${childId}`)
     expect(childLink).toHaveAttribute('href', `/e2e/children/${childId}`)
-    expect(within(childLink.closest('tr')!).getByText('ChildJob')).toBeInTheDocument()
+    expect(childLink).toHaveTextContent('ChildJob')
+    const childRow = childLink.closest('tr')!
+    expect(within(childRow).getByText('Started ChildJob.')).toBeInTheDocument()
+    expect(within(childRow).getByText('Running').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
   })
 
-  it('shows the empty text and no parent for an instance without relatives', async () => {
+  it('shows no parent and no sub-process link for an instance without relatives', async () => {
     stubApi()
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
-    expect(screen.getByText('No sub-processes.')).toBeInTheDocument()
+    await openRun('registerPurchase')
     expect(screen.queryByTestId('inspector-parent-link')).not.toBeInTheDocument()
+    expect(screen.queryByTestId(/^inspector-subprocess-/)).not.toBeInTheDocument()
   })
 
-  it('shows the open task under History', async () => {
+  it('shows the open task in the rows of its run, with Waits for its assignee and the state Open', async () => {
     stubApi()
 
     renderHistory()
 
     await screen.findByTestId('inspector-instance')
-    const taskRow = screen.getByRole('row', { name: /role: manager/ })
-    expect(within(taskRow).getByText('Manager approval')).toBeInTheDocument()
-    expect(within(taskRow).getByText('open')).toBeInTheDocument()
+    const runRow = screen.getByTestId('inspector-history-step-managerApproval-1').closest('tr')!
+    expect(screen.getAllByRole('row', { name: /Waits for manager\./ })).toEqual([runRow])
+    await openRun('managerApproval')
+    const [, taskRow] = screen.getAllByRole('row', { name: /Waits for manager\./ })
+    expect(within(taskRow).getByText('Task')).toBeInTheDocument()
+    expect(within(taskRow).getByText('Open').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
   })
 
   it('has the tabs Diagram, History and Data, Diagram first and open, with no count', async () => {
@@ -529,7 +569,7 @@ describe('ProcessInstancePage', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'History' }))
 
     expect(screen.getByTestId('address')).toHaveTextContent('?tab=history')
-    expect(screen.getByRole('region', { name: 'Tasks' })).toBeInTheDocument()
+    expect(screen.getByTestId('inspector-history')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('tab', { name: 'Data' }))
     expect(screen.getByTestId('address')).toHaveTextContent('?tab=data')
@@ -546,7 +586,7 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Diagram' })).toHaveAttribute('aria-selected', 'false')
-    expect(screen.getByRole('region', { name: 'History' })).toBeInTheDocument()
+    expect(screen.getByTestId('inspector-history')).toBeInTheDocument()
     expect(screen.queryByTestId('inspector-diagram')).not.toBeInTheDocument()
   })
 
@@ -613,41 +653,41 @@ describe('ProcessInstancePage', () => {
     expect(screen.getByLabelText('check to done')).toBeInTheDocument()
   })
 
-  it('shows the em dash in the completed cell of a task that is not completed', async () => {
+  it('shows the em dash in the Duration cell of a task that has not ended', async () => {
     stubApi()
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
-    const taskRow = screen.getByRole('row', { name: /role: manager/ })
+    await openRun('managerApproval')
+    const [, taskRow] = screen.getAllByRole('row', { name: /Waits for manager/ })
     const headers = within(taskRow.closest('table')!).getAllByRole('columnheader')
-    const completed = headers.findIndex((header) => header.textContent === 'Completed')
-    expect(within(taskRow).getAllByRole('cell')[completed].textContent).toBe('—')
+    const duration = headers.findIndex((header) => header.textContent?.startsWith('Duration'))
+    expect(within(taskRow).getAllByRole('cell')[duration].textContent).toBe('—')
   })
 
-  it('shows the history rows and the attempts of a call', async () => {
+  it('opens a call to its attempts, each with its answer and the tone of its outcome', async () => {
     stubApi()
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
+    await openRun('registerPurchase')
     expect(screen.queryByText('No history yet.')).not.toBeInTheDocument()
-    const attemptRow = screen.getByRole('row', { name: /retryable/ })
-    expect(within(attemptRow).getByText('503')).toBeInTheDocument()
-    expect(within(attemptRow).getByText('attempt')).toBeInTheDocument()
-    expect(within(attemptRow).getByText('0af76519')).toBeInTheDocument()
-    const historyRow = screen.getByRole('row', { name: /^Manager approval .*4bf92f/ })
-    expect(within(historyRow).getByText('4bf92f35')).toBeInTheDocument()
+    expect(screen.queryByRole('row', { name: /Attempt 1/ })).not.toBeInTheDocument()
+    const callRow = screen.getByRole('row', { name: /createOrder/ })
+    await userEvent.click(within(callRow).getByRole('button', { name: 'Show the rows in it' }))
+    const attemptRow = screen.getByRole('row', { name: /Attempt 1/ })
+    expect(within(attemptRow).getByText('Answered HTTP 503.')).toBeInTheDocument()
+    expect(within(attemptRow).getByText('Retryable').closest('[data-tone]')).toHaveAttribute('data-tone', 'muted')
   })
 
-  it('words a problem in the Error cells, with the seconds of a timeout, and shows the stored error when there is none', async () => {
+  it('words a failed run from its problem code, with the seconds of a timeout, and never shows a stored error message', async () => {
     const detail = JSON.parse(detailText) as {
       path: Record<string, unknown>[]
       calls: { attempts: Record<string, unknown>[] }[]
     }
     detail.path.push({
       ...detail.path[0],
-      step: 'registerPurchase',
+      step: 'managerApproval',
       traceId: null,
       error: 'The operation did not finish within its timeout.',
       problem: { code: 'timeout', values: { seconds: 30 } },
@@ -665,18 +705,19 @@ describe('ProcessInstancePage', () => {
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
-    const timedOut = screen.getByRole('row', { name: /^registerPurchase / })
-    expect(within(timedOut).getByText('No answer came within 30 sec.')).toBeInTheDocument()
-    expect(within(timedOut).queryByText(/did not finish/)).not.toBeInTheDocument()
-    const stored = screen.getByRole('row', { name: /^done / })
-    expect(within(stored).getByText('System.InvalidOperationException')).toBeInTheDocument()
-    const attempt = screen.getByRole('row', { name: /retryable/ })
+    expect(await screen.findByText('Stopped. No answer came within 30 sec.')).toBeInTheDocument()
+    expect(screen.queryByText(/did not finish/)).not.toBeInTheDocument()
+    expect(screen.getByText('Stopped with an error.')).toBeInTheDocument()
+    expect(screen.queryByText(/InvalidOperationException/)).not.toBeInTheDocument()
+    await openRun('registerPurchase')
+    const callRow = screen.getByRole('row', { name: /createOrder/ })
+    await userEvent.click(within(callRow).getByRole('button', { name: 'Show the rows in it' }))
+    const attempt = screen.getByRole('row', { name: /Attempt 1/ })
     expect(within(attempt).getByText('The outside system answered with a server error.')).toBeInTheDocument()
     expect(within(attempt).queryByText(/answered with the status 503/)).not.toBeInTheDocument()
   })
 
-  it('shows the stored error for a code this build does not know', async () => {
+  it('shows no stored error message for a code this build does not know', async () => {
     const detail = JSON.parse(detailText) as { path: Record<string, unknown>[] }
     detail.path[0].error = 'A fixed text.'
     detail.path[0].problem = { code: 'somethingNew', values: {} }
@@ -684,62 +725,48 @@ describe('ProcessInstancePage', () => {
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
-    expect(screen.getByText('A fixed text.')).toBeInTheDocument()
+    expect(await screen.findByText('Stopped with an error.')).toBeInTheDocument()
+    expect(screen.queryByText('A fixed text.')).not.toBeInTheDocument()
   })
 
-  it('copies the whole trace ID from the copy button beside its first 8 characters', async () => {
-    stubApi()
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-    renderHistory()
-    await screen.findByTestId('inspector-instance')
-    const attemptRow = screen.getByRole('row', { name: /retryable/ })
-
-    await userEvent.click(within(attemptRow).getByRole('button', { name: 'Copy' }))
-
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('0af7651916cd43dd8448eb211c80319c')
-  })
-
-  it('shows the em dash in the HTTP status cell of an attempt without one', async () => {
+  it('reads No answer came. for an attempt with no HTTP status and no problem', async () => {
     const detail = JSON.parse(detailText) as { calls: { attempts: { httpStatus: number | null }[] }[] }
     detail.calls[0].attempts[0].httpStatus = null
     stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
-    const attemptRow = screen.getByRole('row', { name: /retryable/ })
-    const headers = within(attemptRow.closest('table')!).getAllByRole('columnheader')
-    const httpStatus = headers.findIndex((header) => header.textContent === 'HTTP status')
-    expect(within(attemptRow).getAllByRole('cell')[httpStatus].textContent).toBe('—')
+    await openRun('registerPurchase')
+    const callRow = screen.getByRole('row', { name: /createOrder/ })
+    await userEvent.click(within(callRow).getByRole('button', { name: 'Show the rows in it' }))
+    expect(within(screen.getByRole('row', { name: /Attempt 1/ })).getByText('No answer came.')).toBeInTheDocument()
   })
 
-  it('shows the hidden text and no input value for a call whose input is hidden', async () => {
+  it("names a call by its operation and its connector, and shows none of its input, which is the panel's", async () => {
     stubApi()
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
-    const hidden = screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c')
-    expect(within(hidden).getByText('Input: Hidden')).toBeInTheDocument()
-    expect(within(hidden).getByText('PurchasingSystem')).toBeInTheDocument()
-    expect(within(hidden).getByText('createOrder')).toBeInTheDocument()
-    expect(within(hidden).queryByText('title')).not.toBeInTheDocument()
+    await openRun('registerPurchase')
+    const callRow = screen.getByText('createOrder').closest('tr')!
+    expect(within(callRow).getByText('createOrder (PurchasingSystem) is in progress.')).toBeInTheDocument()
+    expect(screen.queryByText('Input: Hidden')).not.toBeInTheDocument()
+    expect(screen.queryByText('Laptops')).not.toBeInTheDocument()
   })
 
-  it('shows a call kind as plain text, and its state as a tag in words with the tone of its meaning', async () => {
+  it('shows the operation of a call as plain text, and its state as a tag in words with the tone of its meaning', async () => {
     stubApi()
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
-    const hidden = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c'))
-    expect(hidden.getByText('connector').closest('.ant-tag')).toBeNull()
+    await openRun('registerPurchase')
+    const hidden = within(screen.getByText('createOrder').closest('tr')!)
+    expect(hidden.getByText('createOrder').closest('.ant-tag')).toBeNull()
     expect(hidden.getByText('Pending').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
-    const visible = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8d'))
-    expect(visible.getByText('package').closest('.ant-tag')).toBeNull()
+    const visible = within(screen.getByText('reference').closest('tr')!)
+    expect(visible.getByText('reference').closest('.ant-tag')).toBeNull()
     expect(visible.getByText('Succeeded').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
+    expect(visible.getByText('reference (PaymentReferences) succeeded.')).toBeInTheDocument()
   })
 
   it('names the tone of each call state, and shows a state it does not know as sent', async () => {
@@ -750,27 +777,12 @@ describe('ProcessInstancePage', () => {
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
-    const first = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c'))
+    await openRun('registerPurchase')
+    const first = within(screen.getByText('createOrder').closest('tr')!)
     expect(first.getByText('Outcome unknown').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
-    const second = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8d'))
+    expect(first.getByText('createOrder (PurchasingSystem) has an unknown outcome.')).toBeInTheDocument()
+    const second = within(screen.getByText('reference').closest('tr')!)
     expect(second.getByText('archived').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
-  })
-
-  it('shows the top-level input properties of a visible input, with numbers as their source digits', async () => {
-    stubApi()
-
-    renderHistory()
-
-    await screen.findByTestId('inspector-instance')
-    const visible = screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8d')
-    expect(within(visible).getByText('PaymentReferences@1.0.0')).toBeInTheDocument()
-    expect(within(visible).getByText('reference')).toBeInTheDocument()
-    expect(within(visible).getByText('No attempts yet.')).toBeInTheDocument()
-    expect(within(visible).queryByText('Hidden')).not.toBeInTheDocument()
-    expect(within(visible).getByText('Laptops')).toBeInTheDocument()
-    expect(within(visible).getByText('1250.50')).toBeInTheDocument()
-    expect(within(visible).getByText('["a","b"]')).toBeInTheDocument()
   })
 
   it('shows a step label from the texts of the instance release, and the name when there is none', async () => {
@@ -834,17 +846,61 @@ describe('ProcessInstancePage', () => {
     expect(assignLocation).not.toHaveBeenCalled()
   })
 
-  it('shows each History section as a part, with the commands on the heading', async () => {
+  it('shows History as one table of runs, newest first, with the commands on the heading', async () => {
     stubApi({ detail: { status: 200, body: detailWith(['cancel']) } })
 
     renderHistory()
 
     await screen.findByTestId('inspector-instance')
     expect(within(screen.getByTestId('page-actions')).getByTestId('inspector-command-cancel')).toBeInTheDocument()
-    for (const title of ['History', 'Tasks', 'Calls', 'Sub-processes']) {
-      expect(screen.getByRole('region', { name: title })).toBeInTheDocument()
+    const table = within(screen.getByTestId('inspector-history'))
+    expect(table.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Step',
+      'What happened',
+      'State',
+      'Started',
+      'Duration',
+    ])
+    expect(shownRuns()).toEqual(['registerPurchase-1', 'managerApproval-1'])
+    for (const title of ['Tasks', 'Calls', 'Sub-processes']) {
+      expect(screen.queryByRole('region', { name: title })).not.toBeInTheDocument()
     }
-    expect(screen.queryByRole('region', { name: 'Details' })).not.toBeInTheDocument()
+  })
+
+  it('reads each run as a sentence: its last call, its task, and the step it went on to', async () => {
+    stubApi()
+
+    renderHistory()
+
+    const open = (await screen.findByTestId('inspector-history-step-registerPurchase-1')).closest('tr')!
+    expect(within(open).getByText('Calls a connector')).toBeInTheDocument()
+    expect(within(open).getByText('reference (PaymentReferences) succeeded.')).toBeInTheDocument()
+    const first = screen.getByTestId('inspector-history-step-managerApproval-1').closest('tr')!
+    expect(within(first).getByText('Waits for manager.')).toBeInTheDocument()
+  })
+
+  it('reads a run whose connector call succeeded on its third attempt, and opens the attempts and the lookup', async () => {
+    const [retryable, succeeded] = connectorCall().attempts
+    const attempts = [
+      retryable,
+      { ...retryable, number: 2, startedAt: '2026-10-10T04:00:05.000000Z', finishedAt: '2026-10-10T04:00:06.000000Z' },
+      { ...succeeded, number: 3, startedAt: '2026-10-10T04:00:10.000000Z' },
+      { ...succeeded, kind: 'lookup', number: 1, outcome: 'found', startedAt: '2026-10-10T04:00:12.000000Z' },
+    ]
+    const call = connectorCall({ connector: 'ERP', operation: 'createPurchaseOrder', attempts })
+    stubApi({ detail: { status: 200, body: detailForRun({ calls: [call] }) } })
+
+    renderHistory()
+
+    const run = (await screen.findByTestId('inspector-history-step-registerPurchase-1')).closest('tr')!
+    expect(within(run).getByText('createPurchaseOrder (ERP) succeeded on attempt 3.')).toBeVisible()
+    await openRun('registerPurchase')
+    const callRow = screen.getByText('createPurchaseOrder').closest('tr')!
+    expect(within(callRow).getByText('createPurchaseOrder (ERP) succeeded on attempt 3.')).toBeVisible()
+    await userEvent.click(within(callRow).getByRole('button', { name: 'Show the rows in it' }))
+    const names = screen.getAllByRole('row').flatMap((row) => /(Attempt|Lookup) \d/.exec(row.textContent!)?.[0] ?? [])
+    expect(names).toEqual(['Lookup 1', 'Attempt 3', 'Attempt 2', 'Attempt 1'])
+    expect(within(screen.getByRole('row', { name: /Lookup 1/ })).getByText('Found')).toBeVisible()
   })
 
   it('is headed by the process title from the release texts, with the state as its tag and Process as its line', async () => {
@@ -1069,7 +1125,7 @@ describe('ProcessInstancePage', () => {
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
+    await openRun('registerPurchase')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('textbox', { name: 'Reason' })).toHaveAccessibleDescription(
@@ -1095,7 +1151,7 @@ describe('ProcessInstancePage', () => {
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
+    await openRun('registerPurchase')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), { target: { value: 'The order exists' } })
@@ -1125,7 +1181,7 @@ describe('ProcessInstancePage', () => {
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
+    await openRun('registerPurchase')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), {
@@ -1161,7 +1217,7 @@ describe('ProcessInstancePage', () => {
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
+    await openRun('registerPurchase')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), { target: { value: 'Try' } })
@@ -1189,7 +1245,7 @@ describe('ProcessInstancePage', () => {
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
+    await openRun('registerPurchase')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), { target: { value: 'Try' } })
@@ -1203,99 +1259,141 @@ describe('ProcessInstancePage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
-  it('shows the Resolve button only on a call the server marks resolvable', async () => {
+  it('shows the Resolve button on the row of a call the server marks resolvable, and on no other row', async () => {
     stubApi({ detail: { status: 200, body: detailWithResolvable() } })
 
     renderHistory()
 
-    await screen.findByTestId('inspector-instance')
+    await openRun('registerPurchase')
     expect(screen.getAllByTestId(/^inspector-resolve-/).map((button) => button.getAttribute('data-testid'))).toEqual([
       `inspector-resolve-${resolvableCallId}`,
     ])
-    expect(screen.getByTestId(`inspector-resolve-${resolvableCallId}`)).toHaveTextContent('Resolve')
+    const button = screen.getByTestId(`inspector-resolve-${resolvableCallId}`)
+    expect(button).toHaveTextContent('Resolve')
+    expect(button.closest('tr')).toBe(screen.getByText('createOrder').closest('tr'))
+    expect(within(screen.getByText('reference').closest('tr')!).queryByRole('button', { name: 'Resolve' })).toBeNull()
+    expect(
+      within(screen.getByTestId('inspector-history-step-registerPurchase-1').closest('tr')!).queryByRole('button', {
+        name: 'Resolve',
+      }),
+    ).toBeNull()
   })
 
   it('shows no Resolve button when no call is resolvable', async () => {
     stubApi()
 
-    renderPage()
+    renderHistory()
 
-    await screen.findByTestId('inspector-instance')
+    await openRun('registerPurchase')
     expect(screen.queryByTestId(/^inspector-resolve-/)).not.toBeInTheDocument()
   })
-  it('offers every column of the tasks in Filter', async () => {
+
+  it('offers Step, State, Started and Duration in Filter', async () => {
     stubApi()
     renderHistory()
     await screen.findByTestId('inspector-instance')
-    await userEvent.click(
-      within(screen.getByTestId('studio-section-inspector-tasks')).getByRole('button', { name: 'Filter' }),
-    )
+
+    await userEvent.click(within(screen.getByTestId('inspector-history')).getByRole('button', { name: 'Filter' }))
     await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
-    expect(optionTexts()).toEqual(['Step', 'Assignee', 'State', 'Outcome', 'Completed by', 'Started', 'Completed'])
+
+    expect(optionTexts()).toEqual(['Step', 'State', 'Started', 'Duration'])
   })
 
-  it('keeps only the tasks that match the filter in the address', async () => {
-    stubApi({
-      detail: {
-        status: 200,
-        body: detailWithTasks({ assignee: 'clerk', state: 'completed', outcome: 'approve', completedBy: 'ann' }),
-      },
-    })
-    renderHistory(filterSearch('tasks.', 'state', 'completed'))
+  it('keeps only the runs in the State that the filter in the address names', async () => {
+    stubApi({ detail: { status: 200, body: detailRuns() } })
 
-    const tasks = within((await screen.findAllByTestId('studio-section-inspector-tasks')).at(-1)!)
-    expect(await tasks.findByRole('row', { name: /role: clerk/ })).toBeInTheDocument()
-    expect(tasks.queryByRole('row', { name: /role: manager/ })).not.toBeInTheDocument()
+    renderHistory(historyFilter({ field: 'state', op: 'eq', value: 'failed' }))
+
+    await screen.findByTestId('inspector-history-step-registerPurchase-1')
+    expect(shownRuns()).toEqual(['registerPurchase-1'])
   })
 
-  it('leaves the tasks and the sub-processes unchanged under a history filter that matches nothing', async () => {
-    const detail = JSON.parse(detailWithRelatives()) as Record<string, unknown>
-    stubApi({
-      detail: {
-        status: 200,
-        body: JSON.stringify({ ...detail, tasks: (JSON.parse(detailText) as { tasks: unknown[] }).tasks }),
-      },
-    })
+  it('filters Started by the local day of the time of a run', async () => {
+    const day = dayjs('2026-10-12T01:00:00Z').format('YYYY-MM-DD')
+    stubApi({ detail: { status: 200, body: detailRuns() } })
 
-    renderHistory(filterSearch('history.', 'step', 'nothing'))
+    renderHistory(historyFilter({ field: 'startedAt', op: 'eq', value: day }))
 
-    await screen.findByTestId('inspector-instance')
-    expect(
-      within(screen.getByTestId('studio-section-inspector-history')).getByText('No history yet.'),
-    ).toBeInTheDocument()
-    expect(
-      within(screen.getByTestId('studio-section-inspector-tasks')).getByRole('row', { name: /role: manager/ }),
-    ).toBeInTheDocument()
-    expect(
-      within(screen.getByTestId('studio-section-inspector-sub-processes')).getByRole('row', { name: /ChildJob/ }),
-    ).toBeInTheDocument()
+    await screen.findByTestId('inspector-history-step-managerApproval-2')
+    expect(shownRuns()).toEqual(['managerApproval-2'])
   })
 
-  it("filters one call's attempts under its own prefix and leaves another call's attempts shown", async () => {
-    const detail = JSON.parse(detailText) as {
-      calls: { id: string; attempts: Record<string, unknown>[] }[]
-    }
-    detail.calls[1].attempts = [{ ...detail.calls[0].attempts[0], outcome: 'succeeded', httpStatus: 200 }]
-    stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
+  it('filters Duration in seconds', async () => {
+    stubApi({ detail: { status: 200, body: detailRuns() } })
 
-    renderHistory(filterSearch(`attempts.${detail.calls[0].id}.`, 'outcome', 'succeeded'))
+    renderHistory(historyFilter({ field: 'duration', op: 'gte', value: 3 }))
 
-    await screen.findByTestId('inspector-instance')
-    const first = within(screen.getByTestId(`inspector-call-${detail.calls[0].id}`))
-    const second = within(screen.getByTestId(`inspector-call-${detail.calls[1].id}`))
-    expect(first.queryByRole('row', { name: /retryable/ })).not.toBeInTheDocument()
-    expect(second.getByRole('row', { name: /succeeded/ })).toBeInTheDocument()
+    await screen.findByTestId('inspector-history-step-registerPurchase-1')
+    expect(shownRuns()).toEqual(['registerPurchase-1'])
   })
 
-  it('filters a date column by the local day of its time', async () => {
-    const createdAt = '2026-10-12T01:00:00Z'
-    stubApi({ detail: { status: 200, body: detailWithTasks({ assignee: 'clerk', createdAt }) } })
+  it('shows the empty text under a filter that matches no run', async () => {
+    stubApi({ detail: { status: 200, body: detailWithRelatives() } })
 
-    renderHistory(filterSearch('tasks.', 'createdAt', dayjs(createdAt).format('YYYY-MM-DD')))
+    renderHistory(historyFilter({ field: 'step', op: 'eq', value: 'nothing' }))
 
-    const tasks = within(await screen.findByTestId('studio-section-inspector-tasks'))
-    expect(await tasks.findByRole('row', { name: /role: clerk/ })).toBeInTheDocument()
-    expect(tasks.queryByRole('row', { name: /role: manager/ })).not.toBeInTheDocument()
+    expect(await screen.findByText('No history yet.')).toBeInTheDocument()
+    expect(shownRuns()).toEqual([])
+  })
+
+  it('finds a run by its own words and by the words of a row inside it, and keeps the search in the address', async () => {
+    stubApi()
+    renderHistory()
+    await screen.findByTestId('inspector-history-step-registerPurchase-1')
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'createOrder{Enter}')
+
+    await waitFor(() => expect(shownRuns()).toEqual(['registerPurchase-1']))
+    expect(screen.getByTestId('address')).toHaveTextContent('history.search=createOrder')
+  })
+
+  it('sorts the runs by State, Failed then Waiting then Done, and keeps the sort as history.sort', async () => {
+    stubApi({ detail: { status: 200, body: detailRuns() } })
+    renderHistory()
+    await screen.findByTestId('inspector-history-step-registerPurchase-1')
+    expect(shownRuns()).toEqual(['registerPurchase-2', 'managerApproval-2', 'registerPurchase-1', 'managerApproval-1'])
+
+    await userEvent.click(screen.getByRole('columnheader', { name: 'State' }))
+
+    await waitFor(() => expect(screen.getByTestId('address')).toHaveTextContent('history.sort=state'))
+    expect(shownRuns()).toEqual(['registerPurchase-1', 'registerPurchase-2', 'managerApproval-2', 'managerApproval-1'])
+    const states = screen
+      .getAllByTestId(/^inspector-history-step-/)
+      .map((link) => within(link.closest('tr')!).getAllByText(/^(Failed|Waiting for an event|Done)$/)[0].textContent)
+    expect(states).toEqual(['Failed', 'Waiting for an event', 'Done', 'Done'])
+  })
+
+  it('sorts the runs by Started from the address, newest first when it is descending', async () => {
+    stubApi({ detail: { status: 200, body: detailRuns() } })
+
+    renderPage('?tab=history&history.sort=-startedAt')
+
+    await screen.findByTestId('inspector-history-step-registerPurchase-1')
+    expect(shownRuns()).toEqual(['managerApproval-2', 'registerPurchase-1', 'managerApproval-1', 'registerPurchase-2'])
+  })
+
+  it('opens a run in the side panel from its step, keeping step and run in the address next to the tab', async () => {
+    stubApi({ detail: { status: 200, body: detailRuns() } })
+    renderHistory()
+
+    await userEvent.click(await screen.findByTestId('inspector-history-step-managerApproval-1'))
+
+    const panel = await stepPanel()
+    expect(panel.getByRole('heading', { name: 'Manager approval' })).toBeVisible()
+    expect(screen.getByTestId('address')).toHaveTextContent('tab=history')
+    expect(screen.getByTestId('address')).toHaveTextContent('step=managerApproval&run=1')
+  })
+
+  it('reads the instance again from Refresh on the timeline', async () => {
+    const fetchMock = stubApi()
+    renderHistory()
+    await screen.findByTestId('inspector-history-step-registerPurchase-1')
+    const reads = () => fetchMock.mock.calls.filter(([url]) => url === `${instancesPath}/${instanceId}`).length
+    const before = reads()
+
+    await userEvent.click(within(screen.getByTestId('inspector-history')).getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() => expect(reads()).toBe(before + 1))
   })
 
   it('shows the input as a table of names and values, with a hidden value as Hidden', async () => {
@@ -1465,6 +1563,19 @@ async function stepPanel() {
 }
 
 describe('ProcessInstancePage step run panel', () => {
+  it("copies the whole trace ID of the run's last entry from the copy button on its Overview", async () => {
+    stubApi()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    renderPage('?step=managerApproval')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('4bf92f35')).toBeVisible()
+    await userEvent.click(panel.getByRole('button', { name: 'Copy' }))
+
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('4bf92f3577b34da6a3ce929d0e0e4736')
+  })
+
   it("opens a step's latest run in the side panel when its card is clicked, with the state as a tag and step in the address", async () => {
     stubApi({ detail: { status: 200, body: detailLooping() } })
     renderPage()

@@ -93,7 +93,10 @@ their own controls where they expect them.
   A small block that stands for one thing, such as a home page tile or a dashboard's KPI or chart, keeps its own
   `borderSubtle` border and `radius-base` corners.
 - **Parts a rule apart.** A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
-  drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
+  drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule. On a page the
+  rule reaches past the page's padding to the page area's edges. In a drawer, a dialog, the side panel, the sidebar, a
+  tile or a column of a grid it stays inside. A runtime page's widget list, a record's detail and a record form also
+  keep it inside.
 - **Rules, not boxes** _(planned)_. One `borderSubtle` rule parts a block from the one beside it, and no border, box
   or rounded corner goes round a region. It follows dividers over containers, as Material's containment has it, and a
   code editor's split panes, and keeps clear of boxes inside boxes.
@@ -164,18 +167,13 @@ application never depends on the UI library.
 ## Page header
 
 A page with a band starts with a header band on `surface` across the page area, with a `borderSubtle` rule
-below it. It says where the person is and what the page is.
+below it. It says what the page is.
 
-- **Regular band.** The band of a platform page that keeps one, the account and Users pages, holds the breadcrumb,
-  then the page title in `heading4`. It has `spacing-lg` padding above and at its sides, `spacing-md` below the title,
-  and `spacing-xs` between the breadcrumb and the title.
-- **Title alone in the band** _(planned)_. The band of a platform page that keeps one holds only the page title in
-  `heading4`, as the page's level-one heading: the account, users, user, licences, console and console instance pages.
-  It has `spacing-md` padding above and below the title, so the title sits evenly, and `spacing-lg` at its sides, where
-  the title lines up with the content below.
-- **Breadcrumb.** The breadcrumb starts at the site and ends at the page: "Axis › Users". Every step but the
-  last is a link, and the last is marked `aria-current`.
-- **No breadcrumb** _(planned)_. No page of any site draws a breadcrumb. The header's mark leads to the site's first
+- **Title alone in the band.** The band of a platform page that keeps one holds only the page title in
+  `heading4`, as the page's level-one heading, such as "Users" or "Your account": the account, users, user, licences,
+  console and console instance pages. It has `spacing-md` padding above and below the title, so the title sits evenly,
+  and `spacing-lg` at its sides, where the title lines up with the content below. `PageLayout`'s `band` switches it on.
+- **No breadcrumb.** No page of any site draws a breadcrumb. The header's mark leads to the site's first
   page, and the browser goes back, as **No link back** in [layout](#layout) says. The user page and the console instance
   page have no step back to their list, because the browser leads back to it. `PageLayout` takes no breadcrumb, and no
   text names one.
@@ -203,10 +201,7 @@ below it. It says where the person is and what the page is.
   elsewhere, is the page's first part. It is a list of facts through `TermList`, see
   [fields](actions-and-controls.md#fields), above a `borderSubtle` rule. It never sits on the heading's line.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
-  see the [platform home page](#platform-home-page). The users page has the band "Axis › Users".
-- **The account page's band.** The account page has the band "Axis › Your account".
-- **Bands by title alone** _(planned)_. Each platform page's band names the page by its title alone, such as "Users" or
-  "Your account", with no "Axis ›" before it.
+  see the [platform home page](#platform-home-page).
 
 ## App switcher and preferences
 
@@ -433,21 +428,30 @@ to the frame shows in every state. How previews work is in
 
   | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Saved record, Saved record with a change, Record not found, Task, Task not found, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                 |
+  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Saved record, Saved record with a change, Record not found, Task, Task not found, Dashboard, Process instance, Platform site, App switcher, Language and theme, Account page, Account notifications, Users page, and User page                                                                                        |
   | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
   | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 
 - **The identity provider's pages are the theme's own.** `identitySignIn` is built from fixtures
   through the shared sign-in components in `web/src/identitySignIn/`. Its states from Two-step
   verification to Error are the same components that the theme draws.
-- **A frame is a screen.** A shell preview draws the shell in a frame exactly as tall as its height, and
-  the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
+- **A frame is a screen.** A shell preview draws the shell in a frame that fills the window down to the canvas's
+  padding and is never shorter than the state's height. The page scrolls inside it as in a window, so a dialog
+  opens in the middle of what shows.
 - **The State control.** `shell`, `signIn` and `identitySignIn` show one state at a time under a State
   control, as `studio` does, and `&state=<slug>` opens one.
 - **Account states.** The `shell` preview gains Account page, the platform's `/account` on its
   Security tab, and Account notifications, the same page on its Notifications tab. Both use fixtures of
   `GET /api/me/authenticators`, `GET /api/me/sessions` and `GET /api/me/notification-preferences`, and `PUT`
   answers `204`.
+- **Users states.** The `shell` preview gains Users page, the platform's `/users`, and User page, `/users/{id}` of the
+  first person listed. Both use fixtures of `GET /api/users`, `GET /api/users/{id}/roles` and
+  `GET /api/me/tables/users`. The five tenant sections of the users page, `GET /api/tenant/outside-clients`, `usage`,
+  `hosts`, `model-key` and `application-packages`, answer `404`, so the page shows only its people.
+- **The preview draws the platform's own routes.** `ShellPreview` renders `PlatformRoutes`, the route table that the app
+  draws, so the preview's platform pages cannot drift from the real ones.
+- **Process instance.** The `shell` preview gains Process instance, which opens a waiting instance from the fixture
+  site's Approvals page, on its Diagram. It uses fixtures of the instance detail and of the instance's release texts.
 - **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
   through the shell over fixtures of the purchase request sample, in sixteen states: Typical, Empty,
   Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live,

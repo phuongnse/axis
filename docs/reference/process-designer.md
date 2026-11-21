@@ -146,7 +146,7 @@ empty, and its branch or outcome stays. A transition left naming a missing step 
 graph draws no edge for it. The designer never invents a step or a transition, and one Undo reverses each
 removal.
 
-- **A step** is removed by its panel's Delete button, or by Delete or Backspace in the canvas.
+- **A step** is removed by Delete in its card's "…" menu, or by Delete or Backspace in the canvas.
   Removing the selected step clears the selection.
 - **An edge.** With an edge selected, the panel shows a Remove line button above the step's panel,
   and Delete or Backspace in the canvas clears that transition instead of removing the step.
@@ -157,11 +157,11 @@ removal.
 
 ## Step panel
 
-Selecting a node opens the step's card of the Form tab beside the canvas, with Move up, Move down and
-Remove. Each move is one change of `steps`, so one Undo reverses it, and an edit in the panel redraws the
-graph. With no step selected, the panel says "Select a step on the canvas." The panel is drawn in
-[`SidePanel`](shell.md#layout), titled Step, with no close button, and it gives way while the Problems or Ask AI panel
-is open and comes back when that panel closes.
+Selecting a node opens the step's card of the Form tab beside the canvas, with a "…" menu that holds Move up,
+Move down and Delete. A read-only tab shows no menu. Each move is one change of `steps`, so one Undo reverses it,
+and an edit in the panel redraws the graph. With no step selected, the panel says "Select a step on the canvas."
+The panel is drawn in [`SidePanel`](shell.md#layout), titled Step, with no close button, and it gives way while the
+Problems or Ask AI panel is open and comes back when that panel closes.
 
 The type picker in the panel and the Add step choice list every type in
 `$defs.step.properties.type.enum` of the process schema. Changing a step's type removes the keys that the
@@ -186,7 +186,7 @@ field of the picked entity, as the `updateRecord` panel has for the subject enti
 
 ### Notify
 
-The operation picker offers `notify`. Its recipients are rows, with Add recipient and Remove. Each row stacks
+The operation picker offers `notify`. Its recipients are rows, with Add recipient on the recipients' title row and Remove recipient in each row's "…" menu, and a read-only tab shows neither. Each row stacks
 a Recipient type choice of User, Role or Email, with a help line under each option, then the one field of that
 type: a user expression, a role picker or an email expression. Each field has its label and help, one field to
 a line, and the required fields are marked. Its `inApp` and `email` channels are two checkboxes, and
@@ -206,7 +206,8 @@ The `input` of a `callConnector` step is rows. Each row stacks a Name, a Kind ch
 with a help line under each option, and an Expression for a value. Each field has its label and help, one
 field to a line, and the required fields are marked. The names route lists no input types, so the panel
 reads a row's kind from the draft: text is a Value, an object with `from` a List, and any other object an
-Object.
+Object. Add row and each row's Remove sit as [the operation's rows](studio-editors-by-kind.md#process-editor) have
+them, and a row's Remove removes what is nested in it.
 
 - **Object.** An `object` shows nested rows, each with the same Name, Kind and Expression, over the subject.
 - **List.** A `list` shows a From picker of the subject's child collections, then nested field rows with
@@ -219,11 +220,14 @@ Object.
 
 ### Task deadline and escalations
 
-A task's panel has a Deadline section and an Escalations list, after Due in. Add deadline writes `deadline` with an empty `after` and `next`, and the author types the duration and
-picks the next step from the step names. Remove deadline removes the key.
+A task's panel has a Deadline section and an Escalations list, after Due in. Add deadline is on the Deadline title
+row and writes `deadline` with an empty `after` and `next`. The author types the duration and picks the next step
+from the step names. Remove deadline is on the same title row, in the danger colour, and removes the key. The
+[Lists](studio-editors-by-kind.md#process-editor) bullet says where these actions sit, and a read-only tab shows none.
 
-Add escalation appends an escalation with the first free name `escalation1`, `escalation2` and so on, and
-an empty `after`, and Remove escalation removes it. Each escalation has a Reassign switch, which adds
+Add escalation is on the Escalations title row and appends an escalation with the first free name `escalation1`,
+`escalation2` and so on, and an empty `after`. Each escalation's Remove escalation is in its "…" menu, at the end
+of its first line beside Escalate after. Each escalation has a Reassign switch, which adds
 `reassign` with the task's assignee editor, and a Notify switch, which adds `notify` with the
 [notify](#notify) editor. Turning a switch off removes its key, and removing the last escalation removes
 `escalations`. A new escalation has neither key yet, so the compiler marks it until one switch is on.
@@ -267,7 +271,9 @@ draft already holds for that name. A child that is not in the names list changes
 A wait for event panel has an event picker, an optional `when` expression editor, an optional timeout
 and a Next step picker. The event picker lists only the events whose entity is the process's subject entity. The `when` editor
 suggests the payload fields of the picked event, with rules and functions, and not the subject record's
-fields, and clearing it removes the key. Add timeout adds a `timeout` with an After duration and a Next
+fields, and clearing it removes the key. The Timeout group always shows its title, with Add timeout or Remove
+timeout on the title row, as the [Lists](studio-editors-by-kind.md#process-editor) bullet says. Its After and Next
+fields show only once a timeout exists. Add timeout adds a `timeout` with an After duration and a Next
 step on timeout picker, both empty until filled. Remove timeout takes the whole `timeout` out, and one
 Undo brings it back.
 

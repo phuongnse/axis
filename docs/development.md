@@ -816,6 +816,9 @@ every directory tenant, so `startPublisher` holds a PostgreSQL advisory lock for
 authoring specs' publishers take it alone, and the cell specs' publishers share it. Both AI authoring specs also hold the
 AI authoring lock for their whole run, see [testing](testing.md#the-e2e-stack).
 
+The package run spec starts its own publisher too, with `Extensions:ApplicationPackages` on and its own Node.js package
+host with a stub Trivy. That publisher takes the publishers' lock alone, see [the package run spec](testing.md#the-e2e-stack).
+
 ## Widget previews
 
 `npm run dev:design-system --prefix web` serves `http://localhost:5174/design-system.html` from
@@ -823,6 +826,11 @@ AI authoring lock for their whole run, see [testing](testing.md#the-e2e-stack).
 widget swaps in place in the open page. An edit to the previews or the fixtures reloads the page. An edit to a
 platform text in `src/Axis.Presentation/Texts/` reloads the page too, so the open preview shows the new text without
 a restart. The query parameters are the ones in [widget previews](reference/widget-previews.md#the-bundle).
+
+The harness loads the app's fonts, `web/src/fonts.css`, so a preview shows its text in IBM Plex Sans, the app's font,
+with the same line spacing. The design-system bundle carries no fonts, see
+[design tokens and previews](reference/frontend.md#design-tokens-and-previews). `tests/e2e/specs/design-system-dev-server.spec.ts`
+starts this server on port 5174 and checks that the font loads, so port 5174 must be free when the e2e suite runs.
 
 The server serves the harness, the modules it loads and the files in `web/`. Paths that begin with `/api` or
 `/health` go to the Axis server, and answer `502` while it is not running. Any other path that names none of

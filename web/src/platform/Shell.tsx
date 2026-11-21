@@ -12,12 +12,12 @@ import { PreferencesMenu } from './PreferencesMenu'
 import { sizeTokens } from './designTokens'
 import { ShellFooter } from './ShellFooter'
 import { ShellNavigation } from './ShellNavigation'
+import { ContentInsetContext } from './contentInsetContext'
 import { ShellAsideContext } from './shellAsideContext'
 import { ShellBarSlotContext } from './shellBarSlotContext'
 import { ShellSidebarContext } from './shellSidebarContext'
 import { SiteMark } from './SiteMark'
 import type { NavigationItem, SiteLegal } from './site'
-import { ContentInsetContext } from './contentInset'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
 import { UserMenu } from './UserMenu'
@@ -154,6 +154,8 @@ export function Shell({
   const [barTarget, setBarTarget] = useState<HTMLElement | null>(null)
   const barContext = useMemo(() => ({ target: barTarget }), [barTarget])
   const hasSidebar = claimed || navigation.length > 1
+  // The content area's padding, which bands reach past to the page area's edges, see docs/reference/shell.md#layout.
+  const inset = claimed ? spacing.md : spacing.lg
   const sidebar = hasSidebar && !narrow
   const home = navigation[0]?.path ?? '/'
   const entries = navigation.map((item) => ({ ...item, label: t(item.labelKey) }))
@@ -299,9 +301,9 @@ export function Shell({
                   {!hasAccount && <ReadOnlyBanner />}
                   <Layout.Content
                     // The page grows with its content inside its scroll, so the footer follows it.
-                    style={{ flex: '1 0 auto', background: colour.surface, padding: claimed ? spacing.md : spacing.lg }}
+                    style={{ flex: '1 0 auto', background: colour.surface, padding: inset }}
                   >
-                    <ContentInsetContext.Provider value={claimed ? spacing.md : spacing.lg}>
+                    <ContentInsetContext.Provider value={inset}>
                       <ShellSidebarContext.Provider value={sidebarContext}>
                         <ShellAsideContext.Provider value={asideContext}>
                           <ShellBarSlotContext.Provider value={barContext}>{children}</ShellBarSlotContext.Provider>

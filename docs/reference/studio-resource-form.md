@@ -20,7 +20,7 @@ with no heading. A property that no section names goes to a last section with no
 - **One field in a section.** A section that holds one field names it in its heading, so the field has
   no label of its own. A section that holds one object shows the object's fields itself.
 - **One list in a section.** In the generic form's sections, a section that holds one list puts the list's Add…
-  on the right of its heading, and the table has no toolbar row.
+  on the right of its heading as a light text button, and the table has no toolbar row.
 - **One rhythm.** There is `spacing-md` on each side of the rule.
 - **One shared part.** The section is `SectionPart`, in `SectionParts`, one shared part that the generic form
   draws and the typed editors draw too.
@@ -74,7 +74,9 @@ away instead.
 ## Lists of objects
 
 A list of objects is a table with one column per property, named by its field text. A list of plain
-values keeps its rows of inputs.
+values and a map with marked keys are rows of inputs, with no box round a row, and spacing sets the
+rows apart. Add, or Add row in a dialog, is a light text button on the list's title row. Each row's
+Remove is in its "…" menu, the table's row actions. A field in `readOnlyNames` shows none of them.
 
 - **A cell shows content, never a bare count.** A cell shows the value, Yes or No, a label's text, a
   nested list's items one to a line, or a map's entries as `key: value`. A label shows its text in the
@@ -94,8 +96,8 @@ values keeps its rows of inputs.
   list as one step to undo. Done stays on, and a click on it with a required field empty shows what to fill in under
   each such field and focuses the first, as [fields](actions-and-controls.md#fields) says, and the dialog stays open.
   Cancel leaves the list as it was, so
-  Add… adds no row until Done. Inside the dialog a nested list is rows of inputs with Add row, because a
-  dialog never opens another.
+  Add… adds no row until Done. Inside the dialog a nested list is rows of inputs with Add row on its title
+  row, because a dialog never opens another.
 - **Labels in the dialog.** The texts typed in a label's boxes in the dialog are held with the copy. Done
   writes them with the item, in the same step to undo, and Cancel drops them, so the label's texts stay as
   they were.
@@ -104,7 +106,8 @@ values keeps its rows of inputs.
 - **A known kind's label.** A value of a known kind shows its label, such as a module
   or a package by the label of its manifest.
 - **A module's roles.** A module's roles are one line for each slot, such as "Budget
-  approver: department-manager", which names the application's role, and a slot that no role plays reads "Not mapped" in `warningText`.
+  approver: department-manager", which names the application's role, and a slot that no role plays reads "Not mapped".
+- **Not mapped is a status**. A slot that no role plays shows Not mapped as a `StatusTag` in `attention`.
 - **A module's relaxed points.** A module's relaxed points show as
   [relaxed points in Settings](#relaxed-points-in-settings) says.
 - **A version range's column.** A version range is as wide as its content.

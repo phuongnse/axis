@@ -1,5 +1,5 @@
 import { AlignLeftOutlined, CopyOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Flex, message, Modal, Tabs } from 'antd'
+import { ConfigProvider, Flex, message, Modal, Tabs } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import {
   lazy,
@@ -32,8 +32,7 @@ import {
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { SectionParts } from '../platform/SectionParts'
-import { useContentInset } from '../platform/contentInset'
-import { workspaceTabRow } from '../platform/workspaceTabRow'
+import { ContentInsetContext } from '../platform/contentInsetContext'
 import { SaveBar } from '../platform/SaveBar'
 import { QuotaRefusedError } from '../platform/quota'
 import { savedRecordIds, seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
@@ -62,6 +61,7 @@ import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useCopy } from '../platform/useCopy'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { workspaceTabRow } from '../platform/workspaceTabRow'
 import { withoutEditorView } from '../platform/unsavedChanges'
 import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointEvent } from './EndpointEvent'
@@ -249,7 +249,7 @@ export function StudioEditor({
   const t = useText()
   const tokens = useDesignTokens()
   const { size, colour } = tokens
-  const wholeWayTabRow = workspaceTabRow(tokens, useContentInset())
+  const inset = useContext(ContentInsetContext)
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -1165,9 +1165,7 @@ export function StudioEditor({
             <ExpressionCheckContext.Provider value={checkContext}>
               <LabelTextsContext.Provider value={labelContext}>
                 <Tabs
-                  // Proposed, #3264 and #4888: a view switch is a row of line tabs in the one look every tab row has,
-                  // and its rule runs the whole way, see docs/reference/shell.md#layout.
-                  {...wholeWayTabRow}
+                  {...workspaceTabRow(tokens, { bleed: inset })}
                   activeKey={tab}
                   onChange={(key) => openTab(key as 'design' | 'form' | 'json' | 'usedBy')}
                   tabBarExtraContent={
@@ -1335,8 +1333,11 @@ export function StudioEditor({
                 data-testid="studio-conflict"
                 kind="warning"
                 message={t('shell.studio.conflict')}
-                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
+                action={
+                  <AxisButton role="secondary" onClick={reload}>
+                    {t('shell.studio.reload')}
+                  </AxisButton>
+                }
               />
             )}
             {saveError !== null && <AxisAlert data-testid="studio-save-error" kind="error" message={saveError} />}

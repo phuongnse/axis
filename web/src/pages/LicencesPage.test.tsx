@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { axisLicenceUrl, axisSourceUrl, type Licences } from '../platform/licences'
+import { expectTitleAloneInBand } from '../test/pageBand'
 import { isSignInNeeded } from '../platform/signInNeeded'
 import { TextProvider } from '../platform/TextProvider'
 import { PlatformContext, type Platform } from './context'
@@ -79,6 +80,15 @@ function renderPage(address = '/licences') {
 const link = (name: string) => screen.getByRole('link', { name })
 
 describe('LicencesPage', () => {
+  it('holds the title alone in the band', async () => {
+    stubServer({ licences: unauthorized, about: unauthorized })
+    renderPage()
+
+    await screen.findByText('react')
+
+    expectTitleAloneInBand('Open source licences')
+  })
+
   it('shows names and licences without versions to an anonymous visitor, and never asks to sign in', async () => {
     const fetchMock = stubServer({ licences: unauthorized, about: unauthorized })
 

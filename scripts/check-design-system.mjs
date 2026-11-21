@@ -9,8 +9,10 @@
 // - start with the line `/* @ds-bundle: {...} */` that scripts/design-system-header.mjs writes: JSON with `format` 4,
 //   the `namespace` Axis, and the `components`, each with the name of one card, every card of the previews once,
 // - parse as a classic script, so it has no `import` declaration and no `import.meta`,
-// - have no dynamic `import(`, which would load code after the script, and
-// - have no literal `</script` or `<!--`, which would end or hide an inlined script.
+// - have no dynamic `import(`, which would load code after the script,
+// - have no literal `</script` or `<!--`, which would end or hide an inlined script, and
+// - have no font, which means no `@font-face` rule and no `data:font/` URL, see
+//   docs/reference/frontend.md#design-tokens-and-previews.
 // Prints the size and exits 1 with the problems on stderr when a check fails.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -110,6 +112,11 @@ export function checkDesignSystemBundle(folder) {
   }
   if (/<!--/.test(source)) {
     problems.push(`${bundleFile} has a literal <!--.`)
+  }
+  if (/@font-face\s*\{/i.test(source) || /data:font\//i.test(source)) {
+    problems.push(
+      `${bundleFile} holds a font. The bundle carries no fonts, see docs/reference/frontend.md#design-tokens-and-previews.`,
+    )
   }
   return { bytes, problems }
 }

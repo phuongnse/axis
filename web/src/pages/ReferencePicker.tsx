@@ -1,8 +1,9 @@
 import { ExportOutlined } from '@ant-design/icons'
-import { Select, Space, Tag } from 'antd'
+import { Select, Space } from 'antd'
 import { useContext } from 'react'
 import { useHref, useLinkClickHandler } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
+import { StatusTag } from '../platform/StatusTag'
 import { studioResourceAddress } from '../platform/studioAddress'
 import { labelText, StudioApplicationContext, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
@@ -16,7 +17,8 @@ import { PlatformContext } from './context'
  * plain string is a choice with no label. A choice may carry a ready `label`, already in the reader's language, which
  * shows in place of the names' label. A value that is not one of the choices stays visible and is tagged unknown,
  * so a file that names something gone still shows it. A chosen resource of the application Studio has open gets an Open
- * link joined after the select, see [reference pickers](docs/reference/studio.md#reference-pickers).
+ * link joined after the select, see [reference pickers](docs/reference/studio.md#reference-pickers). Inside an
+ * `AxisField`, the select and its Open link together are as wide as the field, see docs/reference/shell.md#layout.
  */
 export function ReferencePicker({
   name,
@@ -39,7 +41,10 @@ export function ReferencePicker({
   required: boolean
   options: readonly (string | ReferenceOption)[]
   onChange: (next: string | undefined) => void
-  /** The select's width in px, at least 240 by default. */
+  /**
+   * The select's width in px. By default it is at least 240 px, and inside an `AxisField` with a joined Open link it
+   * grows to fill the field beside the link.
+   */
   width?: number
   placeholder?: string
 }) {
@@ -78,8 +83,7 @@ export function ReferencePicker({
             value: current,
             label: (
               <span data-testid="studio-reference-unknown">
-                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                {current} <Tag color="warning">{t('shell.studio.unknownName')}</Tag>
+                {current} <StatusTag tone="attention">{t('shell.studio.unknownName')}</StatusTag>
               </span>
             ),
           },
@@ -101,6 +105,8 @@ export function ReferencePicker({
     })),
   ]
 
+  // A select joined with its Open link grows to take the room the field leaves beside the link.
+  const joined = application !== undefined && chosen?.id !== undefined
   const select = (
     <Select
       aria-label={name}
@@ -110,7 +116,7 @@ export function ReferencePicker({
       showSearch
       virtual={false}
       allowClear={!required}
-      style={width === undefined ? { minWidth: 240 } : { width }}
+      style={width === undefined ? { minWidth: 240, flex: joined ? 1 : undefined } : { width }}
       placeholder={placeholder}
       value={match ?? current}
       options={choices}

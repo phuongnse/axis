@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { UserRoles } from '../platform/users'
 import { TextProvider } from '../platform/TextProvider'
+import { expectTitleAloneInBand } from '../test/pageBand'
 import { PlatformContext, type Platform } from './context'
 import { UserPage } from './UserPage'
 
@@ -87,6 +88,13 @@ afterEach(() => {
 })
 
 describe('UserPage', () => {
+  it('holds the name alone in the band', async () => {
+    stubRoles()
+    await openAnn()
+
+    expectTitleAloneInBand('Ann Invited')
+  })
+
   it('shows the name as title, the email and the roles, tags one that is not declared and lists the platform roles', async () => {
     const fetchMock = stubRoles()
     const page = await openAnn()

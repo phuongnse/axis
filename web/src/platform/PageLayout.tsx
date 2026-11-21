@@ -1,15 +1,8 @@
-import { Breadcrumb, Flex, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router'
-import { useText } from './texts'
+import { ContentInsetContext } from './contentInsetContext'
 import { useDesignTokens } from './themeMode'
-
-/** One step of a page's breadcrumb. A step with `to` is a link, and the last step has none. */
-export interface BreadcrumbStep {
-  label: string
-  to?: string
-}
 
 /** The element of the page's heading that {@link PageActions} draws into: `null` before it is drawn, `undefined` outside a page. */
 const ActionsSlot = createContext<HTMLElement | null | undefined>(undefined)
@@ -18,15 +11,15 @@ const ActionsSlot = createContext<HTMLElement | null | undefined>(undefined)
  * The layout of a page, see docs/reference/shell.md#page-header: its title as the page's level-one heading, drawn at the
  * size of a level-four one, with its `tags` beside it and its `line`, the kind of the thing, under it in `textMuted`,
  * and the page's sections stacked below. The page's own actions sit on the heading's right, which any component inside
- * the page fills through {@link PageActions}. With a breadcrumb, the heading sits under it in a band on the surface colour
- * that spans the page area, and the last step is marked as the current page. It replaces the old page container. Pages
- * add no spacing or styling of their own.
+ * the page fills through {@link PageActions}. With `band`, the heading sits alone in a band on the surface colour that
+ * spans the page area, see docs/reference/shell.md#page-header. It replaces the old page container. Pages add no
+ * spacing or styling of their own.
  */
 export function PageLayout({
   title,
   tags,
   line,
-  breadcrumb,
+  band,
   children,
 }: {
   title: string
@@ -34,7 +27,8 @@ export function PageLayout({
   tags?: ReactNode
   /** The kind of the thing alone, under the title. Empty draws nothing. */
   line?: string | null
-  breadcrumb?: readonly BreadcrumbStep[]
+  /** Draws the heading alone in a band across the top of the page area. */
+  band?: boolean
   children?: ReactNode
 }) {
   const [slot, setSlot] = useState<HTMLElement | null>(null)
@@ -43,7 +37,7 @@ export function PageLayout({
   return (
     <ActionsSlot.Provider value={slot}>
       <Flex vertical gap="middle">
-        {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
+        {band ? <HeaderBand>{heading}</HeaderBand> : heading}
         {children}
       </Flex>
     </ActionsSlot.Provider>
@@ -102,29 +96,23 @@ export function PageHeading({
   )
 }
 
-function HeaderBand({ steps, children }: { steps: readonly BreadcrumbStep[]; children: ReactNode }) {
-  const t = useText()
+function HeaderBand({ children }: { children: ReactNode }) {
   const { colour, spacing } = useDesignTokens()
+  const inset = useContext(ContentInsetContext)
 
   return (
     <div
+      data-testid="page-band"
       style={{
-        // Negative margins reach the edges of the content area, whose padding is spacing.lg.
-        margin: `-${spacing.lg}px -${spacing.lg}px 0`,
-        padding: `${spacing.lg}px ${spacing.lg}px ${spacing.md}px`,
+        // Negative margins reach the edges of the content area, whose padding the shell gives through ContentInsetContext,
+        // see docs/reference/shell.md#layout.
+        margin: `-${inset}px -${inset}px 0`,
+        padding: `${spacing.md}px ${inset}px`,
         background: colour.surface,
         borderBottom: `1px solid ${colour.borderSubtle}`,
       }}
     >
-      <Flex vertical gap={spacing.xs}>
-        <Breadcrumb
-          aria-label={t('shell.breadcrumb.label')}
-          items={steps.map((step) => ({
-            title: step.to ? <Link to={step.to}>{step.label}</Link> : <span aria-current="page">{step.label}</span>,
-          }))}
-        />
-        {children}
-      </Flex>
+      {children}
     </div>
   )
 }

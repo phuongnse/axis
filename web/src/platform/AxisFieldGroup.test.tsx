@@ -1,6 +1,7 @@
 import { ConfigProvider, Input } from 'antd'
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { AxisButton } from './AxisButton'
 import { AxisFieldGroup } from './AxisFieldGroup'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
@@ -42,5 +43,19 @@ describe('AxisFieldGroup', () => {
     )
 
     expect(screen.getByRole('group', { name: 'Rows' })).toHaveAccessibleDescription('')
+  })
+
+  it('draws its action as a light text button on the title row, and names the group by its title alone', () => {
+    renderGroup(
+      <AxisFieldGroup title="Rows" help="" action={<AxisButton role="secondary">Add row</AxisButton>}>
+        <Input aria-label="Row" />
+      </AxisFieldGroup>,
+    )
+
+    const group = screen.getByRole('group', { name: 'Rows' })
+    const add = within(group).getByRole('button', { name: 'Add row' })
+    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add).not.toHaveClass('ant-btn-variant-outlined')
+    expect(within(group).getByRole('textbox', { name: 'Row' })).toBeInTheDocument()
   })
 })

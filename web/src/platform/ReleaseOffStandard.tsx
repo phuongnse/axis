@@ -1,5 +1,6 @@
-import { Flex, Tag, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { nameCompare } from './listOrder'
+import { StatusTag } from './StatusTag'
 import type { StudioRelaxedPoint } from './studio'
 import { useText } from './texts'
 
@@ -24,10 +25,9 @@ export function ReleaseOffStandard({
   }
   const compare = nameCompare(locale)
   const tag = (
-    // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-    <Tag color="warning" data-testid="release-off-standard">
+    <StatusTag tone="attention" data-testid="release-off-standard">
       {t('shell.studio.offStandard')}
-    </Tag>
+    </StatusTag>
   )
   if (tagOnly) {
     return tag

@@ -1,7 +1,8 @@
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
-import { Button, Flex, Menu, Typography } from 'antd'
+import { Flex, Menu, Typography } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Announcement } from '../platform/Announcement'
+import { AxisButton } from '../platform/AxisButton'
 import { SidePanel } from '../platform/SidePanel'
 import { fillText } from '../platform/fillText'
 import { graphImageName } from '../platform/graphImage'
@@ -317,10 +318,9 @@ export default function StudioProcessDesign({
                       <Typography.Text>
                         {transitionName(graph, selectedTransition, t('shell.studio.processGraph.to'))}
                       </Typography.Text>
-                      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                      <Button danger onClick={() => removeTransition(selectedTransition)}>
+                      <AxisButton role="secondary" destructive onClick={() => removeTransition(selectedTransition)}>
                         {t('shell.studio.process.removeTransition')}
-                      </Button>
+                      </AxisButton>
                     </Flex>
                   ) : null}
                   <ProcessStepPanel
@@ -343,8 +343,7 @@ export default function StudioProcessDesign({
       </div>
       <DragOverlay dropAnimation={null}>
         {dragging === undefined ? null : (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button>{entryLabel(dragging, t('shell.studio.process.packageOperation'))}</Button>
+          <AxisButton role="secondary">{entryLabel(dragging, t('shell.studio.process.packageOperation'))}</AxisButton>
         )}
       </DragOverlay>
     </DndContext>

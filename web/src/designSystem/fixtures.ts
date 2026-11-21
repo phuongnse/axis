@@ -6,7 +6,7 @@ import type { OwnAuthenticators } from '../platform/ownAuthenticators'
 import type { OwnNotificationPreferences } from '../platform/ownNotificationPreferences'
 import type { OwnSessions } from '../platform/ownSessions'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
-import type { DeadLetterPage, InstancePage } from '../platform/inspection'
+import type { DeadLetterPage, InstanceDetail, InstancePage } from '../platform/inspection'
 import type {
   ApplicationSite,
   DataSourceMetadata,
@@ -47,6 +47,7 @@ import type {
   UpdateProfileContext,
   UpdateProfileTexts,
 } from '../identitySignIn/signInContext'
+import type { UserList, UserRoles } from '../platform/users'
 import type { FixtureRoute } from './fixtureFetch'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
@@ -77,12 +78,16 @@ export const requestId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
 export const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 /** The id of the saved request that the `shell` preview opens, whose Urgent box is not checked. */
 export const shellRequestId = '9d4f5a6b-7c81-4d93-a4b5-c6d7e8f90a1b'
+/** The first person of the users page, whose page the `shell` preview opens. */
+export const shellUserId = 'b5e6f708-1c2d-4e3f-8a4b-5c6d7e8f9a0b'
 /** A well-formed request id that no record has, which the fixtures answer `404` for. */
 export const missingRequestId = 'c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f'
 /** The first task of the inbox, which the `shell` preview opens. */
 export const taskId = '9c4f5d6e-7081-4c93-9da4-c5e6f708192a'
 /** A well-formed task id that no task has, which the fixtures answer `404` for. */
 export const missingTaskId = 'e4f5a6b7-c8d9-4e0f-8a1b-2c3d4e5f6a7b'
+/** The waiting instance that the `shell` preview opens, which the instance list shows as its second row. */
+export const instanceId = 'be6b7f80-92a3-4eb5-bfc6-e708192a3b4c'
 const releaseId = '3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b0a'
 
 function field(name: string, type: FieldType, labelKey: string): FieldMetadata {
@@ -691,11 +696,11 @@ const instancePage: InstancePage = {
       endedAt: '2026-03-05T10:20:00.000000Z',
     },
     {
-      id: 'be6b7f80-92a3-4eb5-bfc6-e708192a3b4c',
+      id: instanceId,
       subjectId: requestId,
       subjectLabel: 'Standing desks for the new office',
       state: 'waiting',
-      step: 'Review',
+      step: 'confirmReceipt',
       releaseId,
       releaseNumber: 3,
       createdAt: '2026-03-04T09:31:00.000000Z',
@@ -800,6 +805,7 @@ export const applicationSite: ApplicationSite = {
     { page: 'Requests', labelKey: 'nav.requests', icon: 'list' },
     { page: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks' },
     { page: 'Dashboard', labelKey: 'nav.dashboard', icon: 'dashboard' },
+    { page: 'Instances', labelKey: 'nav.instances', icon: 'process' },
   ],
   notificationsPath,
   // Request has a form page. Category has none, so it opens on the default record page.
@@ -811,6 +817,14 @@ const requestsPage: PageMetadata = {
   titleKey: 'page.requests',
   parameters: [],
   widgets: [tableWidget],
+}
+
+/** The Approvals page: the process inspector over the Approve process, whose instances open on their own page. */
+const instancesPage: PageMetadata = {
+  name: 'Instances',
+  titleKey: 'page.instances',
+  parameters: [],
+  widgets: [processInspectorWidget],
 }
 
 /** A dashboard: two kpi tiles side by side, one of them a link, and a bar chart under them. */
@@ -889,6 +903,286 @@ const currentUser: CurrentUser = {
   tenantExports: false,
 }
 
+/** The texts of the instance's release: its process's title and its steps' labels, in English. */
+const approveTexts: Record<string, string> = {
+  'process.approve.title': 'Purchase approval',
+  'process.approve.checkBudget': 'Check the budget',
+  'process.approve.withinBudget': 'Within budget',
+  'process.approve.review': 'Review the request',
+  'process.approve.createOrder': 'Create the order',
+  'process.approve.arrangeDelivery': 'Arrange delivery',
+  'process.approve.confirmReceipt': 'Confirm receipt',
+  'process.approve.done': 'Done',
+  'process.approve.outcome.approve': 'Approve',
+  'process.approve.outcome.reject': 'Reject',
+  'process.delivery.title': 'Delivery',
+}
+
+/**
+ * The waiting instance that the Process instance state opens. Its path has a decision that took its fallback, a review
+ * that a person completed, an order call that succeeded on its third attempt, a sub-process that completed, and an open
+ * task, so History has each kind of run. Its Data tab reads that it had no input and has not ended.
+ */
+const instanceDetail: InstanceDetail = {
+  id: instanceId,
+  process: 'Approve',
+  processTitleKey: 'process.approve.title',
+  subjectId: requestId,
+  subjectEntity: 'Request',
+  subjectLabel: 'Standing desks for the new office',
+  releaseId,
+  releaseNumber: 3,
+  state: 'waiting',
+  step: 'confirmReceipt',
+  timerDueAt: null,
+  createdAt: '2026-03-04T09:31:00.000000Z',
+  endedAt: null,
+  startedBy: { kind: 'person', name: currentUser.displayName, id: currentUser.id, via: 'request.submit' },
+  input: null,
+  result: null,
+  studio: null,
+  graph: {
+    start: 'checkBudget',
+    steps: [
+      {
+        name: 'checkBudget',
+        type: 'decision',
+        labelKey: 'process.approve.checkBudget',
+        event: null,
+        eventLabelKey: null,
+        transitions: [
+          {
+            next: 'createOrder',
+            on: '0',
+            branch: 'withinBudget',
+            labelKey: 'process.approve.withinBudget',
+            after: null,
+          },
+          { next: 'review', on: 'otherwise', branch: null, labelKey: null, after: null },
+        ],
+      },
+      {
+        name: 'review',
+        type: 'task',
+        labelKey: 'process.approve.review',
+        event: null,
+        eventLabelKey: null,
+        transitions: [
+          {
+            next: 'createOrder',
+            on: 'approve',
+            branch: null,
+            labelKey: 'process.approve.outcome.approve',
+            after: null,
+          },
+          { next: 'done', on: 'reject', branch: null, labelKey: 'process.approve.outcome.reject', after: null },
+        ],
+      },
+      {
+        name: 'createOrder',
+        type: 'operation',
+        labelKey: 'process.approve.createOrder',
+        event: null,
+        eventLabelKey: null,
+        transitions: [{ next: 'arrangeDelivery', on: null, branch: null, labelKey: null, after: null }],
+      },
+      {
+        name: 'arrangeDelivery',
+        type: 'subProcess',
+        labelKey: 'process.approve.arrangeDelivery',
+        event: null,
+        eventLabelKey: null,
+        transitions: [{ next: 'confirmReceipt', on: null, branch: null, labelKey: null, after: null }],
+      },
+      {
+        name: 'confirmReceipt',
+        type: 'task',
+        labelKey: 'process.approve.confirmReceipt',
+        event: null,
+        eventLabelKey: null,
+        transitions: [
+          { next: 'done', on: 'approve', branch: null, labelKey: 'process.approve.outcome.approve', after: null },
+        ],
+      },
+      {
+        name: 'done',
+        type: 'end',
+        labelKey: 'process.approve.done',
+        event: null,
+        eventLabelKey: null,
+        transitions: [],
+      },
+    ],
+  },
+  path: [
+    {
+      step: 'checkBudget',
+      startedAt: '2026-03-04T09:31:00.000000Z',
+      finishedAt: '2026-03-04T09:31:00.010000Z',
+      decision: 'otherwise',
+      output: null,
+      error: null,
+      problem: null,
+      traceId: null,
+    },
+    {
+      step: 'review',
+      startedAt: '2026-03-04T09:31:00.020000Z',
+      finishedAt: '2026-03-04T09:31:00.030000Z',
+      decision: null,
+      output: { state: 'waiting', taskId: 'c5d6e7f8-0a1b-4c2d-8e3f-4a5b6c7d8e9f' },
+      error: null,
+      problem: null,
+      traceId: null,
+    },
+    {
+      step: 'review',
+      startedAt: '2026-03-04T15:12:00.000000Z',
+      finishedAt: '2026-03-04T15:12:00.010000Z',
+      decision: 'approve',
+      output: { state: 'completed', taskId: 'c5d6e7f8-0a1b-4c2d-8e3f-4a5b6c7d8e9f' },
+      error: null,
+      problem: null,
+      traceId: null,
+    },
+    {
+      step: 'createOrder',
+      startedAt: '2026-03-04T15:12:00.020000Z',
+      finishedAt: '2026-03-04T15:12:03.000000Z',
+      decision: null,
+      output: { state: 'succeeded' },
+      error: null,
+      problem: null,
+      traceId: null,
+    },
+    {
+      step: 'arrangeDelivery',
+      startedAt: '2026-03-04T15:12:03.100000Z',
+      finishedAt: '2026-03-04T15:20:00.050000Z',
+      decision: null,
+      output: { state: 'completed', childId: 'e7f8a9b0-2c3d-4e4f-8a5b-6c7d8e9f0a1b' },
+      error: null,
+      problem: null,
+      traceId: null,
+    },
+    {
+      step: 'confirmReceipt',
+      startedAt: '2026-03-04T15:20:00.100000Z',
+      finishedAt: '2026-03-04T15:20:00.120000Z',
+      decision: null,
+      output: { state: 'waiting', taskId: 'd6e7f8a9-1b2c-4d3e-9f4a-5b6c7d8e9f0a' },
+      error: null,
+      problem: null,
+      traceId: null,
+    },
+  ],
+  tasks: [
+    {
+      id: 'c5d6e7f8-0a1b-4c2d-8e3f-4a5b6c7d8e9f',
+      step: 'review',
+      assigneeKind: 'role',
+      assignee: 'Manager',
+      assigneeId: currentUser.id,
+      state: 'completed',
+      outcome: 'approve',
+      completedBy: currentUser.displayName,
+      completedById: currentUser.id,
+      createdAt: '2026-03-04T09:31:00.020000Z',
+      dueAt: '2026-03-05T17:00:00.000000Z',
+      completedAt: '2026-03-04T15:12:00.000000Z',
+    },
+    {
+      id: 'd6e7f8a9-1b2c-4d3e-9f4a-5b6c7d8e9f0a',
+      step: 'confirmReceipt',
+      assigneeKind: 'role',
+      assignee: 'Operator',
+      assigneeId: null,
+      state: 'open',
+      outcome: null,
+      completedBy: null,
+      completedById: null,
+      createdAt: '2026-03-04T15:20:00.120000Z',
+      dueAt: '2026-03-06T17:00:00.000000Z',
+      completedAt: null,
+    },
+  ],
+  calls: [
+    {
+      id: 'f8a9b0c1-3d4e-4f5a-9b6c-7d8e9f0a1b2c',
+      kind: 'connector',
+      step: 'createOrder',
+      connector: 'ERP',
+      operation: 'createPurchaseOrder',
+      state: 'succeeded',
+      attempts: [
+        {
+          kind: 'attempt',
+          number: 1,
+          startedAt: '2026-03-04T15:12:00.100000Z',
+          finishedAt: '2026-03-04T15:12:01.000000Z',
+          outcome: 'retryable',
+          httpStatus: 503,
+          error: null,
+          problem: null,
+          traceId: null,
+        },
+        {
+          kind: 'attempt',
+          number: 2,
+          startedAt: '2026-03-04T15:12:01.500000Z',
+          finishedAt: '2026-03-04T15:12:02.000000Z',
+          outcome: 'retryable',
+          httpStatus: 503,
+          error: null,
+          problem: null,
+          traceId: null,
+        },
+        {
+          kind: 'attempt',
+          number: 3,
+          startedAt: '2026-03-04T15:12:02.500000Z',
+          finishedAt: '2026-03-04T15:12:03.000000Z',
+          outcome: 'succeeded',
+          httpStatus: 201,
+          error: null,
+          problem: null,
+          traceId: null,
+          response: {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' },
+            body: '{"orderId":"PO-2201"}',
+            truncated: false,
+          },
+        },
+      ],
+      input: { item: 'Standing desks', quantity: 4, amount: '1250.50' },
+      inputHidden: false,
+      request: {
+        method: 'POST',
+        url: 'https://erp.example.com/api/purchase-orders',
+        query: {},
+        headers: { 'Content-Type': 'application/json' },
+        body: '{"item":"Standing desks","quantity":4,"amount":"1250.50"}',
+        truncated: false,
+      },
+      resolvable: false,
+    },
+  ],
+  parent: null,
+  subProcesses: [
+    {
+      id: 'e7f8a9b0-2c3d-4e4f-8a5b-6c7d8e9f0a1b',
+      process: 'Delivery',
+      processTitleKey: 'process.delivery.title',
+      step: 'arrangeDelivery',
+      state: 'completed',
+      createdAt: '2026-03-04T15:12:03.250000Z',
+      endedAt: '2026-03-04T15:20:00.000000Z',
+    },
+  ],
+  commands: ['cancel'],
+}
+
 /**
  * The first task of the inbox as the task page reads it: open, claimed by the signed-in person and overdue. Its subject
  * is the shell's request, with Urgent unchecked, as `shellRecord` says.
@@ -937,6 +1231,51 @@ const ownSessions: OwnSessions = {
       current: false,
     },
   ],
+}
+
+const shellUsers: UserList = {
+  page: 1,
+  pageSize: 20,
+  totalCount: 3,
+  items: [
+    {
+      id: shellUserId,
+      displayName: 'Priya Raman',
+      email: 'priya.raman@example.com',
+      provider: null,
+      status: 'active',
+      lastSignedInAt: '2026-11-19T07:45:00Z',
+    },
+    {
+      id: 'c6f70819-2d3e-4f40-9b5c-6d7e8f9a0b1c',
+      displayName: 'Tomas Berg',
+      email: 'tomas.berg@example.com',
+      provider: 'google',
+      status: 'active',
+      lastSignedInAt: '2026-11-18T16:20:00Z',
+    },
+    {
+      id: 'd708192a-3e4f-4051-8c6d-7e8f9a0b1c2d',
+      displayName: 'Lena Fischer',
+      email: 'lena.fischer@example.com',
+      provider: null,
+      status: 'invited',
+      lastSignedInAt: null,
+    },
+  ],
+}
+
+const shellApplicationId = '5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c01'
+
+const shellUserRoles: UserRoles = {
+  displayName: 'Priya Raman',
+  email: 'priya.raman@example.com',
+  given: [
+    { applicationId: shellApplicationId, role: 'buyer', declared: true },
+    { applicationId: null, role: 'author', declared: true },
+  ],
+  applications: [{ id: shellApplicationId, name: 'Purchase requests', roles: ['approver', 'buyer'] }],
+  platformRoles: ['author', 'publisher', 'developer', 'operator', 'administrator'],
 }
 
 // Process has the daily digest on, so the hour shows. Authoring requests have no email.
@@ -1375,9 +1714,11 @@ export const siteTexts: Record<string, string> = {
   'nav.requests': 'Requests',
   'nav.tasks': 'Tasks',
   'nav.dashboard': 'Dashboard',
+  'nav.instances': 'Approvals',
   'page.requests': 'Requests',
   'page.dashboard': 'Dashboard',
   'page.tasks': 'Tasks',
+  'page.instances': 'Approvals',
   'request.outcome.approve': 'Approve',
   'request.outcome.reject': 'Reject',
 }
@@ -1422,6 +1763,8 @@ export const fixtureScopes = [
   '/api/me',
   '/api/about',
   '/api/notifications',
+  '/api/users',
+  '/api/tenant/',
 ] as const
 
 /** A person's table choices when nothing is kept. */
@@ -1446,6 +1789,7 @@ export const routes: Record<string, FixtureRoute> = {
   [`${tasksPath}/${taskId}/form-state`]: noStateAnswer,
   [`${tasksPath}/${missingTaskId}`]: () => new Response(null, { status: 404 }),
   [instancesPath]: () => instancePage,
+  [`${instancesPath}/${instanceId}`]: () => instanceDetail,
   [deadLettersPath]: () => deadLetterPage,
   [requestsByStatusPath]: () => requestsByStatusPage,
   [requestTotalsPath]: () => requestTotalsPage,
@@ -1457,11 +1801,22 @@ export const routes: Record<string, FixtureRoute> = {
   [`/api/me/tables/site.${sitePath}.tasks`]: () => noTableChoices,
   [`/api/me/tables/site.${sitePath}.instances`]: () => noTableChoices,
   [`/api/sites/${sitePath}/texts/${locale}`]: () => ({ texts: siteTexts }),
+  // A release's texts are the site's texts with its process's own, as a site reads a release it shows work from.
+  [`/api/sites/${sitePath}/texts/${locale}?release=${releaseId}`]: () => ({
+    locale,
+    texts: { ...siteTexts, ...approveTexts },
+  }),
   [`/api/sites/${sitePath}`]: () => applicationSite,
   [`/api/sites/${sitePath}/pages/requests`]: () => requestsPage,
   [`/api/sites/${sitePath}/pages/request`]: () => requestPage,
   [`/api/sites/${sitePath}/pages/tasks`]: () => tasksPage,
   [`/api/sites/${sitePath}/pages/dashboard`]: () => dashboardPage,
+  [`/api/sites/${sitePath}/pages/instances`]: () => instancesPage,
+  // The inspector links read each navigation page by the name its navigation gives, not by its address.
+  [`/api/sites/${sitePath}/pages/Requests`]: () => requestsPage,
+  [`/api/sites/${sitePath}/pages/Tasks`]: () => tasksPage,
+  [`/api/sites/${sitePath}/pages/Dashboard`]: () => dashboardPage,
+  [`/api/sites/${sitePath}/pages/Instances`]: () => instancesPage,
   [`/api/sites/${sitePath}/records/category`]: () => categoryRecordPage,
   [formStatePath('RequestForm')]: noStateAnswer,
   [notificationsPath]: () => notificationPage,
@@ -1472,6 +1827,15 @@ export const routes: Record<string, FixtureRoute> = {
   // A save is a PUT, which the page answers with its status alone, so 204 is enough.
   '/api/me/notification-preferences': (init) =>
     init?.method === 'PUT' ? new Response(null, { status: 204 }) : ownNotificationPreferences,
+  '/api/me/tables/users': () => noTableChoices,
+  '/api/users': () => shellUsers,
+  [`/api/users/${shellUserId}/roles`]: () => shellUserRoles,
+  // The users page's tenant sections answer 404, so it shows only its people.
+  '/api/tenant/outside-clients': () => new Response(null, { status: 404 }),
+  '/api/tenant/usage': () => new Response(null, { status: 404 }),
+  '/api/tenant/hosts': () => new Response(null, { status: 404 }),
+  '/api/tenant/model-key': () => new Response(null, { status: 404 }),
+  '/api/tenant/application-packages': () => new Response(null, { status: 404 }),
   '/api/about': () => ({ version: '0.1.0' }),
   '/api/notifications': () => tenantNoticePage,
 }

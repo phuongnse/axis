@@ -1,4 +1,4 @@
-import { Button, Card, Flex, Input, Select, Typography } from 'antd'
+import { Card, ConfigProvider, Flex, Input, Select, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { fillText } from '../platform/fillText'
@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { useContext, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { RowActions } from '../platform/AxisTable'
 import type { StudioNameField } from '../platform/studio'
 import {
   changeStepType,
@@ -89,7 +90,11 @@ export function KeyInput({
   )
 }
 
-/** Rows of a key and a value, each removable, with a button that adds a row under a fresh key. */
+/**
+ * Rows of a key and a value, each removable. Add sits on the group's title row and adds a row under a fresh key. Each
+ * row's Delete is in its "…" menu, and a read-only editor, Ant Design's `componentDisabled`, shows neither, see
+ * docs/reference/studio-editors-by-kind.md#scenario-editor.
+ */
 export function KeyValueRows({
   pointer,
   values,
@@ -107,43 +112,56 @@ export function KeyValueRows({
   prefix: string
   onChange: ChangeHandler
 }) {
-  const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   return (
-    <AxisFieldGroup {...group}>
+    <AxisFieldGroup
+      {...group}
+      action={
+        componentDisabled ? undefined : (
+          <AxisButton role="secondary" onClick={() => onChange(`${pointer}/${freshKey(values, prefix)}`, '')}>
+            {addLabel}
+          </AxisButton>
+        )
+      }
+    >
       <Flex vertical gap="small">
         {Object.keys(values).map((key) => (
-          <Flex key={key} gap="small" align="flex-end">
-            <AxisField {...keyField}>
-              <KeyInput
-                value={key}
-                onRename={(next) => {
-                  const renamed = renameKey(values, key, next)
-                  if (renamed === undefined) {
-                    return false
-                  }
-                  onChange(pointer, renamed)
-                  return true
-                }}
+          <Flex key={key} gap="small" align="flex-start">
+            <Flex gap="small" align="flex-end" style={{ flex: 1 }}>
+              <AxisField {...keyField}>
+                <KeyInput
+                  value={key}
+                  onRename={(next) => {
+                    const renamed = renameKey(values, key, next)
+                    if (renamed === undefined) {
+                      return false
+                    }
+                    onChange(pointer, renamed)
+                    return true
+                  }}
+                />
+              </AxisField>
+              <Input
+                aria-label={key}
+                value={literalText(values[key])}
+                onChange={(event) => onChange(`${pointer}/${pointerSegment(key)}`, parseLiteral(event.target.value))}
               />
-            </AxisField>
-            <Input
-              aria-label={key}
-              value={literalText(values[key])}
-              onChange={(event) => onChange(`${pointer}/${pointerSegment(key)}`, parseLiteral(event.target.value))}
-            />
-            <AxisButton
-              role="secondary"
-              destructive
-              onClick={() => onChange(`${pointer}/${pointerSegment(key)}`, undefined)}
-            >
-              {t('shell.studio.scenario.remove')}
-            </AxisButton>
+            </Flex>
+            {componentDisabled ? null : (
+              <RowActions
+                fold
+                actions={[
+                  {
+                    key: 'remove',
+                    labelKey: 'shell.studio.scenario.remove',
+                    destructive: true,
+                    onClick: () => onChange(`${pointer}/${pointerSegment(key)}`, undefined),
+                  },
+                ]}
+              />
+            )}
           </Flex>
         ))}
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button onClick={() => onChange(`${pointer}/${freshKey(values, prefix)}`, '')}>{addLabel}</Button>
-        </div>
       </Flex>
     </AxisFieldGroup>
   )
@@ -215,6 +233,7 @@ export function ScenarioStep({
   const t = useText()
   const names = useContext(StudioNamesContext)
   const texts = useFieldTexts('scenario')
+  const { componentDisabled } = ConfigProvider.useConfig()
   const stepValue = steps[index]
   const step: Step = isObject(stepValue) ? stepValue : {}
   const type = stepTypes.find((candidate) => candidate === step.type)
@@ -280,8 +299,24 @@ export function ScenarioStep({
     }
     const known = new Set(fields.map((field) => field.name))
     const missing = fields.filter((field) => !Object.hasOwn(values, field.name))
+    const addValue =
+      missing.length > 0 && !componentDisabled ? (
+        <Select
+          showSearch
+          optionFilterProp="label"
+          virtual={false}
+          aria-label={t('shell.studio.scenario.addValue')}
+          placeholder={t('shell.studio.scenario.addValue')}
+          value={null}
+          options={missing.map((field) => ({ value: field.name, label: field.name }))}
+          onChange={(name: string) => {
+            const field = missing.find((candidate) => candidate.name === name)!
+            onChange(at(`values/${pointerSegment(name)}`), startValue(field))
+          }}
+        />
+      ) : undefined
     return (
-      <AxisFieldGroup {...groupText('values')}>
+      <AxisFieldGroup {...groupText('values')} action={addValue}>
         <Flex vertical gap="small">
           {fields
             .filter((field) => Object.hasOwn(values, field.name))
@@ -314,21 +349,6 @@ export function ScenarioStep({
                 </AxisField>
               </div>
             ))}
-          {missing.length > 0 && (
-            <Select
-              showSearch
-              optionFilterProp="label"
-              virtual={false}
-              aria-label={t('shell.studio.scenario.addValue')}
-              placeholder={t('shell.studio.scenario.addValue')}
-              value={null}
-              options={missing.map((field) => ({ value: field.name, label: field.name }))}
-              onChange={(name: string) => {
-                const field = missing.find((candidate) => candidate.name === name)!
-                onChange(at(`values/${pointerSegment(name)}`), startValue(field))
-              }}
-            />
-          )}
         </Flex>
       </AxisFieldGroup>
     )
@@ -536,19 +556,31 @@ export function ScenarioStep({
         data-testid="studio-scenario-step"
         title={fillText(t('shell.studio.scenario.step'), { number: index + 1 })}
         extra={
-          <Flex gap="small">
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button disabled={index === 0} onClick={() => swap(index - 1)}>
-              {t('shell.studio.scenario.moveUp')}
-            </Button>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button disabled={index === steps.length - 1} onClick={() => swap(index + 1)}>
-              {t('shell.studio.scenario.moveDown')}
-            </Button>
-            <AxisButton role="secondary" destructive onClick={() => onChange(pointer, undefined)}>
-              {t('shell.studio.scenario.remove')}
-            </AxisButton>
-          </Flex>
+          componentDisabled ? undefined : (
+            <RowActions
+              fold
+              actions={[
+                {
+                  key: 'moveUp',
+                  labelKey: 'shell.studio.scenario.moveUp',
+                  disabled: index === 0,
+                  onClick: () => swap(index - 1),
+                },
+                {
+                  key: 'moveDown',
+                  labelKey: 'shell.studio.scenario.moveDown',
+                  disabled: index === steps.length - 1,
+                  onClick: () => swap(index + 1),
+                },
+                {
+                  key: 'remove',
+                  labelKey: 'shell.studio.scenario.remove',
+                  destructive: true,
+                  onClick: () => onChange(pointer, undefined),
+                },
+              ]}
+            />
+          )
         }
       >
         <Flex vertical gap="small">

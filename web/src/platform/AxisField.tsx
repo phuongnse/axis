@@ -1,6 +1,7 @@
 import { Form, type FormItemProps } from 'antd'
 import { cloneElement, forwardRef, useId, type ReactElement, type Ref } from 'react'
 import { Announcement } from './Announcement'
+import { fieldClass } from './antTheme'
 import { requiredMark } from './requiredMark'
 import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
@@ -127,7 +128,7 @@ function OwnField({ label, help, required, hideLabel, children }: OwnFieldProps)
   const ownId = useId()
   const id = children.props.id ?? ownId
   return (
-    <div className="axis-field">
+    <div className={fieldClass}>
       <label
         htmlFor={id}
         style={
@@ -159,7 +160,7 @@ function FormField({
   return (
     // The theme keeps no margin below the field. The form gives the gap, see docs/reference/shared-widgets.md#the-rule.
     <Form.Item
-      className="axis-field"
+      className={fieldClass}
       name={name}
       label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{label}</span>}
       required={requiredMessage !== undefined}

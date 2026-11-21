@@ -77,11 +77,14 @@ describe('design-system previews', () => {
         'Task',
         'Task not found',
         'Dashboard',
+        'Process instance',
         'Platform site',
         'App switcher',
         'Language and theme',
         'Account page',
         'Account notifications',
+        'Users page',
+        'User page',
       ],
     ],
     ['signIn', ['Sign-in refused', 'Signed out', 'Session ended']],
@@ -120,7 +123,7 @@ describe('design-system previews', () => {
     }
   })
 
-  test('the cards have the 30 names of the Design System artifact, in group order', () => {
+  test('the cards have the 31 names of the Design System artifact, in group order', () => {
     expect(cardGroups.flatMap(({ previews: group }) => group).map(cardName)).toEqual([
       'TextField',
       'IntegerField',
@@ -144,6 +147,7 @@ describe('design-system previews', () => {
       'Tabs',
       'Section',
       'States',
+      'StatusTag',
       'Shell',
       'SignIn',
       'IdentitySignIn',

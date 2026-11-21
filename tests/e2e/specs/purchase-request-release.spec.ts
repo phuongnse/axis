@@ -612,10 +612,12 @@ test.describe('the active release of the purchase request sample changes', () =>
       await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', headingB)
       await openStudio(page, server.url)
       await publishWithLabel(page, `Second ${stamp}`)
+      // The publisher runs one request of the tenant at a time, and other specs publish to it too, so the wait
+      // includes the queue. The trace of a failed run queued this publish for about 50 seconds before it started.
       await expect(page.getByTestId('studio-release-row').filter({ hasText: `Second ${stamp}` })).toHaveAttribute(
         'data-active',
         'true',
-        { timeout: 60_000 },
+        { timeout: 120_000 },
       )
 
       const first = page.getByTestId('studio-release-row').filter({ hasText: `First ${stamp}` })
@@ -628,7 +630,8 @@ test.describe('the active release of the purchase request sample changes', () =>
       })
       await confirmDialog(page, 'Activate')
 
-      await expect(status).toContainText('Activated', { timeout: 60_000 })
+      // The activation waits in the same queue as the publish above.
+      await expect(status).toContainText('Activated', { timeout: 120_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
       // The activation adds an activation, and the release keeps its one row, which is the live one now.
       await expect(

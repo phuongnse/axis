@@ -1,4 +1,5 @@
 import { expect, type FrameLocator, type Page } from "@playwright/test";
+import { spawn } from "node:child_process";
 import path from "node:path";
 
 // The design-system bundle is a separate build, which scripts/e2e.sh makes with scripts/design-system.sh. The page
@@ -81,4 +82,79 @@ export async function openHarness(
     options.sandboxed ? `${origin}/sandboxed.html` : `${harnessUrl}${query}`,
   );
   return recording;
+}
+
+/** The dev server of the design-system harness, see docs/development.md#widget-previews. */
+export interface DesignSystemDevServer {
+  /** The harness, which the dev server serves from source. */
+  url: string;
+  /** Ends the server with SIGTERM, and with SIGKILL after 15 seconds. */
+  stop(): Promise<void>;
+  /** What the server printed. */
+  output(): string;
+}
+
+/**
+ * Starts `vite` with `vite.design-system.config.ts` in `web/`, and returns once the harness answers 200 on port 5174.
+ * The port is fixed, so a server that already holds it makes this throw. It throws with the server's output when the
+ * server exits, or when the harness does not answer within 60 seconds. The first request compiles the previews, so
+ * a spec that opens the harness should give itself a longer timeout.
+ */
+export async function startDesignSystemDevServer(): Promise<DesignSystemDevServer> {
+  const webFolder = path.join(repositoryRoot, "web");
+  const url = "http://localhost:5174/design-system.html";
+  const child = spawn(
+    process.execPath,
+    [
+      path.join(webFolder, "node_modules", "vite", "bin", "vite.js"),
+      "--config",
+      "vite.design-system.config.ts",
+    ],
+    { cwd: webFolder, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  let output = "";
+  child.stdout
+    .setEncoding("utf8")
+    .on("data", (chunk: string) => (output += chunk));
+  child.stderr
+    .setEncoding("utf8")
+    .on("data", (chunk: string) => (output += chunk));
+  let exitCode: number | null | undefined;
+  const exited = new Promise<void>((resolve) =>
+    child.once("close", (code) => {
+      exitCode = code ?? -1;
+      resolve();
+    }),
+  );
+  const stop = async () => {
+    if (exitCode === undefined) {
+      child.kill("SIGTERM");
+      // A server that ignores SIGTERM must not hang the spec.
+      const killer = setTimeout(() => child.kill("SIGKILL"), 15_000);
+      await exited;
+      clearTimeout(killer);
+    }
+  };
+
+  const deadline = Date.now() + 60_000;
+  while (exitCode === undefined && Date.now() < deadline) {
+    if (await answersOk(url)) return { url, stop, output: () => output };
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  const reason =
+    exitCode !== undefined
+      ? `The design-system dev server exited with code ${exitCode}.`
+      : "The design-system dev server never answered the harness with 200 within 60 seconds.";
+  await stop();
+  throw new Error(`${reason} Dev server output:\n${output}`);
+}
+
+async function answersOk(url: string): Promise<boolean> {
+  try {
+    return (
+      (await fetch(url, { signal: AbortSignal.timeout(5_000) })).status === 200
+    );
+  } catch {
+    return false;
+  }
 }

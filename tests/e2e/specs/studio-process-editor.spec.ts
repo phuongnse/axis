@@ -13,6 +13,7 @@ import {
   jsonViewText,
   openFormTab,
   openProblems,
+  processStepAction,
   saveResource,
   writeLabel,
 } from "../studio-resources";
@@ -226,9 +227,7 @@ test.describe("Studio edits a process in the process editor", () => {
     const save = page.getByRole("button", { name: "Save", exact: true });
     await expect(async () => {
       if ((await name.inputValue()) === "markApproved") {
-        await card
-          .getByRole("button", { name: "Delete", exact: true })
-          .click({ timeout: 2_000 });
+        await processStepAction(page, 4, "Delete", { timeout: 2_000 });
       }
       await expect(name).not.toHaveValue("markApproved", { timeout: 2_000 });
       await expect(save).toBeEnabled({ timeout: 2_000 });
@@ -377,10 +376,7 @@ test.describe("Studio edits a process in the process editor", () => {
       );
 
       await page.getByTestId(`studio-graph-node-${moved}`).click();
-      await page
-        .getByTestId(`studio-step-${moved}`)
-        .getByRole("button", { name: "Move up", exact: true })
-        .click();
+      await processStepAction(page, moved, "Move up");
       await expect(page.getByTestId("studio-process-announcement")).toHaveText(
         before,
       );

@@ -132,8 +132,10 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   handler, and `AxisField` still ties the label to the input and makes the help its description. Such a field
   takes `required`, which draws the shared required mark after its label and sets `aria-required` on the input,
   while a field inside a form is marked by its `requiredMessage` alone.
+  It makes its select, number, date or text input, or a select joined with its action, as wide as the field.
   `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
-  group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
+  group that its title names and its help describes. It takes an `action` on its title row, drawn as a light text
+  button, and the group is still named by its title alone. A field that holds one input uses `AxisField`, and a
   field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
   `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` are built on `AxisField` and `AxisFieldGroup`.
   `AxisCheckboxField` and `AxisChoiceField` take the same two modes: with a `name` inside a form, or with the
@@ -187,12 +189,15 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 
 ## Tab bars
 
-A tab bar sits `spacing-md` under what precedes it. The theme starts a tab's label at the top of its
-bar, with the underline right under the label, for every tab bar, because Ant Design's padding above
-the label reads as a gap too wide.
+A tab bar sits `spacing-md` under what precedes it, except a page's tab row, see below. The theme starts a
+tab's label at the top of its bar, with the underline right under the label, for every tab bar, because Ant
+Design's padding above the label reads as a gap too wide.
 
 - **One tab row look.** Every tab row of a workspace has the same padding and a rule the region's width,
   whether it holds a file's tabs or a view switch.
+- **A page's tab row.** A tab row on a page, such as a Studio resource's Design, Form, JSON and Used by, has the
+  same look. Its rule reaches the page's edges, past the content area's padding. The row sits `spacing-sm` into the
+  gap above it, and its content starts `spacing-md` under its rule.
 
 ## Text
 
@@ -234,6 +239,22 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   role, see [buttons](#buttons).
 - **A status is a `StatusTag` with five tones, and any other enum value is text** _(planned for M35)_. A
   status shows as a tag in one of five tones. Any other value of an enum shows as plain text.
+- **Every tag is a `StatusTag`**. Any tag on any screen is a `StatusTag`: a status, a mark or a value's
+  name. Nothing else draws a tag, neither Ant Design's `Tag` outside `StatusTag` nor a span drawn as one. Its tone says
+  what it asks of the reader:
+  - `attention` for what a person should look at: Off-standard, "Missing read on …", "Unaccepted action …", "Unknown
+    name", a text marked Missing, and a problem's warning.
+  - `danger` for a problem's error.
+  - `muted` for a mark that needs nothing: a role that is Read-only, and the module a resource comes from in a kind's list.
+  - `neutral` for a value's name or a mark that only informs: a policy's actions and fields, a grant's module and Shared,
+    a layer's mark and Customized, a condition's mark on the form canvas, a field's properties, an expression's kind,
+    a choice's mark, and a lifecycle state's Initial and Deletable.
+- **A tag is never a link**. A references field on a record's page shows its links in a row, with no tag
+  round each.
+- **A tag that stands for more than its words names itself**. A layer's mark takes `role="note"` and an
+  accessible name such as "supplier, added by this application", which `StatusTag` passes to its tag.
+- **A removable filter chip is a control**. The table filter's chip is no tag and keeps Ant Design's
+  closable `Tag`.
 
 ## What comes next
 
@@ -374,7 +395,7 @@ be kept right.
   Fields, turns paging off with the view's `paging` option and shows every row with no pager, because a pager would
   move the row an author is editing. Studio's policy matrix, the tables of a module contract, the operator console's Tenant
   table, the two licences lists, the account page's Authenticators and Sessions, the users page's Connected
-  apps and the tables of a process instance's page also show every row with no pager. Only a table that holds all its
+  apps and the tables of a process instance's page, apart from its History timeline, also show every row with no pager. Only a table that holds all its
   rows reads it.
 - **How many.** A paged table says what it shows of how many, as "1–20 of 143", with the numbers in the
   language's format.
@@ -408,7 +429,7 @@ be kept right.
   which keeps its own width.
 - **Group rows.** A row that heads a group shows its heading and leaves its other cells blank, with no dash,
   as `AxisTable`'s `blankRow` draws them.
-- **Folding group rows** _(planned for M35)_. A row with children folds, closed at first, behind an `AxisButton`
+- **Folding group rows**. A row with children folds, closed at first, behind an `AxisButton`
   of the role `icon` with `Chevron`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
   first column's padding, every row's words start where the heading does, and each level of rows starts one fold
   further in. A table that groups rows uses this, and never a list inside a cell.

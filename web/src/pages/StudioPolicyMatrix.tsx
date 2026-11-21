@@ -1,13 +1,17 @@
-import { Button, Checkbox, Flex, Select, Tag, Typography } from 'antd'
+import { Checkbox, Flex, Select, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisButton } from '../platform/AxisButton'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useSelectedItemTint } from '../platform/antTheme'
 import { AxisField } from '../platform/AxisField'
+import { StatusTag } from '../platform/StatusTag'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { diffPatch, setAt } from '../platform/jsonPatch'
+import { SectionPart } from '../platform/SectionParts'
 import {
   createStudioResource,
   fetchStudioPolicyMatrix,
@@ -26,6 +30,7 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { useTableView } from '../platform/useTableView'
 import { ExpressionField } from './ExpressionField'
 import { newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
@@ -165,14 +170,14 @@ function RoleHeader({ role }: { role: StudioMatrixRole }) {
   const reasonText = t(reasonKey) === reasonKey ? (role.readOnlyReason ?? '') : t(reasonKey)
   return (
     <Flex vertical align="flex-start">
-      <span>
+      <Flex gap="small" align="center" wrap>
         {role.name}
         {!role.editable && (
-          <Tag style={{ marginInlineStart: 8 }} data-testid={`studio-matrix-readonly-tag-${role.name}`}>
+          <StatusTag tone="muted" data-testid={`studio-matrix-readonly-tag-${role.name}`}>
             {t('shell.studio.matrix.readOnly')}
-          </Tag>
+          </StatusTag>
         )}
-      </span>
+      </Flex>
       {!role.editable && role.readOnlyReason !== null && (
         <Typography.Text type="secondary" data-testid={`studio-matrix-readonly-${role.name}`}>
           {fillText(reasonText, { policy: role.accessPolicy.name })}
@@ -194,30 +199,32 @@ function MatrixCell({
   onSelect: () => void
 }) {
   const t = useText()
+  const { colour } = useDesignTokens()
+  const tint = useSelectedItemTint()
   return (
-    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-    <Button
-      type={selected ? 'primary' : 'text'}
+    // A selected cell is marked as a menu marks its chosen item: the selected tint and `primaryText`, see
+    // docs/reference/actions-and-controls.md#menus ('A marked choice on the selected tint').
+    <AxisButton
+      role="subtle"
       size="small"
       aria-pressed={selected}
       data-testid={`studio-matrix-cell-${role.name}-${cell.kind}-${cell.target}`}
-      style={{ height: 'auto', minWidth: 32 }}
+      style={{ height: 'auto', minWidth: 32, ...(selected ? { background: tint, color: colour.primaryText } : {}) }}
       onClick={onSelect}
     >
       <Flex wrap gap={4} align="center">
         {cell.actions.map((action) => (
-          <Tag key={action} style={{ marginInlineEnd: 0 }}>
+          <StatusTag key={action} tone="neutral">
             {action}
-          </Tag>
+          </StatusTag>
         ))}
         {cell.missingEntityRead !== null && (
-          // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-          <Tag color="warning" style={{ marginInlineEnd: 0 }} data-testid="studio-matrix-missing-read">
+          <StatusTag tone="attention" data-testid="studio-matrix-missing-read">
             {fillText(t('shell.studio.matrix.missingEntityRead'), { entity: cell.missingEntityRead })}
-          </Tag>
+          </StatusTag>
         )}
       </Flex>
-    </Button>
+    </AxisButton>
   )
 }
 
@@ -241,31 +248,35 @@ function GrantPanel({
   onWritten: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem) => void
 }) {
   const t = useText()
-  const headingId = useId()
   const readOnlyGrants = role.editable ? cell.grants.filter((grant) => grant.shared) : cell.grants
   return (
-    <section data-testid="studio-matrix-grants" aria-labelledby={headingId}>
-      <Typography.Title level={5} id={headingId}>
-        {fillText(t('shell.studio.matrix.grants'), { role: role.name, target: target.name })}
-      </Typography.Title>
-      {!role.editable && cell.grants.length === 0 && <EmptyState text={t('shell.studio.matrix.noGrants')} />}
-      <Flex vertical gap="small">
-        {readOnlyGrants.map((grant) => (
-          <ReadOnlyGrant key={`${grant.policyId}/${grant.index}`} grant={grant} onOpenPolicy={onOpenPolicy} />
-        ))}
-        {role.editable && (
-          <OwnGrants
-            application={application}
-            role={role}
-            target={target}
-            names={names}
-            saved={saved}
-            othersShown={readOnlyGrants.length > 0}
-            onWritten={onWritten}
-          />
-        )}
-      </Flex>
-    </section>
+    <SectionPart
+      testId="studio-matrix-grants"
+      heading={{ title: fillText(t('shell.studio.matrix.grants'), { role: role.name, target: target.name }) }}
+    >
+      {(actionSlot) => (
+        <>
+          {!role.editable && cell.grants.length === 0 && <EmptyState text={t('shell.studio.matrix.noGrants')} />}
+          <Flex vertical gap="small">
+            {readOnlyGrants.map((grant) => (
+              <ReadOnlyGrant key={`${grant.policyId}/${grant.index}`} grant={grant} onOpenPolicy={onOpenPolicy} />
+            ))}
+            {role.editable && (
+              <OwnGrants
+                application={application}
+                role={role}
+                target={target}
+                names={names}
+                saved={saved}
+                othersShown={readOnlyGrants.length > 0}
+                actionSlot={actionSlot}
+                onWritten={onWritten}
+              />
+            )}
+          </Flex>
+        </>
+      )}
+    </SectionPart>
   )
 }
 
@@ -282,18 +293,16 @@ function ReadOnlyGrant({
       <Flex gap="small" align="center" wrap>
         <strong>{grant.policy}</strong>
         {grant.actions.map((action) => (
-          <Tag key={action} style={{ marginInlineEnd: 0 }}>
+          <StatusTag key={action} tone="neutral">
             {action}
-          </Tag>
+          </StatusTag>
         ))}
-        {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-        {grant.shared && <Tag color="processing">{t('shell.studio.matrix.shared')}</Tag>}
-        {grant.module !== null && <Tag>{grant.module}</Tag>}
+        {grant.shared && <StatusTag tone="neutral">{t('shell.studio.matrix.shared')}</StatusTag>}
+        {grant.module !== null && <StatusTag tone="neutral">{grant.module}</StatusTag>}
         {grant.shared && grant.module === null && (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button type="link" size="small" onClick={() => onOpenPolicy(grant.policyId)}>
+          <AxisButton role="link" size="small" onClick={() => onOpenPolicy(grant.policyId)}>
             {t('shell.studio.matrix.openPolicy')}
-          </Button>
+          </AxisButton>
         )}
       </Flex>
       <div>
@@ -308,9 +317,9 @@ function ReadOnlyGrant({
           <Typography.Text type="secondary">{t('shell.studio.matrix.allFields')}</Typography.Text>
         ) : (
           grant.fields.map((field) => (
-            <Tag key={field} style={{ marginInlineEnd: 0 }}>
+            <StatusTag key={field} tone="neutral">
               {field}
-            </Tag>
+            </StatusTag>
           ))
         )}
       </Flex>
@@ -342,6 +351,7 @@ function stringsOf(value: unknown): string[] {
  * one patch with the version the policy was loaded at, or creates the policy when the role has none. Save is on while
  * a grant has no ticked action. A click then shows what to fix under that grant's actions, focuses its first box and
  * sends nothing, see docs/reference/actions-and-controls.md#fields. A save that succeeds and Reload clear that check.
+ * Add grant is drawn in the panel's title row through `actionSlot`, as a light action, see docs/reference/shell.md#layout.
  * It says the role has no own grant only when the cell shows no grant at all, see docs/reference/studio.md#policy-matrix.
  */
 function OwnGrants({
@@ -351,6 +361,7 @@ function OwnGrants({
   names,
   saved,
   othersShown,
+  actionSlot,
   onWritten,
 }: {
   application: string
@@ -359,6 +370,8 @@ function OwnGrants({
   names: StudioNames | null
   saved: boolean
   othersShown: boolean
+  /** The title row's slot of the grants panel, where Add grant is drawn as a light action. */
+  actionSlot: HTMLElement | null
   onWritten: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem) => void
 }) {
   const t = useText()
@@ -543,10 +556,9 @@ function OwnGrants({
                   onChange={(ticked) => setActions(index, ticked)}
                 />
                 {unaccepted.map((action) => (
-                  // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-                  <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
+                  <StatusTag key={action} tone="attention">
                     {fillText(t('shell.studio.matrix.unacceptedAction'), { action })}
-                  </Tag>
+                  </StatusTag>
                 ))}
               </Flex>
               {missing && (
@@ -570,7 +582,6 @@ function OwnGrants({
                 <AxisField label={t('shell.studio.matrix.fields')} help={t('shell.studio.matrix.fields.help')}>
                   <Select
                     mode="multiple"
-                    style={{ minWidth: 240 }}
                     virtual={false}
                     value={stringsOf(grant.fields)}
                     options={fields.map((field) => ({ value: field.name, label: field.name }))}
@@ -582,16 +593,22 @@ function OwnGrants({
           </Flex>
         )
       })}
-      <Flex gap="small" wrap>
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button onClick={() => edit('/grants', [...grants, newGrant(target, grants)])}>
-          {t('shell.studio.matrix.addGrant')}
-        </Button>
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" disabled={!changed || saving || reconnecting} onClick={check}>
+      {/* Add grant is a light action on the grants panel's title row, see docs/reference/shell.md#layout. */}
+      {actionSlot &&
+        createPortal(
+          // The row wraps the button where the portal is made, as context follows the React tree (see ObjectListTable).
+          <AxisActionRow>
+            <AxisButton role="secondary" onClick={() => edit('/grants', [...grants, newGrant(target, grants)])}>
+              {t('shell.studio.matrix.addGrant')}
+            </AxisButton>
+          </AxisActionRow>,
+          actionSlot,
+        )}
+      <AxisActionRow>
+        <AxisButton role="finish" disabled={!changed || saving || reconnecting} onClick={check}>
           {t('shell.studio.matrix.save')}
-        </Button>
-      </Flex>
+        </AxisButton>
+      </AxisActionRow>
       {saved && !changed && (
         <AxisAlert data-testid="studio-matrix-saved" kind="success" message={t('shell.studio.matrix.saved')} />
       )}
@@ -600,8 +617,11 @@ function OwnGrants({
           data-testid="studio-matrix-conflict"
           kind="warning"
           message={t('shell.studio.matrix.conflict')}
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          action={<Button onClick={reload}>{t('shell.studio.matrix.reload')}</Button>}
+          action={
+            <AxisButton role="secondary" onClick={reload}>
+              {t('shell.studio.matrix.reload')}
+            </AxisButton>
+          }
         />
       )}
       {failed && (
