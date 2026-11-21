@@ -1,4 +1,4 @@
-import { Button, ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
+import { ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { StatusTag } from '../platform/StatusTag'
@@ -10,7 +10,7 @@ import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisFieldRow } from '../platform/AxisFieldRow'
-import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { AxisTable, RowActions, type AxisColumn } from '../platform/AxisTable'
 import { datePickerChevrons } from '../platform/datePickerChevrons'
 import { EmptyDash } from '../platform/EmptyValue'
 import { FilledText } from '../platform/FilledText'
@@ -1289,10 +1289,30 @@ function Settings({
         if (drawnSettings.length === 0 && !choice && !validationBoxes) {
           return null
         }
+        const addValidation =
+          group === 'validation' && canAdd && list !== undefined ? (
+            <AxisButton
+              role="secondary"
+              onClick={() =>
+                onChange('/validations', [
+                  ...list,
+                  {
+                    name: uniqueStepName(list, 'validation'),
+                    expression: '',
+                    message: { textKey: '' },
+                    field: name,
+                  },
+                ])
+              }
+            >
+              {t('shell.studio.entity.addValidation')}
+            </AxisButton>
+          ) : undefined
         return (
           <AxisFieldGroup
             key={group}
             {...groupTexts(t, group === 'type' ? `fields.group.type.${type}` : `fields.group.${group}`)}
+            action={addValidation}
           >
             <Flex vertical gap="small" style={{ minWidth: 240 }}>
               {choice && (
@@ -1321,26 +1341,6 @@ function Settings({
                       onChange={onChange}
                     />
                   ))}
-                  {canAdd && list !== undefined && (
-                    <div>
-                      <AxisButton
-                        role="secondary"
-                        onClick={() =>
-                          onChange('/validations', [
-                            ...list,
-                            {
-                              name: uniqueStepName(list, 'validation'),
-                              expression: '',
-                              message: { textKey: '' },
-                              field: name,
-                            },
-                          ])
-                        }
-                      >
-                        {t('shell.studio.entity.addValidation')}
-                      </AxisButton>
-                    </div>
-                  )}
                 </>
               )}
             </Flex>
@@ -1657,7 +1657,20 @@ const Indexes = memo(function Indexes({
   }
 
   return (
-    <SectionPart testName="indexes" heading={sectionHeading(t, 'indexes')}>
+    <SectionPart
+      testName="indexes"
+      heading={sectionHeading(t, 'indexes')}
+      action={
+        readOnly ? undefined : (
+          <AxisButton
+            role="secondary"
+            onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}
+          >
+            {t('shell.studio.entity.addIndex')}
+          </AxisButton>
+        )
+      }
+    >
       <div data-testid="studio-field-/indexes">
         <Flex vertical gap="small">
           {list.map((index, position) => {
@@ -1665,11 +1678,38 @@ const Indexes = memo(function Indexes({
             const content = isContent(index) ? index : {}
             return (
               <Flex key={position} vertical gap="small" data-testid={`studio-field-${pointer}`}>
-                <Flex gap="small" align="center">
-                  <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
-                    {text(content.name)}
-                  </Typography.Text>
-                  {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
+                <Flex gap="small" align="center" justify="space-between">
+                  <Flex gap="small" align="center">
+                    <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
+                      {text(content.name)}
+                    </Typography.Text>
+                    {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
+                  </Flex>
+                  {readOnly ? null : (
+                    <RowActions
+                      fold
+                      actions={[
+                        {
+                          key: 'moveUp',
+                          labelKey: 'shell.studio.entity.moveUp',
+                          disabled: position === 0,
+                          onClick: () => move(position, -1),
+                        },
+                        {
+                          key: 'moveDown',
+                          labelKey: 'shell.studio.entity.moveDown',
+                          disabled: position === list.length - 1,
+                          onClick: () => move(position, 1),
+                        },
+                        {
+                          key: 'remove',
+                          labelKey: 'shell.studio.entity.removeIndex',
+                          destructive: true,
+                          onClick: () => write(list.filter((_, other) => other !== position)),
+                        },
+                      ]}
+                    />
+                  )}
                 </Flex>
                 <div data-testid={`studio-field-${pointer}/fields`}>
                   <AxisField {...fieldTexts(t, 'indexes.fields')} required>
@@ -1691,33 +1731,9 @@ const Indexes = memo(function Indexes({
                     onChange={(checked) => onChange(`${pointer}/unique`, checked ? true : undefined)}
                   />
                 </div>
-                {readOnly ? null : (
-                  <Flex gap="small">
-                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                    <Button disabled={position === 0} onClick={() => move(position, -1)}>
-                      {t('shell.studio.entity.moveUp')}
-                    </Button>
-                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                    <Button disabled={position === list.length - 1} onClick={() => move(position, 1)}>
-                      {t('shell.studio.entity.moveDown')}
-                    </Button>
-                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                    <Button danger onClick={() => write(list.filter((_, other) => other !== position))}>
-                      {t('shell.studio.entity.removeIndex')}
-                    </Button>
-                  </Flex>
-                )}
               </Flex>
             )
           })}
-          {readOnly ? null : (
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}>
-                {t('shell.studio.entity.addIndex')}
-              </Button>
-            </div>
-          )}
           <RemovedRows layer={layer} list="/indexes" />
         </Flex>
       </div>
@@ -1740,8 +1756,20 @@ const Validations = memo(function Validations({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const list = validations === undefined ? [] : Array.isArray(validations) ? validations : undefined
+  // What a move reads when it is pressed, so each row keeps the same handler between draws, as the Fields table does.
+  const latest = useRef({ list, onChange })
+  useLayoutEffect(() => {
+    latest.current = { list, onChange }
+  })
+  const move = useCallback((index: number, offset: number) => {
+    const { list: current, onChange: change } = latest.current
+    const next = [...(current ?? [])]
+    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
+    change('/validations', next)
+  }, [])
 
-  if (validations !== undefined && !Array.isArray(validations)) {
+  if (list === undefined) {
     return (
       <SectionPart testName="validations" heading={sectionHeading(t, 'validations')}>
         <div data-testid="studio-field-/validations">
@@ -1750,10 +1778,27 @@ const Validations = memo(function Validations({
       </SectionPart>
     )
   }
-  const list: unknown[] = validations ?? []
 
   return (
-    <SectionPart testName="validations" heading={sectionHeading(t, 'validations')}>
+    <SectionPart
+      testName="validations"
+      heading={sectionHeading(t, 'validations')}
+      action={
+        readOnly ? undefined : (
+          <AxisButton
+            role="secondary"
+            onClick={() =>
+              onChange('/validations', [
+                ...list,
+                { name: uniqueStepName(list, 'validation'), expression: '', message: { textKey: '' }, field: '' },
+              ])
+            }
+          >
+            {t('shell.studio.entity.addValidation')}
+          </AxisButton>
+        )
+      }
+    >
       <div data-testid="studio-field-/validations">
         <Flex vertical gap="small">
           {list.map((validation, index) => (
@@ -1765,23 +1810,10 @@ const Validations = memo(function Validations({
               readOnly={readOnly}
               layer={layer}
               onChange={onChange}
+              onMove={move}
+              last={index === list.length - 1}
             />
           ))}
-          {readOnly ? null : (
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button
-                onClick={() =>
-                  onChange('/validations', [
-                    ...list,
-                    { name: uniqueStepName(list, 'validation'), expression: '', message: { textKey: '' }, field: '' },
-                  ])
-                }
-              >
-                {t('shell.studio.entity.addValidation')}
-              </Button>
-            </div>
-          )}
           <RemovedRows layer={layer} list="/validations" />
         </Flex>
       </div>
@@ -1792,7 +1824,9 @@ const Validations = memo(function Validations({
 /**
  * One validation of the entity, which draws again only when its own validation or the field names change. With
  * `atField`, as in the field drawer's Validation group, it has no field picker and its message is typed as label texts,
- * see docs/reference/entity-designer.md#settings.
+ * see docs/reference/entity-designer.md#settings. Its "…" menu holds Remove validation, and Move up and Move down too
+ * when the section gives `onMove`, as the drawer does not, see docs/reference/entity-designer.md#validations. `last` is
+ * the validation at the end of the section, where Move down is off.
  */
 const ValidationRow = memo(function ValidationRow({
   index,
@@ -1802,6 +1836,8 @@ const ValidationRow = memo(function ValidationRow({
   readOnly,
   layer,
   onChange,
+  onMove,
+  last = false,
 }: {
   index: number
   atField?: boolean
@@ -1810,6 +1846,8 @@ const ValidationRow = memo(function ValidationRow({
   readOnly: boolean
   layer: DesignerLayer | undefined
   onChange: ChangeHandler
+  onMove?: (index: number, offset: number) => void
+  last?: boolean
 }) {
   const t = useText()
   const pointer = `/validations/${index}`
@@ -1817,11 +1855,42 @@ const ValidationRow = memo(function ValidationRow({
   const expression = fieldTexts(t, 'validations.expression')
   return (
     <Flex vertical gap="small" data-testid={`studio-field-${pointer}`}>
-      <Flex gap="small" align="center">
-        <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
-          {text(content.name)}
-        </Typography.Text>
-        {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
+      <Flex gap="small" align="center" justify="space-between">
+        <Flex gap="small" align="center">
+          <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
+            {text(content.name)}
+          </Typography.Text>
+          {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
+        </Flex>
+        {readOnly ? null : (
+          <RowActions
+            fold
+            actions={[
+              ...(onMove === undefined
+                ? []
+                : [
+                    {
+                      key: 'moveUp',
+                      labelKey: 'shell.studio.entity.moveUp',
+                      disabled: index === 0,
+                      onClick: () => onMove(index, -1),
+                    },
+                    {
+                      key: 'moveDown',
+                      labelKey: 'shell.studio.entity.moveDown',
+                      disabled: last,
+                      onClick: () => onMove(index, 1),
+                    },
+                  ]),
+              {
+                key: 'remove',
+                labelKey: 'shell.studio.entity.removeValidation',
+                destructive: true,
+                onClick: () => onChange(pointer, undefined),
+              },
+            ]}
+          />
+        )}
       </Flex>
       <div data-testid={`studio-field-${pointer}/expression`}>
         <AxisField {...expression} required>
@@ -1860,11 +1929,6 @@ const ValidationRow = memo(function ValidationRow({
             onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
           />
         </>
-      )}
-      {readOnly ? null : (
-        <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
-          {t('shell.studio.entity.removeValidation')}
-        </AxisButton>
       )}
     </Flex>
   )

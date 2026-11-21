@@ -23,7 +23,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import { PlatformContext, type Platform } from './context'
-import { chooseOption, clearPicker, clearSelect, openDropdown, optionTexts, removeTag } from '../test/antd'
+import { chooseOption, clearPicker, clearSelect, openDropdown, optionTexts, removeTag, shownMenu } from '../test/antd'
 import {
   addEntityField,
   entityFieldAction,
@@ -461,6 +461,19 @@ describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
 
 const follows = (first: HTMLElement, second: HTMLElement) =>
   (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+
+/** The entry `action` of the "…" menu of the index or validation at `pointer` in `scope`, opened and unclicked. */
+async function itemMenuItem(pointer: string, action: string, scope: HTMLElement = document.body): Promise<HTMLElement> {
+  await userEvent.click(
+    within(within(scope).getByTestId(`studio-field-${pointer}`)).getByRole('button', { name: 'Actions' }),
+  )
+  return within(await shownMenu('Actions')).getByRole('menuitem', { name: action })
+}
+
+/** Clicks `action` in the "…" menu of the index or validation at `pointer` in `scope`. */
+async function itemAction(pointer: string, action: string, scope: HTMLElement = document.body): Promise<void> {
+  await userEvent.click(await itemMenuItem(pointer, action, scope))
+}
 
 describe('EntityDesigner', () => {
   it('shows the header and the fields of the entity', async () => {
@@ -1005,7 +1018,7 @@ describe('EntityDesigner', () => {
     )
   })
 
-  it('lays each index and validation out as a column: its name, one field to a line, then its buttons', () => {
+  it('lays each index and validation out as a column: its name and "…" menu on top, then one field to a line', () => {
     renderDesigner(
       entity({
         indexes: [{ name: 'index1', fields: ['code'] }],
@@ -1030,17 +1043,92 @@ describe('EntityDesigner', () => {
       'studio-field-/validations/0/message/textKey',
       'studio-field-/validations/0/field',
     ])
-    const index = within(screen.getByTestId('studio-field-/indexes/0'))
-    expect(
-      follows(index.getByTestId('studio-field-/indexes/0/unique'), index.getByRole('button', { name: 'Move up' })),
-    ).toBe(true)
-    const validation = within(screen.getByTestId('studio-field-/validations/0'))
-    expect(
-      follows(
-        validation.getByTestId('studio-field-/validations/0/field'),
-        validation.getByRole('button', { name: 'Remove validation' }),
-      ),
-    ).toBe(true)
+    // Each item's "…" menu sits on its name line, above its fields.
+    for (const pointer of ['/indexes/0', '/validations/0']) {
+      const nameLine = screen.getByTestId(`studio-field-${pointer}/name`).parentElement!.parentElement!
+      expect(within(nameLine).getByRole('button', { name: 'Actions' })).toBeInTheDocument()
+    }
+  })
+
+  it('puts Add index and Add validation in the title row of their section, as text buttons outside the lists', () => {
+    renderDesigner(
+      entity({
+        indexes: [{ name: 'index1', fields: ['code'] }],
+        validations: [
+          { name: 'totalPositive', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' },
+        ],
+      }),
+    )
+
+    for (const [section, name] of [
+      ['indexes', 'Add index'],
+      ['validations', 'Add validation'],
+    ]) {
+      const add = within(screen.getByTestId(`studio-section-${section}`)).getByRole('button', { name })
+      expect(add).toHaveClass('ant-btn-variant-text')
+      expect(add).not.toHaveClass('ant-btn-variant-outlined')
+      expect(follows(add, screen.getByTestId(`studio-field-/${section}`))).toBe(true)
+      expect(screen.getByTestId(`studio-field-/${section}`)).not.toContainElement(add)
+    }
+  })
+
+  it('gives each index and each section validation a "…" menu with Move up, Move down and a destructive Remove', async () => {
+    const validation = (name: string, field: string) => ({
+      name,
+      expression: 'total > 0',
+      message: { textKey: 'validation.total' },
+      field,
+    })
+    renderDesigner(
+      entity({
+        indexes: [
+          { name: 'index1', fields: ['code'] },
+          { name: 'index2', fields: ['total'] },
+        ],
+        validations: [validation('first', 'total'), validation('second', 'code')],
+      }),
+    )
+
+    for (const [pointer, remove] of [
+      ['/indexes/0', 'Remove index'],
+      ['/indexes/1', 'Remove index'],
+      ['/validations/0', 'Remove validation'],
+      ['/validations/1', 'Remove validation'],
+    ]) {
+      const item = within(screen.getByTestId(`studio-field-${pointer}`))
+      expect(item.queryByRole('button', { name: 'Move up' })).toBeNull()
+      expect(item.queryByRole('button', { name: remove })).toBeNull()
+
+      await userEvent.click(item.getByRole('button', { name: 'Actions' }))
+      const menu = within(await shownMenu('Actions'))
+      expect(menu.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(['Move up', 'Move down', remove])
+      expect(menu.getByRole('menuitem', { name: remove })).toHaveClass('ant-dropdown-menu-item-danger')
+      await userEvent.click(document.body)
+    }
+  })
+
+  it('moves a validation and removes an index from their menus, and Move down is off on the last index', async () => {
+    const first = { name: 'first', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' }
+    const second = { name: 'second', expression: 'code <> ""', message: { textKey: 'validation.code' }, field: 'code' }
+    const onChange = renderDesigner(
+      entity({
+        indexes: [
+          { name: 'index1', fields: ['code'] },
+          { name: 'index2', fields: ['total'] },
+        ],
+        validations: [first, second],
+      }),
+    )
+
+    expect(await itemMenuItem('/indexes/1', 'Move down')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
+    await itemAction('/indexes/0', 'Remove index')
+    expect(onChange).toHaveBeenLastCalledWith('/indexes', [{ name: 'index2', fields: ['total'] }])
+
+    expect(await itemMenuItem('/validations/0', 'Move up')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
+    await itemAction('/validations/0', 'Move down')
+    expect(onChange).toHaveBeenLastCalledWith('/validations', [second, first])
   })
 
   it('names the index inputs by their labels and describes them by their help', () => {
@@ -1489,9 +1577,11 @@ describe('EntityDesigner', () => {
       { name: 'index1', fields: ['count', 'stage'], unique: true },
       { name: 'index2', fields: [] },
     ])
-    expect(row(0).getByRole('button', { name: 'Move up' })).toBeDisabled()
-    expect(row(1).getByRole('button', { name: 'Move down' })).toBeDisabled()
-    await userEvent.click(row(1).getByRole('button', { name: 'Move up' }))
+    expect(await itemMenuItem('/indexes/0', 'Move up')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
+    expect(await itemMenuItem('/indexes/1', 'Move down')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
+    await itemAction('/indexes/1', 'Move up')
     expect(indexes()).toEqual([
       { name: 'index2', fields: [] },
       { name: 'index1', fields: ['count', 'stage'], unique: true },
@@ -1504,9 +1594,9 @@ describe('EntityDesigner', () => {
     ])
     expect(Object.hasOwn((indexes() as object[])[1], 'unique')).toBe(false)
 
-    await userEvent.click(row(0).getByRole('button', { name: 'Remove index' }))
+    await itemAction('/indexes/0', 'Remove index')
     expect(indexes()).toEqual([{ name: 'index1', fields: ['count', 'stage'] }])
-    await userEvent.click(row(0).getByRole('button', { name: 'Remove index' }))
+    await itemAction('/indexes/0', 'Remove index')
     expect(Object.hasOwn(content(), 'indexes')).toBe(false)
   })
 
@@ -1521,6 +1611,7 @@ describe('EntityDesigner', () => {
     for (const name of ['Add index', 'Remove index']) {
       expect(screen.queryByRole('button', { name })).toBeNull()
     }
+    expect(within(screen.getByTestId('studio-section-indexes')).queryByRole('button', { name: 'Actions' })).toBeNull()
     expect(screen.getByRole('combobox', { name: 'Index fields' })).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: 'Unique index' })).toBeDisabled()
   })
@@ -1680,7 +1771,7 @@ describe('EntityDesigner', () => {
     await chooseOption('code', screen.getByTestId('studio-field-/validations/0/field'))
     expect(onChange).toHaveBeenLastCalledWith('/validations/0/field', 'code')
 
-    await userEvent.click(within(row).getByRole('button', { name: 'Remove validation' }))
+    await itemAction('/validations/0', 'Remove validation')
     expect(onChange).toHaveBeenLastCalledWith('/validations/0', undefined)
     await userEvent.click(screen.getByRole('button', { name: 'Add validation' }))
     expect(onChange).toHaveBeenLastCalledWith('/validations', [
@@ -1733,6 +1824,7 @@ describe('EntityDesigner', () => {
           { name: 'price', type: 'money', currency: 'VND' },
           { name: 'receipt', type: 'file', maxSize: 1024, accept: ['image/*'] },
         ],
+        indexes: [{ name: 'code', fields: ['code'] }],
         validations: [
           { name: 'totalPositive', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' },
         ],
@@ -1754,14 +1846,27 @@ describe('EntityDesigner', () => {
       expect(input).toBeDisabled()
     }
     expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox')).toHaveValue('Invoice')
-    for (const name of ['Add field', 'Move up', 'Move down', 'Remove validation', 'Add validation']) {
+    for (const name of [
+      'Add field',
+      'Move up',
+      'Move down',
+      'Remove index',
+      'Remove validation',
+      'Add index',
+      'Add validation',
+    ]) {
       expect(screen.queryByRole('button', { name })).toBeNull()
     }
-    // A read-only designer has no row menu, so no row of its fields has an Actions button.
+    // A read-only designer has no row menu, so no row of its fields, index or validation has an Actions button.
     const fieldRows = screen.getAllByTestId(/^studio-field-\/fields\/\d+$/)
     expect(fieldRows.length).toBeGreaterThan(0)
     for (const fieldRow of fieldRows) {
       expect(within(fieldRow).queryByRole('button', { name: 'Actions' })).toBeNull()
+    }
+    for (const section of ['indexes', 'validations']) {
+      expect(
+        within(screen.getByTestId(`studio-section-${section}`)).queryByRole('button', { name: 'Actions' }),
+      ).toBeNull()
     }
 
     // Each name still opens its field's drawer, with every input in it off.
@@ -1824,9 +1929,12 @@ describe('EntityDesigner', () => {
 /** The titles of the groups in the drawer, in order, without those of the groups inside them. */
 function groupTitles(drawer: HTMLElement): string[] {
   const body = within(drawer).getByTestId('studio-field-drawer')
-  return Array.from(body.children)
-    .filter((child) => child.tagName === 'FIELDSET')
-    .map((group) => group.querySelector('legend')?.textContent ?? '')
+  return (
+    Array.from(body.children)
+      .filter((child) => child.tagName === 'FIELDSET')
+      // A group's action sits in its legend beside the title, which is the legend's span when there is an action.
+      .map((group) => (group.querySelector('legend > span') ?? group.querySelector('legend'))?.textContent ?? '')
+  )
 }
 
 describe('the groups of the field drawer', () => {
@@ -1926,13 +2034,28 @@ describe('the groups of the field drawer', () => {
       const onChange = renderDesigner(entity({ validations }))
 
       const drawer = await openEntityField(0)
-      await userEvent.click(
-        within(within(drawer).getByTestId('studio-field-/validations/2')).getByRole('button', {
-          name: 'Remove validation',
-        }),
-      )
+      await itemAction('/validations/2', 'Remove validation', drawer)
 
       expect(onChange).toHaveBeenLastCalledWith('/validations/2', undefined)
+    })
+
+    it('puts Add validation on the Validation group title row as a text button, and its menu has only Remove validation', async () => {
+      const onChange = renderDesigner(entity({ validations: [validations[0]] }))
+
+      const drawer = await openEntityField(0)
+      const group = within(drawer).getByRole('group', { name: 'Validation' })
+      const add = within(group).getByRole('button', { name: 'Add validation' })
+      expect(group.querySelector('legend')).toContainElement(add)
+      expect(add).toHaveClass('ant-btn-variant-text')
+      expect(add).not.toHaveClass('ant-btn-variant-outlined')
+
+      await userEvent.click(
+        within(within(drawer).getByTestId('studio-field-/validations/0')).getByRole('button', { name: 'Actions' }),
+      )
+      const menu = within(await shownMenu('Actions'))
+      expect(menu.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(['Remove validation'])
+      await userEvent.click(menu.getByRole('menuitem', { name: 'Remove validation' }))
+      expect(onChange).toHaveBeenLastCalledWith('/validations/0', undefined)
     })
 
     it('adds a validation at the field, with its name in field', async () => {
@@ -1976,6 +2099,7 @@ describe('the groups of the field drawer', () => {
       expect(within(drawer).getByTestId('studio-field-/validations/0/name')).toHaveTextContent('first')
       expect(within(drawer).queryByRole('button', { name: 'Add validation' })).toBeNull()
       expect(within(drawer).queryByRole('button', { name: 'Remove validation' })).toBeNull()
+      expect(within(drawer).queryByRole('button', { name: 'Actions' })).toBeNull()
     })
 
     it('has no Add validation where the validations are not a list', async () => {
