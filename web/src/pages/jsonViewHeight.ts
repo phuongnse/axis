@@ -13,26 +13,39 @@ export interface JsonViewHeightInput {
   below: number
   /** The gap kept between the view and the footer. */
   gap: number
+  /** The least height of the view. It defaults to `minHeight`. */
+  least?: number
 }
 
 /** The height that puts the bottom of the view `gap` above the footer, which sits at the foot of the window. */
-export function jsonViewHeight({ windowHeight, top, footerHeight, below, gap }: JsonViewHeightInput): number {
-  return Math.max(windowHeight - footerHeight - gap - top - below, minHeight)
+export function jsonViewHeight({ windowHeight, top, footerHeight, below, gap, least }: JsonViewHeightInput): number {
+  return Math.max(windowHeight - footerHeight - gap - top - below, least ?? minHeight)
+}
+
+export interface FillOptions {
+  /** The element whose bottom edge ends the content that follows, so what follows stays on screen. */
+  boundary?: RefObject<HTMLElement | null>
+  /**
+   * A design-system frame, which holds its own shell: no footer, bar or gap lies below it. `least` is the frame's
+   * `frameHeight` and `below` the space under it, the canvas's padding and the frame's borders. See
+   * docs/reference/shell.md#design-system-previews.
+   */
+  frame?: { least: number; below: number }
 }
 
 /**
- * The height that fills the window down to the footer for the element in `ref`, while `fill` is on. `boundary`, when
- * given, is the element whose bottom edge ends the content that follows, so what follows stays on screen. The one
- * measurement behind `CodeEditor`'s `fill` and the package workspace's empty editor area, see
- * docs/reference/studio-packages.md#a-packages-files.
+ * The height that fills the window down to the footer for the element in `ref`, while `fill` is on. The one
+ * measurement behind `CodeEditor`'s `fill`, the package workspace's empty editor area, see
+ * docs/reference/studio-packages.md#a-packages-files, and a design-system frame's height, see
+ * docs/reference/shell.md#design-system-previews.
  */
 export function useFillHeight(
   ref: RefObject<HTMLElement | null>,
   fill: boolean,
-  boundary?: RefObject<HTMLElement | null>,
+  { boundary, frame }: FillOptions = {},
 ): number {
   const tokens = useDesignTokens()
-  const [height, setHeight] = useState(minHeight)
+  const [height, setHeight] = useState(frame?.least ?? minHeight)
   const gap = tokens.spacing.md
   const fit = () => {
     const host = ref.current
@@ -40,6 +53,19 @@ export function useFillHeight(
       return
     }
     const rect = host.getBoundingClientRect()
+    if (frame) {
+      // The frame's own shell fills it, so the measure is the window's bottom less the frame's `below`.
+      const next = jsonViewHeight({
+        windowHeight: window.innerHeight,
+        top: rect.top,
+        footerHeight: 0,
+        below: frame.below,
+        gap: 0,
+        least: frame.least,
+      })
+      setHeight((current) => (current === next ? current : next))
+      return
+    }
     const content = host.closest('main')
     const next = jsonViewHeight({
       windowHeight: window.innerHeight,

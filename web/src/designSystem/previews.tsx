@@ -105,7 +105,10 @@ export interface PreviewState {
   fixtures?: Record<string, FixtureRoute>
   /** The address the state starts at. */
   entry?: InitialEntry
-  /** The height of the screen the state draws in. A taller page scrolls inside it. */
+  /**
+   * The least height of the screen the state draws in. The screen fills the window down to the canvas's padding, and
+   * a taller page scrolls inside it.
+   */
   frameHeight?: number
 }
 
@@ -188,7 +191,7 @@ function studioDesignerStates(resourceId: string): readonly PreviewState[] {
   ]
 }
 
-/** The height of every `shell` state's frame, so more of each page shows. */
+/** The least height of every `shell` state's frame, so more of each page shows in a short window. */
 const shellFrameHeight = 800
 
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
