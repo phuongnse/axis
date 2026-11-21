@@ -816,6 +816,9 @@ every directory tenant, so `startPublisher` holds a PostgreSQL advisory lock for
 authoring specs' publishers take it alone, and the cell specs' publishers share it. Both AI authoring specs also hold the
 AI authoring lock for their whole run, see [testing](testing.md#the-e2e-stack).
 
+The package run spec starts its own publisher too, with `Extensions:ApplicationPackages` on and its own Node.js package
+host with a stub Trivy. That publisher takes the publishers' lock alone, see [the package run spec](testing.md#the-e2e-stack).
+
 ## Widget previews
 
 `npm run dev:design-system --prefix web` serves `http://localhost:5174/design-system.html` from

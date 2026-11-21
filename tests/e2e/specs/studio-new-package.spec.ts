@@ -4,19 +4,24 @@ import path from 'node:path'
 import { chromium, type Browser, type Page } from '@playwright/test'
 import { expect, test } from '../test'
 import { runAdmin } from '../admin-tool'
-import { confirmDialog, waitForDialog } from '../dialogs'
+import { waitForDialog } from '../dialogs'
 import { startDirectoryServer } from '../directory-server'
-import { addAuthenticator, submitCode, submitPassword } from '../keycloak'
-import { pickOption } from '../select'
 import { addRealmAccount, setRealmPassword } from '../tenant-realm'
-import { liveTotp } from '../totp'
+import {
+  giveRoles,
+  newApplication,
+  newPackage,
+  signInAdministrator,
+  signInWithCode,
+  studioDeveloper,
+  turnOnApplicationPackages,
+} from '../studio-packages'
 
 // tenant create makes a database, two roles and a realm, and the realm step waits on Keycloak.
 test.setTimeout(240_000)
 
 const tenant = 'packages-made'
 const host = `${tenant}.localhost`
-const signIn = `https://${host}/api/auth/sign-in?returnUrl=/`
 const application = 'PackageTools'
 const packageId = 'purchasing-tools'
 
@@ -26,11 +31,6 @@ function packageFilePaths(page: Page): Promise<string[]> {
     const listed = (await (await fetch(`/api/studio/apps/${app}/package-files`)).json()) as { items: { path: string }[] }
     return listed.items.map((item) => item.path)
   }, application)
-}
-
-/** Whether `GET /api/me` in `page` says the signed-in person may write application packages. */
-function studioDeveloper(page: Page): Promise<boolean> {
-  return page.evaluate(async () => (await (await fetch('/api/me')).json()).studioDeveloper as boolean)
 }
 
 test('a developer creates a package in Studio, opens its workspace, saves a file, sees a manifest error in Problems, and creates and renames a folder with a file in it', async () => {
@@ -65,57 +65,21 @@ test('a developer creates a package in Studio, opens its workspace, saves a file
     // The developer signs in first, with no role, so the denied case is checked before anything is given. The session
     // reads the given roles at every request, so this page is used again after the roles are given.
     const developerPage = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage()
-    await developerPage.goto(signIn)
-    await submitPassword(developerPage, developer.username, developer.password)
-    await submitCode(developerPage, await liveTotp(developer.secret))
-    await developerPage.waitForURL(`https://${host}/`)
+    await signInWithCode(developerPage, host, developer)
     expect(await studioDeveloper(developerPage)).toBe(false)
 
     const administratorPage = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage()
     const firstAdmin = await setRealmPassword(tenant, `first-admin@${tenant}.test`)
-    await administratorPage.goto(signIn)
-    await submitPassword(administratorPage, firstAdmin.username, firstAdmin.password)
-    await addAuthenticator(administratorPage)
-    await administratorPage.waitForURL(`https://${host}/`)
+    await signInAdministrator(administratorPage, host, firstAdmin)
 
-    await administratorPage.goto(`https://${host}/users`)
-    const switchSection = administratorPage.getByRole('region', { name: 'Application packages', exact: true })
-    await switchSection.getByRole('button', { name: 'Turn on…', exact: true }).click()
-    await confirmDialog(administratorPage, 'Turn on')
-    await expect(switchSection.getByText('Application packages are on.', { exact: true })).toBeVisible()
-
-    await administratorPage.goto(`https://${host}/users/${developer.id}`)
-    const platform = administratorPage.getByTestId('user-roles').getByRole('region', { name: 'Platform', exact: true })
-    for (const role of ['author', 'developer']) {
-      const row = platform.getByTestId('user-role').filter({ has: administratorPage.getByText(role, { exact: true }) })
-      await row.getByRole('button', { name: 'Give', exact: true }).click()
-      await confirmDialog(administratorPage, 'Give')
-      await expect(row.getByText('Given', { exact: true })).toBeVisible()
-    }
+    await turnOnApplicationPackages(administratorPage, host)
+    await giveRoles(administratorPage, host, developer.id, ['author', 'developer'])
 
     // The switch and the roles reach the server within a few seconds, so the answer is polled, not waited for in time.
     await expect.poll(() => studioDeveloper(developerPage), { timeout: 30_000 }).toBe(true)
 
-    await developerPage.goto(`https://${host}/studio`)
-    await developerPage.getByRole('button', { name: 'New application…', exact: true }).click()
-    const newApplication = await waitForDialog(developerPage)
-    await newApplication.getByRole('textbox', { name: 'Name', exact: true }).fill(application)
-    await newApplication.getByRole('button', { name: 'Create', exact: true }).click()
-    await expect(developerPage).toHaveURL(new RegExp(`app=${application}$`))
-
-    await developerPage
-      .getByRole('navigation', { name: 'Menu', exact: true })
-      .getByRole('link', { name: 'Packages', exact: true })
-      .click()
-    await expect(developerPage).toHaveURL(/[?&]view=packages(&|$)/)
-
-    await developerPage.getByRole('button', { name: 'New package…', exact: true }).click()
-    const newPackage = await waitForDialog(developerPage, 'New package')
-    await newPackage.getByRole('textbox', { name: 'ID', exact: true }).fill(packageId)
-    await pickOption(newPackage.getByRole('combobox', { name: 'Language', exact: true }), 'TypeScript')
-    await newPackage.getByRole('button', { name: 'Create', exact: true }).click()
-    // The dialog closes once the last file is written, so the package is complete by then.
-    await expect(newPackage).toBeHidden({ timeout: 30_000 })
+    await newApplication(developerPage, host, application)
+    await newPackage(developerPage, packageId, 'TypeScript')
 
     const row = developerPage
       .getByTestId('studio-packages')
