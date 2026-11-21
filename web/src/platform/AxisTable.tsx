@@ -261,9 +261,8 @@ function ReorderRow(props: HTMLAttributes<HTMLTableRowElement> & { 'data-row-key
 
 function SortableRow({ id, style, ...props }: HTMLAttributes<HTMLTableRowElement> & { id: string }) {
   const { colour } = useDesignTokens()
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
-    id,
-  })
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging, isSorting } =
+    useSortable({ id })
   return (
     <HandleContext.Provider value={{ setActivatorNodeRef, listeners, attributes }}>
       <tr
@@ -272,7 +271,9 @@ function SortableRow({ id, style, ...props }: HTMLAttributes<HTMLTableRowElement
         style={{
           ...style,
           transform: CSS.Translate.toString(transform),
-          transition,
+          // The rows glide aside only while a row is dragged. On the drop the list takes its new order in the same draw,
+          // so each row stands at its new place at once, with no glide back to where it was first.
+          transition: isSorting ? transition : undefined,
           // The dragged row stays above the others and on the surface, so the rows it passes do not show through.
           ...(isDragging ? { position: 'relative', zIndex: 1, background: colour.surface } : {}),
         }}
