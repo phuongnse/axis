@@ -2,12 +2,12 @@ import { CloseOutlined, FileOutlined, FolderOutlined } from '@ant-design/icons'
 import { Flex, Modal, Tabs, Tree, type TreeDataNode } from 'antd'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisButton } from '../platform/AxisButton'
+import { AxisButton, AxisButtonGroup } from '../platform/AxisButton'
 import { Chevron } from '../platform/Chevron'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { sortByName } from '../platform/listOrder'
-import { PageLayout } from '../platform/PageLayout'
+import { PageActions, PageLayout } from '../platform/PageLayout'
 import { PaneHeader } from '../platform/PaneHeader'
 import { QuotaRefusedError } from '../platform/quota'
 import { SaveBar } from '../platform/SaveBar'
@@ -25,6 +25,7 @@ import type { CodeCursor, CodeEditorHandle } from './CodeEditor'
 import { PlatformContext } from './context'
 import { fileLanguage } from './fileLanguage'
 import { useFillHeight } from './jsonViewHeight'
+import { StudioPackageRun } from './StudioPackageRun'
 import { StudioProblemList } from './StudioProblems'
 import { useStudioPackages, type PackageRow } from './useStudioPackages'
 
@@ -32,8 +33,11 @@ const CodeEditor = lazy(() => import('./CodeEditor'))
 
 /** The explorer's width. Handles that set it are planned, see docs/reference/studio-packages.md#a-packages-files. */
 const explorerWidth = 240
-/** The output panel's height. Handles that set it are planned, see docs/reference/studio-packages.md#a-packages-files. */
-const outputHeight = 120
+/**
+ * The output panel's height, tall enough for the Run tab's two panes. Handles that set it are planned, see
+ * docs/reference/studio-packages.md#a-packages-files.
+ */
+const outputHeight = 320
 
 /** A file the workspace has read: its `saved` text, the `text` the editor shows and its `version`, or `failed` when it did not load. */
 type FileState = { saved: string; text: string; version: string } | 'failed'
@@ -195,6 +199,7 @@ function Workspace({
   const [cursors, setCursors] = useState<Record<string, CodeCursor>>({})
   const [discarding, setDiscarding] = useState<string | null>(null)
   const [conflicts, setConflicts] = useState<Record<string, true>>({})
+  const [outputTab, setOutputTab] = useState('problems')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const editors = useRef(new Map<string, CodeEditorHandle>())
@@ -285,21 +290,28 @@ function Workspace({
   /**
    * Saves every open unsaved file that is not in conflict, in the order of the tabs and one after another, as each write
    * takes the folder's write lock and makes one revision. A 409 marks that file and the run goes on. Any other failure
-   * stops it, as it would fail every file after. See docs/reference/studio-packages.md#a-packages-files.
+   * stops it, as it would fail every file after. See docs/reference/studio-packages.md#a-packages-files. It answers
+   * whether every changed file is saved: `false` when a save failed or a changed file is in conflict, which a run waits
+   * for. A file that was already in conflict opens its tab as a new conflict does.
    */
-  async function saveAll() {
+  async function saveAll(): Promise<boolean> {
     if (!canDevelop || saving || reconnecting) {
-      return
+      return false
     }
+    const stale = open.filter((path) => isUnsaved(path) && conflicts[path])
     const paths = open.filter((path) => isUnsaved(path) && !conflicts[path])
     if (paths.length === 0) {
-      return
+      if (stale.length > 0 && (active === null || !conflicts[active])) {
+        setActive(stale[0])
+      }
+      return stale.length === 0
     }
     setSaving(true)
     setSaveError(null)
     let diagnostics: StudioDiagnostic[] | null = null
     const conflicted: string[] = []
     let current = ''
+    let failed = false
     try {
       for (const path of paths) {
         current = path
@@ -324,6 +336,7 @@ function Workspace({
         })
       }
     } catch (error) {
+      failed = true
       if (error instanceof ServerUnreachableError) {
         lost()
       } else if (error instanceof QuotaRefusedError) {
@@ -338,9 +351,11 @@ function Workspace({
     if (diagnostics !== null) {
       onWritten(diagnostics)
     }
-    if (conflicted.length > 0 && (active === null || !(conflicts[active] || conflicted.includes(active)))) {
-      setActive(conflicted[0])
+    const inConflict = [...stale, ...conflicted]
+    if (inConflict.length > 0 && (active === null || !(conflicts[active] || conflicted.includes(active)))) {
+      setActive(inConflict[0])
     }
+    return !failed && inConflict.length === 0
   }
 
   const editFile = (path: string, text: string) =>
@@ -405,6 +420,15 @@ function Workspace({
         <AxisAlert data-testid="studio-package-read-only" kind="info" message={t('shell.studio.packages.readOnly')} />
       )}
       {saveError !== null && <AxisAlert data-testid="studio-package-save-error" kind="error" message={saveError} />}
+      {canDevelop && (
+        <PageActions>
+          <AxisButtonGroup
+            role="secondary"
+            nameKey="shell.studio.packages.actions"
+            actions={[{ key: 'run', label: t('shell.studio.packages.run.open'), onClick: () => setOutputTab('run') }]}
+          />
+        </PageActions>
+      )}
       <div
         style={{ display: 'grid', gridTemplateColumns: `${explorerWidth}px minmax(0, 1fr)`, borderTop: rule }}
         data-testid="studio-package-workspace"
@@ -550,6 +574,8 @@ function Workspace({
             <Tabs
               type="line"
               {...workspaceTabRow(tokens)}
+              activeKey={outputTab}
+              onChange={setOutputTab}
               items={[
                 {
                   key: 'problems',
@@ -570,6 +596,23 @@ function Workspace({
                     </div>
                   ),
                 },
+                ...(canDevelop
+                  ? [
+                      {
+                        key: 'run',
+                        label: t('shell.studio.packages.run.tab'),
+                        children: (
+                          <StudioPackageRun
+                            application={application}
+                            packageId={row.id}
+                            operations={row.operations}
+                            height={outputHeight - workspaceRowHeight(tokens)}
+                            beforeRun={saveAll}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
           </div>

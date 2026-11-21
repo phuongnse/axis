@@ -44,15 +44,18 @@ below.
   left, the open files as tabs with the code editor under them, the status line at the editor's foot, and the output
   panel under it. The workspace follows [rules, not boxes](shell.md#layout): rules between its regions and no box.
 - **The output panel.** The output panel under the status line has a Problems tab, which lists the problems of the
-  package's files, see Problems below. The tab row is a line tab row, in the workspace's one tab-row look.
-- **The output panel's other tabs and handles** _(planned for M37)_. The output panel also has Output, Tests and Run.
+  package's files, see Problems below. For a developer it also has a Run tab, see Run below. The tab row is a line tab
+  row, in the workspace's one tab-row look.
+- **The output panel's other tabs and handles** _(planned for M37)_. The output panel also has Output and Tests.
   A handle on the explorer's end rule sets its width, from a least width to half the workspace, and a handle on the
   output panel's top rule sets its height, both drawn as the one [handle on a rule](shell.md#layout). A rule runs
   under the heading from the sidebar across.
 - **The heading.** The package's label, with its kind and version under it. The heading has no tag of a change,
   because the band's Changes not live tells of every change, so the workspace reads no diff against the live release.
-- **The heading's actions** _(planned for M37)_. Build, Run tests and Run… are on the right as one
-  [group of equal weight](actions-and-controls.md#buttons), each button as wide as the widest.
+- **The heading's actions.** For a developer, Run… is on the right in a
+  [group of equal weight](actions-and-controls.md#buttons). It opens the Run tab.
+- **The heading's other actions** _(planned for M37)_. Build and Run tests join Run… in that group, each button as wide
+  as the widest.
 - **The explorer.** A tree of the package's folders and files, drawn by Ant Design's `Tree`. Folders come first, with
   a chevron on a folder's left and a folder icon, and a file has a file icon. A file with unsaved changes has a dot. A
   chosen or hovered row is marked across its whole width, a chosen one in the tint of the [navigation's](shell.md#layout)
@@ -82,9 +85,11 @@ below.
   still save. A quota refusal shows as it does for a resource.
 - **The status line.** At the editor's foot, right above the output panel, it tells of the open
   file: the cursor's line and column, the file's language and what is unsaved.
-- **Save before a run** _(planned for M37)_. Build, Run tests and Run… save every changed file first, as a code
-  editor saves before it runs a task, so each takes the files the editor shows. A file that cannot be saved, such as
-  one changed elsewhere, stops it with that file's notice.
+- **Save before a run.** Run… saves every changed file first, as a code editor saves before it runs a task, so it takes
+  the files the editor shows. A file that cannot be saved, such as one changed elsewhere, stops it with that file's
+  notice.
+- **Save before a build or a test** _(planned for M37)_. Build and Run tests save every changed file first and stop the
+  same way.
 - **Build** _(planned for M37)_. A build runs only when asked, from Build or Ctrl+Shift+B. Each save still answers the folder's diagnostics. The build's output shows in Output
   under a title row with its state, and its problems in Problems, see [the authoring API](#the-authoring-api).
 - **Problems.** The Problems tab lists the folder's diagnostics whose file is under `packages/<id>/`, errors then
@@ -97,7 +102,7 @@ below.
   other diagnostic. A problem's file at its line follows its message on the row when the row has room.
 - **Tests** _(planned for M37)_. Run tests shows one row a test in Tests, with its result, name, duration and message.
   A failed test's place, its file at its line, follows its message and opens there, as a problem's file does.
-- **Run** _(planned for M37)_. Run… shows two panes parted by a rule that runs the panel's height. The Input pane is
+- **Run.** Run… shows two panes parted by a rule that runs the panel's height. The Input pane is
   one block under its title row, in the order a person works: Operation, then Saved input, then the Form and JSON
   tabs and the values, with no rule between them. Run sits in the pane's action bar at its foot, outlined as the
   pane's main action and lined up with the fields. The JSON shows each field the input lacks as `null`. The Output
@@ -106,11 +111,11 @@ below.
   [scroll areas](actions-and-controls.md#scroll-areas). A run's CPU time is not shown, because one run's CPU time
   tells the author nothing they act on, and it counts in the tenant's
   [package run time](tenant-quotas.md#package-run-time-a-day).
-- **Saved inputs** _(planned for M37)_. A run's named inputs are kept with the application and shared by its
+- **Saved inputs.** A run's named inputs are kept with the application and shared by its
   developers, as AWS Lambda's shareable test events are, so a team runs the same cases. Saved input's list ends with
   Manage saved inputs…, which opens the [dialog that keeps saved items](actions-and-controls.md#fields).
-- **Without the developer role.** The editor is read-only, with an info alert. The workspace shows no save bar, and
-  Ctrl+S saves nothing.
+- **Without the developer role.** The editor is read-only, with an info alert. The workspace shows no save bar, no
+  Run… and no Run tab, and Ctrl+S saves nothing.
 - **Without the developer role, the explorer** _(planned for M37)_. The explorer offers only the files, Copy path and
   Refresh.
 
