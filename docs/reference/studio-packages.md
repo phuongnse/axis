@@ -36,27 +36,25 @@ package's workspace as `&view=packages&package=<id>`.
 
 ## A package's files
 
-An open package is a workspace that shows its files in a code editor, and a developer saves and builds them there.
-Testing and running them, so that a package can be tested and run in the browser, are planned, see the marked bullets
-below.
+An open package is a workspace that shows its files in a code editor, and a developer saves, builds, tests and runs
+them there.
 
 - **The workspace.** An open package is one workspace. It fills the window down to the footer: the explorer on the
   left, the open files as tabs with the code editor under them, the status line at the editor's foot, and the output
   panel under it. The workspace follows [rules, not boxes](shell.md#layout): rules between its regions and no box.
 - **The output panel.** The output panel under the status line has a Problems tab, which lists the problems of the
-  package's files, see Problems below, and an Output tab, which shows the last build, see Build below. For a developer
-  it also has a Run tab, see Run below. The tab row is a line tab row, in the workspace's one tab-row look.
-- **The output panel's other tabs and handles** _(planned for M37)_. The output panel also has Tests.
-  A handle on the explorer's end rule sets its width, from a least width to half the workspace, and a handle on the
+  package's files, see Problems below, an Output tab, which shows the last build or test, see Build and Tests below,
+  and a Tests tab, see Tests below. For a developer it also has a Run tab, see Run below. The tab row is a line tab row,
+  in the workspace's one tab-row look.
+- **The output panel's handles** _(planned for M37)_. A handle on the explorer's end rule sets its width, from a least width to half the workspace, and a handle on the
   output panel's top rule sets its height, both drawn as the one [handle on a rule](shell.md#layout). A rule runs
   under the heading from the sidebar across.
 - **The heading.** The package's label, with its kind and version under it. The heading has no tag of a change,
   because the band's Changes not live tells of every change, so the workspace reads no diff against the live release.
 - **The heading's actions.** Build, Run tests and Run… are on the right as one secondary
   [group of equal weight](actions-and-controls.md#buttons), each button as wide as the widest, named Build and test
-  for assistive technology. They show only with the developer role. Run tests is off while it runs nothing, and Build
-  is off while a save or a build runs and while Studio reconnects. Run… opens the Run tab.
-- **Run tests in the group** _(planned for M37)_. Run tests runs a package's tests.
+  for assistive technology. They show only with the developer role. Build and Run tests are off while a save, a build or a
+  test runs and while Studio reconnects, as one build or test runs at a time. Run… opens the Run tab.
 - **The explorer.** A tree of the package's folders and files, drawn by Ant Design's `Tree`. Folders come first, with
   a chevron on a folder's left and a folder icon, and a file has a file icon. A file with unsaved changes has a dot. A
   chosen or hovered row is marked across its whole width, a chosen one in the tint of the [navigation's](shell.md#layout)
@@ -85,10 +83,9 @@ below.
   still save. A quota refusal shows as it does for a resource.
 - **The status line.** At the editor's foot, right above the output panel, it tells of the open
   file: the cursor's line and column, the file's language and what is unsaved.
-- **Save before a build or a run.** Build and Run… save every changed file first, as a code editor saves before it
+- **Save before a build, a test or a run.** Build, Run tests and Run… save every changed file first, as a code editor saves before it
   runs a task, so each takes the files the editor shows. A file that cannot be saved, such as one changed elsewhere, or
   one already in conflict, stops it with that file's notice: its tab opens with Reload and nothing is sent.
-- **Save before a test** _(planned for M37)_. Run tests saves every changed file first, as Build does.
 - **Build.** A build runs only when asked, from Build or Ctrl+Shift+B (Cmd+Shift+B on macOS). Each save still answers
   the folder's diagnostics. Once every file is saved, Build sends `POST .../build` with the package and follows the
   request until it ends, see [the authoring API](#the-authoring-api). The Output tab opens when it starts. Its title
@@ -100,12 +97,16 @@ below.
   diagnostic has a line, by ", line N". It opens the file in the workspace, or switches to its tab, with the cursor at
   that line, or on line 1 when the diagnostic has none. A package's file shows in the band's Problems panel as plain
   muted text.
-- **Problems from a build.** The diagnostics of a build show in Problems like any other diagnostic, each opening its
-  file at its line. They stay until the next build starts.
+- **Problems from a build or a test.** The diagnostics of a build, or of a test whose copy of the package the host
+  refused, show in Problems like any other diagnostic, each opening its file at its line. They stay until the next
+  build or test starts.
 - **A problem on the row** _(planned for M37)_. A problem's file at its line follows its message on the row when the
   row has room.
-- **Tests** _(planned for M37)_. Run tests shows one row a test in Tests, with its result, name, duration and message.
-  A failed test's place, its file at its line, follows its message and opens there, as a problem's file does.
+- **Tests.** Once every file is saved, Run tests sends `POST .../test` with the package and follows the request until
+  it ends. The Tests tab opens when it starts. It shows one row a test, with its result, name, duration and message.
+  A failed test's place, its file at its line, follows its message and opens there, as a problem's file does. The
+  Output tab's title row then reads Tests, with the test's state as a status tag: queued, testing, passed or failed.
+  Under it are the lines the host wrote. A test that cannot be sent or followed shows the request alert.
 - **Run.** Run… shows two panes parted by a rule that runs the panel's height. The Input pane is
   one block under its title row, in the order a person works: Operation, then Saved input, then the Form and JSON
   tabs and the values, with no rule between them. Run sits in the pane's action bar at its foot, outlined as the
