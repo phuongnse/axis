@@ -1,6 +1,7 @@
 import { CloseOutlined } from '@ant-design/icons'
 import { Flex, Typography } from 'antd'
 import { useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { ActionBar } from './ActionBar'
 import { AxisButton } from './AxisButton'
 import { ShellAside } from './shellAside'
 import { useSidePanelWidth } from './sidePanelWidth'
@@ -20,6 +21,10 @@ type Closing =
  * beside the title, and a `line` shows under it in `textMuted`. The head stays in place, and the body, which holds `children`, scrolls on its own and keeps room
  * for its scrollbar. `testId` marks the panel. With `onClose` the panel has a close button named by `closeNameKey` and
  * marked by `closeTestId`, and it counts as opened by the person, so it shows over a panel with no close button.
+ * Proposed, #3264: `actions` sit in a bar at the panel's foot, which stays in place under the body, as a pane's action
+ * bar: outlined, its main action last on the right. The page keeps the one finish button, such as its Save, so a panel
+ * has none. Every side panel that has actions of its own, such as a new item's Cancel and Add or an item's Done, draws
+ * them here, so every panel has one look.
  */
 export function SidePanel({
   id,
@@ -27,6 +32,7 @@ export function SidePanel({
   status,
   line,
   testId,
+  actions,
   onClose,
   closeNameKey,
   closeTestId,
@@ -37,6 +43,7 @@ export function SidePanel({
   status?: ReactNode
   line?: ReactNode
   testId: string
+  actions?: ReactNode
   children: ReactNode
 } & Closing) {
   const t = useText()
@@ -132,6 +139,12 @@ export function SidePanel({
         >
           {children}
         </div>
+        {actions !== undefined && (
+          // The bar reaches the panel's edges, past its padding, as a pane's action bar does.
+          <div style={{ flex: 'none', margin: `0 -${spacing.sm}px -${spacing.sm}px` }}>
+            <ActionBar pane end={actions} />
+          </div>
+        )}
       </aside>
     </ShellAside>
   )

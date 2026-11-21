@@ -1,5 +1,5 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Tag, Typography, DatePicker } from 'antd'
+import { ConfigProvider, Flex, Input, InputNumber, Select, Tag, Typography, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
@@ -28,7 +28,8 @@ import {
   type ValueSource,
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
-import { escapePointerSegment } from '../platform/jsonPatch'
+import { escapePointerSegment, setAt } from '../platform/jsonPatch'
+import { SidePanel } from '../platform/SidePanel'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { withoutModulePrefix, type StudioNames } from '../platform/studio'
 import { studioResourceAddress } from '../platform/studioAddress'
@@ -594,13 +595,33 @@ const Fields = memo(function Fields({
   }, [])
 
   /**
-   * Proposed, #3264: Add field adds a text field with no name and opens its drawer at once, the same drawer that opens a
-   * field, with its name to type first, so adding a field takes no step of its own.
+   * Proposed, #3264: the new field that Add field opens in the side panel, held there and not in the draft until Add
+   * field puts it in, so Cancel adds nothing. `null` while no new field is open.
    */
+  const [staged, setStaged] = useState<Record<string, unknown> | null>(null)
+
   function addField() {
-    onChange('/fields', [...fields!, { name: '', type: 'text' }])
+    // An open field's panel gives way to the new field's, as one side panel shows at a time.
+    if (latest.current.shown !== null) {
+      closeDrawer()
+    }
+    setStaged({ name: '', type: 'text' })
+  }
+
+  /** A change in the new field's panel, at a pointer under `/fields/<its row>`, goes to the field the panel holds. */
+  function changeStaged(pointer: string, value: unknown) {
+    const prefix = `/fields/${fields!.length}`
+    if (pointer === prefix) {
+      setStaged(isContent(value) ? value : {})
+    } else if (pointer.startsWith(`${prefix}/`)) {
+      setStaged((current) => setAt(current ?? {}, pointer.slice(prefix.length), value) as Record<string, unknown>)
+    }
+  }
+
+  function commitStaged() {
+    onChange('/fields', [...fields!, staged])
     onOriginsChange?.([...rowOrigins(fields!, origins), null])
-    openDrawer(fields!.length)
+    setStaged(null)
   }
 
   if (fields === undefined) {
@@ -719,7 +740,7 @@ const Fields = memo(function Fields({
       </div>
       <FieldDrawer
         index={shown}
-        open={drawerOpen}
+        open={drawerOpen && staged === null}
         focusPath={focusPath}
         onFocused={clearFocusPath}
         field={shown === null ? undefined : fields[shown]}
@@ -740,6 +761,24 @@ const Fields = memo(function Fields({
         onChange={onChange}
         onClose={closeDrawer}
       />
+      {staged !== null && (
+        <FieldDrawer
+          index={fields.length}
+          open
+          focusPath={null}
+          onFocused={clearFocusPath}
+          field={staged}
+          currencyNames={editableSettings(staged).includes('currency') ? currencyNames : undefined}
+          matchSources={editableSettings(staged).includes('match') ? matchSources : undefined}
+          readOnly={false}
+          warning={undefined}
+          validations={undefined}
+          layer={layer}
+          onChange={changeStaged}
+          onClose={() => setStaged(null)}
+          onAdd={commitStaged}
+        />
+      )}
     </SectionPart>
   )
 })
@@ -952,9 +991,13 @@ function focusInDrawer(root: HTMLElement, path: string | null, pointer: string, 
  * (the field's name, label, type and help) and those of its settings, see
  * docs/reference/entity-designer.md#the-drawer-and-its-groups. Each is an input with its help and its id. Opening it
  * moves focus into it, at the name or, for a `focusPath` inside the field, at that setting. Its `focusPath` is reported
- * back through `onFocused` once focus has moved.
+ * back through `onFocused` once focus has moved. Proposed, #3264: it is the platform's one side panel, `SidePanel`, in
+ * the shell's right column from under the header to the footer, see docs/reference/shell.md#layout. An existing
+ * field's edits go into the draft at once and Done closes the panel. A new field, `onAdd` given, is held by the panel
+ * until Add field puts it into the draft; Cancel and Close add nothing.
  */
 const FieldDrawer = memo(function FieldDrawer({
+  onAdd,
   index,
   open,
   focusPath,
@@ -982,9 +1025,9 @@ const FieldDrawer = memo(function FieldDrawer({
   layer: DesignerLayer | undefined
   onChange: ChangeHandler
   onClose: () => void
+  onAdd?: () => void
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
   const content = isContent(field) ? field : {}
   const name = text(content.name)
   const type = text(content.type)
@@ -1015,82 +1058,98 @@ const FieldDrawer = memo(function FieldDrawer({
   }, [open, root, focusPath, index, pointer, readOnly, onFocused])
 
   return (
-    <Drawer
-      open={open && index !== null}
-      mask={false}
-      size={size.dialog.medium}
-      destroyOnHidden
-      // The save bar shows as soon as there is an edit, so the drawer always leaves its height free.
-      rootStyle={{ bottom: size.bar }}
-      title={name || t('shell.studio.entity.unnamedField')}
-      onClose={onClose}
-    >
-      {index !== null && (
-        <Flex vertical gap="middle" data-testid="studio-field-drawer" key={index} ref={setRoot} tabIndex={-1}>
-          {warning && (
-            <AxisAlert
-              kind="warning"
-              data-testid={`studio-migration-warning-${pointer}`}
-              message={t(
-                warning === 'enum'
-                  ? 'shell.studio.entity.migration.enumWarning'
-                  : 'shell.studio.entity.migration.uniqueWarning',
-              )}
-            />
-          )}
-          <AxisFieldGroup {...groupTexts(t, 'fields.group.general')}>
-            <Flex vertical gap="middle">
-              <div data-testid={`studio-field-${pointer}/name`}>
-                <AxisField {...fieldTexts(t, 'fields.name')} required>
-                  <Input value={name} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
-                </AxisField>
-              </div>
-              <AxisField {...fieldTexts(t, 'fields.label')}>
-                <FieldLabel
-                  name={fieldTexts(t, 'fields.label').label}
-                  pointer={`${pointer}/label`}
-                  value={content.label}
-                  onChange={onChange}
-                />
-              </AxisField>
-              <div data-testid={`studio-field-${pointer}/type`}>
-                <AxisField {...fieldTexts(t, 'fields.type')} required>
-                  <Select
-                    showSearch
-                    optionFilterProp="label"
-                    virtual={false}
-                    value={type === '' ? undefined : type}
-                    // Proposed, #3264: the types by name in words, each with a line that says what it holds, as
-                    // the choice of a new field's type is made here.
-                    options={fieldTypeChoices(t)}
-                    optionRender={({ data }) => <TypeOption label={data.label} help={data.help} />}
-                    onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
+    open &&
+    index !== null && (
+      <SidePanel
+        id="studio-field-panel"
+        testId="studio-field-panel"
+        title={onAdd ? t('shell.studio.entity.newField') : name || t('shell.studio.entity.unnamedField')}
+        onClose={onClose}
+        closeNameKey="shell.studio.entity.fieldPanel.close"
+        actions={
+          readOnly ? undefined : onAdd ? (
+            <>
+              <AxisButton role="secondary" onClick={onClose}>
+                {t('shell.studio.cancel')}
+              </AxisButton>
+              <AxisButton role="finish" onClick={onAdd}>
+                {t('shell.studio.entity.addField')}
+              </AxisButton>
+            </>
+          ) : (
+            <AxisButton role="finish" onClick={onClose}>
+              {t('shell.studio.entity.fieldPanel.done')}
+            </AxisButton>
+          )
+        }
+      >
+        {index !== null && (
+          <Flex vertical gap="middle" data-testid="studio-field-drawer" key={index} ref={setRoot} tabIndex={-1}>
+            {warning && (
+              <AxisAlert
+                kind="warning"
+                data-testid={`studio-migration-warning-${pointer}`}
+                message={t(
+                  warning === 'enum'
+                    ? 'shell.studio.entity.migration.enumWarning'
+                    : 'shell.studio.entity.migration.uniqueWarning',
+                )}
+              />
+            )}
+            <AxisFieldGroup {...groupTexts(t, 'fields.group.general')}>
+              <Flex vertical gap="middle">
+                <div data-testid={`studio-field-${pointer}/name`}>
+                  <AxisField {...fieldTexts(t, 'fields.name')} required>
+                    <Input value={name} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
+                  </AxisField>
+                </div>
+                <AxisField {...fieldTexts(t, 'fields.label')}>
+                  <FieldLabel
+                    name={fieldTexts(t, 'fields.label').label}
+                    pointer={`${pointer}/label`}
+                    value={content.label}
+                    onChange={onChange}
                   />
                 </AxisField>
-              </div>
-              <AxisField {...fieldTexts(t, 'fields.helpText')}>
-                <FieldLabel
-                  name={fieldTexts(t, 'fields.helpText').label}
-                  pointer={`${pointer}/help`}
-                  value={content.help}
-                  onChange={onChange}
-                />
-              </AxisField>
-            </Flex>
-          </AxisFieldGroup>
-          <Settings
-            index={index}
-            field={content}
-            currencyNames={currencyNames}
-            matchSources={matchSources}
-            readOnly={readOnly}
-            validations={validations}
-            layer={layer}
-            onChange={onChange}
-          />
-        </Flex>
-      )}
-    </Drawer>
+                <div data-testid={`studio-field-${pointer}/type`}>
+                  <AxisField {...fieldTexts(t, 'fields.type')} required>
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      virtual={false}
+                      value={type === '' ? undefined : type}
+                      // Proposed, #3264: the types by name in words, each with a line that says what it holds, as
+                      // the choice of a new field's type is made here.
+                      options={fieldTypeChoices(t)}
+                      optionRender={({ data }) => <TypeOption label={data.label} help={data.help} />}
+                      onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
+                    />
+                  </AxisField>
+                </div>
+                <AxisField {...fieldTexts(t, 'fields.helpText')}>
+                  <FieldLabel
+                    name={fieldTexts(t, 'fields.helpText').label}
+                    pointer={`${pointer}/help`}
+                    value={content.help}
+                    onChange={onChange}
+                  />
+                </AxisField>
+              </Flex>
+            </AxisFieldGroup>
+            <Settings
+              index={index}
+              field={content}
+              currencyNames={currencyNames}
+              matchSources={matchSources}
+              readOnly={readOnly}
+              validations={validations}
+              layer={layer}
+              onChange={onChange}
+            />
+          </Flex>
+        )}
+      </SidePanel>
+    )
   )
 })
 
