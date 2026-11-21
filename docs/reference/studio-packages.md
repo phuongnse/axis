@@ -36,23 +36,27 @@ package's workspace as `&view=packages&package=<id>`.
 
 ## A package's files
 
-An open package is a workspace that shows its files in a code editor, and a developer saves them there. Building,
-testing and running them, so that a package can be built and run in the browser, are planned, see the marked bullets
+An open package is a workspace that shows its files in a code editor, and a developer saves and builds them there.
+Testing and running them, so that a package can be tested and run in the browser, are planned, see the marked bullets
 below.
 
 - **The workspace.** An open package is one workspace. It fills the window down to the footer: the explorer on the
   left, the open files as tabs with the code editor under them, the status line at the editor's foot, and the output
   panel under it. The workspace follows [rules, not boxes](shell.md#layout): rules between its regions and no box.
 - **The output panel.** The output panel under the status line has a Problems tab, which lists the problems of the
-  package's files, see Problems below. The tab row is a line tab row, in the workspace's one tab-row look.
-- **The output panel's other tabs and handles** _(planned for M37)_. The output panel also has Output, Tests and Run.
+  package's files, see Problems below, and an Output tab, which shows the last build, see Build below. The tab row is
+  a line tab row, in the workspace's one tab-row look.
+- **The output panel's other tabs and handles** _(planned for M37)_. The output panel also has Tests and Run.
   A handle on the explorer's end rule sets its width, from a least width to half the workspace, and a handle on the
   output panel's top rule sets its height, both drawn as the one [handle on a rule](shell.md#layout). A rule runs
   under the heading from the sidebar across.
 - **The heading.** The package's label, with its kind and version under it. The heading has no tag of a change,
   because the band's Changes not live tells of every change, so the workspace reads no diff against the live release.
-- **The heading's actions** _(planned for M37)_. Build, Run tests and Run… are on the right as one
-  [group of equal weight](actions-and-controls.md#buttons), each button as wide as the widest.
+- **The heading's actions.** Build and Run tests are on the right as one secondary
+  [group of equal weight](actions-and-controls.md#buttons), each button as wide as the widest, named Build and test
+  for assistive technology. They show only with the developer role. Run tests is off while it runs nothing, and Build
+  is off while a save or a build runs and while Studio reconnects.
+- **Run tests and Run… in the group** _(planned for M37)_. Run tests runs a package's tests, and Run… joins the group.
 - **The explorer.** A tree of the package's folders and files, drawn by Ant Design's `Tree`. Folders come first, with
   a chevron on a folder's left and a folder icon, and a file has a file icon. A file with unsaved changes has a dot. A
   chosen or hovered row is marked across its whole width, a chosen one in the tint of the [navigation's](shell.md#layout)
@@ -74,27 +78,32 @@ below.
   language without a syntax tree, such as C#, folds by indentation.
 - **The editor's marks and keys** _(planned for M37)_. A build problem is marked at its line. The editor's fold column
   sits `spacing-sm` from the line numbers and from the gutter's rule, and shows an open fold's chevron while the
-  pointer is over the gutter and a folded one always, as VS Code does. Ctrl+P opens a file by its name and
-  Ctrl+Shift+B builds.
+  pointer is over the gutter and a folded one always, as VS Code does. Ctrl+P opens a file by its name.
 - **Saving.** One save bar, or Ctrl+S (Cmd+S on macOS), saves every changed file, one after another. Each save uses
   the version check of [versions](authoring.md#versions), and a save over a stale version answers `409`, as it does for
   a resource. That file keeps its text and its dot, and its tab shows the notice with Reload, while the other files
   still save. A quota refusal shows as it does for a resource.
 - **The status line.** At the editor's foot, right above the output panel, it tells of the open
   file: the cursor's line and column, the file's language and what is unsaved.
-- **Save before a run** _(planned for M37)_. Build, Run tests and Run… save every changed file first, as a code
-  editor saves before it runs a task, so each takes the files the editor shows. A file that cannot be saved, such as
-  one changed elsewhere, stops it with that file's notice.
-- **Build** _(planned for M37)_. A build runs only when asked, from Build or Ctrl+Shift+B. Each save still answers the folder's diagnostics. The build's output shows in Output
-  under a title row with its state, and its problems in Problems, see [the authoring API](#the-authoring-api).
+- **Save before a run.** Build saves every changed file first, as a code editor saves before it runs a task, so it
+  takes the files the editor shows. A file that cannot be saved, such as one changed elsewhere, or one already in
+  conflict, stops it with that file's notice: its tab opens with Reload and nothing is sent.
+- **Save before a test or a run** _(planned for M37)_. Run tests and Run… save every changed file first, as Build does.
+- **Build.** A build runs only when asked, from Build or Ctrl+Shift+B (Cmd+Shift+B on macOS). Each save still answers
+  the folder's diagnostics. Once every file is saved, Build sends `POST .../build` with the package and follows the
+  request until it ends, see [the authoring API](#the-authoring-api). The Output tab opens when it starts. Its title
+  row reads Build, with the build's state as a status tag: queued, building, built or failed. Under it are the lines
+  the host wrote, with no box of their own. A build that cannot be sent or followed shows the request alert.
 - **Problems.** The Problems tab lists the folder's diagnostics whose file is under `packages/<id>/`, errors then
   warnings, with the list of the [Problems panel](studio-workspace.md#problems-panel), or says "No problems.". After a
   save it shows the problems that the save answered. A problem's file is a link, named by the file and, when the
   diagnostic has a line, by ", line N". It opens the file in the workspace, or switches to its tab, with the cursor at
   that line, or on line 1 when the diagnostic has none. A package's file shows in the band's Problems panel as plain
   muted text.
-- **Problems from a build and on the row** _(planned for M37)_. The diagnostics of a build show in Problems like any
-  other diagnostic. A problem's file at its line follows its message on the row when the row has room.
+- **Problems from a build.** The diagnostics of a build show in Problems like any other diagnostic, each opening its
+  file at its line. They stay until the next build starts.
+- **A problem on the row** _(planned for M37)_. A problem's file at its line follows its message on the row when the
+  row has room.
 - **Tests** _(planned for M37)_. Run tests shows one row a test in Tests, with its result, name, duration and message.
   A failed test's place, its file at its line, follows its message and opens there, as a problem's file does.
 - **Run** _(planned for M37)_. Run… shows two panes parted by a rule that runs the panel's height. The Input pane is
@@ -109,8 +118,8 @@ below.
 - **Saved inputs** _(planned for M37)_. A run's named inputs are kept with the application and shared by its
   developers, as AWS Lambda's shareable test events are, so a team runs the same cases. Saved input's list ends with
   Manage saved inputs…, which opens the [dialog that keeps saved items](actions-and-controls.md#fields).
-- **Without the developer role.** The editor is read-only, with an info alert. The workspace shows no save bar, and
-  Ctrl+S saves nothing.
+- **Without the developer role.** The editor is read-only, with an info alert. The workspace shows no save bar and no
+  Build and Run tests group, Ctrl+S saves nothing and Ctrl+Shift+B builds nothing.
 - **Without the developer role, the explorer** _(planned for M37)_. The explorer offers only the files, Copy path and
   Refresh.
 
@@ -134,24 +143,24 @@ Package files take the same checks as a resource, so Studio, an author's own too
 reach them one way. The files are the files under `packages/` of the application's working folder, and a
 path names one as `packages/<package>/<path>`.
 
-| Route                                                                  | Response                                                                                                                                                                                                                                              |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/studio/apps/{application}/package-files`                     | `200` with `{ items: [{ package, path, version }] }`, every file under `packages/` in a package folder, sorted by file                                                                                                                                 |
-| `GET /api/studio/apps/{application}/packages/{package}/files/{**path}` | `200` with `{ package, path, version, content }` and the version as an `ETag`, `content` being the file's text                                                                                                                                         |
-| `PUT /api/studio/apps/{application}/packages/{package}/files/{**path}` | `200` with `{ version, diagnostics }` and an `ETag`, both for a create and for a replace. The body is `{ content }` as `application/json`, with `If-None-Match: *` to create or `If-Match` of the file's version to replace                           |
-| `DELETE /api/studio/apps/{application}/packages/{package}/files/{**path}` | `200` with `{ diagnostics }`. It needs `If-Match` of the file's version                                                                                                                                                                            |
+| Route                                                                     | Response                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/studio/apps/{application}/package-files`                        | `200` with `{ items: [{ package, path, version }] }`, every file under `packages/` in a package folder, sorted by file                                                                                                      |
+| `GET /api/studio/apps/{application}/packages/{package}/files/{**path}`    | `200` with `{ package, path, version, content }` and the version as an `ETag`, `content` being the file's text                                                                                                              |
+| `PUT /api/studio/apps/{application}/packages/{package}/files/{**path}`    | `200` with `{ version, diagnostics }` and an `ETag`, both for a create and for a replace. The body is `{ content }` as `application/json`, with `If-None-Match: *` to create or `If-Match` of the file's version to replace |
+| `DELETE /api/studio/apps/{application}/packages/{package}/files/{**path}` | `200` with `{ diagnostics }`. It needs `If-Match` of the file's version                                                                                                                                                     |
 
 Studio's package workspace needs these routes besides, see [a package's files](#a-packages-files). Each has the
 developer role and the switch as a write has, and answers `403` otherwise.
 
-| Route                                                                                  | Response                                                                                                                                                                                                                                                         |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/studio/apps/{application}/build`                                            | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below                                              |
-| `POST /api/studio/apps/{application}/test`                                             | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below                                      |
-| `POST /api/studio/apps/{application}/run` _(planned for M37)_                          | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run`, see A run of one operation below                                                                                                            |
-| `GET /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ items: [{ name, operation, input }] }`. The version is the `ETag`, which comes once the inputs are saved, see Saved run inputs below                                                                                                                                    |
-| `PUT /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ version }` and an `ETag`. The body is `{ items }`, with `If-None-Match: *` for the first save or `If-Match` of the version, and a stale version answers `409`                                                                                       |
-| `POST /api/studio/apps/{application}/packages/{package}/move`      | `200` with `{ diagnostics }`. The body is `{ moves: [{ from, to, version }] }`, see Moves below                                                                                                                                                              |
+| Route                                                              | Response                                                                                                                                                                                       |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/studio/apps/{application}/build`                        | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below       |
+| `POST /api/studio/apps/{application}/test`                         | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below |
+| `POST /api/studio/apps/{application}/run` _(planned for M37)_      | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run`, see A run of one operation below                                                                 |
+| `GET /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ items: [{ name, operation, input }] }`. The version is the `ETag`, which comes once the inputs are saved, see Saved run inputs below                                             |
+| `PUT /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ version }` and an `ETag`. The body is `{ items }`, with `If-None-Match: *` for the first save or `If-Match` of the version, and a stale version answers `409`                    |
+| `POST /api/studio/apps/{application}/packages/{package}/move`      | `200` with `{ diagnostics }`. The body is `{ moves: [{ from, to, version }] }`, see Moves below                                                                                                |
 
 - **The checks.** A write to a package's files is under the [versions](authoring.md#versions) and the write
   lock, the storage quota of a save, see [refusals](tenant-quotas.md#refusals), and the

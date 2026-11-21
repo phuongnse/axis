@@ -22,19 +22,51 @@ const contents: Record<string, string> = {
 
 afterEach(() => vi.unstubAllGlobals())
 
+const problem = (file: string, extra: Partial<StudioDiagnostic> = {}): StudioDiagnostic => ({
+  code: 'AXC0132',
+  severity: 'error',
+  message: `Problem in ${file}`,
+  file,
+  path: '',
+  resourceId: null,
+  ...extra,
+})
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
+const buildRoute = '/api/studio/apps/Shop/build'
+const queuedBuild = { id: 'b1', application: 'Shop', kind: 'build', status: 'queued', package: 'tools', output: [] }
+const failedBuild = {
+  ...queuedBuild,
+  status: 'failed',
+  output: ['Compiled 1 Python file.', 'lib/x.py: invalid syntax'],
+  diagnostics: [problem('packages/tools/lib/x.py', { line: 2, column: 1 })],
+}
+
 /**
  * Stubs a package `tools` with five files, and answers a file's read from `contents`. A write answers
- * `{ version: 'new-<path>' }` unless `writes` has a response for its path. The writes are recorded in `puts`.
+ * `{ version: 'new-<path>' }` unless `writes` has a response for its path. The writes are recorded in `puts`. Each write
+ * and each build post is also recorded in `calls`, in order, as `PUT <path>` and `POST build <body>`. A build post answers
+ * the queued build `b1`, and its read answers `failedBuild` unless `readBuild` answers otherwise.
  */
-function stubPackage(writes: Record<string, () => Response> = {}) {
+function stubPackage(
+  writes: Record<string, () => Response> = {},
+  calls: string[] = [],
+  readBuild: () => Response = () => json(failedBuild),
+) {
   const puts: { path: string; ifMatch: string | null; body: { content: string } }[] = []
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string, init?: RequestInit): Promise<Response> => {
+      if (input === buildRoute) {
+        calls.push(`POST build ${init?.body as string}`)
+        return json(queuedBuild, 202)
+      }
+      if (input === '/api/studio/apps/Shop/requests/b1') {
+        return readBuild()
+      }
       if (input === files) {
         return json({ items: Object.keys(contents).map((path) => ({ package: 'tools', path, version: `v-${path}` })) })
       }
@@ -43,6 +75,7 @@ function stubPackage(writes: Record<string, () => Response> = {}) {
         return new Response(null, { status: 404 })
       }
       if (init?.method === 'PUT') {
+        calls.push(`PUT ${path}`)
         puts.push({
           path,
           ifMatch: new Headers(init.headers).get('If-Match'),
@@ -91,16 +124,6 @@ async function openFile(name: string, path: string) {
   await userEvent.click(within(screen.getByTestId('studio-package-tree')).getByText(name, { exact: true }))
   return EditorView.findFromDOM(await screen.findByRole('textbox', { name: path }))!
 }
-
-const problem = (file: string, extra: Partial<StudioDiagnostic> = {}): StudioDiagnostic => ({
-  code: 'AXC0132',
-  severity: 'error',
-  message: `Problem in ${file}`,
-  file,
-  path: '',
-  resourceId: null,
-  ...extra,
-})
 
 const typeAtStart = (view: EditorView) =>
   act(() => view.dispatch({ changes: { from: 0, insert: 'x' }, selection: { anchor: 1 }, userEvent: 'input.type' }))
@@ -415,6 +438,120 @@ describe('StudioPackageWorkspace', () => {
       await screen.findByTestId('studio-package-tree')
 
       expect(within(within(output()).getByRole('tabpanel')).getByText('No problems.')).toBeInTheDocument()
+    })
+  })
+
+  describe('Build', () => {
+    const buildButton = () => screen.getByRole('button', { name: 'Build' })
+
+    it('saves every changed file before it posts the build of the package, and opens the Output tab', async () => {
+      const calls: string[] = []
+      stubPackage({}, calls)
+      renderWorkspace(true)
+      await editTwoFiles()
+
+      await userEvent.click(buildButton())
+
+      await waitFor(() => expect(calls).toHaveLength(3))
+      expect(calls).toEqual(['PUT src/b.ts', 'PUT adapter.py', 'POST build {"package":"tools"}'])
+      expect(await screen.findByRole('tab', { name: 'Output', selected: true })).toBeInTheDocument()
+    })
+
+    it('posts nothing when a file changed elsewhere, and opens that file with its notice', async () => {
+      const calls: string[] = []
+      stubPackage({ 'src/b.ts': () => json({ title: 'Changed.' }, 409) }, calls)
+      renderWorkspace(true)
+      await editTwoFiles()
+      await userEvent.click(screen.getByRole('tab', { name: /adapter\.py/ }))
+
+      await userEvent.click(buildButton())
+
+      expect(await screen.findByTestId('studio-package-conflict')).toHaveTextContent('Someone else changed this file.')
+      expect(screen.getByRole('tab', { name: /b\.ts/ })).toHaveAttribute('aria-selected', 'true')
+      expect(calls).toEqual(['PUT src/b.ts', 'PUT adapter.py'])
+      await waitFor(() => expect(buildButton()).toBeEnabled())
+
+      // The file stays in conflict, so a second build stops before any request.
+      await userEvent.click(buildButton())
+      await waitFor(() => expect(buildButton()).toBeEnabled())
+      expect(calls).toEqual(['PUT src/b.ts', 'PUT adapter.py'])
+    })
+
+    it('shows the failed build’s output under its title row and state, and its problem opens the file at its line', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(buildButton())
+
+      const panel = within(screen.getByTestId('studio-package-output'))
+      await waitFor(() => expect(panel.getByTestId('studio-package-build-state')).toHaveTextContent('Failed'), {
+        timeout: 3000,
+      })
+      expect(panel.getByRole('heading', { level: 2, name: 'Build' })).toBeInTheDocument()
+      expect(panel.getByTestId('studio-package-build-output')).toHaveTextContent(
+        'Compiled 1 Python file. lib/x.py: invalid syntax',
+      )
+
+      await userEvent.click(panel.getByRole('tab', { name: 'Problems' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'packages/tools/lib/x.py, line 2' }))
+
+      const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
+      await waitFor(() =>
+        expect(within(screen.getByTestId('studio-package-status')).getByText('Line 2, column 1')).toBeInTheDocument(),
+      )
+      expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(2)
+    })
+
+    it('shows the alert and turns Build back on when reading the build fails', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      stubPackage({}, [], () => new Response(null, { status: 500 }))
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(buildButton())
+
+      expect(
+        await screen.findByText('The request could not be sent or checked.', {}, { timeout: 3000 }),
+      ).toBeInTheDocument()
+      await waitFor(() => expect(buildButton()).toBeEnabled())
+      expect(buildButton()).not.toHaveAttribute('aria-busy', 'true')
+    })
+
+    it('says no build has run before the first one, and leaves Run tests off', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Output' }))
+
+      expect(await screen.findByText('No build has run yet.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Run tests' })).toBeDisabled()
+      expect(screen.getByRole('group', { name: 'Build and test' })).toBeInTheDocument()
+    })
+
+    it('builds on Ctrl+Shift+B', async () => {
+      const calls: string[] = []
+      stubPackage({}, calls)
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.keyboard('{Control>}{Shift>}b{/Shift}{/Control}')
+
+      await waitFor(() => expect(calls).toEqual(['POST build {"package":"tools"}']))
+    })
+
+    it('shows no Build and Run tests group and posts nothing on Ctrl+Shift+B without the developer role', async () => {
+      const calls: string[] = []
+      stubPackage({}, calls)
+      renderWorkspace(false)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.keyboard('{Control>}{Shift>}b{/Shift}{/Control}')
+
+      expect(screen.queryByRole('group', { name: 'Build and test' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Build' })).not.toBeInTheDocument()
+      expect(calls).toEqual([])
     })
   })
 })
