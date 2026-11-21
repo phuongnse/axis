@@ -4,9 +4,6 @@
 // They are written against ESLint's rule API only, so ESLint can run them if oxlint's JS plugins change.
 // Each rule reads the syntax tree, so a comment or a string that names a forbidden call is not reported.
 
-const presetColours =
-  /^(?:(?:magenta|red|volcano|orange|gold|lime|green|cyan|blue|geekblue|purple|pink|yellow)(?:-inverse)?|success|processing|error|warning|default)$/
-
 const isString = (node) => node?.type === 'Literal' && typeof node.value === 'string'
 const isLiteralKey = (node) =>
   node?.type === 'Literal' && (typeof node.value === 'string' || typeof node.value === 'number')
@@ -105,46 +102,6 @@ const noPrototypeWrite = {
   },
 }
 
-// A string literal preset anywhere inside the value, or the value itself.
-function holdsPreset(node) {
-  if (isString(node)) return presetColours.test(node.value)
-  if (node?.type === 'TemplateLiteral') {
-    return (
-      node.expressions.length === 0 && node.quasis.length === 1 && presetColours.test(node.quasis[0].value.cooked ?? '')
-    )
-  }
-  if (!node || typeof node !== 'object') return false
-  return Object.entries(node).some(([key, child]) => {
-    if (key === 'parent' || key === 'loc' || key === 'range') return false
-    if (Array.isArray(child)) return child.some((item) => item && typeof item.type === 'string' && holdsPreset(item))
-    return child && typeof child.type === 'string' && holdsPreset(child)
-  })
-}
-
-const noPresetTagColour = {
-  meta: {
-    type: 'problem',
-    messages: { preset: 'Colour a tag with the colour tokens, not a preset name.' },
-    schema: [],
-  },
-  create(context) {
-    return {
-      JSXOpeningElement(node) {
-        if (node.name?.type !== 'JSXIdentifier' || node.name.name !== 'Tag') return
-        for (const attribute of node.attributes) {
-          if (attribute.type !== 'JSXAttribute' || attribute.name?.name !== 'color' || !attribute.value) continue
-          const value = attribute.value
-          const preset =
-            value.type === 'JSXExpressionContainer'
-              ? holdsPreset(value.expression)
-              : isString(value) && presetColours.test(value.value)
-          if (preset) context.report({ node, messageId: 'preset' })
-        }
-      },
-    }
-  },
-}
-
 // `allowed` names the elements of the component that the rule lets through.
 const noAntdComponent = (component, message, allowed = () => false) => ({
   meta: {
@@ -190,6 +147,7 @@ const isSmallCard = (node) => {
 
 const noAntdButton = noAntdComponent('Button', 'Use AxisButton with a role, not the Button of antd.')
 const noAntdAlert = noAntdComponent('Alert', 'Use AxisAlert with a kind, not the Alert of antd.')
+const noAntdTag = noAntdComponent('Tag', 'Use StatusTag with a tone, not the Tag of antd.')
 // A page's parts sit a rule apart, so a page draws its panels through SectionParts, see docs/reference/shell.md#layout.
 const noCardPanel = noAntdComponent(
   'Card',
@@ -438,9 +396,9 @@ export default {
     'no-srcdoc': noSrcdoc,
     'no-computed-key-write': noComputedKeyWrite,
     'no-prototype-write': noPrototypeWrite,
-    'no-preset-tag-colour': noPresetTagColour,
     'no-antd-button': noAntdButton,
     'no-antd-alert': noAntdAlert,
+    'no-antd-tag': noAntdTag,
     'no-card-panel': noCardPanel,
     'field-label-through-axis-field': fieldLabelThroughAxisField,
     'exact-locators': exactLocators,

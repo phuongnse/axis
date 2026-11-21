@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { fillText } from '../platform/fillText'
 import { ProcessRouteEdge } from '../platform/ProcessGraph'
 import { type GraphPoint, routeBetween, useGraphLayout } from '../platform/processLayout'
+import { StatusTag } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import type { ContractEdge, ContractState } from './contractView'
@@ -21,7 +22,6 @@ function StateNodeView({ data }: NodeProps<StateNode>) {
   const t = useText()
   const { colour, radius } = useDesignTokens()
   const { state } = data
-  const mark = { padding: '0 6px', border: `1px solid ${colour.border}`, borderRadius: radius.base, fontSize: 12 }
   return (
     <>
       <Handle type="target" position={Position.Left} isConnectable={false} style={{ display: 'none' }} aria-hidden />
@@ -41,12 +41,8 @@ function StateNodeView({ data }: NodeProps<StateNode>) {
       >
         <strong>{state.name}</strong>
         <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-          {state.initial && (
-            <span style={{ ...mark, color: colour.primaryText, borderColor: colour.primaryText }}>
-              {t('shell.studio.contract.initial')}
-            </span>
-          )}
-          {state.deletable && <span style={mark}>{t('shell.studio.contract.deletable')}</span>}
+          {state.initial && <StatusTag tone="neutral">{t('shell.studio.contract.initial')}</StatusTag>}
+          {state.deletable && <StatusTag tone="neutral">{t('shell.studio.contract.deletable')}</StatusTag>}
         </div>
       </div>
       <Handle type="source" position={Position.Right} isConnectable={false} style={{ display: 'none' }} aria-hidden />

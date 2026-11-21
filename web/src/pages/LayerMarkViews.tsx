@@ -1,6 +1,7 @@
-import { Button, Flex, Tag, Typography } from 'antd'
+import { Button, Flex, Typography } from 'antd'
 import { fillText } from '../platform/fillText'
 import { markName, markOf, type LayerElement, type LayerMark } from '../platform/layerMarks'
+import { StatusTag } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
 
 /** What the designer needs to show a customization layer: its marked elements, and Reset to module for each. */
@@ -11,7 +12,7 @@ export interface DesignerLayer {
 }
 
 /**
- * What the layer did to one element, as a tag with its accessible name, such as "supplier, added by this application".
+ * What the layer did to one element, as a neutral tag with its accessible name, such as "supplier, added by this application".
  * `data-testid` passes to the tag. It is the one tag that the designers and a request's diff draw for a mark.
  */
 export function LayerMarkLabel({
@@ -25,9 +26,9 @@ export function LayerMarkLabel({
 }) {
   const t = useText()
   return (
-    <Tag role="note" aria-label={markName(t, mark, name)} data-testid={testId}>
+    <StatusTag tone="neutral" role="note" aria-label={markName(t, mark, name)} data-testid={testId}>
       {t(`shell.studio.module.${mark}`)}
-    </Tag>
+    </StatusTag>
   )
 }
 

@@ -4,6 +4,7 @@ import type { JsonPatchOperation } from './jsonPatch'
 import { type ModuleKind, moduleKinds } from './moduleKinds'
 import { QuotaRefusedError, quotaRefusalTitle } from './quota'
 import { sortByName } from './listOrder'
+import type { StatusTone } from './statusTones'
 import { kindSingular, sidebarRank } from './studioKinds'
 import type { EntityWidgetMetadata, PageMetadata } from './site'
 
@@ -349,6 +350,16 @@ export interface StudioDiagnostic {
    */
   changedBy?: string | null
   changedAt?: string | null
+}
+
+/** The tone of a problem's severity: an error is `danger` and a warning is `attention`. */
+export function severityTone(severity: StudioDiagnostic['severity']): StatusTone {
+  return severity === 'error' ? 'danger' : 'attention'
+}
+
+/** The platform text of a problem's severity, "Error" or "Warning". */
+export function severityText(t: (key: string) => string, severity: StudioDiagnostic['severity']): string {
+  return t(`shell.studio.problems.severity.${severity}`)
 }
 
 /** The other end of a reference. Each type writes only its own fields. */

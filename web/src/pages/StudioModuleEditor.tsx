@@ -1,5 +1,6 @@
-import { Button, Flex, Modal, Tag } from 'antd'
+import { Button, Flex, Modal } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { StatusTag } from '../platform/StatusTag'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
@@ -394,7 +395,9 @@ export function StudioModuleEditor({
     <Flex vertical gap="middle" ref={rootRef}>
       {loaded.layer !== null && (
         <Flex gap="small" align="center">
-          <Tag data-testid="studio-module-layer">{t('shell.studio.module.layer')}</Tag>
+          <StatusTag tone="neutral" data-testid="studio-module-layer">
+            {t('shell.studio.module.layer')}
+          </StatusTag>
           <AxisButton
             role="destructive"
             data-testid="studio-module-reset-all"

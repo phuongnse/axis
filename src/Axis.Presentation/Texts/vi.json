@@ -2645,6 +2645,8 @@
   "shell.studio.problems.errors": "{count} lỗi",
   "shell.studio.problems.warning": "1 cảnh báo",
   "shell.studio.problems.warnings": "{count} cảnh báo",
+  "shell.studio.problems.severity.error": "Lỗi",
+  "shell.studio.problems.severity.warning": "Cảnh báo",
   "shell.studio.problems.title": "Vấn đề",
   "shell.sidePanel.resize": "Đổi độ rộng khung",
   "shell.studio.problems.close": "Đóng danh sách vấn đề",

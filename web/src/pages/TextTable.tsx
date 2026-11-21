@@ -1,8 +1,9 @@
-import { Button, Flex, Input, Tag, Typography } from 'antd'
+import { Button, Flex, Input, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { escapePointerSegment } from '../platform/jsonPatch'
+import { StatusTag } from '../platform/StatusTag'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
@@ -137,7 +138,7 @@ export function TextTable({
               const missing = !Object.hasOwn(column.texts, row.key)
               if (!column.editable) {
                 return missing ? (
-                  <Tag>{t('shell.studio.texts.missing')}</Tag>
+                  <StatusTag tone="attention">{t('shell.studio.texts.missing')}</StatusTag>
                 ) : (
                   <Typography.Text>{textOf(column, row.key)}</Typography.Text>
                 )
@@ -149,7 +150,7 @@ export function TextTable({
                     value={textOf(column, row.key)}
                     onChange={(event) => onChange(`/texts/${escapePointerSegment(row.key)}`, event.target.value)}
                   />
-                  {missing && <Tag>{t('shell.studio.texts.missing')}</Tag>}
+                  {missing && <StatusTag tone="attention">{t('shell.studio.texts.missing')}</StatusTag>}
                 </Flex>
               )
             },

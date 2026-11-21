@@ -1,8 +1,9 @@
 import { ExportOutlined } from '@ant-design/icons'
-import { Select, Space, Tag } from 'antd'
+import { Select, Space } from 'antd'
 import { useContext } from 'react'
 import { useHref, useLinkClickHandler } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
+import { StatusTag } from '../platform/StatusTag'
 import { studioResourceAddress } from '../platform/studioAddress'
 import { labelText, StudioApplicationContext, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
@@ -78,8 +79,7 @@ export function ReferencePicker({
             value: current,
             label: (
               <span data-testid="studio-reference-unknown">
-                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                {current} <Tag color="warning">{t('shell.studio.unknownName')}</Tag>
+                {current} <StatusTag tone="attention">{t('shell.studio.unknownName')}</StatusTag>
               </span>
             ),
           },

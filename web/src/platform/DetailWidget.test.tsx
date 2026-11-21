@@ -458,7 +458,7 @@ describe('DetailWidget', () => {
     expect(screen.queryByRole('link', { name: categoryId })).toBeNull()
   })
 
-  it('shows each entry of a references field as a link inside its tag, and the id as text where a label is missing', async () => {
+  it('shows each entry of a references field as a link with no tag round it, and the id as text where a label is missing', async () => {
     const widget: EntityWidgetMetadata = {
       ...noteWidget,
       entity: {
@@ -482,8 +482,8 @@ describe('DetailWidget', () => {
 
     const word = await screen.findByRole('link', { name: 'Word' })
     expect(word).toHaveAttribute('href', '/e2e/software/id-word')
-    expect(word.closest('.ant-tag')).not.toBeNull()
-    expect(screen.getByText('id-excel').closest('.ant-tag')).not.toBeNull()
+    expect(word.closest('.ant-tag')).toBeNull()
+    expect(screen.getByText('id-excel').closest('.ant-tag')).toBeNull()
     expect(screen.queryByRole('link', { name: 'id-excel' })).toBeNull()
     unmount()
 

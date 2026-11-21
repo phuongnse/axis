@@ -105,7 +105,7 @@ values keeps its rows of inputs.
   or a package by the label of its manifest.
 - **A module's roles.** A module's roles are one line for each slot, such as "Budget
   approver: department-manager", which names the application's role, and a slot that no role plays reads "Not mapped".
-- **Not mapped is a status** _(planned)_. A slot that no role plays shows Not mapped as a `StatusTag` in `attention`.
+- **Not mapped is a status**. A slot that no role plays shows Not mapped as a `StatusTag` in `attention`.
 - **A module's relaxed points.** A module's relaxed points show as
   [relaxed points in Settings](#relaxed-points-in-settings) says.
 - **A version range's column.** A version range is as wide as its content.

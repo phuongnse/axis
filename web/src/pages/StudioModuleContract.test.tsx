@@ -373,6 +373,23 @@ describe('StudioModuleContract', () => {
       expect(list).toHaveTextContent('The transition enters a protected state.')
       expect(list).not.toHaveTextContent('AXC0999')
     })
+
+    it('shows an error as a danger tag reading "Error" and a warning as an attention tag reading "Warning"', async () => {
+      const diagnostic = {
+        code: 'AXC0370',
+        severity: 'error' as const,
+        message: 'The transition enters a protected state.',
+        file: layer.file,
+        path: '/changes/lifecycle/transitions/3/to',
+        resourceId: 'layer-id',
+      }
+      renderLayered([diagnostic, { ...diagnostic, code: 'AXC0371', severity: 'warning' as const }])
+
+      const list = await screen.findByTestId('studio-contract-diagnostics')
+      const [errorItem, warningItem] = within(list).getAllByRole('listitem')
+      expect(within(errorItem).getByText('Error')).toHaveAttribute('data-tone', 'danger')
+      expect(within(warningItem).getByText('Warning')).toHaveAttribute('data-tone', 'attention')
+    })
   })
 
   describe('relaxing a point', () => {
