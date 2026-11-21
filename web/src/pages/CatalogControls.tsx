@@ -1,5 +1,4 @@
 import { Flex, Select } from 'antd'
-import type { ReactNode } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { EmptyState } from '../platform/EmptyState'
 import { escapePointerSegment } from '../platform/jsonPatch'
@@ -9,6 +8,7 @@ import type { ReferenceOption } from '../platform/studioNames'
 import { timeZoneText } from '../platform/timeZones'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { WarningLine } from '../platform/WarningLine'
 import { ReferencePicker } from './ReferencePicker'
 
 /** An installed module or package that the control chooses from. */
@@ -68,16 +68,6 @@ export function CatalogChoice({
         onChange(itemPointer, { ...item, id, ...(empty && newest !== undefined ? { version: `^${newest}` } : {}) })
       }}
     />
-  )
-}
-
-/** A line in `warningText` under a control, for a value that the control keeps shown but that will not pass. */
-export function WarningLine({ testId, children }: { testId: string; children: ReactNode }) {
-  const { colour } = useDesignTokens()
-  return (
-    <div data-testid={testId} style={{ color: colour.warningText }}>
-      {children}
-    </div>
   )
 }
 

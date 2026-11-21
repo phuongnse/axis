@@ -32,7 +32,7 @@ import { referenceOptions, StudioNamesContext, type ReferenceOption } from '../p
 import type { StudioNamePage, StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { WarningLine } from './CatalogControls'
+import { WarningLine } from '../platform/WarningLine'
 import { LabelTexts } from './LabelTexts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { useFieldTexts } from './fieldTexts'

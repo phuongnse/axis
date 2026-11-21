@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import oauth2Fixture from '../../../tests/e2e/fixtures/studio-connector-oauth2.json'
+import { designTokensFor } from '../platform/designTokens'
 import { setAt } from '../platform/jsonPatch'
 import type { StudioBindings } from '../platform/studio'
 import { StudioBindingsContext } from '../platform/studioCatalog'
@@ -337,6 +338,18 @@ describe('ConnectorEditor', () => {
     const inputs = within(screen.getByTestId('studio-field-/operations/0/input'))
     expect(field('operations.input.name', 'textbox', inputs)).toHaveValue('a')
     expect(screen.getByTestId('studio-connector-get-no-input')).toBeVisible()
+  })
+
+  it('shows the GET warning as a block line in warningText after the input rows', () => {
+    const operations = [{ name: 'find', method: 'GET', path: '/x', input: [{ name: 'a', type: 'text' }] }]
+    renderEditor({ ...connector, operations })
+
+    const rows = screen.getByTestId('studio-field-/operations/0/input')
+    const warning = screen.getByTestId('studio-connector-get-no-input')
+    expect(warning.tagName).toBe('DIV')
+    expect(warning).toHaveTextContent(platformEnglish['shell.studio.connector.getNoInput'])
+    expect(warning).toHaveStyle({ color: designTokensFor('light').colour.warningText })
+    expect(rows.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('does not say that a GET sends no body when its rows all go in the path, the query or a header', () => {
