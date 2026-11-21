@@ -137,6 +137,9 @@ export function SidePanel({
               margin: `-${spacing.sm}px -${spacing.sm}px 0`,
               padding: spacing.sm,
               background: colour.surface,
+              // A rule goes under a block's title row, see docs/reference/shell.md#layout, so the body that scrolls
+              // under the head is parted from it.
+              borderBottom: `1px solid ${colour.borderSubtle}`,
             }}
           >
             <Flex vertical style={{ minWidth: 0 }}>
