@@ -33,6 +33,13 @@ namespace Axis.Server.Studio;
 /// the version (409), which is the version in the draft. A write is one commit on the draft's branch, and its diagnostics are
 /// the draft's own.
 /// </para>
+/// <para>
+/// <c>POST /api/studio/apps/{application}/packages/{package}/move</c> takes <c>{ moves: [{ from, to, version }] }</c>, paths inside the
+/// package, moves every file as one revision, or one commit on the draft, and answers <c>{ diagnostics }</c>. It is checked in order:
+/// session (401), author role (403), developer role (403), the switch (403), the application (404), the package (400), the content type
+/// (415), the body (400) and each path (400). The write lock (503), the draft (404) and a stale, missing or taken file (409) come last.
+/// It never checks the storage quota, as it adds no bytes, see <c>docs/reference/tenant-quotas.md#refusals</c>.
+/// </para>
 /// </summary>
 internal static class StudioPackageFileEndpoints
 {
@@ -42,6 +49,9 @@ internal static class StudioPackageFileEndpoints
 
     internal const string BadPath = "The package or the path is not a plain file path under packages/.";
 
+    internal const string BadMoves =
+        "The body must be an object with a moves array. Each move has a from, a to and a version, and no path appears twice or inside another to.";
+
     internal const string StalePackageFile = "The package file has changed since this version, or it exists already. Read it again.";
 
     public static void MapStudioPackageFileEndpoints(this IEndpointRouteBuilder endpoints)
@@ -50,6 +60,7 @@ internal static class StudioPackageFileEndpoints
         endpoints.MapGet("/api/studio/apps/{application}/packages/{package}/files/{**path}", GetAsync);
         endpoints.MapPut("/api/studio/apps/{application}/packages/{package}/files/{**path}", PutAsync).WithStorageQuota();
         endpoints.MapDelete("/api/studio/apps/{application}/packages/{package}/files/{**path}", DeleteAsync);
+        endpoints.MapPost("/api/studio/apps/{application}/packages/{package}/move", MoveAsync);
     }
 
     private static async Task<IResult> ListAsync(
@@ -271,6 +282,118 @@ internal static class StudioPackageFileEndpoints
 
         return Results.Ok(new StudioDeleteResponse(StudioDiagnostics.Compile(folder, packages, modules)));
     }
+
+    private static async Task<IResult> MoveAsync(
+        string application,
+        string package,
+        string? draft,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options, developer: true);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        if (!StudioPackageFiles.IsPackage(package))
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadPath);
+        }
+
+        var request = httpContext.Request;
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
+            || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+        }
+
+        var moves = new List<(string From, string To, string Version)>();
+        try
+        {
+            var body = await JsonNode.ParseAsync(request.Body, cancellationToken: httpContext.RequestAborted) as JsonObject
+                ?? throw new JsonException();
+            if (body.Count != 1 || body["moves"] is not JsonArray { Count: > 0 } items)
+            {
+                throw new JsonException();
+            }
+
+            foreach (var item in items)
+            {
+                if (item is not JsonObject { Count: 3 } move
+                    || Text(move["from"]) is not { } from
+                    || Text(move["to"]) is not { } to
+                    || Text(move["version"]) is not { } version)
+                {
+                    throw new JsonException();
+                }
+
+                moves.Add((from, to, version));
+            }
+        }
+        catch (JsonException)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadMoves);
+        }
+
+        var mapped = new List<(string From, string To, string Version)>();
+        foreach (var (from, to, version) in moves)
+        {
+            if (StudioPackageFiles.File(package, from) is not { } source || StudioPackageFiles.File(package, to) is not { } target)
+            {
+                return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadPath);
+            }
+
+            mapped.Add((source, target, version));
+        }
+
+        // A repeated path, a move onto itself or a to inside another to would make the move ambiguous or fail half-way.
+        if (mapped.Select(move => move.From).Distinct(StringComparer.Ordinal).Count() != mapped.Count
+            || mapped.Select(move => move.To).Distinct(StringComparer.Ordinal).Count() != mapped.Count
+            || mapped.Any(move => move.From == move.To
+                || mapped.Any(other => move.To.StartsWith(other.To + "/", StringComparison.Ordinal))))
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadMoves);
+        }
+
+        if (draft is not null)
+        {
+            if (await DraftsAsync(httpContext, options, folder, writeLock) is not { } drafts)
+            {
+                return StudioEndpoints.NotFound(StudioRevisionEndpoints.NoDraft);
+            }
+
+            var moved = await drafts.MovePackageFilesAsync(draft, package, mapped, httpContext.RequestAborted);
+            if (Refused(moved.Refusal) is { } notMoved)
+            {
+                return notMoved;
+            }
+
+            var (draftDiagnostics, error) = await DraftDiagnosticsAsync(httpContext, drafts, draft, packages, modules);
+            return error ?? Results.Ok(new StudioDeleteResponse(draftDiagnostics!));
+        }
+
+        var outcome = await StudioWrites.MovePackageFilesAsync(
+            writeLock,
+            await StudioEndpoints.RevisionsAsync(httpContext, options, folder),
+            folder,
+            package,
+            mapped,
+            httpContext.RequestAborted);
+        if (Refused(outcome.Refusal, StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadPath)) is { } refused)
+        {
+            return refused;
+        }
+
+        return Results.Ok(new StudioDeleteResponse(StudioDiagnostics.Compile(folder, packages, modules)));
+    }
+
+    // The non-empty string of a JSON value, or null.
+    private static string? Text(JsonNode? node) =>
+        node is JsonValue value && value.TryGetValue<string>(out var text) && text.Length > 0 ? text : null;
 
     // The draft's package file write, after the checks it shares with the working folder's. The answer is the working folder's, with
     // the draft's version and diagnostics.

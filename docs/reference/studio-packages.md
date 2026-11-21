@@ -153,17 +153,17 @@ path names one as `packages/<package>/<path>`.
 Studio's package workspace needs these routes besides, see [a package's files](#a-packages-files). Each has the
 developer role and the switch as a write has, and answers `403` otherwise.
 
-| Route                                                                             | Response                                                                                                                                                                                       |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/studio/apps/{application}/build`                                       | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below       |
-| `POST /api/studio/apps/{application}/test`                                        | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below |
-| `POST /api/studio/apps/{application}/run` _(planned for M37)_                     | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run`, see A run of one operation below                                                                 |
-| `GET /api/studio/apps/{application}/packages/{package}/run-inputs`                | `200` with `{ items: [{ name, operation, input }] }`. The version is the `ETag`, which comes once the inputs are saved, see Saved run inputs below                                             |
-| `PUT /api/studio/apps/{application}/packages/{package}/run-inputs`                | `200` with `{ version }` and an `ETag`. The body is `{ items }`, with `If-None-Match: *` for the first save or `If-Match` of the version, and a stale version answers `409`                    |
-| `POST /api/studio/apps/{application}/packages/{package}/move` _(planned for M37)_ | `200` with `{ diagnostics }`. The body is `{ moves: [{ from, to, version }] }`, see Moves below                                                                                                |
+| Route                                                              | Response                                                                                                                                                                                       |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/studio/apps/{application}/build`                        | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below       |
+| `POST /api/studio/apps/{application}/test`                         | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below |
+| `POST /api/studio/apps/{application}/run` _(planned for M37)_      | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run`, see A run of one operation below                                                                 |
+| `GET /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ items: [{ name, operation, input }] }`. The version is the `ETag`, which comes once the inputs are saved, see Saved run inputs below                                             |
+| `PUT /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ version }` and an `ETag`. The body is `{ items }`, with `If-None-Match: *` for the first save or `If-Match` of the version, and a stale version answers `409`                    |
+| `POST /api/studio/apps/{application}/packages/{package}/move`      | `200` with `{ diagnostics }`. The body is `{ moves: [{ from, to, version }] }`, see Moves below                                                                                                |
 
 - **The checks.** A write to a package's files is under the [versions](authoring.md#versions) and the write
-  lock, the storage quota, see [refusals](tenant-quotas.md#refusals), and the
+  lock, the storage quota of a save, see [refusals](tenant-quotas.md#refusals), and the
   [revisions](revisions-and-drafts.md) of the application, so a package file has history and can be
   undone. A stale version, or a create over a file that exists, answers `409`.
 - **The file.** A file is read and written as UTF-8 text. A write puts the bytes of `content` in the file
@@ -186,9 +186,9 @@ developer role and the switch as a write has, and answers `403` otherwise.
   file packages/x/adapter.py" or "Delete package file packages/x/adapter.py", and the
   [undo](revisions-and-drafts.md#undo) puts the file back.
 - **Diagnostics.** The answer carries the diagnostics of the folder, as a resource write does.
-- **Drafts.** Each route takes an optional `?draft=<draft id>`. The list, the read, the write and the delete
+- **Drafts.** Each route takes an optional `?draft=<draft id>`. The list, the read, the write, the delete and the move
   then work on the files of the signed-in author's [draft](revisions-and-drafts.md#drafts), and leave the
-  working folder and `main` as they are. The checks, the roles, the switch and the storage quota are those
+  working folder and `main` as they are. The checks, the roles, the switch and the storage quota of a save are those
   of the working folder. `If-Match` and `If-None-Match` are checked against the file in the draft. A draft
   that is another person's, or does not exist, answers `404`, as does any server that keeps no revisions.
   Each write is one commit on the draft's branch, named as a revision is, and the answer's diagnostics are
@@ -244,7 +244,18 @@ developer role and the switch as a write has, and answers `403` otherwise.
   (`428` for none, `400` for both), the content type (`415`), the body and the version. In a cell `PUT` also checks the
   [storage quota](tenant-quotas.md#refusals). Each save is a revision, "Create run inputs of package x" or "Change
   run inputs of package x", and [undo](revisions-and-drafts.md#undo) puts the earlier inputs back.
-- **Moves** _(planned for M37)_. `POST .../packages/{package}/move` with `{ moves: [{ from, to, version }] }` moves
-  files as one revision, so one [undo](revisions-and-drafts.md#undo) puts them all back. Renaming a folder moves each
-  of its files. A changed file or a taken path answers `409`, and a refused path `400`, by the rules of
-  the path above.
+- **Moves.** `POST .../packages/{package}/move` with `{ moves: [{ from, to, version }] }` moves files as one
+  revision, so one [undo](revisions-and-drafts.md#undo) puts them all back. A folder moves by listing each of its
+  files. `from` and `to` are paths inside the package of the URL, by the rules of the path above, so a move never
+  carries a file into another package. `version` is the bare hex that the list and the read give. The body is an
+  object with only a non-empty `moves` array of objects with exactly the non-empty strings `from`, `to` and
+  `version`. No `from` or `to` may appear twice, no `from` may equal its `to`, and no `to` may be a folder of another
+  `to`, or the answer is `400`. A `to` may be another move's `from`, so a chain or a swap works, because the `to`
+  paths are free once every `from` has left. A missing or changed `from`, a `to` that holds a file that stays, a
+  folder, or a file in the way, answers `409`. A refused path answers `400`. Nothing is written on a refusal. The
+  route checks the session, the author role, the developer role, the switch, the application, the package (`400`),
+  the content type (`415`), the body (`400`) and each path (`400`), then the write lock (`503`), the draft (`404`)
+  and the files (`409`). It never checks the storage quota, because a move adds no bytes. The revision is "Move
+  package file packages/x/a.ts to packages/x/b.ts" for one file and "Move 2 package files in packages/x" for more,
+  and a draft commit has the same name. With `?draft`, a missing `from` answers `409` too. When every file leaves a
+  folder, the empty folder stays on disk: the list never shows it, but a file at its path answers `409`.
