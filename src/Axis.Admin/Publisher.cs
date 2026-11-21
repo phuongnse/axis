@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -65,6 +66,8 @@ namespace Axis.Admin;
 /// <see cref="ApplicationPackageRuns"/>. It stores the call as the request's <c>run</c>, and the lines the host wrote as its <c>output</c>. It ends
 /// <c>succeeded</c> when the build raised no diagnostic and the operation succeeded. A refused or unanswered build fails it with <c>AXC0149</c> or <c>AXC0152</c> and
 /// stores no <c>run</c>, and without <c>Extensions:ApplicationPackages</c> it fails with <c>AXC0148</c> and sends nothing. A stop ends it at once with <c>AXC0220</c>.
+/// In a cell a <c>run</c> adds the call's CPU seconds to the tenant's package run time a day, as the worker counts a call, and never holds or refuses the run. A count that
+/// fails is written once for the tenant and the run still ends, see <see href="docs/reference/tenant-quotas.md#package-run-time-a-day">package run time a day</see>.
 /// An <c>accept</c> applies a person's draft to the application's folder, see <see href="docs/reference/revisions-and-drafts.md#accepting-a-draft">accepting a draft</see>.
 /// Holding the folder's write lock throughout, it fails when the draft is not the requester's or a resource the draft read has changed on
 /// <c>main</c> (<c>AXC0377</c>), then runs the steps of a <c>validate</c> on the applied files, with their contract scenarios, and
@@ -108,7 +111,8 @@ internal sealed class Publisher(
     TenantExportSweep? exports = null,
     PublisherStudio? studio = null,
     ApplicationPackageBuilds? packageBuilds = null,
-    ApplicationPackageRuns? packageRuns = null)
+    ApplicationPackageRuns? packageRuns = null,
+    TenantDailyCounterStore? packageRunTime = null)
 {
     /// <summary>The Studio folders this publisher reads and writes, or null when no Studio setting is set.</summary>
     internal PublisherStudio? Studio { get; } = studio;
@@ -116,6 +120,9 @@ internal sealed class Publisher(
     // Both loops write to these.
     private readonly TextWriter _output = TextWriter.Synchronized(output);
     private readonly TextWriter _error = TextWriter.Synchronized(error);
+
+    // A failed count of a tenant's package run time is written once for the tenant.
+    private readonly ConcurrentDictionary<string, byte> _warnedRunTime = new(StringComparer.Ordinal);
 
     internal static readonly TimeSpan DefaultLeaseDuration = TimeSpan.FromMinutes(5);
 
@@ -803,6 +810,10 @@ internal sealed class Publisher(
                 }
 
                 run = result.Run;
+                if (result.CpuSeconds is { } seconds && packageRunTime is not null)
+                {
+                    await CountRunTimeAsync(tenant.Id, seconds);
+                }
             }
             catch (OperationCanceledException) when (stopping.IsCancellationRequested)
             {
@@ -822,6 +833,23 @@ internal sealed class Publisher(
         }
 
         return (diagnostics.Count == 0 && outcome == ApplicationPackageRuns.Succeeded, run);
+    }
+
+    // Adds the CPU seconds of a run's call to the tenant's package run time for the UTC day, see
+    // docs/reference/tenant-quotas.md#package-run-time-a-day. Counting is not part of the run, so a platform database that cannot be reached does not fail it.
+    private async Task CountRunTimeAsync(string tenantId, long seconds)
+    {
+        try
+        {
+            await packageRunTime!.AddAsync(tenantId, TenantDailyCounterStore.PackageCpuSeconds, DateOnly.FromDateTime(DateTime.UtcNow), seconds, CancellationToken.None);
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            if (_warnedRunTime.TryAdd(tenantId, 0))
+            {
+                _error.WriteLine($"{tenantId} package run time not counted: {TenantDatabaseSteps.Safe(exception)}");
+            }
+        }
     }
 
     // Applies a person's draft to the application's folder as one revision. The folder's write lock spans every step, so Studio

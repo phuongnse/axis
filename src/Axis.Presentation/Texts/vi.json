@@ -3075,6 +3075,7 @@
   "shell.studio.packages.create": "Tạo",
   "shell.studio.packages.renameOk": "Đổi tên",
   "shell.studio.packages.nameTaken": "Tên này đã có, hoặc một tệp đã đổi từ lần đọc danh sách. Danh sách được đọc lại.",
+  "shell.studio.packages.moveRefused": "Chưa chuyển {name}. Thư mục đó đã có tên này, hoặc một tệp đã đổi từ lần đọc danh sách. Danh sách được đọc lại.",
   "shell.studio.packages.nameInvalid": "Tên này không dùng được. Tên không để trống, không bắt đầu bằng dấu chấm và không có dấu gạch chéo hay xuống dòng.",
   "shell.studio.packages.deleteFailed": "Không xóa được {file}.",
   "shell.studio.packages.deleteFile": "Xóa {file}?",

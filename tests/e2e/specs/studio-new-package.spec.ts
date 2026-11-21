@@ -39,12 +39,20 @@ const testChecks = [
   '',
 ].join('\n')
 
+/** The paths that `GET .../package-files` lists for the application in `page`. */
+function packageFilePaths(page: Page): Promise<string[]> {
+  return page.evaluate(async (app) => {
+    const listed = (await (await fetch(`/api/studio/apps/${app}/package-files`)).json()) as { items: { path: string }[] }
+    return listed.items.map((item) => item.path)
+  }, application)
+}
+
 /** Whether `GET /api/me` in `page` says the signed-in person may write application packages. */
 function studioDeveloper(page: Page): Promise<boolean> {
   return page.evaluate(async () => (await (await fetch('/api/me')).json()).studioDeveloper as boolean)
 }
 
-test('a developer creates a package in Studio, saves a file, sees a manifest error in Problems, then builds and tests a Python package', async () => {
+test('a developer creates a package in Studio, opens its workspace, saves a file, sees a manifest error in Problems, creates and renames a folder with a file in it, then builds and tests a Python package', async () => {
   const created = await runAdmin([
     'tenant',
     'create',
@@ -166,6 +174,43 @@ test('a developer creates a package in Studio, saves a file, sees a manifest err
     const problems = developerPage.getByTestId('studio-package-output').getByRole('tabpanel')
     await expect(problems).toContainText('AXC0132')
     await expect(problems).toContainText(`packages/${packageId}/axis-package.json`)
+
+    // A folder and a file in it are made from the explorer's menus. Renaming the folder moves the file with it.
+    await developerPage
+      .getByRole('region', { name: 'Files', exact: true })
+      .getByRole('button', { name: 'New', exact: true })
+      .click()
+    await developerPage.getByRole('menuitem', { name: 'New folder…', exact: true }).click()
+    const newFolder = await waitForDialog(developerPage, 'New folder')
+    await newFolder.getByRole('textbox', { name: 'Name', exact: true }).fill('lib')
+    await newFolder.getByRole('button', { name: 'Create', exact: true }).click()
+
+    // The folder is made from its own menu, not F2: a click on a folder also folds it, and F2 acts on the clicked node.
+    await tree.getByText('lib', { exact: true }).click({ button: 'right' })
+    await developerPage.getByRole('menuitem', { name: 'New file…', exact: true }).click()
+    const newFile = await waitForDialog(developerPage, 'New file')
+    await newFile.getByRole('textbox', { name: 'Name', exact: true }).fill('util.js')
+    await newFile.getByRole('button', { name: 'Create', exact: true }).click()
+    await expect(developerPage.getByRole('textbox', { name: 'lib/util.js', exact: true })).toBeVisible()
+
+    await tree.getByText('lib', { exact: true }).click({ button: 'right' })
+    await developerPage.getByRole('menuitem', { name: 'Rename…', exact: true }).click()
+    const rename = await waitForDialog(developerPage, 'Rename lib')
+    const renameField = rename.getByRole('textbox', { name: 'Name', exact: true })
+    await renameField.clear()
+    await renameField.fill('shared')
+    await rename.getByRole('button', { name: 'Rename', exact: true }).click()
+
+    await expect(tree.getByText('shared', { exact: true })).toBeVisible()
+    await expect(tree.getByText('util.js', { exact: true })).toBeVisible()
+    await expect(tree.getByText('lib', { exact: true })).toHaveCount(0)
+    await expect(developerPage.getByRole('textbox', { name: 'shared/util.js', exact: true })).toBeVisible()
+    await expect
+      .poll(async () => {
+        const paths = await packageFilePaths(developerPage)
+        return paths.includes('shared/util.js') && !paths.includes('lib/util.js')
+      })
+      .toBe(true)
 
     // A Python package with a test file. The file is written from the page, through the files route, so its session is used.
     await developerPage

@@ -890,14 +890,21 @@ internal sealed partial class PackageCallHandler(
         instance is { State: ProcessStarts.Waiting } && instance.Step == call.Step && instance.Revision == attempt.Revision;
 
     /// <summary>
+    /// The CPU seconds that one call counts in the tenant's package run time, see docs/reference/tenant-quotas.md#package-run-time-a-day. They are
+    /// <paramref name="cpuMilliseconds"/> rounded up, or without them the time since <paramref name="sent"/>, rounded up too.
+    /// </summary>
+    internal static long RunTimeSeconds(long? cpuMilliseconds, long sent) =>
+        cpuMilliseconds is { } milliseconds
+            ? (milliseconds + 999) / 1000
+            : (long)Math.Ceiling(Stopwatch.GetElapsedTime(sent).TotalSeconds);
+
+    /// <summary>
     /// Adds the CPU seconds of one call to the tenant's package run time. The seconds are <paramref name="cpuMilliseconds"/> rounded up, or without
-    /// them the time since <paramref name="sent"/>, rounded up too.
+    /// them the time since <paramref name="sent"/>, rounded up too, see <see cref="RunTimeSeconds"/>.
     /// </summary>
     private async Task CountRunTimeAsync(IPackageRunTime runTime, string tenant, long? cpuMilliseconds, long sent, CancellationToken cancellationToken)
     {
-        var seconds = cpuMilliseconds is { } milliseconds
-            ? (milliseconds + 999) / 1000
-            : (long)Math.Ceiling(Stopwatch.GetElapsedTime(sent).TotalSeconds);
+        var seconds = RunTimeSeconds(cpuMilliseconds, sent);
         try
         {
             await runTime.AddAsync(tenant, seconds, cancellationToken);
