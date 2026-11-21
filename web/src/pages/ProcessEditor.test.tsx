@@ -510,13 +510,19 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const latest = renderEditor()
     const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
 
-    await userEvent.click(field('/steps/1/deadline').getByRole('button', { name: 'Add deadline' }))
+    const add = field('/steps/1/deadline').getByRole('button', { name: 'Add deadline' })
+    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add.closest('legend')).not.toBeNull()
+    await userEvent.click(add)
     expect(stepOf(latest, 1).deadline).toEqual({ after: '', next: '' })
     await userEvent.type(field('/steps/1/deadline/after').getByRole('textbox'), 'P5D')
     await chooseOption('submit', screen.getByTestId('studio-field-/steps/1/deadline/next'))
     expect(stepOf(latest, 1).deadline).toEqual({ after: 'P5D', next: 'submit' })
 
-    await userEvent.click(field('/steps/1/deadline').getByRole('button', { name: 'Remove deadline' }))
+    const remove = field('/steps/1/deadline').getByRole('button', { name: 'Remove deadline' })
+    expect(remove).toHaveClass('ant-btn-variant-text')
+    expect(remove.closest('legend')).not.toBeNull()
+    await userEvent.click(remove)
     expect(stepOf(latest, 1)).not.toHaveProperty('deadline')
     expect(field('/steps/1/deadline').getByRole('button', { name: 'Add deadline' })).toBeInTheDocument()
   })
@@ -527,13 +533,13 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const add = () => userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
 
     await add()
-    await userEvent.click(field('/steps/1/escalations/0').getByRole('button', { name: 'Remove escalation' }))
+    await chooseRowAction(screen.getByTestId('studio-field-/steps/1/escalations/0'), 'Remove escalation')
     expect(stepOf(latest, 1)).not.toHaveProperty('escalations')
 
     await add()
     await add()
     await userEvent.type(field('/steps/1/escalations/1/after').getByRole('textbox'), 'P2D')
-    await userEvent.click(field('/steps/1/escalations/0').getByRole('button', { name: 'Remove escalation' }))
+    await chooseRowAction(screen.getByTestId('studio-field-/steps/1/escalations/0'), 'Remove escalation')
     expect(stepOf(latest, 1).escalations).toEqual([{ name: 'escalation2', after: 'P2D' }])
   })
 
@@ -728,11 +734,17 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const card = screen.getByTestId('studio-step-0')
     expect(within(card).getByRole('textbox', { name: label('steps.timeout.after') })).toHaveValue('P2D')
 
-    await userEvent.click(within(card).getByRole('button', { name: 'Remove timeout' }))
+    const remove = within(card).getByRole('button', { name: 'Remove timeout' })
+    expect(remove).toHaveClass('ant-btn-variant-text')
+    expect(remove.closest('legend')).not.toBeNull()
+    await userEvent.click(remove)
 
     expect(stepOf(latest, 0)).not.toHaveProperty('timeout')
     expect(within(card).queryByRole('textbox', { name: label('steps.timeout.after') })).toBeNull()
-    await userEvent.click(within(card).getByRole('button', { name: 'Add timeout' }))
+    const add = within(card).getByRole('button', { name: 'Add timeout' })
+    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add.closest('legend')).not.toBeNull()
+    await userEvent.click(add)
     expect(stepOf(latest, 0).timeout).toEqual({ after: '', next: '' })
   })
 
@@ -1163,15 +1175,19 @@ describe('ProcessEditor choices, rows and required fields', () => {
     }
   })
 
-  it('puts each field of a deadline row on its own line, with Remove below', () => {
+  it('puts each field of a deadline on its own line, with Remove deadline on the group title row', () => {
     renderEditor({ ...complete, entity: undefined, parameters: [{ name: 'daysOverdue', type: 'integer' }] })
 
-    const row = screen.getByTestId('studio-field-/steps/0/deadline/after').parentElement!
-    expect(row).toHaveClass('ant-flex-vertical')
+    const column = screen.getByTestId('studio-field-/steps/0/deadline/after').parentElement!
+    expect(column).toHaveClass('ant-flex-vertical')
     for (const field of ['/steps/0/deadline/after', '/steps/0/deadline/next']) {
-      expect(screen.getByTestId(`studio-field-${field}`).parentElement).toBe(row)
+      expect(screen.getByTestId(`studio-field-${field}`).parentElement).toBe(column)
     }
-    expect(row.lastElementChild).toContainElement(within(row).getByRole('button', { name: 'Remove deadline' }))
+    const remove = within(screen.getByTestId('studio-field-/steps/0/deadline')).getByRole('button', {
+      name: 'Remove deadline',
+    })
+    expect(remove.closest('legend')).not.toBeNull()
+    expect(column).not.toContainElement(remove)
   })
 
   it('puts the fields of a parameter, branch and outcome row in one column, with the "…" menu beside it', () => {
@@ -1283,6 +1299,36 @@ describe('ProcessEditor lists', () => {
     expect(stepOf(latest, 1).outcomes).toEqual([
       { name: 'approve', label: { textKey: 'task.approve' }, next: 'financeCheck', note: 'x' },
     ])
+  })
+
+  it('shows no Add deadline, Add timeout, Add escalation or row menu while the editor is read-only', () => {
+    renderEditor(
+      {
+        ...process,
+        steps: [
+          { ...process.steps[1], escalations: [{ name: 'late', after: 'PT4H' }] },
+          { name: 'wait', type: 'waitEvent', event: 'PaymentReceived', next: 'wait' },
+        ],
+      },
+      false,
+      true,
+    )
+
+    for (const name of ['Add deadline', 'Add timeout', 'Add escalation']) {
+      expect(screen.queryByRole('button', { name })).toBeNull()
+    }
+    expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
+    expect(screen.getByRole('group', { name: label('steps.timeout') })).toBeInTheDocument()
+  })
+
+  it('shows no Remove deadline, Remove timeout or Remove escalation while the editor is read-only', () => {
+    renderEditor(complete, false, true)
+
+    for (const name of ['Remove deadline', 'Remove timeout']) {
+      expect(screen.queryByRole('button', { name })).toBeNull()
+    }
+    expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
+    expect(screen.getByTestId('studio-field-/steps/0/escalations/0')).toBeInTheDocument()
   })
 
   it('shows no Add and no row menu on its lists while the editor is read-only', () => {

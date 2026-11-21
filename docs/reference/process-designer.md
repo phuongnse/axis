@@ -220,11 +220,14 @@ them, and a row's Remove removes what is nested in it.
 
 ### Task deadline and escalations
 
-A task's panel has a Deadline section and an Escalations list, after Due in. Add deadline writes `deadline` with an empty `after` and `next`, and the author types the duration and
-picks the next step from the step names. Remove deadline removes the key.
+A task's panel has a Deadline section and an Escalations list, after Due in. Add deadline is on the Deadline title
+row and writes `deadline` with an empty `after` and `next`. The author types the duration and picks the next step
+from the step names. Remove deadline is on the same title row, in the danger colour, and removes the key. The
+[Lists](studio-editors-by-kind.md#process-editor) bullet says where these actions sit, and a read-only tab shows none.
 
-Add escalation appends an escalation with the first free name `escalation1`, `escalation2` and so on, and
-an empty `after`, and Remove escalation removes it. Each escalation has a Reassign switch, which adds
+Add escalation is on the Escalations title row and appends an escalation with the first free name `escalation1`,
+`escalation2` and so on, and an empty `after`. Each escalation's Remove escalation is in its "…" menu, at the end
+of its first line beside Escalate after. Each escalation has a Reassign switch, which adds
 `reassign` with the task's assignee editor, and a Notify switch, which adds `notify` with the
 [notify](#notify) editor. Turning a switch off removes its key, and removing the last escalation removes
 `escalations`. A new escalation has neither key yet, so the compiler marks it until one switch is on.
@@ -268,7 +271,9 @@ draft already holds for that name. A child that is not in the names list changes
 A wait for event panel has an event picker, an optional `when` expression editor, an optional timeout
 and a Next step picker. The event picker lists only the events whose entity is the process's subject entity. The `when` editor
 suggests the payload fields of the picked event, with rules and functions, and not the subject record's
-fields, and clearing it removes the key. Add timeout adds a `timeout` with an After duration and a Next
+fields, and clearing it removes the key. The Timeout group always shows its title, with Add timeout or Remove
+timeout on the title row, as the [Lists](studio-editors-by-kind.md#process-editor) bullet says. Its After and Next
+fields show only once a timeout exists. Add timeout adds a `timeout` with an After duration and a Next
 step on timeout picker, both empty until filled. Remove timeout takes the whole `timeout` out, and one
 Undo brings it back.
 
