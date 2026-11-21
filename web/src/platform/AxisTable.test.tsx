@@ -56,6 +56,8 @@ const texts = {
   'shell.table.selectRow': 'Select row',
   'shell.table.showDetails': 'Show the details',
   'shell.table.hideDetails': 'Hide the details',
+  'shell.table.showRows': 'Show the rows in it',
+  'shell.table.hideRows': 'Hide the rows in it',
   'row.archive': 'Archive',
   'row.delete': 'Delete',
   'row.open': 'Open',
@@ -218,6 +220,98 @@ describe('AxisTable', () => {
       expect(screen.getAllByRole('columnheader')).toHaveLength(2)
       const row = screen.getByRole('cell', { name: 'Nothing more' }).closest('tr')!
       expect(within(row).queryByRole('button')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('group rows', () => {
+    const inside: Record<string, Row[]> = {
+      '1': [
+        { id: '1/a', name: 'Sheets', amount: 3 },
+        { id: '1/b', name: 'Envelopes', amount: 9 },
+      ],
+      '1/a': [{ id: '1/a/x', name: 'A4', amount: 1 }],
+      '2': [{ id: '2/a', name: 'Cartridges', amount: 2 }],
+    }
+    const topLevel: Row[] = [
+      { id: '1', name: 'Paper', amount: 12 },
+      { id: '2', name: 'Ink', amount: 8 },
+      { id: '3', name: 'Nothing inside', amount: 1 },
+    ]
+    const rowsIn = (row: Row) => inside[row.id] ?? null
+
+    it('starts closed, opens its rows from a fold named "Show the rows in it" and closes them from "Hide the rows in it"', async () => {
+      renderTable({ dataSource: topLevel, rowsIn })
+
+      expect(screen.queryByText('Sheets')).not.toBeInTheDocument()
+      const [first] = screen.getAllByRole('button', { name: 'Show the rows in it' })
+      expect(first).toHaveAttribute('aria-expanded', 'false')
+      expect(within(first.closest('td')!).getByText('Paper')).toBeVisible()
+
+      await userEvent.click(first)
+
+      expect(screen.getByText('Sheets')).toBeVisible()
+      expect(screen.getByText('Envelopes')).toBeVisible()
+      expect(screen.queryByText('Cartridges')).not.toBeInTheDocument()
+      const open = screen.getByRole('button', { name: 'Hide the rows in it' })
+      expect(open).toHaveAttribute('aria-expanded', 'true')
+
+      await userEvent.click(open)
+
+      expect(screen.queryByText('Sheets')).not.toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: 'Show the rows in it' })).toHaveLength(2)
+    })
+
+    it('draws no fold in a row with no rows in it', () => {
+      renderTable({ dataSource: topLevel, rowsIn })
+
+      const row = screen.getByRole('cell', { name: 'Nothing inside' }).closest('tr')!
+      expect(within(row).queryByRole('button')).not.toBeInTheDocument()
+    })
+
+    it('opens a nested level on its own and starts each level one fold further in', async () => {
+      renderTable({ dataSource: topLevel, rowsIn })
+      const start = (name: string) => parseFloat(screen.getByRole('cell', { name }).style.paddingInlineStart)
+
+      await userEvent.click(screen.getAllByRole('button', { name: 'Show the rows in it' })[0])
+      expect(screen.queryByText('A4')).not.toBeInTheDocument()
+      await userEvent.click(
+        within(screen.getByRole('cell', { name: 'Sheets' })).getByRole('button', { name: 'Show the rows in it' }),
+      )
+
+      expect(screen.getByText('A4')).toBeVisible()
+      const { size, spacing } = designTokensFor('light')
+      expect(start('Sheets') - start('Paper')).toBe(size.smallControl)
+      expect(start('A4') - start('Sheets')).toBe(size.smallControl)
+      // Every row's words start where the header's do, one fold in from the cell's edge.
+      expect(screen.getByRole('columnheader', { name: 'Name' }).style.paddingInlineStart).toBe(`${start('Paper')}px`)
+      expect(start('Paper')).toBe(spacing.lg + size.smallControl + spacing.xs)
+    })
+
+    it('pages the rows it holds and counts only the rows that are not inside another', async () => {
+      const onChange = vi.fn()
+      renderTable({
+        dataSource: topLevel,
+        rowsIn,
+        pagination: undefined,
+        view: { query: { page: 1, pageSize: 2, sort: null }, onChange, pageSizes: [2, 10] },
+      })
+
+      expect(screen.getByText('1–2 of 3')).toBeInTheDocument()
+      expect(screen.queryByText('Nothing inside')).not.toBeInTheDocument()
+      await userEvent.click(screen.getAllByRole('button', { name: 'Show the rows in it' })[0])
+      await userEvent.click(
+        within(screen.getByRole('cell', { name: 'Sheets' })).getByRole('button', { name: 'Show the rows in it' }),
+      )
+
+      // Open rows add no row to the page's count: it still holds two of the three rows.
+      expect(screen.getByText('A4')).toBeVisible()
+      expect(screen.getByText('Ink')).toBeVisible()
+      expect(screen.getByText('1–2 of 3')).toBeInTheDocument()
+      expect(screen.queryByText('Nothing inside')).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('listitem', { name: '2' }).querySelector('a, button') as HTMLElement)
+
+      expect(onChange).toHaveBeenCalledWith({ page: 2, pageSize: 2, sort: null })
     })
   })
 

@@ -390,7 +390,7 @@ be kept right.
   Fields, turns paging off with the view's `paging` option and shows every row with no pager, because a pager would
   move the row an author is editing. Studio's policy matrix, the tables of a module contract, the operator console's Tenant
   table, the two licences lists, the account page's Authenticators and Sessions, the users page's Connected
-  apps and the tables of a process instance's page also show every row with no pager. Only a table that holds all its
+  apps and the tables of a process instance's page, apart from its History timeline, also show every row with no pager. Only a table that holds all its
   rows reads it.
 - **How many.** A paged table says what it shows of how many, as "1–20 of 143", with the numbers in the
   language's format.
@@ -424,7 +424,7 @@ be kept right.
   which keeps its own width.
 - **Group rows.** A row that heads a group shows its heading and leaves its other cells blank, with no dash,
   as `AxisTable`'s `blankRow` draws them.
-- **Folding group rows** _(planned for M35)_. A row with children folds, closed at first, behind an `AxisButton`
+- **Folding group rows**. A row with children folds, closed at first, behind an `AxisButton`
   of the role `icon` with `Chevron`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
   first column's padding, every row's words start where the heading does, and each level of rows starts one fold
   further in. A table that groups rows uses this, and never a list inside a cell.

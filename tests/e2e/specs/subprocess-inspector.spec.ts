@@ -46,7 +46,12 @@ test('an operator opens the child sub-process from its parent, and the child lin
 
   await page.goto(`/subprocess/parents/${parentId}?tab=history`)
   await expect(page.getByTestId('inspector-instance')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Sub-processes', exact: true })).toBeVisible()
+  // The parent waits at its sub-process step, so the child is in its newest run, the first row of History.
+  await page
+    .getByTestId('inspector-history')
+    .getByRole('button', { name: 'Show the rows in it', exact: true })
+    .first()
+    .click()
   await page.getByTestId(`inspector-subprocess-${childId}`).click()
 
   await expect(page).toHaveURL(new RegExp(`/subprocess/children/${childId}$`))
