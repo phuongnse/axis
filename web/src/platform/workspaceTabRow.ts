@@ -22,8 +22,10 @@ export function workspaceTabRow(tokens: DesignTokens, bleed = 0): Pick<TabsProps
       height: workspaceRowHeight(tokens),
       // Proposed, #3264 and #4888: on a page, `bleed` is the content area's padding, so the row's rule runs the whole
       // way and its tabs still start at the page's inset.
-      // What the tabs show starts `spacing-md` under the rule, as a part does under its rule.
-      margin: bleed === 0 ? 0 : `0 -${bleed}px ${tokens.spacing.md}px`,
+      // What the tabs show starts `spacing-md` under the rule, as a part does under its rule. The row's own space above
+      // its tabs stands for most of the gap under the page's heading, so the tabs sit as far under the heading's line as
+      // the heading sits under the band's rule.
+      margin: bleed === 0 ? 0 : `-${tokens.spacing.sm}px -${bleed}px ${tokens.spacing.md}px`,
       paddingInline: bleed === 0 ? tokens.spacing.md : bleed,
       borderBottom: `1px solid ${tokens.colour.borderSubtle}`,
     },
