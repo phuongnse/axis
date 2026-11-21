@@ -694,6 +694,70 @@ export async function createStudioPackageFile(
   return { status: 'created', version: body.version, diagnostics: body.diagnostics }
 }
 
+/** What moving package files answers: the folder's diagnostics, or that a file changed or a new path is taken (`conflict`), or that a path or the body is refused (`invalid`). */
+export type MovePackageFilesResult =
+  { status: 'moved'; diagnostics: StudioDiagnostic[] } | { status: 'conflict' } | { status: 'invalid' }
+
+/**
+ * Moves files of an application's package as one revision, each with the version it was read at, see
+ * docs/reference/studio-packages.md#the-authoring-api. A 409 and a 400 write nothing. A 401 shows the sign-in prompt and
+ * throws, as any other failure does.
+ */
+export async function moveStudioPackageFiles(
+  application: string,
+  pkg: string,
+  moves: readonly { from: string; to: string; version: string }[],
+): Promise<MovePackageFilesResult> {
+  const route = `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(pkg)}/move`
+  const response = await studioFetch(route, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ moves }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (response.status === 400) {
+    return { status: 'invalid' }
+  }
+  if (!response.ok) {
+    throw new Error(`Posting '${route}' failed with status ${response.status}.`)
+  }
+  return { status: 'moved', diagnostics: ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics }
+}
+
+/** What deleting a package file answers: the folder's diagnostics, or that the file changed since (`conflict`) or is gone (`missing`). */
+export type DeletePackageFileResult =
+  { status: 'deleted'; diagnostics: StudioDiagnostic[] } | { status: 'conflict' } | { status: 'missing' }
+
+/**
+ * Deletes one file of an application's package, with the version it was read at in `If-Match`, see
+ * docs/reference/studio-packages.md#the-authoring-api. A 409 and a 404 write nothing. A 401 shows the sign-in prompt and
+ * throws, as any other failure does.
+ */
+export async function deleteStudioPackageFile(
+  application: string,
+  pkg: string,
+  path: string,
+  version: string,
+): Promise<DeletePackageFileResult> {
+  const route = packageFilePath(application, pkg, path)
+  const response = await studioFetch(route, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (response.status === 404) {
+    return { status: 'missing' }
+  }
+  if (!response.ok) {
+    throw new Error(`Deleting '${route}' failed with status ${response.status}.`)
+  }
+  return {
+    status: 'deleted',
+    diagnostics: ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics,
+  }
+}
+
 /** What saving a package file answers: the file's new version and the folder's diagnostics, or that the file changed since. */
 export type SavePackageFileResult =
   { status: 'saved'; version: string; diagnostics: StudioDiagnostic[] } | { status: 'conflict' }
