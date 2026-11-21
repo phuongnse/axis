@@ -72,14 +72,37 @@ const failedBuild = {
 /** The requests of the last stubbed package that are not reads: the explorer's creates, moves and deletes. */
 const writesSent = () => requests.filter((call) => call.method !== 'GET')
 
+const testRoute = '/api/studio/apps/Shop/test'
+const queuedTest = { id: 't1', application: 'Shop', kind: 'test', status: 'queued', package: 'tools', output: [] }
+const failedTest = {
+  ...queuedTest,
+  status: 'failed',
+  diagnostics: [],
+  scenarios: null,
+  packageTests: [
+    { name: 'test_adds', outcome: 'passed', message: null, durationMs: 12 },
+    {
+      name: 'test_greets',
+      outcome: 'failed',
+      message: 'AssertionError: Hello Ada != Hi Ada',
+      durationMs: 30,
+      file: 'lib/x.py',
+      line: 3,
+      column: 5,
+    },
+  ],
+  output: ['collected 2 tests', '1 failed, 1 passed'],
+}
+
 /**
  * Stubs a package `tools` with five files, and answers a file's read from a copy of `contents` that moves, deletes and
  * creates change, and the list of its files. A move answers `{ diagnostics: [] }`, and a delete too. A write answers
  * `{ version: 'new-<path>' }` unless `writes` has a response for its path. The writes are recorded in `puts`. Each write
  * and each build post is also recorded in `calls`, in order, as `PUT <path>` and `POST build <body>`. A build post answers
- * the queued build `b1`, and its read answers `failedBuild` unless `readBuild` answers otherwise. A move answers `moveStatus`
- * with a problem when it is not 200, and moves nothing. The package's run
- * inputs start as `saved` at version `v0`, or have no version before the first save, and a write with a wrong version
+ * the queued build `b1`, and its read answers `failedBuild` unless `readBuild` answers otherwise. A test post is
+ * recorded as `POST test <body>` and answers the queued package test `t1`, and its read answers `failedTest` unless
+ * `readTest` answers otherwise. A move answers `moveStatus` with a problem when it is not 200, and moves nothing. The
+ * package's run inputs start as `saved` at version `v0`, or have no version before the first save, and a write with a wrong version
  * answers `409`. A run answers `202`, and its request has ended with the run `greet`. Every request is recorded in
  * `requests`, and `writesSent` has those that are not reads.
  */
@@ -88,6 +111,7 @@ function stubPackage(
   calls: string[] = [],
   readBuild: () => Response = () => json(failedBuild),
   saved: StudioRunInput[] | null = null,
+  readTest: () => Response = () => json(failedTest),
   moveStatus = 200,
 ) {
   const puts: { path: string; ifMatch: string | null; body: { content: string } }[] = []
@@ -147,6 +171,13 @@ function stubPackage(
       }
       if (input === '/api/studio/apps/Shop/requests/b1') {
         return readBuild()
+      }
+      if (input === testRoute) {
+        calls.push(`POST test ${init?.body as string}`)
+        return json(queuedTest, 202)
+      }
+      if (input === '/api/studio/apps/Shop/requests/t1') {
+        return readTest()
       }
       if (input === files) {
         return json({ items: Object.keys(store).map((path) => ({ package: 'tools', path, version: `v-${path}` })) })
@@ -651,7 +682,7 @@ describe('StudioPackageWorkspace', () => {
     })
 
     it('says in the dialog that the name is taken or a file changed on a 409, and reads the list again', async () => {
-      stubPackage({}, [], undefined, null, 409)
+      stubPackage({}, [], undefined, null, undefined, 409)
       renderWorkspace(true)
       await screen.findByTestId('studio-package-tree')
       const listed = () => vi.mocked(fetch).mock.calls.filter(([url]) => url === files).length
@@ -1086,15 +1117,15 @@ describe('StudioPackageWorkspace', () => {
       expect(buildButton()).not.toHaveAttribute('aria-busy', 'true')
     })
 
-    it('says no build has run before the first one, and leaves Run tests off', async () => {
+    it('says nothing has run before the first build or test, and leaves Run tests on', async () => {
       stubPackage()
       renderWorkspace(true)
       await screen.findByTestId('studio-package-tree')
 
       await userEvent.click(screen.getByRole('tab', { name: 'Output' }))
 
-      expect(await screen.findByText('No build has run yet.')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Run tests' })).toBeDisabled()
+      expect(await screen.findByText('Nothing has been built or tested yet.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Run tests' })).toBeEnabled()
       expect(screen.getByRole('group', { name: 'Build and test' })).toBeInTheDocument()
     })
 
@@ -1120,6 +1151,131 @@ describe('StudioPackageWorkspace', () => {
       expect(screen.queryByRole('group', { name: 'Build and test' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Build' })).not.toBeInTheDocument()
       expect(calls).toEqual([])
+    })
+  })
+
+  describe('Run tests', () => {
+    // A running button also names its loading icon, so the names match as a pattern.
+    const testButton = () => screen.getByRole('button', { name: /Run tests/ })
+    const buildButton = () => screen.getByRole('button', { name: /Build/ })
+
+    it('saves every changed file before it posts the test of the package, and opens the Tests tab', async () => {
+      const calls: string[] = []
+      stubPackage({}, calls)
+      renderWorkspace(true)
+      await editTwoFiles()
+
+      await userEvent.click(testButton())
+
+      await waitFor(() => expect(calls).toHaveLength(3))
+      expect(calls).toEqual(['PUT src/b.ts', 'PUT adapter.py', 'POST test {"package":"tools"}'])
+      expect(await screen.findByRole('tab', { name: 'Tests', selected: true })).toBeInTheDocument()
+    })
+
+    it('posts nothing when a file changed elsewhere, and opens that file with its notice', async () => {
+      const calls: string[] = []
+      stubPackage({ 'src/b.ts': () => json({ title: 'Changed.' }, 409) }, calls)
+      renderWorkspace(true)
+      await editTwoFiles()
+      await userEvent.click(screen.getByRole('tab', { name: /adapter\.py/ }))
+
+      await userEvent.click(testButton())
+
+      expect(await screen.findByTestId('studio-package-conflict')).toHaveTextContent('Someone else changed this file.')
+      expect(screen.getByRole('tab', { name: /b\.ts/ })).toHaveAttribute('aria-selected', 'true')
+      expect(calls).toEqual(['PUT src/b.ts', 'PUT adapter.py'])
+      await waitFor(() => expect(testButton()).toBeEnabled())
+
+      // The file stays in conflict, so a second run stops before any request.
+      await userEvent.click(testButton())
+      await waitFor(() => expect(testButton()).toBeEnabled())
+      expect(calls).toEqual(['PUT src/b.ts', 'PUT adapter.py'])
+    })
+
+    it('says no test has run before the first one', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Tests' }))
+
+      expect(await screen.findByText('No tests have run yet.')).toBeInTheDocument()
+    })
+
+    it('lists each test with its result, name, duration and message, and the failed place opens its line', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(testButton())
+
+      const panel = within(screen.getByTestId('studio-package-output'))
+      await waitFor(() => expect(panel.getAllByTestId('studio-test-result')).toHaveLength(2), { timeout: 3000 })
+      const [passed, failed] = panel.getAllByTestId('studio-test-result')
+      expect(passed).toHaveAttribute('data-outcome', 'passed')
+      expect(passed).toHaveTextContent('passedtest_adds< 1 sec')
+      expect(failed).toHaveAttribute('data-outcome', 'failed')
+      expect(failed).toHaveTextContent('failedtest_greets< 1 sec')
+      expect(failed).toHaveTextContent('AssertionError: Hello Ada != Hi Ada')
+      expect(panel.queryByRole('heading', { name: 'Test results' })).not.toBeInTheDocument()
+
+      await userEvent.click(within(failed).getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+
+      const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
+      await waitFor(() =>
+        expect(within(screen.getByTestId('studio-package-status')).getByText('Line 3, column 1')).toBeInTheDocument(),
+      )
+      expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(3)
+    })
+
+    it('turns Build and Run tests off while the test is followed, and on when it ends', async () => {
+      let ended = false
+      stubPackage({}, [], undefined, null, () => (ended ? json(failedTest) : json(queuedTest)))
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(testButton())
+
+      await waitFor(() => expect(testButton()).toBeDisabled())
+      expect(buildButton()).toBeDisabled()
+      expect(screen.getByText('The results show when the run ends.')).toBeInTheDocument()
+      ended = true
+      await waitFor(() => expect(testButton()).toBeEnabled(), { timeout: 3000 })
+      expect(buildButton()).toBeEnabled()
+    })
+
+    it('shows the test’s output under the Tests title row with its state', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(testButton())
+      const panel = within(screen.getByTestId('studio-package-output'))
+      await waitFor(() => expect(panel.getAllByTestId('studio-test-result')).toHaveLength(2), { timeout: 3000 })
+      await userEvent.click(panel.getByRole('tab', { name: 'Output' }))
+
+      expect(panel.getByRole('heading', { level: 2, name: 'Tests' })).toBeInTheDocument()
+      expect(panel.getByTestId('studio-package-build-state')).toHaveTextContent('Failed')
+      expect(panel.getByTestId('studio-package-build-output')).toHaveTextContent('collected 2 tests 1 failed, 1 passed')
+    })
+
+    it('shows the problems of a refused test copy in Problems', async () => {
+      stubPackage({}, [], undefined, null, () =>
+        json({
+          ...failedTest,
+          packageTests: [],
+          diagnostics: [problem('packages/tools/lib/x.py', { line: 2, column: 1 })],
+        }),
+      )
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(testButton())
+      const panel = within(screen.getByTestId('studio-package-output'))
+      expect(await panel.findByText('No test ran. See the problems.', {}, { timeout: 3000 })).toBeInTheDocument()
+      await userEvent.click(panel.getByRole('tab', { name: 'Problems' }))
+
+      expect(await screen.findByRole('button', { name: 'packages/tools/lib/x.py, line 2' })).toBeInTheDocument()
     })
   })
 })

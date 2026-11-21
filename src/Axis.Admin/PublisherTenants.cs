@@ -12,7 +12,8 @@ using Npgsql;
 namespace Axis.Admin;
 
 /// <summary>
-/// One tenant the publisher serves: its id, its schema version, its bindings and how to connect to its database.
+/// One tenant the publisher serves: its id, its schema version, its bindings, its deployment bindings with their values, which a package run
+/// from Studio resolves, and how to connect to its database.
 /// <paramref name="HasPreview"/> means the tenant has a preview tenant in any state. <paramref name="Preview"/> is that tenant,
 /// only when the publisher serves it. <paramref name="SyncRealm"/> brings the tenant's realm in step after an activation, or is
 /// <c>null</c> when the tenant has no realm details, such as a preview tenant.
@@ -21,6 +22,7 @@ internal sealed record PublisherTenant(
     string Id,
     string SchemaVersion,
     ActivationBindings Bindings,
+    IReadOnlyDictionary<string, TenantBinding> DeploymentBindings,
     Func<ITenantConnections> Connect,
     bool HasPreview = false,
     PublisherTenant? Preview = null,
@@ -78,6 +80,7 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, Realm
                 row.Id,
                 row.SchemaVersion,
                 bindings[row.Id],
+                realmBindings[row.Id],
                 () => new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(settings.PlatformConnectionString), CancellationToken.None),
                 SyncRealm: TenantReleaseActivation.RealmSync(
                     http,
@@ -146,6 +149,7 @@ internal sealed class ConfigurationPublisherTenants(
                 entry.Id,
                 TenantSchemaVersion.Current,
                 Bindings(entry),
+                entry.Bindings,
                 () => new ConfiguredTenantConnections(entry),
                 SyncRealm: TenantReleaseActivation.RealmSync(
                     http,

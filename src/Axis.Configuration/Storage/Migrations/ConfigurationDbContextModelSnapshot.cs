@@ -285,6 +285,10 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("folder");
 
+                    b.Property<string>("Input")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("input");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasColumnType("text")
@@ -301,6 +305,10 @@ namespace Axis.Configuration.Storage.Migrations
                     b.Property<string>("Note")
                         .HasColumnType("text")
                         .HasColumnName("note");
+
+                    b.Property<string>("Operation")
+                        .HasColumnType("text")
+                        .HasColumnName("operation");
 
                     b.Property<string>("Output")
                         .HasColumnType("jsonb")
@@ -332,6 +340,10 @@ namespace Axis.Configuration.Storage.Migrations
                     b.Property<string>("RequestedByName")
                         .HasColumnType("text")
                         .HasColumnName("requested_by_name");
+
+                    b.Property<string>("Run")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("run");
 
                     b.Property<string>("ScenarioNames")
                         .HasColumnType("jsonb")

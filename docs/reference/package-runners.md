@@ -70,11 +70,13 @@ package reaches nothing of the host and no binding of another call.
   known token gets `407`. The proxy refuses any other request, and a refused
   request fails the attempt at once, even if the package catches the error. The
   error names the operation and the package. It follows no redirects, so a
-  redirect to another host is a new request that the proxy checks again. Compose puts the worker, the publisher and the hosts
+  redirect to another host is a new request that the proxy checks again. The publisher has an egress proxy of its own for the runner of
+  a [run](#an-applications-packages), with the same rules and the same `Extensions:Runners:ProxyPort`, and it starts with the publisher's
+  first run. Compose puts the worker, the publisher and the hosts
   on an `internal` network of their own. The Helm chart gives a
   NetworkPolicy that admits traffic to the hosts only from the worker, and to
-  the application package host from the publisher too, and lets them reach
-  only the proxy port. Every other route is closed, DNS included,
+  the application package host from the publisher too, and lets the hosts reach
+  only the proxy port, which the application package host reaches on the publisher's pods as well as on the worker's. Every other route is closed, DNS included,
   because the proxy resolves hosts. A library that ignores the proxy variables
   reaches nothing.
 - **Timeout.** The operation's `timeout` starts when the worker sends the `run`. At the `timeout` the
@@ -85,7 +87,7 @@ package reaches nothing of the host and no binding of another call.
 - **No host.** A host that cannot be reached, that starts no runner, or that is not set makes the
   attempt retryable, because the operation never ran. The error names the setting of the call's runtime.
 
-The server reads `Extensions:Isolation`, and the worker reads all seven settings:
+The server reads `Extensions:Isolation`, and the worker reads all seven settings. The publisher reads `Extensions:Runners:Application`, `Extensions:Runners:ProxyPort` and `Extensions:ApplicationPackages` only:
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
@@ -95,7 +97,7 @@ The server reads `Extensions:Isolation`, and the worker reads all seven settings
 | `Extensions:Runners:Python` | `Extensions__Runners__Python` | none | The `host:port` of the Python package host, with the same forms. Unset, every `python` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Application` | `Extensions__Runners__Application` | none | The `host:port` of `application-package-host`, with the same forms. With `Extensions:ApplicationPackages` on, the worker and the publisher need it, see [an application's packages](#an-applications-packages). The worker sends each attempt of an application's package there. Unset, every such attempt is retryable and names the setting, and with the setting off the worker never contacts the host otherwise. A value that is not a `host:port` stops the worker at start, with the setting on or off |
 | `Extensions:ApplicationPackages` | `Extensions__ApplicationPackages` | `false` | `true` makes the worker ask `application-package-host` at start whether it runs under gVisor, and stop with exit code 1 when it does not, see [an application's packages](#an-applications-packages). `false` never asks. Any other value stops the worker at start |
-| `Extensions:Runners:ProxyPort` | `Extensions__Runners__ProxyPort` | `5311` | The port of the worker's egress proxy for the runners, a whole number from 0 to 65535. `0` picks a free port. Any other value stops the worker at start |
+| `Extensions:Runners:ProxyPort` | `Extensions__Runners__ProxyPort` | `5311` | The port of the worker's egress proxy for the runners, and of the publisher's for a run, a whole number from 0 to 65535. `0` picks a free port. Any other value stops the worker, and the publisher with `Extensions:ApplicationPackages` on, at start |
 
 The package host in host mode reads two settings of its own:
 
@@ -342,6 +344,15 @@ trusted code, so the platform gives it more limits than an installation's packag
   and a `publish` to a `tenant` writes `release.publishFailed`. A `built` answer lets the compile go on, and a new release
   stores the built files, see [a built package in the release](extension-packages.md#versions-and-pinning). A `test` that names a package sends that package as a `test`, see [test](authoring-publishing.md#test).
   A `build` request sends its package as a `build`, and stores no release, see [build](authoring-publishing.md#build).
+  A `run` request builds its package as a `build` does, then starts one runner from the built files with the tenant's id, through the
+  publisher's own egress proxy, and sends one `run` with the request's input and the tenant's `url` and `secret` bindings that the operation
+  declares, resolved as the worker resolves them. It stores the call as `run` (`operation`, `outcome`, `output`, `error` with `code` and `message`,
+  and `durationMs`) and the lines the host wrote as `output`, and stops the runner at once, so none stays idle in the publisher.
+  `error.code` is the error's type name, or `operation` for an operation the built package does not declare, `input` for an input that does not fit
+  its inputs, `binding`, `timeout` or `exited`, because the protocol carries no exception message. `run.output` is the runner's result as it wrote it,
+  fitted to no process step. The build and the call each wait at most 5 minutes. A refused or unanswered build fails the request with `AXC0149` or
+  `AXC0152` and stores no `run`, and without `Extensions:ApplicationPackages` it fails with `AXC0148` and sends nothing. The route that queues a
+  run is [a run of one operation](studio-packages.md#the-authoring-api).
   A `validate`, `accept`, any other `test`, `activate` and the activation at server start do not build
   packages yet. A publish needs the publisher role only.
 - **In the release.** The release holds every file of the package as written, and the content hash covers
