@@ -130,4 +130,25 @@ describe('the design-system shell states', () => {
     )
     expect(screen.getByRole('link', { name: 'Go to Tasks' })).toBeVisible()
   }, 30000)
+
+  it('shows the waiting instance under its process title, with its Waiting tag and the Approvals entry marked', async () => {
+    render(<Preview states={[state('Process instance')]} />)
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Purchase approval' }, { timeout: 15000 }),
+    ).toBeVisible()
+    expect(within(screen.getByTestId('page-heading')).getByText('Waiting')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Approvals' })).toHaveAttribute('aria-current', 'page')
+  }, 30000)
+
+  it('shows the instance History with its call on attempt 3 and its sub-process', async () => {
+    render(<Preview states={[state('Process instance')]} />)
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'History' }, { timeout: 15000 }))
+
+    expect(
+      await screen.findByText('createPurchaseOrder (ERP) succeeded on attempt 3.', {}, { timeout: 15000 }),
+    ).toBeVisible()
+    expect(screen.getByText('Started Delivery.')).toBeVisible()
+  }, 30000)
 })

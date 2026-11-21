@@ -54,6 +54,7 @@ import {
   missingTaskId,
   loadingRoutes,
   loadingTableWidget,
+  instanceId,
   noRowsPath,
   type PreviewFieldType,
   locale,
@@ -320,6 +321,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: shellFrameHeight,
     },
     { caption: 'Dashboard', draw: () => <ShellPreview />, entry: '/sample/dashboard', frameHeight: shellFrameHeight },
+    {
+      caption: 'Process instance',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/instances/${instanceId}`, state: { from: '/sample/instances' } },
+      frameHeight: shellFrameHeight,
+    },
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: shellFrameHeight },
     {
       caption: 'App switcher',

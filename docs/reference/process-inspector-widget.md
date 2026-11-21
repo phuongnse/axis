@@ -192,7 +192,7 @@ wrong form show the not-found page, and the instance is not requested.
 
 A process is drawn as one graph, with the same layout, cards and controls wherever it shows.
 
-- **One graph** _(planned)_. `ProcessGraphCanvas` draws a process on an instance's Diagram tab and in the process
+- **One graph**. `ProcessGraphCanvas` draws a process on an instance's Diagram tab and in the process
   designer. React Flow draws the graph, and ELK lays it out.
 - **Layout.** ELK's layered layout, `elkjs`, places the steps in the process's order from left to right. Every
   transition is routed in right angles with rounded corners, and no route crosses or runs through a step. A
@@ -225,7 +225,7 @@ A process is drawn as one graph, with the same layout, cards and controls wherev
   Otherwise. A wait for an event shows the event's label, or its name where it has none. A timeout shows "After {duration}" ("Sau {duration}"). A
   condition is not written in words, since a generated sentence explains a branch less well than the author's own
   words. The labels come from the [instance detail](process-inspection.md#instance-detail).
-- **Controls** _(planned)_. `ProcessGraphControls` gives each control a tooltip in the reader's language:
+- **Controls**. `ProcessGraphControls` gives each control a tooltip in the reader's language:
   - Zoom in and Zoom out.
   - Show the whole process.
   - Go to the current step ("Tới bước hiện tại"), on an instance only. It also chooses the current step and opens
@@ -339,5 +339,5 @@ The widget shows a failure where it happens, and its words come from the platfor
   errors.
 - **New texts.** _(planned for M38)_ The Current mark, the Paths and Variables labels and the Path column are platform
   texts under `shell.inspector.*`. The three cancel buttons and their dialog titles are under `shell.inspector.commands.*`.
-- **Page texts** _(planned)_. The tabs, the facts, the Data texts, the timeline's columns and sentences, and the step
+- **Page texts**. The tabs, the facts, the Data texts, the timeline's columns and sentences, and the step
   run panel's tabs and terms are platform texts under `shell.inspector.*`, as are the graph's control names, a card's run duration and the timeout's label.

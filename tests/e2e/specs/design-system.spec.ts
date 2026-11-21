@@ -138,6 +138,12 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
     Task: (state) =>
       state.getByRole("group", { name: "Decision", exact: true }),
     "Task not found": (state) => state.getByTestId("record-not-found"),
+    "Process instance": (state) =>
+      state.getByRole("heading", {
+        name: "Purchase approval",
+        exact: true,
+        level: 1,
+      }),
     "Platform site": (state) =>
       state.getByText(
         "Runs the company's purchases, from the request to approval and ordering.",
