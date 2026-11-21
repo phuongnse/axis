@@ -1306,12 +1306,13 @@ export interface StudioSkippedScenarioResult {
 /**
  * A request, as `GET /api/studio/apps/{application}/requests/{id}` answers. The diagnostics are empty until it ends.
  * `scenarios` holds the stored results of a `test`, `publish` or `validate`, and is `null` when none were stored. For a
- * `test` it is empty until the request ends.
+ * `test` it is empty until the request ends. A `build` of one package names it in `package`, and its `output` is the lines
+ * the host wrote, see docs/reference/studio-packages.md#the-authoring-api.
  */
 export interface StudioRequest {
   id: string
   application: string
-  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept'
+  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept' | 'build'
   target: 'tenant' | 'preview'
   status: StudioRequestStatus
   label: string | null
@@ -1319,6 +1320,8 @@ export interface StudioRequest {
   releaseId: string | null
   diagnostics: StudioDiagnostic[]
   scenarios: (StudioScenarioResult | StudioSkippedScenarioResult)[] | null
+  package?: string | null
+  output?: string[] | null
 }
 
 /**
@@ -1496,6 +1499,23 @@ export async function testStudioApp(application: string, scenarios?: string[]): 
     method: 'POST',
     headers: scenarios === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: scenarios === undefined ? undefined : JSON.stringify({ scenarios }),
+  })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/**
+ * Sends a build request, which builds the package `pkg` of the working folder and publishes no release. It answers at
+ * once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function buildStudioPackage(application: string, pkg: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/build`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ package: pkg }),
   })
   if (!response.ok) {
     throw new Error(`Posting '${path}' failed with status ${response.status}.`)
