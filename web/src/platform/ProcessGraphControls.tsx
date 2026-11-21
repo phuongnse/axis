@@ -24,6 +24,7 @@ import { useGraphMoves } from './useGraphMoves'
  * docs/reference/process-inspector-widget.md#process-graph. At the top left, Find a step lists the `steps` in the order
  * given, as wide as a card. Choosing one moves the view to it and calls `onChoose` with its id. At the bottom left, icon
  * buttons zoom in and out, show the whole process, go to the `current` step, on an instance only, and go full screen.
+ * Go to the current step also calls `onChoose` with the current step.
  * Each but Go to the current step names its key in `aria-keyshortcuts`. With `onDownload`, the last button is Download, a
  * menu of SVG and PNG with no key, see docs/reference/process-designer.md#download. The overview draws each step in the tone of its run state, and the muted
  * colour for a step not reached. The graph handles the keys.
@@ -92,7 +93,10 @@ export function ProcessGraphControls({
           {button('shell.inspector.graph.showAll', <ExpandOutlined />, '0', moves.showAll)}
           {runStates !== undefined &&
             current !== undefined &&
-            button('shell.inspector.graph.current', <AimOutlined />, undefined, () => moves.goTo(current))}
+            button('shell.inspector.graph.current', <AimOutlined />, undefined, () => {
+              moves.goTo(current)
+              onChoose?.(current)
+            })}
           {button(
             fullScreen ? 'shell.inspector.graph.exitFullScreen' : 'shell.inspector.graph.fullScreen',
             fullScreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />,

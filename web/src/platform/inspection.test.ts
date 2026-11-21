@@ -14,7 +14,12 @@ import {
   stateTone,
   stepRuns,
   stepTypeText,
+  takenTransition,
   transitionId,
+  runParts,
+  runProblem,
+  type InstanceCall,
+  type InstanceTask,
   type InstanceDetail,
   type PathEntry,
 } from './inspection'
@@ -182,6 +187,7 @@ describe('stepRuns', () => {
       releaseNumber: 1,
       state: 'completed',
       step: 'done',
+      timerDueAt: null,
       createdAt: '2026-10-10T02:05:00Z',
       endedAt: null,
       startedBy: null,
@@ -328,5 +334,125 @@ describe('stepRuns', () => {
     )
 
     expect([...taken].sort()).toEqual([transitionId('approve', 0), transitionId('register', 0)])
+  })
+
+  const task = (stepName: string, second: number): InstanceTask => ({
+    id: `task-${stepName}-${second}`,
+    step: stepName,
+    assigneeKind: 'role',
+    assignee: 'manager',
+    assigneeId: null,
+    state: 'completed',
+    outcome: 'approve',
+    completedBy: null,
+    completedById: null,
+    createdAt: `2026-10-10T02:05:${String(second).padStart(2, '0')}Z`,
+    dueAt: null,
+    completedAt: null,
+  })
+  const call = (stepName: string, second: number | null, state = 'succeeded'): InstanceCall => ({
+    id: `call-${stepName}-${second}`,
+    kind: 'connector',
+    step: stepName,
+    connector: 'ERP',
+    operation: 'send',
+    state,
+    attempts:
+      second === null
+        ? []
+        : [
+            {
+              kind: 'attempt',
+              number: 1,
+              startedAt: `2026-10-10T02:05:${String(second).padStart(2, '0')}Z`,
+              finishedAt: `2026-10-10T02:05:${String(second).padStart(2, '0')}.5Z`,
+              outcome: state === 'failed' ? 'failed' : 'succeeded',
+              httpStatus: null,
+              error: state === 'failed' ? 'refused by ERP' : null,
+              problem: null,
+              traceId: null,
+            },
+          ],
+    input: null,
+    inputHidden: false,
+    resolvable: false,
+  })
+  const looping = (patch: Partial<InstanceDetail> = {}) =>
+    instance({
+      state: 'completed',
+      step: 'done',
+      path: [row('register', 0), row('approve', 2), row('register', 4), row('done', 6)],
+      ...patch,
+    })
+
+  it('gives each run of a step that looped its own tasks, calls and sub-processes, by the time they began', () => {
+    const detail = looping({
+      tasks: [task('approve', 2)],
+      calls: [call('register', 0), call('register', 4)],
+      subProcesses: [
+        {
+          id: 'c1',
+          process: 'Child',
+          processTitleKey: 'child.title',
+          step: 'register',
+          state: 'completed',
+          createdAt: '2026-10-10T02:05:04Z',
+          endedAt: null,
+        },
+      ],
+    })
+    const { runs } = stepRuns(detail)
+
+    expect(runParts(detail, runs, runs[0]!).calls.map((item) => item.id)).toEqual(['call-register-0'])
+    expect(runParts(detail, runs, runs[2]!).calls.map((item) => item.id)).toEqual(['call-register-4'])
+    expect(runParts(detail, runs, runs[0]!).subProcesses).toEqual([])
+    expect(runParts(detail, runs, runs[2]!).subProcesses.map((item) => item.id)).toEqual(['c1'])
+    expect(runParts(detail, runs, runs[1]!).tasks.map((item) => item.id)).toEqual(['task-approve-2'])
+    expect(runParts(detail, runs, runs[1]!).calls).toEqual([])
+  })
+
+  it("gives a call with no attempts to its step's last run", () => {
+    const detail = looping({ calls: [call('register', null)] })
+    const { runs } = stepRuns(detail)
+
+    expect(runParts(detail, runs, runs[0]!).calls).toEqual([])
+    expect(runParts(detail, runs, runs[2]!).calls).toHaveLength(1)
+  })
+
+  it('words the problem of the last row of a run, and of the last failed attempt when no row has one', () => {
+    const failed = looping({
+      state: 'failed',
+      step: 'register',
+      path: [row('register', 0, { problem: { code: 'refused', values: {} }, error: 'x' })],
+    })
+    const { runs } = stepRuns(failed)
+    expect(runProblem(t, 'en', failed, runs, runs[0]!)).toBe('The outside system refused the call.')
+
+    const viaCall = looping({
+      state: 'failed',
+      step: 'register',
+      path: [row('register', 0)],
+      calls: [call('register', 0, 'failed')],
+    })
+    const viaRuns = stepRuns(viaCall).runs
+    expect(runProblem(t, 'en', viaCall, viaRuns, viaRuns[0]!)).toBe('refused by ERP')
+
+    const none = looping({ path: [row('register', 0), row('done', 2)] })
+    const noneRuns = stepRuns(none).runs
+    expect(runProblem(t, 'en', none, noneRuns, noneRuns[0]!)).toBeNull()
+  })
+
+  it("gives the transition a run took to its next step, by the run's decision", () => {
+    const detail = instance({
+      graph: {
+        start: 'check',
+        steps: [step('check', 'decision', [move('done', '0'), move('done', 'otherwise')]), step('done', 'end', [])],
+      },
+      path: [row('check', 0, { decision: 'otherwise' }), row('done', 2)],
+    })
+    const { runs } = stepRuns(detail)
+
+    expect(takenTransition(detail, runs[0]!, 'done')?.on).toBe('otherwise')
+    expect(takenTransition(detail, runs[0]!, 'nowhere')).toBeUndefined()
   })
 })

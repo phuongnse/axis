@@ -68,3 +68,27 @@ test('an instance without a subject shows "No subject" in the list and has no re
     await expect(page.getByTestId('studio-section-inspector-facts').getByText('Record', { exact: true })).toHaveCount(0)
   }
 })
+
+test("an operator opens the parent from its site's list, opens a step's run in the side panel and opens the child from it", async ({
+  page,
+}) => {
+  const { parentId, childId } = await waitingParent(page)
+
+  await page.goto('/subprocess/parents')
+  await page.locator(`tr[data-row-key="${parentId}"]`).getByRole('link', { name: 'No subject', exact: true }).click()
+  await expect(page.getByTestId('inspector-instance')).toBeVisible()
+  await expect(page.getByTestId('inspector-step-run')).toHaveCount(0)
+
+  await page.getByTestId('rf__node-runChild').getByRole('button', { name: 'runChild', exact: true }).click()
+
+  const panel = page.getByTestId('inspector-step-run')
+  await expect(panel).toBeVisible()
+  await expect(panel.getByRole('heading', { name: 'runChild', exact: true })).toBeVisible()
+  await expect(panel.getByText('Starts a sub-process', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/[?&]step=runChild(&|$)/)
+
+  await panel.getByTestId(`inspector-run-subprocess-${childId}`).click()
+
+  await expect(page).toHaveURL(new RegExp(`/subprocess/children/${childId}$`))
+  await expect(page.getByTestId('inspector-instance')).toBeVisible()
+})

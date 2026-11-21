@@ -1,18 +1,24 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { fillText } from './fillText'
 import { formatDuration, isoDurationMs } from './formatValue'
 import {
-  stepRuns,
   transitionId,
   type GraphStep as InstanceStep,
   type GraphTransition as InstanceTransition,
   type InstanceDetail,
+  type InstanceRuns,
 } from './inspection'
 import { ProcessGraphCanvas, type GraphStep, type GraphTransition } from './ProcessGraph'
 import { useText } from './texts'
 
 interface InstanceDiagramProps {
   instance: InstanceDetail
+  /** The runs of the instance, from `stepRuns`. */
+  runs: InstanceRuns
+  /** The step that is chosen, which has the border. */
+  chosen: string
+  /** Called with a step that a click or Find a step chooses, and with the current step that Go to the current step chooses. */
+  onChoose: (step: string) => void
   /** The words of a step: its label, or its name where the page has no release texts. */
   stepLabel: (name: string) => string
   /** Shows the author's branch and outcome names and not their labels, for a page with no release texts. */
@@ -24,14 +30,20 @@ interface InstanceDiagramProps {
  * The Diagram tab of an instance: the graph of the release it is pinned to, drawn by `ProcessGraphCanvas` with the run
  * state of each step reached, the transitions taken and the labels of the transitions, see
  * docs/reference/process-inspector-widget.md#process-graph. A card shows the duration of its step's last run, and the
- * count of its runs where there are two or more, such as "2 runs, last 2 sec". An open run has no duration. The step the
- * instance is at is chosen and in view when the page opens, and choosing another step moves the border to it. It fills
- * the frame that holds it, and the page loads it in its own chunk, so React Flow stays out of the first load.
+ * count of its runs where there are two or more, such as "2 runs, last 2 sec". An open run has no duration. The page
+ * chooses the step, so it can open that step's run in the side panel. The step the instance is at is in view when the page
+ * opens. It fills the frame that holds it, and the page loads it in its own chunk, so React Flow stays out of the first load.
  */
-export default function InstanceDiagram({ instance, stepLabel, stepNames, locale }: InstanceDiagramProps) {
+export default function InstanceDiagram({
+  instance,
+  runs: { runs, runStates, taken },
+  chosen,
+  onChoose,
+  stepLabel,
+  stepNames,
+  locale,
+}: InstanceDiagramProps) {
   const t = useText()
-  const { runs, runStates, taken } = useMemo(() => stepRuns(instance), [instance])
-  const [chosen, setChosen] = useState(instance.step)
 
   const steps = useMemo(
     () =>
@@ -75,7 +87,7 @@ export default function InstanceDiagram({ instance, stepLabel, stepNames, locale
       label={t('shell.inspector.tabs.diagram')}
       testIdPrefix="inspector-graph"
       chosen={chosen}
-      onChoose={setChosen}
+      onChoose={onChoose}
       current={instance.step}
       runStates={runStates}
       taken={taken}

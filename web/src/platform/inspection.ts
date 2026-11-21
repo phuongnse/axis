@@ -238,6 +238,17 @@ export interface GraphStep {
   transitions: GraphTransition[]
 }
 
+/**
+ * What a run made, with each part `null` where it made none, see docs/reference/process-inspection.md#instance-detail.
+ * The panel reads which part is set. What each part holds is for the Output tab.
+ */
+export interface RunMade {
+  changes: unknown[] | null
+  event: { name: string } | null
+  notified: unknown | null
+  created: { entity: string; id: string } | null
+}
+
 /** One occurrence of a step in the instance's history. */
 export interface PathEntry {
   step: string
@@ -250,18 +261,26 @@ export interface PathEntry {
   problem: StepProblem | null
   /** The trace id of the run that wrote the entry, or `null` when it stored none. */
   traceId: string | null
+  /** What the run made. A detail from before the API sent it has none. */
+  made?: RunMade
 }
 
-/** A task of the instance. `outcome`, `completedBy` and `completedAt` are `null` while it is open. */
+/**
+ * A task of the instance. `outcome`, `completedBy`, `completedById` and `completedAt` are `null` while it is open.
+ * `assigneeId` is a user assignee's id, or the id of the person who claimed a role task, and `null` while no one holds it.
+ */
 export interface InstanceTask {
   id: string
   step: string
   assigneeKind: string
   assignee: string
+  assigneeId: string | null
   state: string
   outcome: string | null
   completedBy: string | null
+  completedById: string | null
   createdAt: string
+  dueAt: string | null
   completedAt: string | null
 }
 
@@ -371,6 +390,8 @@ export interface InstanceDetail {
   releaseNumber: number | null
   state: string
   step: string
+  /** The time the timer step that the instance waits on goes on, or `null` when the instance does not wait on a timer. */
+  timerDueAt: string | null
   createdAt: string
   endedAt: string | null
   /** Who started the instance, or `null` for an instance started before Axis recorded its starter. */
@@ -481,18 +502,86 @@ export function stepRuns(instance: InstanceDetail): InstanceRuns {
   const taken = new Set<string>()
   runs.slice(1).forEach((run, index) => {
     const from = runs[index]!
-    const transitions = instance.graph.steps.find((step) => step.name === from.step)?.transitions ?? []
-    const leading = transitions.flatMap((transition, place) => (transition.next === run.step ? [place] : []))
-    const decision = from.entries.at(-1)?.decision
-    const place =
-      leading.length === 1
-        ? leading[0]
-        : (leading.find((candidate) => transitions[candidate]!.on === decision) ?? leading[0])
+    const place = takenPlace(instance, from, run.step)
     if (place !== undefined) {
       taken.add(transitionId(from.step, place))
     }
   })
   return { runs, runStates, taken }
+}
+
+/**
+ * The place among its step's transitions of the one `run` took to the step `next`: the only one to that target, else the
+ * one whose `on` is the run's last `decision`, else the first. `undefined` when the step has none to `next`.
+ */
+function takenPlace(instance: InstanceDetail, run: StepRun, next: string): number | undefined {
+  const transitions = instance.graph.steps.find((step) => step.name === run.step)?.transitions ?? []
+  const leading = transitions.flatMap((transition, place) => (transition.next === next ? [place] : []))
+  const decision = run.entries.at(-1)?.decision
+  return leading.length === 1
+    ? leading[0]
+    : (leading.find((candidate) => transitions[candidate]!.on === decision) ?? leading[0])
+}
+
+/** The transition `run` took to the step `next`, chosen as {@link stepRuns} chooses the transitions taken. */
+export function takenTransition(instance: InstanceDetail, run: StepRun, next: string): GraphTransition | undefined {
+  const place = takenPlace(instance, run, next)
+  return place === undefined
+    ? undefined
+    : instance.graph.steps.find((step) => step.name === run.step)?.transitions[place]
+}
+
+/** The tasks, calls and sub-processes of one run, see {@link runParts}. */
+export interface RunParts {
+  tasks: InstanceTask[]
+  calls: InstanceCall[]
+  subProcesses: SubProcess[]
+}
+
+/**
+ * The tasks, calls and sub-processes that belong to `run`, see docs/reference/process-inspector-widget.md#instance-page.
+ * The detail does not link them to a path row, so each is matched by its step and its time: it belongs to the run of its
+ * step that began before it and after the step's previous run ended, both ends exclusive. A task or a sub-process uses
+ * its `createdAt`, and a call its first attempt's start. A call with no attempts yet belongs to the step's last run.
+ */
+export function runParts(instance: InstanceDetail, runs: readonly StepRun[], run: StepRun): RunParts {
+  const own = runs.filter((candidate) => candidate.step === run.step)
+  const place = own.indexOf(run)
+  const after = own[place - 1]?.finishedAt ?? null
+  const before = own[place + 1]?.startedAt ?? null
+  const inside = (time: string | undefined): boolean => {
+    if (time === undefined) {
+      return place === own.length - 1
+    }
+    const at = Date.parse(time)
+    return (after === null || at > Date.parse(after)) && (before === null || at < Date.parse(before))
+  }
+  return {
+    tasks: instance.tasks.filter((task) => task.step === run.step && inside(task.createdAt)),
+    calls: instance.calls.filter((call) => call.step === run.step && inside(call.attempts[0]?.startedAt)),
+    subProcesses: instance.subProcesses.filter((child) => child.step === run.step && inside(child.createdAt)),
+  }
+}
+
+/**
+ * The words of why a run failed, in the reader's language, see docs/reference/process-inspector-widget.md#instance-page:
+ * the last row of the run with a `problem` or an `error`, else the last attempt with one of the run's last failed call.
+ * `null` when the run holds neither.
+ */
+export function runProblem(
+  t: (key: string) => string,
+  locale: string,
+  instance: InstanceDetail,
+  runs: readonly StepRun[],
+  run: StepRun,
+): string | null {
+  const entry = run.entries.findLast((row) => row.problem || row.error)
+  if (entry) {
+    return problemText(t, locale, entry.problem, entry.error)
+  }
+  const call = runParts(instance, runs, run).calls.findLast((row) => row.state === 'failed')
+  const attempt = call?.attempts.findLast((row) => row.problem || row.error)
+  return attempt ? problemText(t, locale, attempt.problem, attempt.error) : null
 }
 
 /** The operator commands the instance page offers. */

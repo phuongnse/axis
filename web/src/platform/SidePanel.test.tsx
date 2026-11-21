@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { sizeTokens, spacingTokens } from './designTokens'
+import { designTokensFor, sizeTokens, spacingTokens } from './designTokens'
 import { SidePanel } from './SidePanel'
 import { ShellAsideContext } from './shellAsideContext'
 import { TextProvider } from './TextProvider'
@@ -11,7 +11,7 @@ import { ThemeModeProvider } from './theme'
 let aside: HTMLDivElement | undefined
 
 /** Renders a panel in the shell's right column, which is `aside`. */
-function renderPanel({ onClose, status }: { onClose?: () => void; status?: string } = {}) {
+function renderPanel({ onClose, status, line }: { onClose?: () => void; status?: string; line?: string } = {}) {
   aside = document.createElement('div')
   document.body.append(aside)
   return render(
@@ -23,6 +23,7 @@ function renderPanel({ onClose, status }: { onClose?: () => void; status?: strin
               id="panel"
               title="Problems"
               status={status}
+              line={line}
               closeNameKey="shell.studio.problems.close"
               onClose={onClose}
               testId="panel-test"
@@ -31,7 +32,7 @@ function renderPanel({ onClose, status }: { onClose?: () => void; status?: strin
               <p>Body text</p>
             </SidePanel>
           ) : (
-            <SidePanel id="panel" title="Problems" status={status} testId="panel-test">
+            <SidePanel id="panel" title="Problems" status={status} line={line} testId="panel-test">
               <p>Body text</p>
             </SidePanel>
           )}
@@ -89,6 +90,19 @@ describe('SidePanel', () => {
     expect(screen.getByText('Waiting').parentElement).toContainElement(
       screen.getByRole('heading', { name: 'Problems' }),
     )
+  })
+})
+
+describe('SidePanel line', () => {
+  it('shows its line under the title, in the muted colour', () => {
+    renderPanel({ line: 'Calls a connector' })
+
+    const line = screen.getByText('Calls a connector')
+    expect(line).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
+    expect(
+      screen.getByRole('heading', { name: 'Problems' }).compareDocumentPosition(line) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 })
 
