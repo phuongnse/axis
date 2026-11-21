@@ -36,8 +36,8 @@ package's workspace as `&view=packages&package=<id>`.
 
 ## A package's files
 
-An open package is a workspace that shows its files in a code editor, and a developer saves, builds and tests them
-there. Running them, so that a package can be run in the browser, is planned, see the marked bullets below.
+An open package is a workspace that shows its files in a code editor, and a developer saves, builds, tests and runs
+them there.
 
 - **The workspace.** An open package is one workspace. It fills the window down to the footer: the explorer on the
   left, the open files as tabs with the code editor under them, the status line at the editor's foot, and the output
