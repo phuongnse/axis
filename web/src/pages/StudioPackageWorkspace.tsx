@@ -70,7 +70,7 @@ function EmptyEditorArea({ boundary }: { boundary: React.RefObject<HTMLElement |
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const ref = useRef<HTMLDivElement>(null)
-  const height = useFillHeight(ref, true, boundary)
+  const height = useFillHeight(ref, true, { boundary })
   return (
     <div ref={ref} style={{ height, padding: spacing.md, color: colour.textMuted }}>
       {t('shell.studio.packages.noFile')}

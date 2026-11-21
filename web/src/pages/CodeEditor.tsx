@@ -249,7 +249,7 @@ export default function CodeEditor({
     },
   }))
 
-  const height = useFillHeight(hostRef, fill && !grow, boundary)
+  const height = useFillHeight(hostRef, fill && !grow, { boundary })
 
   return (
     <div
