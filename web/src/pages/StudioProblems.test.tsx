@@ -128,4 +128,25 @@ describe('StudioProblemList', () => {
     expect(within(item).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByText(/Path:/)).not.toBeInTheDocument()
   })
+
+  it('makes the file of a problem with no resource a link named by its file and line when onOpenFile is given', async () => {
+    const onOpenFile = vi.fn()
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioProblemList
+            diagnostics={[{ ...error, file: 'packages/tools/lib/x.py', line: 3 }, error]}
+            resources={resources}
+            onOpenFile={onOpenFile}
+          />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+    expect(onOpenFile).toHaveBeenCalledWith('packages/tools/lib/x.py', 3)
+
+    await userEvent.click(screen.getByRole('button', { name: 'entities/purchase-request.json' }))
+    expect(onOpenFile).toHaveBeenLastCalledWith('entities/purchase-request.json', undefined)
+  })
 })

@@ -25,7 +25,7 @@ function studioDeveloper(page: Page): Promise<boolean> {
   return page.evaluate(async () => (await (await fetch('/api/me')).json()).studioDeveloper as boolean)
 }
 
-test('a developer creates a package in Studio and opens its workspace', async () => {
+test('a developer creates a package in Studio, opens its workspace, saves a file and sees a manifest error in Problems', async () => {
   const created = await runAdmin([
     'tenant',
     'create',
@@ -123,6 +123,30 @@ test('a developer creates a package in Studio and opens its workspace', async ()
     await expect(
       developerPage.getByTestId('studio-package-tree').getByText('axis-package.json', { exact: true }),
     ).toBeVisible()
+
+    // The starter's code is index.js. An edit saves with Ctrl+S, and the status line shows nothing unsaved.
+    const tree = developerPage.getByTestId('studio-package-tree')
+    await tree.getByText('index.js', { exact: true }).click()
+    const adapter = developerPage.getByRole('textbox', { name: 'index.js', exact: true })
+    await adapter.click()
+    await developerPage.keyboard.press('Control+End')
+    await developerPage.keyboard.press('Enter')
+    await developerPage.keyboard.type('// edited')
+    // Escape closes the word completion, so Ctrl+S does not follow a picked word.
+    await developerPage.keyboard.press('Escape')
+    await expect(developerPage.getByTestId('studio-package-status')).toContainText('1 unsaved file')
+    await developerPage.keyboard.press('Control+S')
+    await expect(developerPage.getByTestId('studio-package-status')).toContainText('No unsaved files')
+
+    // An invalid manifest saves, and the folder's check answers AXC0132 at its file in the Problems tab.
+    await tree.getByText('axis-package.json', { exact: true }).click()
+    await developerPage.getByRole('textbox', { name: 'axis-package.json', exact: true }).click()
+    await developerPage.keyboard.press('Control+A')
+    await developerPage.keyboard.type('x')
+    await developerPage.keyboard.press('Control+S')
+    const problems = developerPage.getByTestId('studio-package-output').getByRole('tabpanel')
+    await expect(problems).toContainText('AXC0132')
+    await expect(problems).toContainText(`packages/${packageId}/axis-package.json`)
   } finally {
     await browser?.close()
     await server.stop()

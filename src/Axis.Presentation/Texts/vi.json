@@ -2602,6 +2602,7 @@
   "shell.sidePanel.resize": "Đổi độ rộng khung",
   "shell.studio.problems.close": "Đóng danh sách vấn đề",
   "shell.studio.problems.none": "Không có vấn đề nào.",
+  "shell.studio.problems.fileAtLine": "{file}, dòng {line}",
   "shell.studio.band.changesNotLive": "Có thay đổi chưa chạy",
   "shell.studio.band.notPublished": "Chưa phát hành",
   "shell.studio.band.live": "Phiên bản {release} đang chạy",

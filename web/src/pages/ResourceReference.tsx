@@ -6,11 +6,12 @@ import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { FileAtLine } from './FileAtLine'
 
 /**
  * A pointer to a resource, named as people read it: its title, with its kind muted after it. It is a link when `onOpen`
- * is given, and plain text otherwise. Without a `resource` Studio cannot name the thing, so the pointer is its `file`, in
- * muted text, and it opens nothing. See docs/reference/actions-and-controls.md#buttons and the which-widget row of
+ * is given, and plain text otherwise. Without a `resource` Studio cannot name the thing, so the pointer is its `file`, drawn
+ * by {@link FileAtLine} as muted text, and it opens nothing. See docs/reference/actions-and-controls.md#buttons and the which-widget row of
  * docs/reference/shared-widgets.md#which-widget.
  */
 export function ResourceReference({
@@ -26,7 +27,7 @@ export function ResourceReference({
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { colour, spacing } = useDesignTokens()
   if (resource === undefined) {
-    return <Typography.Text style={{ color: colour.textMuted }}>{file}</Typography.Text>
+    return <FileAtLine file={file} />
   }
   const title = resourceTitle(resource, locale, t)
   return (

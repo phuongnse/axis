@@ -2602,6 +2602,7 @@
   "shell.sidePanel.resize": "Resize panel",
   "shell.studio.problems.close": "Close problems",
   "shell.studio.problems.none": "No problems.",
+  "shell.studio.problems.fileAtLine": "{file}, line {line}",
   "shell.studio.band.changesNotLive": "Changes not live",
   "shell.studio.band.notPublished": "Not published yet",
   "shell.studio.band.live": "Release {release} is live",

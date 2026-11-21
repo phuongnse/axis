@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import type { StudioDiagnostic } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioPackageWorkspace } from './StudioPackageWorkspace'
@@ -14,7 +15,7 @@ const fileRoute = (path: string) => `/api/studio/apps/Shop/packages/tools/files/
 const contents: Record<string, string> = {
   'src/b.ts': 'const b = 1',
   'src/a.cs': 'class A {}',
-  'lib/x.py': 'x = 1',
+  'lib/x.py': 'x = 1\ny = 2\nz = 3',
   'adapter.py': 'print(1)',
   'axis-package.json': JSON.stringify({ id: 'tools', label: 'Purchasing tools', version: '1.2.0' }),
 }
@@ -55,7 +56,7 @@ function stubPackage(writes: Record<string, () => Response> = {}) {
   return puts
 }
 
-function renderWorkspace(canDevelop: boolean, packageId = 'tools') {
+function renderWorkspace(canDevelop: boolean, packageId = 'tools', diagnostics: StudioDiagnostic[] = []) {
   const onWritten = vi.fn()
   render(
     // Without motion a closed dialog leaves the document at once, as jsdom runs no animations.
@@ -69,6 +70,7 @@ function renderWorkspace(canDevelop: boolean, packageId = 'tools') {
               packageId={packageId}
               folderRevision={0}
               canDevelop={canDevelop}
+              diagnostics={diagnostics}
               onWritten={onWritten}
             />
           </TextProvider>
@@ -89,6 +91,16 @@ async function openFile(name: string, path: string) {
   await userEvent.click(within(screen.getByTestId('studio-package-tree')).getByText(name, { exact: true }))
   return EditorView.findFromDOM(await screen.findByRole('textbox', { name: path }))!
 }
+
+const problem = (file: string, extra: Partial<StudioDiagnostic> = {}): StudioDiagnostic => ({
+  code: 'AXC0132',
+  severity: 'error',
+  message: `Problem in ${file}`,
+  file,
+  path: '',
+  resourceId: null,
+  ...extra,
+})
 
 const typeAtStart = (view: EditorView) =>
   act(() => view.dispatch({ changes: { from: 0, insert: 'x' }, selection: { anchor: 1 }, userEvent: 'input.type' }))
@@ -345,6 +357,64 @@ describe('StudioPackageWorkspace', () => {
 
       expect(screen.queryByTestId('studio-package-save-bar')).not.toBeInTheDocument()
       expect(puts).toEqual([])
+    })
+  })
+
+  describe('Problems tab', () => {
+    const output = () => screen.getByTestId('studio-package-output')
+
+    it("lists only the package's problems, and a problem's file opens its tab", async () => {
+      stubPackage()
+      renderWorkspace(true, 'tools', [
+        problem('packages/tools/axis-package.json'),
+        problem('packages/other/axis-package.json'),
+        problem('entities/a.json', { resourceId: 'e1' }),
+      ])
+      await screen.findByTestId('studio-package-tree')
+
+      const panel = within(output()).getByRole('tabpanel')
+      expect(within(output()).getByRole('tab', { name: 'Problems' })).toBeInTheDocument()
+      expect(within(panel).getAllByRole('listitem')).toHaveLength(1)
+      expect(within(panel).queryByText('Problem in packages/other/axis-package.json')).not.toBeInTheDocument()
+      expect(within(panel).queryByText('Problem in entities/a.json')).not.toBeInTheDocument()
+
+      await userEvent.click(within(panel).getByRole('button', { name: 'packages/tools/axis-package.json' }))
+
+      expect(await screen.findByRole('textbox', { name: 'axis-package.json' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /axis-package\.json/, selected: true })).toBeInTheDocument()
+    })
+
+    it('opens the file at the problem’s line, and at line 1 when it has none', async () => {
+      stubPackage()
+      renderWorkspace(true, 'tools', [
+        problem('packages/tools/lib/x.py', { line: 3 }),
+        problem('packages/tools/adapter.py', { severity: 'warning' }),
+      ])
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(screen.getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+
+      const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
+      await waitFor(() =>
+        expect(within(screen.getByTestId('studio-package-status')).getByText('Line 3, column 1')).toBeInTheDocument(),
+      )
+      expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(3)
+
+      // A file that is already open jumps again.
+      await userEvent.click(screen.getByRole('button', { name: 'packages/tools/adapter.py' }))
+      await screen.findByRole('textbox', { name: 'adapter.py' })
+      await userEvent.click(screen.getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+      await waitFor(() =>
+        expect(within(screen.getByTestId('studio-package-status')).getByText('Line 3, column 1')).toBeInTheDocument(),
+      )
+    })
+
+    it('says there are no problems when the package has none', async () => {
+      stubPackage()
+      renderWorkspace(true, 'tools', [problem('packages/other/axis-package.json')])
+      await screen.findByTestId('studio-package-tree')
+
+      expect(within(within(output()).getByRole('tabpanel')).getByText('No problems.')).toBeInTheDocument()
     })
   })
 })

@@ -43,10 +43,12 @@ below.
 - **The workspace.** An open package is one workspace. It fills the window down to the footer: the explorer on the
   left, the open files as tabs with the code editor under them, the status line at the editor's foot, and the output
   panel under it. The workspace follows [rules, not boxes](shell.md#layout): rules between its regions and no box.
-- **The output panel** _(planned for M37)_. The output panel has Problems, Output, Tests and Run. A handle on the
-  explorer's end rule sets its width, from a least width to half the workspace, and a handle on the output panel's top
-  rule sets its height, both drawn as the one [handle on a rule](shell.md#layout). A rule runs under the heading from
-  the sidebar across.
+- **The output panel.** The output panel under the status line has a Problems tab, which lists the problems of the
+  package's files, see Problems below. The tab row is a line tab row, in the workspace's one tab-row look.
+- **The output panel's other tabs and handles** _(planned for M37)_. The output panel also has Output, Tests and Run.
+  A handle on the explorer's end rule sets its width, from a least width to half the workspace, and a handle on the
+  output panel's top rule sets its height, both drawn as the one [handle on a rule](shell.md#layout). A rule runs
+  under the heading from the sidebar across.
 - **The heading.** The package's label, with its kind and version under it. The heading has no tag of a change,
   because the band's Changes not live tells of every change, so the workspace reads no diff against the live release.
 - **The heading's actions** _(planned for M37)_. Build, Run tests and Run… are on the right as one
@@ -85,9 +87,14 @@ below.
   one changed elsewhere, stops it with that file's notice.
 - **Build** _(planned for M37)_. A build runs only when asked, from Build or Ctrl+Shift+B. Each save still answers the folder's diagnostics. The build's output shows in Output
   under a title row with its state, and its problems in Problems, see [the authoring API](#the-authoring-api).
-- **Problems** _(planned for M37)_. The diagnostics of the folder and of a build show in the
-  [Problems panel](studio-workspace.md#problems-panel) like any other diagnostic. A problem's file at its line
-  follows its message on the row when the row has room, and opens the file at that line.
+- **Problems.** The Problems tab lists the folder's diagnostics whose file is under `packages/<id>/`, errors then
+  warnings, with the list of the [Problems panel](studio-workspace.md#problems-panel), or says "No problems.". After a
+  save it shows the problems that the save answered. A problem's file is a link, named by the file and, when the
+  diagnostic has a line, by ", line N". It opens the file in the workspace, or switches to its tab, with the cursor at
+  that line, or on line 1 when the diagnostic has none. A package's file shows in the band's Problems panel as plain
+  muted text.
+- **Problems from a build and on the row** _(planned for M37)_. The diagnostics of a build show in Problems like any
+  other diagnostic. A problem's file at its line follows its message on the row when the row has room.
 - **Tests** _(planned for M37)_. Run tests shows one row a test in Tests, with its result, name, duration and message.
   A failed test's place, its file at its line, follows its message and opens there, as a problem's file does.
 - **Run** _(planned for M37)_. Run… shows two panes parted by a rule that runs the panel's height. The Input pane is
