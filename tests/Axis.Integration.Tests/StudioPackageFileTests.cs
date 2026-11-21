@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
@@ -29,6 +30,8 @@ public sealed class StudioPackageFileTests(PostgreSqlFixture database) : IClassF
     private const string Url = "/api/studio/apps/PurchaseRequests";
 
     private const string FileUrl = $"{Url}/packages/x/files/adapter.py";
+
+    private const string MoveUrl = $"{Url}/packages/x/move";
 
     private const string RunInputsUrl = $"{Url}/packages/x/run-inputs";
 
@@ -501,6 +504,202 @@ public sealed class StudioPackageFileTests(PostgreSqlFixture database) : IClassF
         Assert.Equal(HttpStatusCode.OK, undo.StatusCode);
         Assert.Equal(created, File.ReadAllBytes(file));
     }
+
+    [Fact]
+    public async Task A_developer_moves_two_package_files_as_one_revision_and_one_undo_puts_both_back()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var seeded = SeedMoveFiles(folder.Path);
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        using var client = factory.CreateClient().SignedInAs("developer");
+
+        using var move = await SendAsync(client, HttpMethod.Post, MoveUrl, MoveBody(("a.py", "lib/a.py", seeded["a.py"]), ("b.py", "lib/b.py", seeded["b.py"])));
+
+        Assert.Equal(HttpStatusCode.OK, move.StatusCode);
+        Assert.Equal(JsonValueKind.Array, (await ReadAsync(move)).GetProperty("diagnostics").ValueKind);
+        Assert.Equal(seeded["a.py"], Version(File.ReadAllBytes(Path.Combine(folder.Path, "packages", "x", "lib", "a.py"))));
+        Assert.Equal(seeded["b.py"], Version(File.ReadAllBytes(Path.Combine(folder.Path, "packages", "x", "lib", "b.py"))));
+        Assert.False(File.Exists(Path.Combine(folder.Path, "packages", "x", "a.py")));
+        Assert.False(File.Exists(Path.Combine(folder.Path, "packages", "x", "b.py")));
+
+        using var revisionList = await client.GetAsync(new Uri($"{Url}/revisions", UriKind.Relative), CancellationToken);
+        var latest = (await ReadAsync(revisionList)).GetProperty("items")[0];
+        Assert.Equal("Move 2 package files in packages/x", latest.GetProperty("summary").GetString());
+        using (var repository = new Repository(Path.Combine(revisions.Path, Path.GetFileName(folder.Path) + ".git")))
+        {
+            Assert.Equal(
+                ["Start of history", "Move 2 package files in packages/x"],
+                repository.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = "refs/heads/main", SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Reverse })
+                    .Select(commit => commit.MessageShort));
+        }
+
+        using var undo = await SendAsync(client, HttpMethod.Post, $"{Url}/revisions/{latest.GetProperty("id").GetString()}/undo", null);
+        Assert.Equal(HttpStatusCode.OK, undo.StatusCode);
+        Assert.Equal(seeded["a.py"], Version(File.ReadAllBytes(Path.Combine(folder.Path, "packages", "x", "a.py"))));
+        Assert.Equal(seeded["b.py"], Version(File.ReadAllBytes(Path.Combine(folder.Path, "packages", "x", "b.py"))));
+        Assert.False(File.Exists(Path.Combine(folder.Path, "packages", "x", "lib", "a.py")));
+        Assert.False(File.Exists(Path.Combine(folder.Path, "packages", "x", "lib", "b.py")));
+    }
+
+    [Fact]
+    public async Task A_move_swaps_two_package_files_and_a_single_move_is_named_by_its_paths()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var seeded = SeedMoveFiles(folder.Path);
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        using var client = factory.CreateClient().SignedInAs("developer");
+
+        using var swap = await SendAsync(client, HttpMethod.Post, MoveUrl, MoveBody(("a.py", "b.py", seeded["a.py"]), ("b.py", "a.py", seeded["b.py"])));
+        Assert.Equal(HttpStatusCode.OK, swap.StatusCode);
+        Assert.Equal(seeded["b.py"], Version(File.ReadAllBytes(Path.Combine(folder.Path, "packages", "x", "a.py"))));
+        Assert.Equal(seeded["a.py"], Version(File.ReadAllBytes(Path.Combine(folder.Path, "packages", "x", "b.py"))));
+
+        using var single = await SendAsync(client, HttpMethod.Post, MoveUrl, MoveBody(("a.py", "c.py", seeded["b.py"])));
+        Assert.Equal(HttpStatusCode.OK, single.StatusCode);
+        using var revisionList = await client.GetAsync(new Uri($"{Url}/revisions", UriKind.Relative), CancellationToken);
+        Assert.Equal(
+            "Move package file packages/x/a.py to packages/x/c.py",
+            (await ReadAsync(revisionList)).GetProperty("items")[0].GetProperty("summary").GetString());
+    }
+
+    [Fact]
+    public async Task A_move_with_a_stale_version_or_a_taken_path_answers_409_and_a_refused_path_or_body_answers_400_and_nothing_is_written()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var seeded = SeedMoveFiles(folder.Path);
+        File.WriteAllText(Path.Combine(folder.Path, "packages", "x", "c.py"), "c = 3\n");
+        File.WriteAllText(Path.Combine(folder.Path, "packages", "x", "dir", "d.py"), "d = 4\n");
+        var before = Snapshot(folder.Path);
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        using var client = factory.CreateClient().SignedInAs("developer");
+        await CreateDraftAsync(factory, folder.Path, revisions.Path, "developer");
+        var mainTip = MainTip(revisions.Path, folder.Path);
+
+        var refusals = new (string Body, HttpStatusCode Status)[]
+        {
+            (MoveBody(("a.py", "lib/a.py", "stale")), HttpStatusCode.Conflict),
+            (MoveBody(("missing.py", "lib/m.py", seeded["a.py"])), HttpStatusCode.Conflict),
+            (MoveBody(("a.py", "c.py", seeded["a.py"])), HttpStatusCode.Conflict),
+            (MoveBody(("a.py", "dir", seeded["a.py"])), HttpStatusCode.Conflict),
+            (MoveBody(("a.py", "c.py/inside.py", seeded["a.py"])), HttpStatusCode.Conflict),
+            (MoveBody(("a.py", "lib/a.py", seeded["a.py"]), ("b.py", "lib/b.py", "stale")), HttpStatusCode.Conflict),
+            (MoveBody(("a.py", "../y.py", seeded["a.py"])), HttpStatusCode.BadRequest),
+            (MoveBody(("a.py", ".hidden", seeded["a.py"])), HttpStatusCode.BadRequest),
+            (MoveBody(("../y.py", "lib/a.py", seeded["a.py"])), HttpStatusCode.BadRequest),
+            (MoveBody(("a.py", "a.py", seeded["a.py"])), HttpStatusCode.BadRequest),
+            (MoveBody(("a.py", "lib/x.py", seeded["a.py"]), ("a.py", "lib/y.py", seeded["a.py"])), HttpStatusCode.BadRequest),
+            (MoveBody(("a.py", "lib/x.py", seeded["a.py"]), ("b.py", "lib/x.py", seeded["b.py"])), HttpStatusCode.BadRequest),
+            (MoveBody(("a.py", "lib", seeded["a.py"]), ("b.py", "lib/b.py", seeded["b.py"])), HttpStatusCode.BadRequest),
+            ("{}", HttpStatusCode.BadRequest),
+            ("""{"moves":[]}""", HttpStatusCode.BadRequest),
+            ("""{"moves":[{"from":"a.py","to":"lib/a.py"}]}""", HttpStatusCode.BadRequest),
+            ("""{"moves":[{"from":"a.py","to":"lib/a.py","version":"x","extra":1}]}""", HttpStatusCode.BadRequest),
+            ("""{"moves":[{"from":"a.py","to":"","version":"x"}]}""", HttpStatusCode.BadRequest),
+            ("""{"moves":[{"from":"a.py","to":"lib/a.py","version":"x"}],"extra":1}""", HttpStatusCode.BadRequest),
+        };
+        foreach (var (body, status) in refusals)
+        {
+            using var response = await SendAsync(client, HttpMethod.Post, MoveUrl, body);
+            Assert.True(status == response.StatusCode, $"{body} answered {response.StatusCode}.");
+            Assert.Equal(before, Snapshot(folder.Path));
+        }
+
+        using var notJson = await SendAsync(client, HttpMethod.Post, MoveUrl, "x", contentType: "text/plain");
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, notJson.StatusCode);
+        using var badPackage = await SendAsync(client, HttpMethod.Post, $"{Url}/packages/.x/move", MoveBody(("a.py", "lib/a.py", seeded["a.py"])));
+        Assert.Equal(HttpStatusCode.BadRequest, badPackage.StatusCode);
+        Assert.Equal(before, Snapshot(folder.Path));
+        Assert.Equal(mainTip, MainTip(revisions.Path, folder.Path));
+    }
+
+    [Fact]
+    public async Task A_move_without_the_developer_role_or_with_the_switch_off_answers_403_and_writes_nothing()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var seeded = SeedMoveFiles(folder.Path);
+        var before = Snapshot(folder.Path);
+        var body = MoveBody(("a.py", "lib/a.py", seeded["a.py"]));
+        using var revisions = new TemporaryFolder();
+        await using var on = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        await using var off = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: false);
+        await CreateDraftAsync(on, folder.Path, revisions.Path, "developer");
+        var mainTip = MainTip(revisions.Path, folder.Path);
+
+        foreach (var (factory, identity) in new[] { (on, "author"), (on, "outsider"), (off, "developer") })
+        {
+            using var client = factory.CreateClient().SignedInAs(identity);
+            using var response = await SendAsync(client, HttpMethod.Post, MoveUrl, body);
+            Assert.True(HttpStatusCode.Forbidden == response.StatusCode, $"{identity} answered {response.StatusCode}.");
+            Assert.Equal(before, Snapshot(folder.Path));
+            Assert.Equal(mainTip, MainTip(revisions.Path, folder.Path));
+        }
+    }
+
+    [Fact]
+    public async Task A_developer_moves_package_files_in_a_draft_while_the_folder_and_main_stay_unchanged()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var seeded = SeedMoveFiles(folder.Path);
+        var before = Snapshot(folder.Path);
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        var draft = await CreateDraftAsync(factory, folder.Path, revisions.Path, "developer");
+        var mainTip = MainTip(revisions.Path, folder.Path);
+        using var client = factory.CreateClient().SignedInAs("developer");
+        var draftUrl = $"{MoveUrl}?draft={draft}";
+
+        using var stale = await SendAsync(client, HttpMethod.Post, draftUrl, MoveBody(("a.py", "lib/a.py", "stale")));
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        using var missing = await SendAsync(client, HttpMethod.Post, draftUrl, MoveBody(("missing.py", "lib/m.py", seeded["a.py"])));
+        Assert.Equal(HttpStatusCode.Conflict, missing.StatusCode);
+        using var taken = await SendAsync(client, HttpMethod.Post, draftUrl, MoveBody(("a.py", "b.py", seeded["a.py"])));
+        Assert.Equal(HttpStatusCode.Conflict, taken.StatusCode);
+        using var unknown = await SendAsync(client, HttpMethod.Post, $"{MoveUrl}?draft=nope", MoveBody(("a.py", "lib/a.py", seeded["a.py"])));
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+
+        using var move = await SendAsync(client, HttpMethod.Post, draftUrl, MoveBody(("a.py", "lib/a.py", seeded["a.py"]), ("b.py", "lib/b.py", seeded["b.py"])));
+        Assert.Equal(HttpStatusCode.OK, move.StatusCode);
+        Assert.Equal(JsonValueKind.Array, (await ReadAsync(move)).GetProperty("diagnostics").ValueKind);
+
+        using var list = await client.GetAsync(new Uri($"{Url}/package-files?draft={draft}", UriKind.Relative), CancellationToken);
+        Assert.Equal(
+            ["dir/d.py", "lib/a.py", "lib/b.py"],
+            (await ReadAsync(list)).GetProperty("items").EnumerateArray().Select(item => item.GetProperty("path").GetString()));
+        Assert.Equal(before, Snapshot(folder.Path));
+        Assert.Equal(mainTip, MainTip(revisions.Path, folder.Path));
+        using var folderList = await client.GetAsync(new Uri($"{Url}/package-files", UriKind.Relative), CancellationToken);
+        Assert.Equal(
+            ["a.py", "b.py", "dir/d.py"],
+            (await ReadAsync(folderList)).GetProperty("items").EnumerateArray().Select(item => item.GetProperty("path").GetString()));
+    }
+
+    // Seeds packages/x/a.py, b.py and dir/d.py, and answers the version of a.py and b.py by path.
+    private static Dictionary<string, string> SeedMoveFiles(string folder)
+    {
+        var directory = Path.Combine(folder, "packages", "x");
+        Directory.CreateDirectory(Path.Combine(directory, "dir"));
+        byte[] a = [.. "a = 1\n"u8];
+        byte[] b = [.. "b = 2\n"u8];
+        File.WriteAllBytes(Path.Combine(directory, "a.py"), a);
+        File.WriteAllBytes(Path.Combine(directory, "b.py"), b);
+        File.WriteAllBytes(Path.Combine(directory, "dir", "d.py"), [.. "d = 4\n"u8]);
+        return new() { ["a.py"] = Version(a), ["b.py"] = Version(b) };
+    }
+
+    private static string MoveBody(params (string From, string To, string Version)[] moves) =>
+        new JsonObject
+        {
+            ["moves"] = new JsonArray([.. moves.Select(move => (JsonNode)new JsonObject { ["from"] = move.From, ["to"] = move.To, ["version"] = move.Version })]),
+        }.ToJsonString();
+
+    // Every file under packages/ with the SHA-256 of its bytes, so a test sees any file that was added, removed or changed.
+    private static IReadOnlyList<string> Snapshot(string folder) =>
+        [.. Directory.EnumerateFiles(Path.Combine(folder, "packages"), "*", SearchOption.AllDirectories)
+            .Select(file => $"{Path.GetRelativePath(folder, file)} {Version(File.ReadAllBytes(file))}")
+            .Order(StringComparer.Ordinal)];
 
     private static async Task<string> CreateDraftAsync(WebApplicationFactory<Program> factory, string folder, string revisions, string userId)
     {

@@ -60,6 +60,9 @@ public sealed class StorageQuotaRouteTests
         "DELETE /api/apps/{app}/entities/{entity}/records/{id}",
         "DELETE /api/apps/{app}/entities/{module}/{entity}/records/{id}",
 
+        // A package file move adds no bytes, so it goes on over the quota, see docs/reference/tenant-quotas.md#refusals.
+        "POST /api/studio/apps/{application}/packages/{package}/move",
+
         // Sessions, sign-out and form state hold no tenant data that the quota counts.
         "DELETE /api/me/sessions",
         "DELETE /api/me/sessions/{id}",

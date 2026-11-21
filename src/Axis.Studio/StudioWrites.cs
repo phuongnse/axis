@@ -481,6 +481,82 @@ internal static class StudioWrites
         return new StudioWriteOutcome(null, null);
     }
 
+    /// <summary>
+    /// The name of the revision, or the draft commit, that moves package files: "Move package file &lt;from&gt; to &lt;to&gt;" for one
+    /// move and "Move &lt;n&gt; package files in packages/&lt;package&gt;" for more. The moves hold full paths under <c>packages/</c>.
+    /// </summary>
+    internal static string MoveSummary(string package, IReadOnlyList<(string From, string To, string Version)> moves) =>
+        moves.Count == 1
+            ? $"Move package file {moves[0].From} to {moves[0].To}"
+            : $"Move {moves.Count} package files in {ApplicationLoader.PackagesFolderPrefix}{package}";
+
+    /// <summary>
+    /// Moves the package files of <paramref name="moves"/>, full paths under <c>packages/</c> that <see cref="StudioPackageFiles.File"/>
+    /// made, each with the version its <c>from</c> must have, as one revision, "Move package file" and the paths, or "Move n package
+    /// files in" the package. It refuses as <see cref="StudioWriteRefusal.Stale"/> when a <c>from</c> is missing or has another version,
+    /// and as <see cref="StudioWriteRefusal.Exists"/> when a <c>to</c> is a folder, has a file in its way or is a file that no move
+    /// takes away. A <c>to</c> may be another move's <c>from</c>. Nothing is written when it refuses.
+    /// </summary>
+    public static async Task<StudioWriteOutcome> MovePackageFilesAsync(
+        IStudioWriteLock writeLock,
+        StudioRevisions? revisions,
+        string folder,
+        string package,
+        IReadOnlyList<(string From, string To, string Version)> moves,
+        CancellationToken cancellationToken)
+    {
+        if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
+        {
+            return StudioWriteOutcome.Refused(StudioWriteRefusal.Unavailable);
+        }
+
+        await using var _ = held;
+        revisions?.RecordOutside();
+
+        var froms = new HashSet<string>(moves.Select(move => move.From), StringComparer.Ordinal);
+        var files = new List<(string File, byte[]? Bytes)>();
+        var arrivals = new List<(string File, byte[] Bytes)>();
+        foreach (var (from, to, version) in moves)
+        {
+            if (Target(folder, from) is not { } source || Target(folder, to) is null)
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.UnsafePath);
+            }
+
+            if (!File.Exists(source))
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.Stale);
+            }
+
+            var bytes = await File.ReadAllBytesAsync(source, cancellationToken);
+            if (!string.Equals(Unquote(version), Version(bytes), StringComparison.Ordinal))
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.Stale);
+            }
+
+            files.Add((from, null));
+            arrivals.Add((to, bytes));
+        }
+
+        foreach (var (to, _) in arrivals)
+        {
+            var target = Target(folder, to)!;
+            if (Directory.Exists(target) || FileInTheWay(folder, target) || (File.Exists(target) && !froms.Contains(to)))
+            {
+                return StudioWriteOutcome.Refused(StudioWriteRefusal.Exists);
+            }
+        }
+
+        files.AddRange(arrivals.Select(arrival => (arrival.File, (byte[]?)arrival.Bytes)));
+        if (await WriteFilesAsync(folder, files, cancellationToken) is { } refusal)
+        {
+            return StudioWriteOutcome.Refused(refusal);
+        }
+
+        revisions?.Record(MoveSummary(package, moves));
+        return new StudioWriteOutcome(null, null);
+    }
+
     // True when a folder on the way to the target, below the application folder, is a file, so no folder can be made there.
     private static bool FileInTheWay(string folder, string target)
     {
