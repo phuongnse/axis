@@ -63,6 +63,12 @@ public sealed class PublishRequest
     /// </summary>
     public string? PackageTests { get; init; }
 
+    /// <summary>
+    /// For a <c>build</c>, the lines the package host wrote as a JSON array of strings, empty when it wrote none. Null until the request
+    /// ends, and for other requests.
+    /// </summary>
+    public string? Output { get; init; }
+
     /// <summary>For an <c>accept</c>, the id of the draft to apply. Null for other kinds.</summary>
     public Guid? DraftId { get; init; }
 

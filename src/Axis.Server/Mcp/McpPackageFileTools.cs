@@ -21,8 +21,6 @@ namespace Axis.Server.Mcp;
 /// </summary>
 internal static class McpPackageFileTools
 {
-    internal const string NoPackage = "The application has no package with this id.";
-
     /// <summary>
     /// The answer of <c>test_package</c>: the request's id and status, its diagnostics and the outcome of each test, each an empty
     /// list until the publisher has run the request.
@@ -196,7 +194,7 @@ internal static class McpPackageFileTools
 
         if (StudioPackageFiles.File(package, PackageCatalog.ManifestFileName) is null)
         {
-            return (null, NoPackage);
+            return (null, StudioPackageFileEndpoints.NoPackage);
         }
 
         var (files, error) = await McpReadTools.DraftFilesAsync(context, folder, draft, ct);
@@ -207,7 +205,7 @@ internal static class McpPackageFileTools
 
         if (!StudioPackageFiles.List(files).Any(item => item.Package == package))
         {
-            return (null, NoPackage);
+            return (null, StudioPackageFileEndpoints.NoPackage);
         }
 
         if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })

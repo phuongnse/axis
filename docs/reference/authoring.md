@@ -195,7 +195,7 @@ a caller without the roles cannot find out which applications, resources, reques
    A write in a [read-only tenant](subscriptions.md#the-read-only-tenant) is refused next, before the session.
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs Studio to be on and `Studio:AuthorRole` to be set and held in
-   the session's roles, see [Settings](#settings). A package file write then needs the developer role, `403`, which needs
+   the session's roles, see [Settings](#settings). A package file write or a `build` then needs the developer role, `403`, which needs
    `Studio:DeveloperRole` to be set and held in the session's roles, and the tenant's
    [application packages](user-administration.md#application-packages) switch on, `403`.
 4. The publisher role, `403`, on `publish`, `activate` and the settings `PUT` only. It needs
@@ -205,7 +205,7 @@ a caller without the roles cannot find out which applications, resources, reques
 6. On `preview` only, a session's tenant with no served preview tenant, `409`. A preview tenant that is
    suspended is not served, so it counts as none. The check comes after the unknown application, so a
    caller cannot learn from it which applications exist.
-7. On `validate`, `publish`, `preview` and the settings `PUT`, a manifest with no UUID `id`, `409`,
+7. On `validate`, `publish`, `preview`, `build` and the settings `PUT`, a manifest with no UUID `id`, `409`,
    because the request needs the application id for the publisher's queue, and the setting is kept by
    it. On `publish` and the settings `PUT` it comes before the body is read.
    An `activate` has no such check, because it names a release of the history.
@@ -591,7 +591,8 @@ references is saved, and the diagnostics list the broken references.
   [startup activation](host-settings.md#startup-activation). Each diagnostic is
   `{ code, severity, message, file, path, resourceId }`. `severity` is `error` or `warning`.
   `resourceId` is the lower-case id of the resource, or `null` when the problem concerns a whole file
-  or the whole folder.
+  or the whole folder. The diagnostic of a refused package `build` also has `line` and `column`, counted from 1,
+  when the host gave the problem's place, see [Build](authoring-publishing.md#build). An entry has neither field otherwise.
 - **What is left out.** The problems of a broken extension package are not returned, because they
   belong to the server's install and not to the folder. Nor are the checks that activation runs
   against a tenant: bindings, name and site path conflicts, and storage changes, which need a tenant

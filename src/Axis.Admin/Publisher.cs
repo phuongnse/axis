@@ -25,7 +25,7 @@ using NpgsqlTypes;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>publisher</c>: runs the <c>publish</c>, <c>validate</c>, <c>activate</c>, <c>accept</c> and <c>test</c> requests that Studio stores in the tenant
+/// <c>publisher</c>: runs the <c>publish</c>, <c>validate</c>, <c>activate</c>, <c>accept</c>, <c>test</c> and <c>build</c> requests that Studio stores in the tenant
 /// databases, until it is stopped. Each poll round it claims the oldest queued request of every active tenant that is on this build's schema
 /// version. A <c>publish</c> runs the steps of an activation, compiling from the stored snapshot and never from a folder. A
 /// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. An <c>activate</c> runs the
@@ -54,6 +54,11 @@ namespace Axis.Admin;
 /// <c>application-package-host</c> as a <c>test</c>, see <see cref="ApplicationPackageBuilds"/>, and stores each test's outcome on the
 /// request. It ends <c>succeeded</c> when every test passed. A refused or unanswered test fails it with <c>AXC0149</c> or <c>AXC0152</c>, and without
 /// <c>Extensions:ApplicationPackages</c> it fails with <c>AXC0148</c> and sends nothing. A stop ends it at once with <c>AXC0220</c>.
+/// A <c>build</c> names a package. It sends that package's files from the snapshot to <c>application-package-host</c> as a <c>build</c>, see
+/// <see cref="ApplicationPackageBuilds"/>, and stores the lines the host wrote as the request's <c>output</c>. It stores no release, writes
+/// no audit record and activates nothing. It ends <c>succeeded</c> when the host built the package. A refused or unanswered build fails it with
+/// <c>AXC0149</c>, each at its file with the problem's line and column, or <c>AXC0152</c>, and without <c>Extensions:ApplicationPackages</c> it
+/// fails with <c>AXC0148</c> and sends nothing. A stop ends it at once with <c>AXC0220</c>.
 /// An <c>accept</c> applies a person's draft to the application's folder, see <see href="docs/reference/revisions-and-drafts.md#accepting-a-draft">accepting a draft</see>.
 /// Holding the folder's write lock throughout, it fails when the draft is not the requester's or a resource the draft read has changed on
 /// <c>main</c> (<c>AXC0377</c>), then runs the steps of a <c>validate</c> on the applied files, with their contract scenarios, and
@@ -63,15 +68,15 @@ namespace Axis.Admin;
 /// scenarios first. When an accept succeeds, it moves the <c>ready</c> authoring request of the draft to <c>accepted</c>, erases that
 /// request's refresh token and writes <c>authoringRequest.accepted</c>, in the transaction that ends the request, see
 /// <see href="docs/reference/authoring-requests.md#accepting">accepting</see>.
-/// The first four kinds share one queue for each application, oldest first. The <c>test</c> requests form a queue of their
-/// own for each application, and run in a second loop of this process, so a long test holds up no publish and a publish holds
-/// up no test. While a request runs,
+/// The first four kinds share one queue for each application, oldest first. The <c>test</c> and <c>build</c> requests form a queue of their
+/// own for each application, and run in a second loop of this process, so a long test or build holds up no publish and a publish holds
+/// up no test or build. While a request runs,
 /// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
 /// run out ends it <c>failed</c> with <c>AXC0215</c>. The <c>claims</c> count fences the final update, so a publisher that
 /// lost its claim changes nothing. A request whose run throws, such as when the tenant connection broke, has its lease ended at once,
 /// so the next round claims it again on a new connection, within the same three claims. Every step runs as the tenant's schema role. A <c>test</c> may run for at most
 /// 10 minutes, and past that its running scenario fails, its database is dropped and the request ends <c>failed</c> with
-/// <c>AXC0219</c>. A stop ends a running <c>test</c> at once in the same way, with <c>AXC0220</c>, and lets a running
+/// <c>AXC0219</c>. A stop ends a running <c>test</c> or <c>build</c> at once in the same way, with <c>AXC0220</c>, and lets a running
 /// <c>publish</c>, <c>validate</c>, <c>activate</c> or <c>accept</c> finish. Then the loops end. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
 /// see <see cref="IPublisherTenants"/>. After a <c>publish</c> or an <c>activate</c> that left a work item due now for the tenant, such
 /// as a schedule trigger that is past due, the publisher sends the wake signal for that tenant, and a failure to send it fails nothing.
@@ -122,7 +127,7 @@ internal sealed class Publisher(
         """
         UPDATE axis.publish_requests
         SET status = 'failed', finished_at = clock_timestamp(), diagnostics = @diagnostics
-        WHERE kind IN ('publish', 'validate', 'activate', 'test', 'accept') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
+        WHERE kind IN ('publish', 'validate', 'activate', 'test', 'build', 'accept') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
         RETURNING id, application_id, requested_by, kind, release_id, target
         """;
 
@@ -131,13 +136,13 @@ internal sealed class Publisher(
         """
         WITH next AS (
           SELECT r.id FROM axis.publish_requests r
-          WHERE r.kind IN ('publish', 'validate', 'activate', 'test', 'accept') AND (r.kind = 'test') = @tests
+          WHERE r.kind IN ('publish', 'validate', 'activate', 'test', 'build', 'accept') AND (r.kind IN ('test', 'build')) = @tests
             AND (r.status = 'queued'
                  OR (r.status = 'running' AND r.lease_until < clock_timestamp() AND r.claims < @max))
             AND (r.target = 'tenant' OR (r.target = 'preview' AND r.kind = 'publish' AND @preview))
             AND NOT EXISTS (SELECT 1 FROM axis.publish_requests o
                             WHERE o.application_id = r.application_id AND o.status = 'running' AND o.id <> r.id
-                              AND (o.kind = 'test') = (r.kind = 'test'))
+                              AND (o.kind IN ('test', 'build')) = (r.kind IN ('test', 'build')))
           ORDER BY r.requested_at, r.id LIMIT 1
           FOR UPDATE SKIP LOCKED)
         UPDATE axis.publish_requests p
@@ -166,7 +171,7 @@ internal sealed class Publisher(
     private const string FinishSql =
         """
         UPDATE axis.publish_requests
-        SET status = @status, finished_at = now(), release_id = @release, diagnostics = @diagnostics, scenario_results = @scenarios, package_tests = @packageTests
+        SET status = @status, finished_at = now(), release_id = @release, diagnostics = @diagnostics, scenario_results = @scenarios, package_tests = @packageTests, output = @output
         WHERE id = @id AND status = 'running' AND claims = @claims
         """;
 
@@ -521,6 +526,15 @@ internal sealed class Publisher(
             return;
         }
 
+        if (request.Kind == "build")
+        {
+            var lines = new JsonArray();
+            var built = await BuildPackageAsync(tenant.Id, files, request.Package!, diagnostics, lines);
+            await StopRenewalAsync(renewing, renewal);
+            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(built, null), diagnostics, audit: false, output: lines.ToJsonString());
+            return;
+        }
+
         if (request.Kind == "test")
         {
             if (request.Package is { } package)
@@ -682,6 +696,50 @@ internal sealed class Publisher(
         }
 
         return diagnostics.Count == 0 && failed == 0;
+    }
+
+    // Sends the one package of a build request to application-package-host to build, see
+    // docs/reference/package-runners.md#an-applications-packages. It keeps no built file, stores no release and writes no audit record, so
+    // it touches no tenant data. The host's wait bounds it. A stop ends it at once.
+    private async Task<bool> BuildPackageAsync(string tenantId, IReadOnlyList<ResourceContent>? files, string package, List<Diagnostic> diagnostics, JsonArray lines)
+    {
+        if (packageBuilds is null || !settings.ApplicationPackages)
+        {
+            diagnostics.Add(ApplicationPackageDiagnostics.Off($"{ApplicationLoader.PackagesFolderPrefix}{package}/{PackageCatalog.ManifestFileName}"));
+        }
+        else if (files is null)
+        {
+            _output.WriteLine($"{tenantId} build failed: The snapshot cannot be read.");
+            return false;
+        }
+        else
+        {
+            try
+            {
+                var result = await packageBuilds.BuildPackageAsync(files, package, stopping);
+                diagnostics.AddRange(result.Diagnostics);
+                foreach (var line in result.Output)
+                {
+                    lines.Add(line);
+                }
+            }
+            catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticCodes.ScenarioStopped, "The publisher stopped while the package build ran.", "", ""));
+            }
+        }
+
+        foreach (var diagnostic in diagnostics)
+        {
+            _output.WriteLine($"{tenantId} build failed: {diagnostic.Code} {diagnostic.Message}");
+        }
+
+        if (diagnostics.Count == 0)
+        {
+            _output.WriteLine($"{tenantId} build ok");
+        }
+
+        return diagnostics.Count == 0;
     }
 
     // Applies a person's draft to the application's folder as one revision. The folder's write lock spans every step, so Studio
@@ -944,7 +1002,7 @@ internal sealed class Publisher(
 
     // The final status, the diagnostics and the audit record commit together, so a request never ends without its record. A
     // validate has no release audit record. A publisher that lost its claim changes nothing and writes no record.
-    private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit, string? scenarioResults = null, string? packageTests = null, IReadOnlyDictionary<Diagnostic, StudioRevision?>? conflicted = null)
+    private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit, string? scenarioResults = null, string? packageTests = null, IReadOnlyDictionary<Diagnostic, StudioRevision?>? conflicted = null, string? output = null)
     {
         var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -956,6 +1014,7 @@ internal sealed class Publisher(
             command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb) { Value = DiagnosticsJson(diagnostics, conflicted) });
             command.Parameters.Add(new NpgsqlParameter("scenarios", NpgsqlDbType.Jsonb) { Value = (object?)scenarioResults ?? DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("packageTests", NpgsqlDbType.Jsonb) { Value = (object?)packageTests ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("output", NpgsqlDbType.Jsonb) { Value = (object?)output ?? DBNull.Value });
             command.Parameters.AddWithValue("id", request.Id);
             command.Parameters.AddWithValue("claims", request.Claims);
             changed = await command.ExecuteNonQueryAsync();
@@ -1054,7 +1113,8 @@ internal sealed class Publisher(
                 new JsonObject { ["requestId"] = requestId, ["releaseId"] = releaseId, ["number"] = number }));
     }
 
-    // Each entry has the shape of a Studio diagnostic. An accept's AXC0377 also has changedBy and changedAt, the author and time of
+    // Each entry has the shape of a Studio diagnostic, with line and column only when the diagnostic has them, see
+    // docs/reference/authoring.md#diagnostics. An accept's AXC0377 also has changedBy and changedAt, the author and time of
     // the newest revision that changed the file, both null when none is found, see docs/reference/authoring-requests.md#accepting.
     private static string DiagnosticsJson(List<Diagnostic> diagnostics, IReadOnlyDictionary<Diagnostic, StudioRevision?>? conflicted = null) =>
         new JsonArray([.. diagnostics.Select(diagnostic =>
@@ -1068,6 +1128,16 @@ internal sealed class Publisher(
                 ["path"] = diagnostic.Path,
                 ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
             };
+            if (diagnostic.Line is { } line)
+            {
+                entry["line"] = line;
+            }
+
+            if (diagnostic.Column is { } column)
+            {
+                entry["column"] = column;
+            }
+
             if (conflicted is not null && conflicted.TryGetValue(diagnostic, out var revision))
             {
                 entry["changedBy"] = revision?.Author;

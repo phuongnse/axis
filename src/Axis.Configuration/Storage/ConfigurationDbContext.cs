@@ -223,6 +223,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             request.Property(r => r.ScenarioResults).HasColumnName("scenario_results").HasColumnType("jsonb");
             request.Property(r => r.Package).HasColumnName("package").HasColumnType("text");
             request.Property(r => r.PackageTests).HasColumnName("package_tests").HasColumnType("jsonb");
+            request.Property(r => r.Output).HasColumnName("output").HasColumnType("jsonb");
             request.Property(r => r.DraftId).HasColumnName("draft_id").HasColumnType("uuid");
             request.Property(r => r.Folder).HasColumnName("folder").HasColumnType("text");
             request.Property(r => r.Client).HasColumnName("client").HasColumnType("text");

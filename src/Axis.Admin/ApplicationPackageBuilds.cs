@@ -9,7 +9,7 @@ namespace Axis.Admin;
 /// <summary>
 /// Sends each <c>packages/&lt;id&gt;/</c> of a snapshot to <c>application-package-host</c> as a <c>build</c>, and one package of it as a <c>test</c>, see
 /// docs/reference/package-runners.md#an-applications-packages. The publisher runs no pip, npm or install script itself. A <c>refused</c> answer
-/// gives <c>AXC0149</c> for each problem, at the problem's file in the package. A host that gives no answer within <c>wait</c> gives
+/// gives <c>AXC0149</c> for each problem, at the problem's file in the package, with its line and column when the host gave them. A host that gives no answer within <c>wait</c> gives
 /// <c>AXC0152</c> at the package's manifest, and no message names the host's address. The files of a <c>built</c> answer are stored with a new release, see <see cref="ReleaseCompiler"/>.
 /// </summary>
 internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan wait)
@@ -77,6 +77,27 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
         };
     }
 
+    /// <summary>
+    /// Sends the files of the package <paramref name="package"/> of <paramref name="files"/> to the host as a <c>build</c> and returns the
+    /// diagnostics of a refused or unanswered build and the lines the host wrote. It keeps no built file, so nothing is released, see
+    /// docs/reference/studio-packages.md#the-authoring-api. A package with no file is sent too, and the host refuses it at its manifest.
+    /// </summary>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
+    public async Task<PackageBuildCheck> BuildPackageAsync(IReadOnlyList<ResourceContent> files, string package, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(package);
+
+        var own = PackageFiles(files).FirstOrDefault(group => group.Key == package)?.ToDictionary(file => file.Segments[1], file => Encoding.UTF8.GetBytes(file.Content), StringComparer.Ordinal)
+            ?? new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        return await RunnerProtocol.AskAsync(host, port, new BuildMessage(own), wait, cancellationToken) switch
+        {
+            BuiltMessage built => new PackageBuildCheck([], built.Output ?? []),
+            RefusedMessage refused => new PackageBuildCheck([.. Refusals(package, refused)], refused.Output ?? []),
+            _ => new PackageBuildCheck([NoAnswer(package, "build", "it was not built")], []),
+        };
+    }
+
     // The files under packages/<id>/ of each package, with the path inside the package. A file directly under packages/ is not a package's.
     private static IEnumerable<IGrouping<string, (string[] Segments, string Content)>> PackageFiles(IReadOnlyList<ResourceContent> files) => files
         .Where(file => file.Path.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal))
@@ -88,7 +109,9 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
         DiagnosticCodes.ApplicationPackageBuildRefused,
         $"Package '{package}': {problem.Message}",
         $"{ApplicationLoader.PackagesFolderPrefix}{package}/{problem.File}",
-        ""));
+        "",
+        Line: problem.Line,
+        Column: problem.Column));
 
     private static Diagnostic NoAnswer(string package, string verb, string consequence) => new(
         DiagnosticCodes.ApplicationPackageBuildNoAnswer,
@@ -106,3 +129,6 @@ internal sealed record PackageBuildResult(IReadOnlyList<Diagnostic> Diagnostics,
 
 /// <summary>The diagnostics of the test of one package and the outcome of each test that ran. A refused or unanswered test has no outcome.</summary>
 internal sealed record PackageTestResult(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<PackageTestOutcome> Tests);
+
+/// <summary>The diagnostics of the build of one package and the lines the host wrote. A package that built has no diagnostic.</summary>
+internal sealed record PackageBuildCheck(IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<string> Output);

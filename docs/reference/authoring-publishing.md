@@ -1,7 +1,7 @@
 # Publishing in the authoring API
 
 This page gives the routes of the [authoring API](authoring.md) that validate, publish, preview, test and
-activate an application, list its releases and record its audit. The other routes are in the
+activate an application, build one of its packages, list its releases and record its audit. The other routes are in the
 [authoring API](authoring.md) page.
 
 ## Publishing
@@ -21,7 +21,8 @@ tenant only.
 | `POST /api/studio/apps/{application}/publish`                | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role                                               |
 | `POST /api/studio/apps/{application}/preview`                | `202` with the request and a `Location` header. It needs the author role only, and answers `409` when the tenant has no preview tenant, see [Preview](#preview)                                                               |
 | `POST /api/studio/apps/{application}/test`                   | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`, and none or an empty list means every scenario. It needs the author role only, see [Test](#test) |
-| `GET /api/studio/apps/{application}/requests/{id}`           | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes                                                                                                                                    |
+| `POST /api/studio/apps/{application}/build`                  | `202` with the request and a `Location` header. The body is `{ "package": "<id>" }`. It needs the author role, the developer role and the tenant's application packages switch, see [Build](#build)                           |
+| `GET /api/studio/apps/{application}/requests/{id}`           | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes and, for `build`, its output                                                                                                       |
 | `GET /api/studio/apps/{application}/releases`                | `200` with the activation history, newest first, and which release is active, see [Release history](#release-history)                                                                                                         |
 | `POST /api/studio/apps/{application}/releases/{id}/activate` | `202` with the request and a `Location` header. It needs the author role and the publisher role, see [Activating a release](#activating-a-release)                                                                            |
 
@@ -34,25 +35,26 @@ rest of the API, see [Order of checks](authoring.md#order-of-checks) and [Respon
 ### The request
 
 A request is shown as
-`{ id, application, kind, target, status, label, note, requestedBy, requestedByName, requestedAt, startedAt, finishedAt, releaseId, diagnostics, scenarios }`.
+`{ id, application, kind, target, status, label, note, requestedBy, requestedByName, requestedAt, startedAt, finishedAt, releaseId, diagnostics, scenarios, output }`.
 
-| Field             | Meaning                                                                                                                                                                                                                    |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`              | The request id, a UUID                                                                                                                                                                                                     |
-| `application`     | The application `name`                                                                                                                                                                                                     |
-| `kind`            | `validate`, `publish`, `activate`, `test` or `accept`                                                                                                                                                                      |
-| `target`          | `tenant` or `preview`. `preview` marks a request that runs on the session tenant's preview tenant, see [Preview](#preview). Only the preview route writes `preview`, and the request status route reports the stored value |
-| `status`          | `queued`, `running`, `succeeded` or `failed`, see [Lifecycle](#lifecycle)                                                                                                                                                  |
-| `label`           | The optional label of a `publish`, up to 100 characters, or null                                                                                                                                                           |
-| `note`            | The optional note of a `publish`, up to 2000 characters, or null                                                                                                                                                           |
-| `requestedBy`     | The requesting user's id                                                                                                                                                                                                   |
-| `requestedByName` | The requesting user's display name from their [user profile](notifications.md#user-profiles), else the name stored with the request, else null                                                                             |
-| `requestedAt`     | When the request was stored                                                                                                                                                                                                |
-| `startedAt`       | When a publisher first started it, or null while `queued`                                                                                                                                                                  |
-| `finishedAt`      | When it reached `succeeded` or `failed`, or null before                                                                                                                                                                    |
-| `releaseId`       | The release a `publish` activated or an `activate` named, or null. A `validate` and a `test` have none                                                                                                                     |
+| Field             | Meaning                                                                                                                                                                                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | The request id, a UUID                                                                                                                                                                                                                                     |
+| `application`     | The application `name`                                                                                                                                                                                                                                     |
+| `kind`            | `validate`, `publish`, `activate`, `test`, `build` or `accept`                                                                                                                                                                                             |
+| `target`          | `tenant` or `preview`. `preview` marks a request that runs on the session tenant's preview tenant, see [Preview](#preview). Only the preview route writes `preview`, and the request status route reports the stored value                                 |
+| `status`          | `queued`, `running`, `succeeded` or `failed`, see [Lifecycle](#lifecycle)                                                                                                                                                                                  |
+| `label`           | The optional label of a `publish`, up to 100 characters, or null                                                                                                                                                                                           |
+| `note`            | The optional note of a `publish`, up to 2000 characters, or null                                                                                                                                                                                           |
+| `requestedBy`     | The requesting user's id                                                                                                                                                                                                                                   |
+| `requestedByName` | The requesting user's display name from their [user profile](notifications.md#user-profiles), else the name stored with the request, else null                                                                                                             |
+| `requestedAt`     | When the request was stored                                                                                                                                                                                                                                |
+| `startedAt`       | When a publisher first started it, or null while `queued`                                                                                                                                                                                                  |
+| `finishedAt`      | When it reached `succeeded` or `failed`, or null before                                                                                                                                                                                                    |
+| `releaseId`       | The release a `publish` activated or an `activate` named, or null. A `validate`, a `test` and a `build` have none                                                                                                                                          |
 | `diagnostics`     | The diagnostics, in the form of [Diagnostics](authoring.md#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings. An `accept`'s `AXC0377` adds `changedBy` and `changedAt`, see [accepting](authoring-requests.md#accepting) |
-| `scenarios`       | The scenario outcomes, see below. For a `test`, empty until the request ends. For a `publish`, a `validate` or an `accept`, null until the request ends and when no scenario ran. Null for an `activate`                   |
+| `scenarios`       | The scenario outcomes, see below. For a `test`, empty until the request ends. For a `publish`, a `validate` or an `accept`, null until the request ends and when no scenario ran. Null for an `activate`                                                   |
+| `output`          | For a `build`, the lines the package host wrote, as a list of strings, empty until the request ends. Null for every other kind                                                                                                                             |
 
 `scenarios` has one item for each scenario that ran, in file order: for a `test`, the application's
 scenarios, and for a `publish`, a `validate` and an `accept`, the stored results of their
@@ -91,6 +93,7 @@ What each kind does:
   [`axis-admin activate`](administration.md#activate). A `seed` failure happens after activation has
   committed, so the request ends `failed` with `releaseId` set, and the release stays active.
 - **`test`.** The publisher runs the scenarios, see [Test](#test).
+- **`build`.** The publisher builds one package, see [Build](#build).
 - **`accept`**. The publisher applies a person's draft to the application's folder, see
   [accepting a draft](revisions-and-drafts.md#accepting-a-draft). It runs the contract scenarios, then
   the steps of a `validate`, then the application's own test scenarios on the applied files, and a
@@ -98,7 +101,7 @@ What each kind does:
   used it ends the request `failed` with one `AXC0377` for each such resource or file. An author's `accept` comes from the [accept route](authoring-requests.md#routes).
 - **Order.** For one tenant and application the publisher runs `publish`, `validate`, `activate` and
   `accept` requests one at a time, oldest first, so when two publishes are queued, the newer one ends
-  up live. A `test` has a queue of its own.
+  up live. A `test` and a `build` share a queue of their own.
 
 ### Preview
 
@@ -155,7 +158,7 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
   that runs fails, its database is dropped and the request ends `failed` with `AXC0219`. A stop of the
   publisher (`SIGTERM`) does the same at once, with `AXC0220`. The scenarios that finished keep their
   outcomes, and the one that was cut is stored as `failed` with no `step` and no `path`.
-- **Order.** At most one `test` request per application runs at a time, oldest first. Its queue is
+- **Order.** At most one `test` or `build` request per application runs at a time, oldest first. Their queue is
   separate from `validate`, `publish` and `activate`, so a `test` never waits behind a `publish`.
 - **A package's tests.** A `test` whose request names a `package` tests that one application package, see
   [an application's packages](package-runners.md#an-applications-packages). The publisher compiles
@@ -167,6 +170,30 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
   is empty.
 - **Audit.** A `test` writes no audit record.
 - **A request that runs again.** A request claimed again after a lost lease runs every scenario again.
+
+### Build
+
+`POST .../build` stores a request to build one application package of the working folder without a publish, see
+[an application's packages](package-runners.md#an-applications-packages). The request has the kind `build`, the
+target `tenant` and the `package` it builds, see [the authoring API](studio-packages.md#the-authoring-api).
+
+- **Who may.** The author role, the developer role and the tenant's application packages switch. Without
+  one of them the route answers `403` and stores nothing, see [Order of checks](authoring.md#order-of-checks).
+  A build changes no tenant, so no storage quota or package run time applies.
+- **The body.** `{ "package": "<id>" }` with a string and nothing else, or the answer is `400`. A body that is not
+  `application/json` answers `415`, and a package with no file in the working folder answers `404`.
+- **Where it runs.** The server stores the request with a snapshot of the working folder, taken as for `test`. The
+  publisher sends only the named package's files to `application-package-host` as a `build`. It stores no
+  release, writes no audit record and activates nothing. It touches the tenant database only for the request's
+  status, diagnostics and `output`.
+- **The outcome.** The request ends `succeeded` when the host built the package and `failed` when the host
+  refused it. Each problem the host refused is an `AXC0149` [diagnostic](authoring.md#diagnostics) at
+  `packages/<id>/<file>`, with its `line` and `column` when the host gave them. `output` holds the lines the
+  host wrote, for a refused build too. A host that gives no answer within 5 minutes is one `AXC0152` at the
+  manifest, and the setting off is one `AXC0148` at the manifest, with nothing sent. A stop of the publisher
+  ends it with `AXC0220`. In each of these cases `output` is empty.
+- **Order.** A `build` shares the queue of `test`: at most one `test` or `build` request per application runs
+  at a time, oldest first, so a `build` never waits behind a `publish`.
 
 ### Lifecycle
 
@@ -192,8 +219,8 @@ stateDiagram-v2
   `failed` with `AXC0215` in place of a fourth claim, so a request that crashes the publisher cannot
   block the queue for good.
 - **Time limit.** A `test` that runs past 10 minutes ends `failed` with `AXC0219`, and so can the
-  contract scenarios of a `publish` or `validate`, and the test scenarios of an `accept`. A stop of the publisher ends a `test` with
-  `AXC0220`, see [Test](#test).
+  contract scenarios of a `publish` or `validate`, and the test scenarios of an `accept`. A stop of the publisher ends a `test` or a `build` with
+  `AXC0220`, see [Test](#test) and [Build](#build).
 - **Final.** `succeeded` and `failed` are final, and Studio polls `GET .../requests/{id}` until the
   status is one of them.
 - **Running again.** A request that runs again does no harm, because activating the same content hash

@@ -146,7 +146,7 @@ developer role and the switch as a write has, and answers `403` otherwise.
 
 | Route                                                                                  | Response                                                                                                                                                                                                                                                         |
 | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/studio/apps/{application}/build` _(planned for M37)_                        | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below                                              |
+| `POST /api/studio/apps/{application}/build`                                            | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below                                              |
 | `POST /api/studio/apps/{application}/test` _(planned for M37)_                         | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below                                      |
 | `POST /api/studio/apps/{application}/run` _(planned for M37)_                          | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run`, see A run of one operation below                                                                                                            |
 | `GET /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ items: [{ name, operation, input }] }`. The version is the `ETag`, which comes once the inputs are saved, see Saved run inputs below                                                                                                                                    |
@@ -196,12 +196,16 @@ developer role and the switch as a write has, and answers `403` otherwise.
 - **Testing a package.** The MCP server's `test_package` tests a package's files in a draft, see
   [tools](mcp-server.md#tools) and [a package's tests](authoring-publishing.md#test). It needs the developer role and the switch,
   as a write does.
-- **A build without a publish** _(planned for M37)_. `POST .../build` queues a `build` request that the publisher
-  sends to `application-package-host`, as a publish's build is sent, and it releases nothing. A Node.js package
-  compiles its TypeScript with its `tsconfig.json` before the checks, so an author never compiles on their own
-  machine. Studio polls `GET .../requests/{id}` as for any request. The request ends with each problem as a
-  [diagnostic](authoring.md#diagnostics) at its file, with `line` and `column`, which only a package file's
-  diagnostic has, and with `output`, the lines the host wrote.
+- **A build without a publish.** `POST .../build` queues a `build` request that the publisher
+  sends to `application-package-host`, as a publish's build is sent, and it releases nothing and writes no audit
+  record. The body is exactly `{ package }`, a string, and anything else answers `400`. A package with no file in
+  the working folder answers `404`. The route checks no quota, as a test does not. Studio polls `GET .../requests/{id}`
+  as for any request. The request ends `succeeded` when the host built the package and `failed` when the host refused
+  it. It ends with each problem as a [diagnostic](authoring.md#diagnostics) at its file, with `line` and `column`,
+  which only a package file's diagnostic has, and with `output`, the lines the host wrote. Its `output` is an empty
+  list until it ends, and `null` for every other kind of request.
+- **A Node.js package's TypeScript** _(planned for M37)_. A Node.js package's build compiles its TypeScript with its
+  `tsconfig.json` before the checks, so an author never compiles on their own machine.
 - **A package's tests from Studio** _(planned for M37)_. `POST .../test` with `{ package }` queues a `test` request
   for that package's files, as `test_package` does. Its answer has `package`, `packageTests` and `output`. Each of
   `packageTests` has `name`, `outcome`, `message` and `durationMs`, and a failed test has `file`, `line` and `column`,
