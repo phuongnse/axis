@@ -956,7 +956,7 @@ describe('StudioEditor for a process', () => {
     await openFormTab()
 
     const second = await screen.findByTestId('studio-field-/steps/2/branches/1', {}, slow)
-    await userEvent.click(within(second).getByRole('button', { name: 'Remove branch' }))
+    await chooseRowAction(second, 'Remove branch')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')

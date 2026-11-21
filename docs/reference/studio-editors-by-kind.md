@@ -291,18 +291,22 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 
 - **The process.** The Form tab has the General, Subject and Steps [sections](studio-resource-form.md#sections),
   and each field has a [field text](studio-resource-form.md#fields).
+- **Lists.** The lists of a process's parameters, a decision's branches, a task's outcomes and an operation's
+  rows have Add on their title row as a light text button. Each row's actions, and each step card's, are entries
+  of its "…" menu, the table's [row actions](actions-and-controls.md#tables). A read-only tab, such as while the
+  JSON has an error, shows no Add and no menu.
 - **Subject.** A choice between Entity, which shows the entity picker, and Parameters, which shows rows
-  of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, with Add
-  and Remove. Switching replaces the draft in one change, so one undo brings it back: the other key is
-  removed, and the new key, empty, takes its place in the file. See
+  of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, as the
+  [Lists](#process-editor) bullet says. Switching replaces the draft in one change, so one undo brings it back: the
+  other key is removed, and the new key, empty, takes its place in the file. See
   [processes without a subject](process-flow.md#processes-without-a-subject).
 - **Steps.** The steps show as cards in file order, each with the step's name and type. Each card has a "…"
-  menu with Move up, off on the first step, Move down, off on the last, and Delete. A read-only tab shows no
-  menu. Add step appends a step of the chosen type, with an empty name. A type change works
-  as the [step panel](process-designer.md#step-panel) says.
+  menu with Move up, off on the first step, Move down, off on the last, and Delete, as the
+  [Lists](#process-editor) bullet says. Add step appends a step of the chosen type, with an empty name. A type change
+  works as the [step panel](process-designer.md#step-panel) says.
 - **Decision and end.** A decision shows its branches, each with a `when` expression and a target, and
-  its `otherwise`. A branch can be added and removed, and a new one is named `branch1`, `branch2` and so
-  on. An end step shows only its name and type.
+  its `otherwise`. A branch is added and removed as the [Lists](#process-editor) bullet says, and a new one is
+  named `branch1`, `branch2` and so on. An end step shows only its name and type.
 - **Transitions.** The start step, `next`, a branch's `next`, `otherwise` and an outcome's `next` pick
   their target from the step names of the unsaved draft. A target that is not a step stays visible and
   is tagged unknown. Removing a step does not rewrite the transitions that name it, so the compiler
@@ -310,17 +314,17 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 - **Task.** A task shows its label and its form as pickers over the application's text keys and forms.
   The assignee has a User and Role switch: User shows the expression editor and Role a role picker, and
   a switch removes the other key, so the step never holds both. `dueIn` is a text box, and clearing it
-  removes the key. The outcomes are rows of name, label and target step, with add and remove. A key the
-  card does not show stays as it is. A diagnostic path inside a task's label, assignee, form, `dueIn` or
-  outcomes opens the Form tab at that field.
+  removes the key. The outcomes are rows of name, label and target step, added and removed as the
+  [Lists](#process-editor) bullet says. A key the card does not show stays as it is. A diagnostic path inside a
+  task's label, assignee, form, `dueIn` or outcomes opens the Form tab at that field.
 - **Operation.** An `operation` step shows an operation choice, `updateRecord`, `callConnector`,
   `raiseEvent`, `createRecord`, `notify` or Package operation, above its transition. Changing the
   operation removes only the keys the new one forbids and adds no empty key, so the compiler reports
   what is still missing, and every other key, unknown keys included, stays.
   - **Rows.** Each list of rows, `set`, `input` and its nested `fields`, `output`, an event's `fields`, a
-    notification's `values` and a page's parameters, has Add row on its title row as a light text button, or the add
-    choice of the unmapped keys where the keys are known. Each row's "…" menu, the table's row actions, holds
-    Remove. A read-only tab, such as while the JSON has an error, shows neither.
+    notification's `values` and a page's parameters, has Add row on its title row, or the add choice of the
+    unmapped keys where the keys are known. Its rows' menus and a read-only tab follow the
+    [Lists](#process-editor) bullet.
   - `updateRecord` shows `set` as rows of a field of the process's entity and an expression.
   - `callConnector` shows the connector and its operation as pickers, its
     [`input`](process-designer.md#connector-input), `output` as rows of a typed connector output name
@@ -361,7 +365,7 @@ Operations heading, and the JSON view stays as the second view of the same draft
   on the Operations heading. Each input, output and nested field list has its Add on its title row, as a
   light text button. Each operation's Delete operation is in its "…" menu at its top right, and each row's
   Delete is in its "…" menu, which also removes the fields nested in the row. A read-only tab, such as while the JSON has
-  an error, shows no Add and no menu, as the Rows bullet of the [process editor](#process-editor) says.
+  an error, shows no Add and no menu, as the Lists bullet of the [process editor](#process-editor) says.
   A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
 - **Placement and nesting.** A scalar input has a Sent in choice of `body`, `path`, `query` or
   `header`, which shows `body` when the file has no `in` key and removes the key when `body` is chosen.
@@ -398,7 +402,7 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
   same name, and the editor says so.
 - **Assurance.** `acr` is a list of text rows. Add assurance level sits on the Assurance heading, and each
   row's Delete is in its "…" menu. With none the key is removed. A read-only tab, such as while the JSON
-  has an error, shows no Add and no menu, as the Rows bullet of the [process editor](#process-editor) says.
+  has an error, shows no Add and no menu, as the Lists bullet of the [process editor](#process-editor) says.
 - **Unknown keys.** A key the editor does not show is saved unchanged.
 
 ### A site's sign-in
@@ -422,7 +426,7 @@ stays as the second view of the same draft. Scenarios themselves are in [test sc
   A read-only tab shows no menu.
 - **Rows.** A key and value list, such as an expected notification's values or a stub's output, has Add on
   its title row, and each row's Delete is in its "…" menu. Users and stubs keep their Delete in a menu too.
-  A read-only tab shows neither, as the Rows bullet of the [process editor](#process-editor) says.
+  A read-only tab shows neither, as the Lists bullet of the [process editor](#process-editor) says.
 - **Pickers.** Entities, processes, roles and connectors are picked by name. A `record` is picked from
   the aliases that earlier `createRecord` steps save, and a `step` and its `outcome` come from the
   processes that the record started.
