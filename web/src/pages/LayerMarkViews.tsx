@@ -1,4 +1,5 @@
-import { Button, Flex, Tag, Typography } from 'antd'
+import { Button, Flex, Typography } from 'antd'
+import { StatusTag } from '../platform/StatusTag'
 import { fillText } from '../platform/fillText'
 import { markName, markOf, type LayerElement, type LayerMark } from '../platform/layerMarks'
 import { useText } from '../platform/texts'
@@ -25,9 +26,11 @@ export function LayerMarkLabel({
 }) {
   const t = useText()
   return (
-    <Tag role="note" aria-label={markName(t, mark, name)} data-testid={testId}>
-      {t(`shell.studio.module.${mark}`)}
-    </Tag>
+    <span role="note" aria-label={markName(t, mark, name)}>
+      <StatusTag tone="neutral" data-testid={testId}>
+        {t(`shell.studio.module.${mark}`)}
+      </StatusTag>
+    </span>
   )
 }
 

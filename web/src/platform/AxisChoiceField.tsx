@@ -1,6 +1,8 @@
-import { Flex, Radio, Tag, Typography, type FormItemProps } from 'antd'
+import { Flex, Radio, Typography, type FormItemProps } from 'antd'
+import { StatusTag } from './StatusTag'
 import { useId } from 'react'
 import { AxisField, type AxisFieldStatus } from './AxisField'
+import { useDesignTokens } from './themeMode'
 
 /** An option of a choice: its value, its label, its help and an optional mark such as "Built in". */
 export interface AxisChoiceOption {
@@ -55,6 +57,7 @@ function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
  */
 export function AxisChoiceField(props: FormMode | OwnMode) {
   const { label, help, options } = props
+  const { spacing } = useDesignTokens()
   const optionId = useId()
   const groupName = useId()
   const radios = (
@@ -64,7 +67,11 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
         return (
           <Radio key={option.value} value={option.value} aria-describedby={option.help === '' ? undefined : helpId}>
             <span>{option.label}</span>
-            {option.mark && <Tag style={{ marginInlineStart: 8 }}>{option.mark}</Tag>}
+            {option.mark && (
+              <span style={{ marginInlineStart: spacing.xs }}>
+                <StatusTag tone="neutral">{option.mark}</StatusTag>
+              </span>
+            )}
             {option.help !== '' && (
               <Typography.Text type="secondary" id={helpId} style={{ display: 'block' }}>
                 {option.help}

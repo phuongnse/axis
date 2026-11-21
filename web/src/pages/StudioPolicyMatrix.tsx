@@ -1,4 +1,5 @@
-import { Button, Checkbox, Flex, Select, Tag, Typography } from 'antd'
+import { Button, Checkbox, Flex, Select, Typography } from 'antd'
+import { StatusTag } from '../platform/StatusTag'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -165,14 +166,14 @@ function RoleHeader({ role }: { role: StudioMatrixRole }) {
   const reasonText = t(reasonKey) === reasonKey ? (role.readOnlyReason ?? '') : t(reasonKey)
   return (
     <Flex vertical align="flex-start">
-      <span>
+      <Flex gap="small" align="center" wrap>
         {role.name}
         {!role.editable && (
-          <Tag style={{ marginInlineStart: 8 }} data-testid={`studio-matrix-readonly-tag-${role.name}`}>
+          <StatusTag tone="muted" data-testid={`studio-matrix-readonly-tag-${role.name}`}>
             {t('shell.studio.matrix.readOnly')}
-          </Tag>
+          </StatusTag>
         )}
-      </span>
+      </Flex>
       {!role.editable && role.readOnlyReason !== null && (
         <Typography.Text type="secondary" data-testid={`studio-matrix-readonly-${role.name}`}>
           {fillText(reasonText, { policy: role.accessPolicy.name })}
@@ -206,15 +207,14 @@ function MatrixCell({
     >
       <Flex wrap gap={4} align="center">
         {cell.actions.map((action) => (
-          <Tag key={action} style={{ marginInlineEnd: 0 }}>
+          <StatusTag key={action} tone="neutral">
             {action}
-          </Tag>
+          </StatusTag>
         ))}
         {cell.missingEntityRead !== null && (
-          // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-          <Tag color="warning" style={{ marginInlineEnd: 0 }} data-testid="studio-matrix-missing-read">
+          <StatusTag tone="attention" data-testid="studio-matrix-missing-read">
             {fillText(t('shell.studio.matrix.missingEntityRead'), { entity: cell.missingEntityRead })}
-          </Tag>
+          </StatusTag>
         )}
       </Flex>
     </Button>
@@ -282,13 +282,12 @@ function ReadOnlyGrant({
       <Flex gap="small" align="center" wrap>
         <strong>{grant.policy}</strong>
         {grant.actions.map((action) => (
-          <Tag key={action} style={{ marginInlineEnd: 0 }}>
+          <StatusTag key={action} tone="neutral">
             {action}
-          </Tag>
+          </StatusTag>
         ))}
-        {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-        {grant.shared && <Tag color="processing">{t('shell.studio.matrix.shared')}</Tag>}
-        {grant.module !== null && <Tag>{grant.module}</Tag>}
+        {grant.shared && <StatusTag tone="neutral">{t('shell.studio.matrix.shared')}</StatusTag>}
+        {grant.module !== null && <StatusTag tone="neutral">{grant.module}</StatusTag>}
         {grant.shared && grant.module === null && (
           // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button type="link" size="small" onClick={() => onOpenPolicy(grant.policyId)}>
@@ -308,9 +307,9 @@ function ReadOnlyGrant({
           <Typography.Text type="secondary">{t('shell.studio.matrix.allFields')}</Typography.Text>
         ) : (
           grant.fields.map((field) => (
-            <Tag key={field} style={{ marginInlineEnd: 0 }}>
+            <StatusTag key={field} tone="neutral">
               {field}
-            </Tag>
+            </StatusTag>
           ))
         )}
       </Flex>
@@ -542,10 +541,9 @@ function OwnGrants({
                   onChange={(ticked) => setActions(index, ticked)}
                 />
                 {unaccepted.map((action) => (
-                  // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-                  <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
+                  <StatusTag key={action} tone="attention">
                     {fillText(t('shell.studio.matrix.unacceptedAction'), { action })}
-                  </Tag>
+                  </StatusTag>
                 ))}
               </Flex>
               {missing && (

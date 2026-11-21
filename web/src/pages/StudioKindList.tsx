@@ -1,4 +1,5 @@
-import { Flex, Tag } from 'antd'
+import { Flex } from 'antd'
+import { StatusTag } from '../platform/StatusTag'
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
@@ -14,7 +15,6 @@ import { studioResourceAddress } from '../platform/studioAddress'
 import { useStudioConnection } from '../platform/studioConnection'
 import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
 import { useTableView } from '../platform/useTableView'
 import { PlatformContext } from './context'
 
@@ -52,7 +52,6 @@ export function StudioKindList({
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour } = useDesignTokens()
   const { generation, lost } = useStudioConnection()
   const { view, setView, saved } = useTableView(
     listFields,
@@ -100,19 +99,7 @@ export function StudioKindList({
           <Link data-testid={`studio-resource-${row.id}`} to={studioResourceAddress(application, row.id)}>
             {row.locale === null ? row.title : languageName(row.locale, locale)}
           </Link>
-          {row.module !== null && (
-            <Tag
-              variant="outlined"
-              style={{
-                color: colour.textMuted,
-                borderColor: colour.border,
-                background: 'transparent',
-                marginInlineEnd: 0,
-              }}
-            >
-              {row.moduleLabel ?? row.module}
-            </Tag>
-          )}
+          {row.module !== null && <StatusTag tone="muted">{row.moduleLabel ?? row.module}</StatusTag>}
         </Flex>
       ),
     },

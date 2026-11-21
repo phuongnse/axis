@@ -1,4 +1,5 @@
-import { Flex, Input, Tabs, Tag, Typography } from 'antd'
+import { Flex, Input, Tabs, Typography } from 'antd'
+import { StatusTag } from '../platform/StatusTag'
 import { useContext, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { PlatformContext } from './context'
@@ -138,7 +139,7 @@ function EntryList({
               <AxisButton role="link" onClick={() => onPick(entry.insert, entry.cursorInside)}>
                 <code style={{ fontFamily: type.codeFontFamily }}>{entry.name}</code>
               </AxisButton>
-              {tagged && <Tag>{t(kindTexts[entry.kind])}</Tag>}
+              {tagged && <StatusTag tone="neutral">{t(kindTexts[entry.kind])}</StatusTag>}
             </Flex>
             {entry.description !== '' && <Typography.Text type="secondary">{entry.description}</Typography.Text>}
             {entry.example !== undefined && (
