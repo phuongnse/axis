@@ -192,11 +192,12 @@ export function Shell({
     <div data-theme-mode={mode} style={{ colorScheme: mode }}>
       <ConfigProvider locale={antLocaleFor(locale)} theme={claimed ? claimedTheme : siteTheme}>
         {/* A design-system frame sets --shell-min-height to its own height, so its states fit their card. */}
-        <Layout style={{ minHeight: 'var(--shell-min-height, 100vh)' }}>
+        {/* Proposed, #4934: the window does not scroll. The shell is as tall as the window, the header stays, and each
+            region below it, the sidebar's menu, the page and the side panel, scrolls inside its own frame. */}
+        <Layout style={{ height: 'var(--shell-min-height, 100vh)', overflow: 'hidden' }}>
           <Layout.Header
             style={{
-              position: 'sticky',
-              top: 0,
+              flex: 'none',
               zIndex: 10,
               display: 'flex',
               alignItems: 'center',
@@ -267,7 +268,7 @@ export function Shell({
               {preferences}
             </nav>
           )}
-          <Layout hasSider={sidebar}>
+          <Layout hasSider={sidebar} style={{ flex: 1, minHeight: 0 }}>
             {sidebar && (
               <Layout.Sider
                 id="shell-sidebar"
@@ -281,9 +282,7 @@ export function Shell({
                 <nav
                   aria-label={t('shell.navigation.menu')}
                   style={{
-                    position: 'sticky',
-                    top: headerHeight,
-                    maxHeight: `calc(var(--shell-min-height, 100vh) - ${headerHeight}px)`,
+                    height: '100%',
                     overflowY: 'auto',
                     // A scroll area stops at its end, so the page does not scroll,
                     // see docs/reference/actions-and-controls.md#scroll-areas.
@@ -294,12 +293,16 @@ export function Shell({
                 </nav>
               </Layout.Sider>
             )}
-            <Layout>
+            <Layout style={{ minHeight: 0 }}>
               {/* The row always wraps the content and the column, so claiming the column never remounts the page. */}
-              <Layout hasSider style={{ minWidth: 0 }}>
-                <Layout style={{ minWidth: 0 }}>
+              <Layout hasSider style={{ minWidth: 0, height: '100%' }}>
+                {/* The page's own scroll, with its scrollbar at its own edge, before the side panel. */}
+                <Layout data-shell-scroll style={{ minWidth: 0, height: '100%', overflowY: 'auto' }}>
                   {!hasAccount && <ReadOnlyBanner />}
-                  <Layout.Content style={{ background: colour.surface, padding: inset }}>
+                  <Layout.Content
+                    // The page grows with its content inside its scroll, so the footer follows it.
+                    style={{ flex: '1 0 auto', background: colour.surface, padding: inset }}
+                  >
                     <ContentInsetContext.Provider value={inset}>
                       <ShellSidebarContext.Provider value={sidebarContext}>
                         <ShellAsideContext.Provider value={asideContext}>
@@ -309,24 +312,24 @@ export function Shell({
                     </ContentInsetContext.Provider>
                   </Layout.Content>
                   <div ref={setBarTarget} data-shell-bar-slot style={{ position: 'sticky', bottom: 0, zIndex: 10 }} />
+                  <ShellFooter legal={legal} />
                 </Layout>
                 {asideClaimed && (
                   <div
                     id="shell-aside"
                     style={{
                       flex: 'none',
+                      height: '100%',
                       background: colour.surface,
                       borderInlineStart: `1px solid ${colour.borderSubtle}`,
                     }}
                   >
-                    <div ref={setAsideTarget} style={{ position: 'sticky', top: headerHeight }} />
+                    <div ref={setAsideTarget} style={{ height: '100%' }} />
                   </div>
                 )}
               </Layout>
-              {sidebar && <ShellFooter legal={legal} />}
             </Layout>
           </Layout>
-          {!sidebar && <ShellFooter legal={legal} />}
         </Layout>
       </ConfigProvider>
     </div>

@@ -40,7 +40,7 @@ export function SidePanel({
   children: ReactNode
 } & Closing) {
   const t = useText()
-  const { colour, size, spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const { width, min, max, set } = useSidePanelWidth()
   const panel = useRef<HTMLElement>(null)
 
@@ -74,7 +74,9 @@ export function SidePanel({
           flexDirection: 'column',
           gap: spacing.sm,
           width,
-          height: `calc(var(--shell-min-height, 100vh) - ${size.bar}px)`,
+          // Proposed, #4934: as tall as the shell's column under the header, which does not scroll.
+          height: '100%',
+          boxSizing: 'border-box',
           padding: spacing.sm,
         }}
       >

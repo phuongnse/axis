@@ -50,7 +50,8 @@ export function StudioBand({
       data-testid="studio-band"
       style={{
         position: 'sticky',
-        top: size.bar,
+        // Proposed, #4934: the page scrolls in its own frame under the header, so the band stays at that frame's top.
+        top: 0,
         zIndex: 5,
         height: size.bar,
         margin: `-${inset}px -${inset}px 0`,
