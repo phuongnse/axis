@@ -439,3 +439,14 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
     expect(onChange).toHaveBeenLastCalledWith('/groupBy', ['status', { field: 'placedOn', bucket: 'month' }, ''])
   })
 })
+
+describe('ReferencePicker in a field', () => {
+  it('fills the field with a chosen resource, its select and its Open link joined together', () => {
+    renderForm({ entity: 'Order', grants: [] }, true, schema, 'Shop')
+
+    const group = screen.getByRole('link', { name: 'Open entity' }).closest<HTMLElement>('.ant-space-compact')
+    expect(group?.closest('.axis-field')).not.toBeNull()
+    expect(group).toHaveStyle({ width: '100%' })
+    expect(group?.querySelector('.ant-select')).toHaveStyle({ flexGrow: '1' })
+  })
+})
