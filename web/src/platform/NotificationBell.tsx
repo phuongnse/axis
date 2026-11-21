@@ -15,6 +15,7 @@ import {
   type NotificationPage,
 } from './notifications'
 import { paginationItems } from './pagination'
+import { PartBoundary } from './SectionParts'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
@@ -128,61 +129,63 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
       </Button>
       <Announcement>{named}</Announcement>
       <Drawer title={label} open={open} onClose={() => setOpen(false)} size="default">
-        <Flex vertical gap={spacing.md}>
-          {failed && <AxisAlert kind="error" message={t('shell.notifications.loadFailed')} />}
-          {markFailed && <AxisAlert kind="error" message={t('shell.notifications.markFailed')} />}
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button disabled={unread === 0} onClick={markAllRead} style={{ alignSelf: 'flex-start' }}>
-            {t('shell.notifications.markAllRead')}
-          </Button>
-          {data.items.length === 0 ? (
-            !failed && <EmptyState text={t('shell.notifications.empty')} />
-          ) : (
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {data.items.map((item) => (
-                <li key={item.id} style={{ borderBottom: `1px solid ${colour.borderSubtle}` }}>
-                  <button
-                    type="button"
-                    onClick={() => void openRow(item)}
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      padding: spacing.sm,
-                      border: 0,
-                      borderRadius: radius.base,
-                      background: 'transparent',
-                      color: colour.text,
-                      font: 'inherit',
-                      textAlign: 'start',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Flex gap={spacing.xs} align="center">
-                      {!item.read && <Badge status="processing" />}
-                      <Typography.Text strong>{item.subject}</Typography.Text>
-                      {!item.read && <span style={visuallyHidden}>{t('shell.notifications.unreadItem')}</span>}
-                    </Flex>
-                    <div>{item.body}</div>
-                    <Typography.Text type="secondary">
-                      {formatValue({ name: 'createdAt', type: 'date-time' }, item.createdAt, {}, { locale, text: t })}
-                    </Typography.Text>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {data.totalCount > pageSize && (
-            <Pagination
-              current={data.page}
-              pageSize={pageSize}
-              total={data.totalCount}
-              showSizeChanger={false}
-              hideOnSinglePage
-              itemRender={paginationItems(data.page, t)}
-              onChange={(next) => void load(next)}
-            />
-          )}
-        </Flex>
+        <PartBoundary>
+          <Flex vertical gap={spacing.md}>
+            {failed && <AxisAlert kind="error" message={t('shell.notifications.loadFailed')} />}
+            {markFailed && <AxisAlert kind="error" message={t('shell.notifications.markFailed')} />}
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+            <Button disabled={unread === 0} onClick={markAllRead} style={{ alignSelf: 'flex-start' }}>
+              {t('shell.notifications.markAllRead')}
+            </Button>
+            {data.items.length === 0 ? (
+              !failed && <EmptyState text={t('shell.notifications.empty')} />
+            ) : (
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {data.items.map((item) => (
+                  <li key={item.id} style={{ borderBottom: `1px solid ${colour.borderSubtle}` }}>
+                    <button
+                      type="button"
+                      onClick={() => void openRow(item)}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: spacing.sm,
+                        border: 0,
+                        borderRadius: radius.base,
+                        background: 'transparent',
+                        color: colour.text,
+                        font: 'inherit',
+                        textAlign: 'start',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Flex gap={spacing.xs} align="center">
+                        {!item.read && <Badge status="processing" />}
+                        <Typography.Text strong>{item.subject}</Typography.Text>
+                        {!item.read && <span style={visuallyHidden}>{t('shell.notifications.unreadItem')}</span>}
+                      </Flex>
+                      <div>{item.body}</div>
+                      <Typography.Text type="secondary">
+                        {formatValue({ name: 'createdAt', type: 'date-time' }, item.createdAt, {}, { locale, text: t })}
+                      </Typography.Text>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {data.totalCount > pageSize && (
+              <Pagination
+                current={data.page}
+                pageSize={pageSize}
+                total={data.totalCount}
+                showSizeChanger={false}
+                hideOnSinglePage
+                itemRender={paginationItems(data.page, t)}
+                onChange={(next) => void load(next)}
+              />
+            )}
+          </Flex>
+        </PartBoundary>
       </Drawer>
     </>
   )
