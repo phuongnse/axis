@@ -887,7 +887,20 @@ function AddFieldDialog({
   )
 }
 
-/** The name of a field's row as a link that opens the field drawer, with the mark of a customization layer. */
+/** The query of the open resource with the drawer of the field `name` open, and no path. */
+function fieldAddress(current: URLSearchParams, name: string): URLSearchParams {
+  const next = new URLSearchParams(current)
+  next.delete('path')
+  next.set('field', name)
+  return next
+}
+
+/**
+ * The name of a field's row as a link that opens the field drawer, with the mark of a customization layer. Proposed,
+ * #4902: it is a real link to the field's address, `&field=<name>`, see docs/reference/studio.md#route-and-address, so
+ * it opens in a new tab and its address can be copied. A plain click opens the drawer here, as the address would. A field
+ * with no name has no address, so its name is a subtle button.
+ */
 const NameCell = memo(function NameCell({
   index,
   field,
@@ -900,13 +913,30 @@ const NameCell = memo(function NameCell({
   onOpen: (index: number) => void
 }) {
   const t = useText()
+  const [searchParams] = useSearchParams()
   const name = text(isContent(field) ? field.name : undefined)
   return (
     <Flex gap="small" align="center" wrap>
       {/* A read-only designer turns its inputs off, but its name still opens the drawer. */}
-      <AxisButton role="link" size="small" disabled={false} onClick={() => onOpen(index)}>
-        {name || t('shell.studio.entity.unnamedField')}
-      </AxisButton>
+      {name ? (
+        <Link
+          to={{ search: `?${fieldAddress(searchParams, name)}` }}
+          onClick={(event) => {
+            // A click with a modifier or another button opens the address as the browser does, such as in a new tab.
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+              return
+            }
+            event.preventDefault()
+            onOpen(index)
+          }}
+        >
+          {name}
+        </Link>
+      ) : (
+        <AxisButton role="subtle" size="small" disabled={false} onClick={() => onOpen(index)}>
+          {t('shell.studio.entity.unnamedField')}
+        </AxisButton>
+      )}
       {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
     </Flex>
   )
