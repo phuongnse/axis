@@ -1,5 +1,5 @@
 import { ConfigProvider, Segmented } from 'antd'
-import { StrictMode, useState, type CSSProperties, type ReactNode } from 'react'
+import { StrictMode, useLayoutEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { TextProvider } from '../platform/TextProvider'
 import { useDesignTokens } from '../platform/themeMode'
@@ -24,13 +24,36 @@ function Canvas({ children }: { children: ReactNode }) {
 }
 
 /**
- * A screen exactly as tall as its height. The page scrolls inside it, as it scrolls in a window, so a dialog opens in
- * the middle of what shows. The outer box does not scroll. It holds the popups and dialogs, and the transform keeps
- * them inside it.
+ * Proposed: the height of a frame that fills the window from its top down to the canvas's padding, never less than the
+ * state's own height, see #3264. It follows the window as it is resized, so no empty band is left under a screen.
  */
-function Frame({ height, children }: { height: number; children: ReactNode }) {
-  const { colour } = useDesignTokens()
+function useFillHeight(frame: HTMLDivElement | null, least: number, padding: number) {
+  const [height, setHeight] = useState(least)
+  useLayoutEffect(() => {
+    if (frame === null) {
+      return
+    }
+    const measure = () => {
+      const top = frame.getBoundingClientRect().top + window.scrollY
+      // The frame's border is outside its content height.
+      setHeight(Math.max(least, Math.floor(window.innerHeight - top - padding - 2)))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [frame, least, padding])
+  return height
+}
+
+/**
+ * A screen as tall as the window leaves it, and never less than its height. The page scrolls inside it, as it scrolls
+ * in a window, so a dialog opens in the middle of what shows. The outer box does not scroll. It holds the popups and
+ * dialogs, and the transform keeps them inside it.
+ */
+function Frame({ height: least, children }: { height: number; children: ReactNode }) {
+  const { colour, spacing } = useDesignTokens()
   const [frame, setFrame] = useState<HTMLDivElement | null>(null)
+  const height = useFillHeight(frame, least, spacing.lg)
   return (
     <div
       ref={setFrame}
