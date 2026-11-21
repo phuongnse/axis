@@ -338,6 +338,12 @@ export interface StudioDiagnostic {
   path: string
   resourceId: string | null
   /**
+   * Only a build's diagnostics carry them: the place in `file`, counted from 1, see
+   * docs/reference/studio-packages.md#the-authoring-api. A package file's problem opens at `line`, or at the top.
+   */
+  line?: number
+  column?: number
+  /**
    * Only an accept's `AXC0377` carries these: the author name and the time of the newest revision that changed the
    * resource or file. Both are `null` when none is found, see docs/reference/authoring-requests.md#accepting.
    */

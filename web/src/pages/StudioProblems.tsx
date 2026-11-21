@@ -4,6 +4,7 @@ import { SidePanel } from '../platform/SidePanel'
 import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { problemsPanelId } from './StudioBand'
+import { FileAtLine } from './FileAtLine'
 import { ResourceReference } from './ResourceReference'
 
 /**
@@ -46,17 +47,20 @@ export function StudioProblems({
 /**
  * The problems of a draft or a check, errors first, then warnings, each with its severity, code, message and resource. A
  * problem's resource is a link when `onSelect` is given, see {@link ResourceReference}, and `onSelect` opens that resource
- * at the problem's path. Without `onSelect`, the resource is plain text. A problem that names no resource shows its file.
+ * at the problem's path. Without `onSelect`, the resource is plain text. A problem that names no resource shows its file,
+ * as a link when `onOpenFile` is given, see {@link FileAtLine}, and `onOpenFile` opens that file at the problem's line.
  * The list has no margin of its own, see docs/reference/shared-widgets.md#which-widget.
  */
 export function StudioProblemList({
   diagnostics,
   resources,
   onSelect,
+  onOpenFile,
 }: {
   diagnostics: StudioDiagnostic[]
   resources?: readonly StudioResourceItem[]
   onSelect?: (resourceId: string, path: string) => void
+  onOpenFile?: (file: string, line?: number) => void
 }) {
   const ordered = [
     ...diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
@@ -66,22 +70,24 @@ export function StudioProblemList({
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {ordered.map((diagnostic, index) => (
         <li key={index}>
-          <DiagnosticRow diagnostic={diagnostic} resources={resources} onSelect={onSelect} />
+          <DiagnosticRow diagnostic={diagnostic} resources={resources} onSelect={onSelect} onOpenFile={onOpenFile} />
         </li>
       ))}
     </ul>
   )
 }
 
-/** One problem: severity, code and message, then its resource, or its file when it names none. */
+/** One problem: severity, code and message, then its resource, or its file, with its line, when it names none. */
 function DiagnosticRow({
   diagnostic,
   resources,
   onSelect,
+  onOpenFile,
 }: {
   diagnostic: StudioDiagnostic
   resources?: readonly StudioResourceItem[]
   onSelect?: (resourceId: string, path: string) => void
+  onOpenFile?: (file: string, line?: number) => void
 }) {
   const resourceId = diagnostic.resourceId
   const resource = resourceId === null ? undefined : resources?.find((item) => item.id === resourceId)
@@ -93,11 +99,19 @@ function DiagnosticRow({
           <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
           <strong>{diagnostic.code}</strong> {diagnostic.message}
         </span>
-        <ResourceReference
-          resource={resource}
-          file={diagnostic.file}
-          onOpen={resourceId !== null && onSelect ? () => onSelect(resourceId, diagnostic.path) : undefined}
-        />
+        {resource === undefined && onOpenFile ? (
+          <FileAtLine
+            file={diagnostic.file}
+            line={diagnostic.line}
+            onOpen={() => onOpenFile(diagnostic.file, diagnostic.line)}
+          />
+        ) : (
+          <ResourceReference
+            resource={resource}
+            file={diagnostic.file}
+            onOpen={resourceId !== null && onSelect ? () => onSelect(resourceId, diagnostic.path) : undefined}
+          />
+        )}
       </Flex>
     </div>
   )

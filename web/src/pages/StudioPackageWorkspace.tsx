@@ -4,6 +4,7 @@ import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { Chevron } from '../platform/Chevron'
+import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { sortByName } from '../platform/listOrder'
 import { PageLayout } from '../platform/PageLayout'
@@ -19,11 +20,12 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { workspaceTabRow } from '../platform/workspaceTabRow'
-import type { CodeCursor } from './CodeEditor'
+import { workspaceRowHeight, workspaceTabRow } from '../platform/workspaceTabRow'
+import type { CodeCursor, CodeEditorHandle } from './CodeEditor'
 import { PlatformContext } from './context'
 import { fileLanguage } from './fileLanguage'
 import { useFillHeight } from './jsonViewHeight'
+import { StudioProblemList } from './StudioProblems'
 import { useStudioPackages, type PackageRow } from './useStudioPackages'
 
 const CodeEditor = lazy(() => import('./CodeEditor'))
@@ -116,7 +118,9 @@ function EmptyEditorArea({ boundary }: { boundary: React.RefObject<HTMLElement |
 /**
  * A package's workspace, `&view=packages&package=<id>`: the package's label as the heading with its kind and version
  * under it, the explorer's tree of its files on the left, the open files as tabs over the code editor, the status line
- * under them and an empty output panel. An id that names no package shows a warning. Without `canDevelop` the editor is
+ * under them and the output panel, whose Problems tab lists the package's problems: the `diagnostics` whose file is under
+ * `packages/<id>/`, each file a link that opens it in the workspace at the problem's line, or at the top. An id that names
+ * no package shows a warning. Without `canDevelop` the editor is
  * read-only and an info alert says why. With it, Ctrl+S and the save bar save every changed file, one after another, each
  * with the version it was read at, and `onWritten` hears the last answer's diagnostics. The workspace reads and writes the
  * working folder, see docs/reference/studio-packages.md#a-packages-files.
@@ -126,12 +130,14 @@ export function StudioPackageWorkspace({
   packageId,
   folderRevision,
   canDevelop,
+  diagnostics,
   onWritten,
 }: {
   application: string
   packageId: string
   folderRevision: number
   canDevelop: boolean
+  diagnostics: StudioDiagnostic[]
   onWritten: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
@@ -151,18 +157,29 @@ export function StudioPackageWorkspace({
       <AxisAlert data-testid="studio-package-missing" kind="warning" message={t('shell.studio.packages.missing')} />
     )
   }
-  return <Workspace key={row.id} application={application} row={row} canDevelop={canDevelop} onWritten={onWritten} />
+  return (
+    <Workspace
+      key={row.id}
+      application={application}
+      row={row}
+      canDevelop={canDevelop}
+      diagnostics={diagnostics}
+      onWritten={onWritten}
+    />
+  )
 }
 
 function Workspace({
   application,
   row,
   canDevelop,
+  diagnostics,
   onWritten,
 }: {
   application: string
   row: PackageRow
   canDevelop: boolean
+  diagnostics: StudioDiagnostic[]
   onWritten: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
@@ -180,6 +197,11 @@ function Workspace({
   const [conflicts, setConflicts] = useState<Record<string, true>>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const editors = useRef(new Map<string, CodeEditorHandle>())
+  const pending = useRef<{ path: string; line: number } | null>(null)
+  const [jump, setJump] = useState(0)
+  const prefix = `packages/${row.id}/`
+  const problems = diagnostics.filter((diagnostic) => diagnostic.file.startsWith(prefix))
   const isUnsaved = (path: string) => {
     const file = files[path]
     return file !== undefined && file !== 'failed' && file.text !== file.saved
@@ -208,6 +230,25 @@ function Workspace({
       },
     )
   }
+
+  /** Opens a problem's file, or switches to it, and puts the cursor at the problem's line, or on line 1 without one. */
+  const openAt = (file: string, line?: number) => {
+    const path = file.slice(prefix.length)
+    pending.current = { path, line: line ?? 1 }
+    openFile(path)
+    setJump((count) => count + 1)
+  }
+
+  // Moves the cursor of the file that openAt asked for once its editor is there. The editor builds its view in an effect
+  // that runs before this one, so a file that loads later is reached through the editor's ref below, which bumps `jump`.
+  useEffect(() => {
+    const target = pending.current
+    const editor = target && editors.current.get(target.path)
+    if (target && editor) {
+      editor.goTo(target.line)
+      pending.current = null
+    }
+  }, [jump])
 
   /** Reads a file again, which drops its unsaved text and its conflict. */
   const reload = (path: string) =>
@@ -460,6 +501,16 @@ function Workspace({
                         <Suspense fallback={null}>
                           <CodeEditor
                             key={path}
+                            ref={(handle) => {
+                              if (handle === null) {
+                                editors.current.delete(path)
+                                return
+                              }
+                              editors.current.set(path, handle)
+                              if (pending.current?.path === path) {
+                                setJump((count) => count + 1)
+                              }
+                            }}
                             label={path}
                             value={file.text}
                             onChange={(text) => editFile(path, text)}
@@ -495,7 +546,33 @@ function Workspace({
             )}
             <span style={{ marginInlineStart: 'auto' }}>{unsavedText}</span>
           </div>
-          <div data-testid="studio-package-output" style={{ height: outputHeight, borderTop: rule }} />
+          <div data-testid="studio-package-output" style={{ height: outputHeight, borderTop: rule }}>
+            <Tabs
+              type="line"
+              {...workspaceTabRow(tokens)}
+              items={[
+                {
+                  key: 'problems',
+                  label: t('shell.studio.problems.title'),
+                  children: (
+                    <div
+                      style={{
+                        height: outputHeight - workspaceRowHeight(tokens),
+                        overflowY: 'auto',
+                        overscrollBehavior: 'contain',
+                      }}
+                    >
+                      {problems.length === 0 ? (
+                        <EmptyState text={t('shell.studio.problems.none')} />
+                      ) : (
+                        <StudioProblemList diagnostics={problems} onOpenFile={openAt} />
+                      )}
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </div>
         </div>
       </div>
       <Modal
