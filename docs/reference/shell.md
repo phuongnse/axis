@@ -104,7 +104,7 @@ their own controls where they expect them.
   where one block ends and the next begins, such as between a run's Output and its Log. Inside a block's content no
   rule is drawn at will: the parts of one task sit together under one title, set apart by spacing. Where a rule is
   needed is judged on the whole page, not by applying a rule everywhere.
-- **A rule runs the whole way** _(planned)_. It runs the length of what it parts, from one rule to the next or to the
+- **A rule runs the whole way**. It runs the length of what it parts, from one rule to the next or to the
   edge, as the rules under the header and beside the sidebar do.
 - **What fills a region fills it to its rules** _(planned)_. A log, a code editor or a table reaches the region's
   rules, with no box of its own.
@@ -115,12 +115,12 @@ their own controls where they expect them.
 - **Fields as wide as each other** _(planned)_. Every field of a region is as wide as the others, and no button stands
   loose beside an input. An action of the whole region, such as Reset or Import, sits in its title row, and an action
   of one control goes with the control.
-- **A title row's actions are light** _(planned)_. They are borderless text buttons or icon buttons with their names as
+- **A title row's actions are light**. They are borderless text buttons or icon buttons with their names as
   tooltips, at the usual button size, such as the explorer's New and Refresh.
 - **A view switch sits above what it switches** _(planned)_. A switch between two views of one content, such as Form
   and JSON, is a row of line tabs right above that content, in the one look every tab row of the workspace has, see
   [tab bars](actions-and-controls.md#tab-bars).
-- **The layout follows the work** _(planned)_. A region puts what to act on first, then the input, the action and the
+- **The layout follows the work**. A region puts what to act on first, then the input, the action and the
   result. An action sits after what it acts on, at the foot of its region when the input can be long, and the result
   comes after it.
 - **A handle on a rule** _(planned)_. Every size handle, the side panel's included, is one handle: a grip of two bars

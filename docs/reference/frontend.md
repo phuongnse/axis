@@ -54,7 +54,7 @@ component holds a number of its own.
   [which widget](shared-widgets.md#which-widget).
 - **Rules on a flush page** _(planned)_. `borderSubtle` stands apart from `surface` about as much in light mode as in
   dark, because on a flush page a rule is all that parts two areas. `border` stays for controls.
-- **One meaning, one sign** _(planned)_. A sign means one thing and looks one way. The same icon for the same meaning
+- **One meaning, one sign**. A sign means one thing and looks one way. The same icon for the same meaning
   has one shape, size and colour on every screen, whichever widget draws it.
 - **One chevron** _(planned)_. Every chevron is Ant Design's `DownOutlined` at 12 px in `textMuted`, turned to point
   down for open or a menu below, right for closed and up for a panel that opens upwards, and left for a previous
