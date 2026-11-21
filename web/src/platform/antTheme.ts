@@ -1,5 +1,6 @@
 import { theme, type ConfigProviderProps, type ThemeConfig } from 'antd'
 import { colourTokens, designTokensFor, type ColourName, type DesignTokens, type PageTokenValues } from './designTokens'
+import type { StatusTone } from './statusTones'
 import type { ThemeMode } from './themeMode'
 
 // The only file that names Ant Design tokens. It maps the Axis tokens to Ant Design's theme.
@@ -226,6 +227,37 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
 /** The tint Ant Design gives a selected item. Dropdown menus draw their selected item on it, so Axis reads it here. */
 export function selectedItemTint(mode: ThemeMode): string {
   return theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
+}
+
+/** A status tag's fill and border, Ant Design's tints of the seed colours. No fill is `transparent`. */
+export interface StatusTint {
+  fill: string
+  border: string
+}
+
+const statusTintCache = new Map<ThemeMode, Record<StatusTone, StatusTint>>()
+
+/**
+ * Each tone's fill and border, read from Ant Design's tints of the seed colours as `selectedItemTint` reads a
+ * selected item's, see docs/reference/shared-widgets.md#which-widget. `neutral` takes the secondary fill and `muted` no
+ * fill, and each keeps the secondary border.
+ * Proposed: the status tag's look, design review #4765. Which tints a tag draws is the owner's choice in that review.
+ */
+export function statusTints(mode: ThemeMode): Record<StatusTone, StatusTint> {
+  const cached = statusTintCache.get(mode)
+  if (cached) {
+    return cached
+  }
+  const token = theme.getDesignToken(antThemeFor(mode))
+  const tints: Record<StatusTone, StatusTint> = {
+    neutral: { fill: token.colorFillSecondary, border: token.colorBorderSecondary },
+    attention: { fill: token.colorWarningBg, border: token.colorWarningBorder },
+    success: { fill: token.colorSuccessBg, border: token.colorSuccessBorder },
+    danger: { fill: token.colorErrorBg, border: token.colorErrorBorder },
+    muted: { fill: 'transparent', border: token.colorBorderSecondary },
+  }
+  statusTintCache.set(mode, tints)
+  return tints
 }
 
 /**

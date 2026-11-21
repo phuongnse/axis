@@ -1,13 +1,15 @@
 import { Tag } from 'antd'
-import type { ReactNode } from 'react'
+import { useContext, type ReactNode } from 'react'
+import { statusTints } from './antTheme'
 import { toneColours, type StatusTone } from './statusTones'
-import { useDesignTokens } from './themeMode'
+import { ThemeModeContext, useDesignTokens } from './themeMode'
 
 export type { StatusTone }
 
 /**
- * A status as an outlined tag in one of five tones. It has no margin of its own, so the heading that holds it sets the
- * spacing. Data attributes pass to the tag, and `data-tone` names the tone.
+ * A status as a tag in one of five tones, see docs/reference/shared-widgets.md#which-widget. It has no margin of its
+ * own, so the heading that holds it sets the spacing. Data attributes pass to the tag, and `data-tone` names the tone.
+ * Proposed: Ant Design's tinted fill and border of each tone, as step 11 of #3263 agreed, design review #4765.
  */
 export function StatusTag({
   tone,
@@ -18,16 +20,17 @@ export function StatusTag({
   children: ReactNode
 } & Record<`data-${string}`, string | undefined>) {
   const { colour } = useDesignTokens()
-  const { text, border } = toneColours[tone]
+  const mode = useContext(ThemeModeContext)?.mode ?? 'light'
+  const { fill, border } = statusTints(mode)[tone]
   return (
     <Tag
       variant="outlined"
       data-tone={tone}
       {...data}
       style={{
-        color: colour[text],
-        borderColor: colour[border],
-        background: 'transparent',
+        color: colour[toneColours[tone].text],
+        borderColor: border,
+        background: fill,
         marginInlineEnd: 0,
       }}
     >
