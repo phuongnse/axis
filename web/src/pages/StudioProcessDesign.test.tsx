@@ -259,6 +259,22 @@ describe('moving a step', () => {
   })
 })
 
+describe('removing a line', () => {
+  it('draws Remove line as a destructive button, and clicking it clears that line and says so', async () => {
+    const calls = renderDesign(0)
+    await userEvent.click(await screen.findByTestId('rf__edge-/steps/2/otherwise'))
+    const remove = within(screen.getByTestId('studio-process-transition')).getByRole('button', { name: 'Remove line' })
+
+    expect(remove).toHaveClass('ant-btn-variant-outlined')
+    expect(remove).toHaveStyle({ color: colourTokens.dangerText.light, borderColor: colourTokens.dangerText.light })
+    await userEvent.click(remove)
+
+    expect(calls.changes.at(-1)).toEqual(['/steps/2/otherwise', ''])
+    expect(screen.queryByTestId('rf__edge-/steps/2/otherwise')).not.toBeInTheDocument()
+    expect(announcement()).toHaveTextContent(/^Removed the line check to done, otherwise\.$/)
+  })
+})
+
 describe('a module process with a customization layer', () => {
   // The first lookup waits for the graph to lay out, which is slow while other test files run.
   const slow = { timeout: 5000 }
