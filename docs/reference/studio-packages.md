@@ -70,9 +70,13 @@ them there.
   dialog says so and the tree is read again. Delete… asks first, then deletes each file of the node, one after another,
   each its own revision, and the tabs of those files close. Copy path copies `packages/<id>/<path>`, the name that
   problems and history use for a package file.
-- **Dragging and the chevron's place** _(planned for M37)_. A file or folder dragged onto a folder moves into it, and onto
-  the explorer's free space moves to the package's root. A file keeps the chevron's place only in a tree that has a
-  folder, so without one the files start at the explorer's edge.
+- **Dragging.** With the developer role, a file or folder dragged onto a folder moves into it, and onto the explorer's
+  free space moves to the package's root. A drop where the node already is, or a folder into itself, does nothing. It
+  sends one [move](#the-authoring-api) that lists each file the node holds with its version, as Rename… does, so a drag
+  is one revision, and open tabs follow their files. A taken name, or a file that changed since, is said in the alert
+  above the workspace and the tree is read again.
+- **The chevron's place** _(planned for M37)_. A file keeps the chevron's place only in a tree that has a folder, so
+  without one the files start at the explorer's edge.
 - **The files and the editor.** An open file is a tab with a dot while it is unsaved, and closing it asks before it
   discards. The tabs are line tabs in the one tab look, and their rule is level with the rule under the explorer's
   title row. The editor is one CodeMirror 6 editor, the one the [JSON view](studio-resource-form.md#json-view) is, in
@@ -130,7 +134,7 @@ them there.
 - **Without the developer role.** The editor is read-only, with an info alert. The workspace shows no save bar, no
   Build, Run tests and Run… group and no Run tab, Ctrl+S saves nothing and Ctrl+Shift+B builds nothing.
 - **Without the developer role, the explorer.** The explorer offers only the files, Copy path and Refresh. The node's
-  menu holds Copy path alone, and F2 does nothing.
+  menu holds Copy path alone, F2 does nothing and nothing can be dragged.
 
 ## Diffs
 

@@ -1,6 +1,6 @@
 import { FileOutlined, FolderOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Dropdown, Flex, Modal, Tree, type TreeDataNode } from 'antd'
-import { useContext, useMemo, useState, type KeyboardEvent } from 'react'
+import { useContext, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { Chevron } from '../platform/Chevron'
 import { fillText } from '../platform/fillText'
@@ -118,7 +118,9 @@ type NameDialog = { kind: 'file' | 'folder'; parent: string } | { kind: 'rename'
  * file is in it. Rename… sends one move that lists each file of the node with its version, `versionOf`, and `onRenamed`
  * hears the new path of each. Delete… asks first and then deletes each file of the node, one after another, `onDeleted`
  * hears the paths gone and a failure goes to `onFailed`. Every write reads the list again through `onRefresh` and tells
- * the folder's diagnostics to `onWritten`. Refresh reads the list again too.
+ * the folder's diagnostics to `onWritten`. Refresh reads the list again too. With `canDevelop` a file or folder can also
+ * be dragged onto a folder, or onto the free space for the package's root, which sends the same one move as Rename…, and
+ * a refusal goes to `onFailed`.
  */
 export function StudioPackageExplorer({
   application,
@@ -159,6 +161,8 @@ export function StudioPackageExplorer({
   const [dialog, setDialog] = useState<NameDialog | null>(null)
   const [deleting, setDeleting] = useState<Entry | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  // The key of the node being dragged, for a drop on the free space, which the tree does not report.
+  const dragged = useRef<string | null>(null)
 
   // A new folder stays only until a file is in it, as the folder holds only files.
   const emptyFolders = newFolders.filter((folder) => !row.files.some((path) => path.startsWith(`${folder}/`)))
@@ -229,15 +233,11 @@ export function StudioPackageExplorer({
     return { ok: true }
   }
 
-  async function rename(node: Entry, text: string): Promise<CommandResult> {
-    const name = text.trim()
-    if (!isName(name)) {
-      return nameInvalid()
-    }
-    if (name === node.name) {
-      return { ok: true }
-    }
-    const to = join(dirnameOf(node.path), name)
+  /**
+   * Moves `node` to the path `to` with one move that lists each file it holds with its version, or with no request for an
+   * empty folder that only the explorer knows. The caller has checked that `to` is not taken.
+   */
+  async function moveNode(node: Entry, to: string): Promise<'moved' | 'conflict' | 'invalid'> {
     const remap = (path: string) => swapPrefix(path, node.path, to)
     const remapState = () => {
       setNewFolders((before) => before.map(remap))
@@ -248,15 +248,11 @@ export function StudioPackageExplorer({
         before === null ? before : keyOf({ ...entryOf(before), path: remap(entryOf(before).path) }),
       )
     }
-    // The server refuses only a file as the target, so a folder with that name would merge.
-    if (taken(to)) {
-      return nameTaken()
-    }
     const paths = node.isFolder ? filesUnder(node.path) : [node.path]
     if (paths.length === 0) {
       // An empty folder that only the explorer knows.
       remapState()
-      return { ok: true }
+      return 'moved'
     }
     try {
       const result = await moveStudioPackageFiles(
@@ -265,22 +261,68 @@ export function StudioPackageExplorer({
         paths.map((from) => ({ from, to: remap(from), version: versionOf(from) })),
       )
       if (result.status === 'invalid') {
-        return nameInvalid()
+        return 'invalid'
       }
       if (result.status === 'conflict') {
         onRefresh()
-        return nameTaken()
+        return 'conflict'
       }
       onRenamed(new Map(paths.map((from) => [from, remap(from)])))
       remapState()
       onWritten(result.diagnostics)
       onRefresh()
-      return { ok: true }
+      return 'moved'
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
         lost()
       }
       throw error
+    }
+  }
+
+  async function rename(node: Entry, text: string): Promise<CommandResult> {
+    const name = text.trim()
+    if (!isName(name)) {
+      return nameInvalid()
+    }
+    if (name === node.name) {
+      return { ok: true }
+    }
+    const to = join(dirnameOf(node.path), name)
+    // The server refuses only a file as the target, so a folder with that name would merge.
+    if (taken(to)) {
+      return nameTaken()
+    }
+    const result = await moveNode(node, to)
+    return result === 'invalid' ? nameInvalid() : result === 'conflict' ? nameTaken() : { ok: true }
+  }
+
+  /** Moves `node` into `folder`, the package's root when it is empty. A refusal goes to `onFailed`. */
+  async function moveInto(node: Entry, folder: string) {
+    if (
+      folder === dirnameOf(node.path) ||
+      (node.isFolder && (folder === node.path || folder.startsWith(`${node.path}/`)))
+    ) {
+      return
+    }
+    const to = join(folder, node.name)
+    const refused = () => onFailed(fillText(t('shell.studio.packages.moveRefused'), { name: node.name }))
+    if (taken(to)) {
+      refused()
+      return
+    }
+    try {
+      const result = await moveNode(node, to)
+      if (result !== 'moved') {
+        refused()
+      } else if (folder !== '') {
+        reveal(folder)
+      }
+    } catch (error) {
+      if (!(error instanceof ServerUnreachableError)) {
+        console.warn(`Moving '${node.path}' of the package '${row.id}' failed`, error)
+        refused()
+      }
     }
   }
 
@@ -443,6 +485,20 @@ export function StudioPackageExplorer({
           data-testid="studio-package-tree"
           style={{ position: 'absolute', inset: 0, overflow: 'auto', overscrollBehavior: 'contain' }}
           onKeyDown={onKeyDown}
+          onDragOver={(event) => {
+            if (dragged.current !== null) {
+              event.preventDefault()
+            }
+          }}
+          onDrop={(event) => {
+            if (dragged.current === null) {
+              return
+            }
+            event.preventDefault()
+            const key = dragged.current
+            dragged.current = null
+            void moveInto(entryOf(key), '')
+          }}
         >
           <Tree.DirectoryTree
             treeData={tree}
@@ -481,6 +537,20 @@ export function StudioPackageExplorer({
               )
             }}
             expandAction="click"
+            draggable={canDevelop ? { icon: false } : false}
+            allowDrop={({ dropNode }) => !dropNode.isLeaf}
+            onDragStart={({ node }) => {
+              dragged.current = String(node.key)
+            }}
+            onDragEnd={() => {
+              dragged.current = null
+            }}
+            onDrop={(info) => {
+              const key = String(info.dragNode.key)
+              dragged.current = null
+              // `allowDrop` refuses files, so the node dropped on is a folder.
+              void moveInto(entryOf(key), entryOf(String(info.node.key)).path)
+            }}
             // A file explorer opens and closes its folders at once, and a renamed or new folder shows its rows with no motion to wait for.
             motion={false}
             multiple={false}
