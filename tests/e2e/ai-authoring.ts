@@ -36,9 +36,10 @@ export async function askAi(page: Page, host: string, application: string, text:
 /**
  * The spec's own publisher, with the server's Studio settings, the scenario role and the runtime role. The runtime role
  * gives it the write lock that an accept takes, so without it the accept fails with "The draft is not found."
- * It runs alone under the publishers' lock. See the layer test of the Ask AI agent spec.
+ * It runs alone under the publishers' lock. See the layer test of the Ask AI agent spec. `env` adds settings after these,
+ * such as the application package host of the package spec. The AI specs pass none.
  */
-export function startSpecPublisher(applications: string) {
+export function startSpecPublisher(applications: string, env: Record<string, string> = {}) {
   return startPublisher(
     {
       Studio__ApplicationsPath: applications,
@@ -51,6 +52,7 @@ export function startSpecPublisher(applications: string) {
         'AXIS_E2E_SCENARIO_DATABASE',
         'the PostgreSQL connection string of the scenario role',
       ),
+      ...env,
     },
     { alone: true },
   )

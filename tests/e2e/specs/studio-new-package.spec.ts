@@ -3,9 +3,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { chromium, type Browser, type Page } from '@playwright/test'
 import { expect, test } from '../test'
+import { startSpecPublisher } from '../ai-authoring'
 import { runAdmin } from '../admin-tool'
 import { waitForDialog } from '../dialogs'
 import { startDirectoryServer } from '../directory-server'
+import { startPackageHost } from '../package-host'
+import { pickOption } from '../select'
 import { addRealmAccount, setRealmPassword } from '../tenant-realm'
 import {
   giveRoles,
@@ -17,13 +20,30 @@ import {
   turnOnApplicationPackages,
 } from '../studio-packages'
 
-// tenant create makes a database, two roles and a realm, and the realm step waits on Keycloak.
-test.setTimeout(240_000)
+// tenant create makes a database, two roles and a realm, and the realm step waits on Keycloak. The build and the test run
+// add a publisher that waits for the other publishers' locks, and the package host's Python build and tests.
+test.setTimeout(480_000)
 
 const tenant = 'packages-made'
 const host = `${tenant}.localhost`
 const application = 'PackageTools'
 const packageId = 'purchasing-tools'
+const checksId = 'checks'
+
+// The failing assertion is on line 10. The line numbers stay as they are, because the spec checks that line.
+const testChecks = [
+  'import unittest',
+  '',
+  '',
+  'class ChecksCase(unittest.TestCase):',
+  '    def test_passes(self):',
+  '        print("checking the sum")',
+  '        self.assertEqual(2, 1 + 1)',
+  '',
+  '    def test_fails(self):',
+  '        self.assertEqual(1, 2)',
+  '',
+].join('\n')
 
 /** The paths that `GET .../package-files` lists for the application in `page`. */
 function packageFilePaths(page: Page): Promise<string[]> {
@@ -33,7 +53,7 @@ function packageFilePaths(page: Page): Promise<string[]> {
   }, application)
 }
 
-test('a developer creates a package in Studio, opens its workspace, saves a file, sees a manifest error in Problems, and creates and renames a folder with a file in it', async () => {
+test('a developer creates a package in Studio, opens its workspace, saves a file, sees a manifest error in Problems, creates and renames a folder with a file in it, then builds and tests a Python package', async () => {
   const created = await runAdmin([
     'tenant',
     'create',
@@ -156,6 +176,82 @@ test('a developer creates a package in Studio, opens its workspace, saves a file
         return paths.includes('shared/util.js') && !paths.includes('lib/util.js')
       })
       .toBe(true)
+
+    // A Python package with a test file. The file is written from the page, through the files route, so its session is used.
+    await developerPage
+      .getByRole('navigation', { name: 'Menu', exact: true })
+      .getByRole('link', { name: 'Packages', exact: true })
+      .click()
+    await expect(developerPage).toHaveURL(/[?&]view=packages(&|$)/)
+
+    await developerPage.getByRole('button', { name: 'New package…', exact: true }).click()
+    const newPython = await waitForDialog(developerPage, 'New package')
+    await newPython.getByRole('textbox', { name: 'ID', exact: true }).fill(checksId)
+    await pickOption(newPython.getByRole('combobox', { name: 'Language', exact: true }), 'Python')
+    await newPython.getByRole('button', { name: 'Create', exact: true }).click()
+    await expect(newPython).toBeHidden({ timeout: 30_000 })
+
+    const written = await developerPage.evaluate(
+      ({ application, id, content }) =>
+        fetch(`/api/studio/apps/${application}/packages/${id}/files/test_checks.py`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'If-None-Match': '*', 'X-Axis-Csrf': '1' },
+          body: JSON.stringify({ content }),
+        }).then((response) => response.status),
+      { application, id: checksId, content: testChecks },
+    )
+    expect(written).toBe(200)
+
+    const checksRow = developerPage
+      .getByTestId('studio-packages')
+      .getByRole('row')
+      .filter({ has: developerPage.getByTestId(`studio-package-${checksId}`) })
+    await checksRow.getByRole('link', { name: 'Checks', exact: true }).click()
+    await expect(developerPage).toHaveURL(new RegExp(`[?&]package=${checksId}(&|$)`))
+    await expect(developerPage.getByRole('heading', { name: 'Checks', exact: true })).toBeVisible()
+    await expect(
+      developerPage.getByTestId('studio-package-tree').getByText('test_checks.py', { exact: true }),
+    ).toBeVisible()
+
+    // The build and the test run need a package host and a publisher that builds application packages. The publisher runs
+    // alone under the publishers' lock, and both stop when these steps end, see docs/testing.md.
+    const output = developerPage.getByTestId('studio-package-output')
+    const passed = output.getByTestId('studio-test-result').and(developerPage.locator('[data-outcome="passed"]'))
+    const failed = output.getByTestId('studio-test-result').and(developerPage.locator('[data-outcome="failed"]'))
+    const packageHost = await startPackageHost()
+    let publisher: Awaited<ReturnType<typeof startSpecPublisher>> | undefined
+    try {
+      publisher = await startSpecPublisher(applications, {
+        Extensions__ApplicationPackages: 'true',
+        Extensions__Runners__Application: packageHost.address,
+        // Port 0 keeps the publisher's egress proxy off the fixed port of the shared worker's proxy.
+        Extensions__Runners__ProxyPort: '0',
+      })
+
+      await developerPage.getByRole('button', { name: 'Build', exact: true }).click()
+      // The publisher may wait for the other publishers' locks first, so the build waits longer than a page's usual wait.
+      await expect(developerPage.getByTestId('studio-package-build-state')).toHaveText('Built', { timeout: 180_000 })
+      await expect(developerPage.getByTestId('studio-package-build-output')).toContainText(
+        `Checked the manifest of ${checksId} 0.1.0.`,
+      )
+
+      await developerPage.getByRole('button', { name: 'Run tests', exact: true }).click()
+      await expect(passed).toHaveCount(1, { timeout: 180_000 })
+      await expect(failed).toHaveCount(1)
+      await expect(passed).toContainText('test_checks.ChecksCase.test_passes')
+    } catch (error) {
+      await test.info().attach('publisher-output', { body: publisher?.output() ?? '', contentType: 'text/plain' })
+      await test.info().attach('package-host-output', { body: packageHost.output(), contentType: 'text/plain' })
+      throw error
+    } finally {
+      await publisher?.stop()
+      await packageHost.stop()
+    }
+
+    // The failed test's place opens its file at that line, with the cursor at the start of the line. The place is a button,
+    // drawn as a link, so its role is button.
+    await failed.getByRole('button', { name: 'packages/checks/test_checks.py, line 10', exact: true }).click()
+    await expect(developerPage.getByTestId('studio-package-status')).toContainText('Line 10, column 1')
   } finally {
     await browser?.close()
     await server.stop()
