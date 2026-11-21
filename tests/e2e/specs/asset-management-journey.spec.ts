@@ -28,6 +28,7 @@ import {
   openKind,
   openListItem,
   openTab,
+  processStepAction,
   widgetRowAction,
   writeLabel,
 } from '../studio-resources'
@@ -1100,7 +1101,7 @@ test.describe('the author builds the asset management application with Studio on
     // The subject of a new process is an entity, so only the entity is picked.
     await pick(page, 'studio-field-/entity', 'Asset')
     await writeLabel(page, 'studio-field-/title', text('processes.warrantyReminder.title'))
-    await stepCard(0).getByRole('button', { name: 'Delete', exact: true }).click()
+    await processStepAction(page, 0, 'Delete')
     for (const [index, [stepName, type]] of [
       ['remind', 'operation'],
       ['done', 'end'],

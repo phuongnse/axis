@@ -296,8 +296,9 @@ sub-process and wait for event steps and of a task's deadline and escalations.
   and Remove. Switching replaces the draft in one change, so one undo brings it back: the other key is
   removed, and the new key, empty, takes its place in the file. See
   [processes without a subject](process-flow.md#processes-without-a-subject).
-- **Steps.** The steps show as cards in file order, each with the step's name and type, Move up, Move
-  down and Remove. Add step appends a step of the chosen type, with an empty name. A type change works
+- **Steps.** The steps show as cards in file order, each with the step's name and type. Each card has a "…"
+  menu with Move up, off on the first step, Move down, off on the last, and Delete. A read-only tab shows no
+  menu. Add step appends a step of the chosen type, with an empty name. A type change works
   as the [step panel](process-designer.md#step-panel) says.
 - **Decision and end.** A decision shows its branches, each with a `when` expression and a target, and
   its `otherwise`. A branch can be added and removed, and a new one is named `branch1`, `branch2` and so

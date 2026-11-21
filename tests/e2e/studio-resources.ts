@@ -288,6 +288,26 @@ export async function entityFieldAction(page: Page, index: number, action: 'Move
 }
 
 /**
+ * Chooses Move up, Move down or Delete in the "…" menu of the process step at `index`, on the Form tab or in the Design
+ * tab's step panel. It presses Enter on the entry, as `entityFieldAction` does, and waits until the menu has closed.
+ * `timeout` limits each wait, for a caller that retries the action inside `toPass`.
+ */
+export async function processStepAction(
+  page: Page,
+  index: number,
+  action: 'Move up' | 'Move down' | 'Delete',
+  { timeout }: { timeout?: number } = {},
+) {
+  await page
+    .getByTestId(`studio-step-actions-${index}`)
+    .getByRole('button', { name: 'Actions', exact: true })
+    .click({ timeout })
+  const menu = page.getByRole('menu', { name: 'Actions', exact: true })
+  await menu.getByRole('menuitem', { name: action, exact: true }).press('Enter', { timeout })
+  await expect(menu).toHaveCount(0, { timeout })
+}
+
+/**
  * Chooses Move up, Move down or Delete in the "…" menu of the widget row at `pointer` in `scope`, such as a page's design
  * panel. It presses Enter on the entry, as `entityFieldAction` does, and waits until the menu has closed.
  */

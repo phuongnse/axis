@@ -26,6 +26,7 @@ import {
   openFormTab,
   openKind,
   openListItem,
+  processStepAction,
   widgetRowAction,
   writeLabel,
 } from '../studio-resources'
@@ -579,7 +580,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
     await writeLabel(page, 'studio-field-/title', text('processes.ticketHandling.title'))
-    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Delete', exact: true }).click()
+    await processStepAction(page, 0, 'Delete')
 
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
     const steps: [name: string, type: string][] = [
@@ -1094,7 +1095,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await page.getByTestId(`studio-field-/parameters/${index}/name`).getByRole('textbox').fill(parameter)
         await pick(page, `studio-field-/parameters/${index}/type`, type)
       }
-      await stepCard(0).getByRole('button', { name: 'Delete', exact: true }).click()
+      await processStepAction(page, 0, 'Delete')
       for (const [index, [stepName, type]] of [
         [step.name, 'operation'],
         ['done', 'end'],

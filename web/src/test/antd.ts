@@ -40,6 +40,21 @@ export function shownMenu(name: string): Promise<HTMLElement> {
   )
 }
 
+/**
+ * Opens the "…" menu of the one Actions button in `scope` and returns it once it is shown. Give a scope that holds one
+ * such button, such as a step card's own wrapper, since a card's rows have their own menus.
+ */
+export async function openRowMenu(scope: HTMLElement): Promise<HTMLElement> {
+  await userEvent.click(within(scope).getByRole('button', { name: 'Actions' }))
+  return shownMenu('Actions')
+}
+
+/** Opens the "…" menu in `scope` and chooses its entry `name`. The menu closes once the entry is chosen. */
+export async function chooseRowAction(scope: HTMLElement, name: string): Promise<void> {
+  const menu = await openRowMenu(scope)
+  await userEvent.click(within(menu).getByRole('menuitem', { name }))
+}
+
 /** The texts of the options in `scope`, the whole document by default. */
 export function optionTexts(scope: ParentNode = document): string[] {
   return [...scope.querySelectorAll('.ant-select-item-option')].map((option) => option.textContent ?? '')

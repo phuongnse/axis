@@ -16,7 +16,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { ShellAsideHost } from '../test/shellAsideHost'
 import { loadKindSchema } from '../platform/studioSchemas'
-import { chooseOption, selectRoot, shownMenu } from '../test/antd'
+import { chooseOption, chooseRowAction, openRowMenu, selectRoot, shownMenu } from '../test/antd'
 import {
   addEntityField,
   entityFieldAction,
@@ -1003,7 +1003,7 @@ describe('StudioEditor for a process', () => {
 
     const card = await screen.findByTestId('studio-step-4', {}, slow)
     expect(card).toHaveTextContent('markApproved')
-    await userEvent.click(within(card).getByRole('button', { name: 'Delete' }))
+    await chooseRowAction(screen.getByTestId('studio-step-actions-4'), 'Delete')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -1018,11 +1018,13 @@ describe('StudioEditor for a process', () => {
     renderResource(processItem)
     await openFormTab()
 
-    const first = await screen.findByTestId('studio-step-0', {}, slow)
-    expect(within(first).getByRole('button', { name: 'Move up' })).toBeDisabled()
-    expect(within(screen.getByTestId('studio-step-11')).getByRole('button', { name: 'Move down' })).toBeDisabled()
-    await userEvent.click(within(first).getByRole('button', { name: 'Move down' }))
-    await userEvent.click(within(screen.getByTestId('studio-step-11')).getByRole('button', { name: 'Move up' }))
+    await screen.findByTestId('studio-step-0', {}, slow)
+    const firstMenu = await openRowMenu(screen.getByTestId('studio-step-actions-0'))
+    expect(within(firstMenu).getByRole('menuitem', { name: 'Move up' })).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(within(firstMenu).getByRole('menuitem', { name: 'Move down' }))
+    const lastMenu = await openRowMenu(screen.getByTestId('studio-step-actions-11'))
+    expect(within(lastMenu).getByRole('menuitem', { name: 'Move down' })).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(within(lastMenu).getByRole('menuitem', { name: 'Move up' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
