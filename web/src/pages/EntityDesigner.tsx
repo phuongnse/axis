@@ -1,4 +1,17 @@
-import { Button, ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Tag, Typography, DatePicker } from 'antd'
+import {
+  Button,
+  ConfigProvider,
+  Drawer,
+  Flex,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Tag,
+  Typography,
+  DatePicker,
+} from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
@@ -23,6 +36,7 @@ import {
   valueSourcesOf,
   withValueSource,
   type FieldSetting,
+  type FieldType,
   type ValueSource,
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
@@ -44,6 +58,7 @@ import { ReferencePicker } from './ReferencePicker'
 import { fieldElement } from './studioFieldElement'
 import type { ChangeHandler } from './SchemaForm'
 import { setOwn } from '../platform/ownProperty'
+import { requiredMark } from '../platform/requiredMark'
 
 type Content = Record<string, unknown>
 
@@ -601,10 +616,18 @@ const Fields = memo(function Fields({
     )
   }, [])
 
-  function addField() {
-    onChange('/fields', [...fields!, { name: '', type: 'text' }])
+  const [adding, setAdding] = useState(false)
+
+  /**
+   * Proposed: adds a field of the name and type that Add field's dialog asked for, and opens its drawer at its name, see
+   * #3264. A field is never added without a name.
+   */
+  function addField(name: string, type: FieldType) {
+    setAdding(false)
+    onChange('/fields', [...fields!, { name, type }])
     onOriginsChange?.([...rowOrigins(fields!, origins), null])
-    openDrawer(fields!.length)
+    setDrawer({ index: fields!.length, open: true })
+    writeField(name, false)
   }
 
   if (fields === undefined) {
@@ -649,7 +672,7 @@ const Fields = memo(function Fields({
       filter: {
         kind: 'enum',
         value: ({ field }) => text(isContent(field) ? field.type : undefined) || null,
-        options: fieldTypes.map((option) => ({ value: option, label: option })),
+        options: fieldTypeChoices(t).map(({ value, label }) => ({ value, label })),
       },
       render: (_, { field }) => <TypeCell application={application} field={field} />,
     },
@@ -669,7 +692,7 @@ const Fields = memo(function Fields({
       heading={sectionHeading(t, 'fields')}
       action={
         readOnly ? undefined : (
-          <AxisButton role="secondary" onClick={addField}>
+          <AxisButton role="secondary" onClick={() => setAdding(true)}>
             {t('shell.studio.entity.addField')}
           </AxisButton>
         )
@@ -741,9 +764,126 @@ const Fields = memo(function Fields({
         onChange={onChange}
         onClose={closeDrawer}
       />
+      <AddFieldDialog open={adding} fields={fields} onAdd={addField} onClose={() => setAdding(false)} />
     </SectionPart>
   )
 })
+
+/**
+ * The field types in the order Add field offers them: text and numbers, then yes or no and dates, then a choice, the
+ * types that point to another entity, and a file. Proposed, see #3264.
+ */
+const fieldTypeChoiceOrder: readonly FieldType[] = [
+  'text',
+  'integer',
+  'decimal',
+  'money',
+  'boolean',
+  'date',
+  'date-time',
+  'enum',
+  'reference',
+  'references',
+  'child-collection',
+  'file',
+]
+
+/** The field types as choices, each its name in words and a line that says what it holds. Proposed, see #3264. */
+function fieldTypeChoices(t: (key: string) => string) {
+  return fieldTypeChoiceOrder.map((type) => ({
+    value: type,
+    label: t(`shell.studio.entity.type.${type}`),
+    help: t(`shell.studio.entity.type.${type}.help`),
+  }))
+}
+
+/**
+ * Proposed: Add field's dialog, which asks for the new field's name and type before the field is added, see #3264. Add
+ * is never off: a click checks the name, shows under it what is wrong and focuses it, as docs/reference/actions-and-controls.md#fields
+ * says. The type starts at Text, the most common one. The rest of the field's settings are in its drawer.
+ */
+function AddFieldDialog({
+  open,
+  fields,
+  onAdd,
+  onClose,
+}: {
+  open: boolean
+  fields: unknown[]
+  onAdd: (name: string, type: FieldType) => void
+  onClose: () => void
+}) {
+  const t = useText()
+  const { size, spacing } = useDesignTokens()
+  const [form] = Form.useForm<{ name: string; type: FieldType }>()
+  const nameTexts = fieldTexts(t, 'fields.name')
+  const typeTexts = fieldTexts(t, 'fields.type')
+
+  function add({ name, type }: { name: string; type: FieldType }) {
+    const entered = name.trim()
+    const problem = !/^[A-Za-z][A-Za-z0-9]*$/.test(entered)
+      ? 'nameInvalid'
+      : fields.some((field) => fieldName(field)?.toLowerCase() === entered.toLowerCase())
+        ? 'nameTaken'
+        : null
+    if (problem !== null) {
+      form.setFields([{ name: 'name', errors: [t(`shell.studio.entity.addFieldDialog.${problem}`)] }])
+      form.focusField('name')
+      return
+    }
+    onAdd(entered, type)
+  }
+
+  return (
+    <Modal
+      open={open}
+      width={size.dialog.large}
+      title={t('shell.studio.entity.addFieldDialog.title')}
+      okText={t('shell.studio.entity.addFieldDialog.add')}
+      cancelText={t('shell.studio.cancel')}
+      onOk={() => form.submit()}
+      onCancel={onClose}
+      // Each opening starts with an empty name and Text.
+      afterClose={() => form.resetFields()}
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark={requiredMark}
+        initialValues={{ name: '', type: 'text' }}
+        scrollToFirstError={{ focus: true }}
+        onFinish={add}
+      >
+        <Flex vertical gap={spacing.lg}>
+          <AxisField
+            name="name"
+            label={nameTexts.label}
+            help={nameTexts.help}
+            requiredMessage={t('shell.studio.entity.addFieldDialog.nameRequired')}
+          >
+            <Input
+              aria-label={nameTexts.label}
+              autoFocus
+              // The browser also submits a form with one text box on Enter, so this stops it from adding twice.
+              onPressEnter={(event) => {
+                event.preventDefault()
+                form.submit()
+              }}
+            />
+          </AxisField>
+          <AxisChoiceField
+            name="type"
+            label={typeTexts.label}
+            help={t('shell.studio.entity.addFieldDialog.type.help')}
+            requiredMessage={t('shell.studio.entity.addFieldDialog.typeRequired')}
+            options={fieldTypeChoices(t)}
+            columns={2}
+          />
+        </Flex>
+      </Form>
+    </Modal>
+  )
+}
 
 /** The name of a field's row as a link that opens the field drawer, with the mark of a customization layer. */
 const NameCell = memo(function NameCell({
@@ -795,6 +935,9 @@ const LabelCell = memo(function LabelCell({ field }: { field: unknown }) {
  * the application does not have reads as written and is not a link. A type the designer does not know reads as written
  * too, see docs/reference/entity-designer.md#fields.
  */
+/** The types that point to another entity, whose words name it. */
+const targetTypes: readonly string[] = ['reference', 'references', 'child-collection']
+
 const TypeCell = memo(function TypeCell({ field, application }: { field: unknown; application: string }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
@@ -805,6 +948,9 @@ const TypeCell = memo(function TypeCell({ field, application }: { field: unknown
   }
   if (!(fieldTypes as readonly string[]).includes(type)) {
     return type
+  }
+  if (!targetTypes.includes(type)) {
+    return t(`shell.studio.entity.type.${type}`)
   }
   const target = text(isContent(field) ? field.target : undefined)
   if (target === '') {
@@ -970,7 +1116,8 @@ const FieldDrawer = memo(function FieldDrawer({
                     optionFilterProp="label"
                     virtual={false}
                     value={type === '' ? undefined : type}
-                    options={fieldTypes.map((option) => ({ value: option, label: option }))}
+                    // Proposed: the types by name in words, in Add field's order, see #3264.
+                    options={fieldTypeChoices(t).map(({ value, label }) => ({ value, label }))}
                     onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
                   />
                 </AxisField>
