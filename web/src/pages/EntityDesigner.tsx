@@ -28,7 +28,7 @@ import {
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
-import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { PartBoundary, SectionPart, SectionParts } from '../platform/SectionParts'
 import { withoutModulePrefix, type StudioNames } from '../platform/studio'
 import { studioResourceAddress } from '../platform/studioAddress'
 import { labelText, referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
@@ -938,68 +938,70 @@ const FieldDrawer = memo(function FieldDrawer({
       title={name || t('shell.studio.entity.unnamedField')}
       onClose={onClose}
     >
-      {index !== null && (
-        <Flex vertical gap="middle" data-testid="studio-field-drawer" key={index} ref={setRoot} tabIndex={-1}>
-          {warning && (
-            <AxisAlert
-              kind="warning"
-              data-testid={`studio-migration-warning-${pointer}`}
-              message={t(
-                warning === 'enum'
-                  ? 'shell.studio.entity.migration.enumWarning'
-                  : 'shell.studio.entity.migration.uniqueWarning',
-              )}
-            />
-          )}
-          <AxisFieldGroup {...groupTexts(t, 'fields.group.general')}>
-            <Flex vertical gap="middle">
-              <div data-testid={`studio-field-${pointer}/name`}>
-                <AxisField {...fieldTexts(t, 'fields.name')} required>
-                  <Input value={name} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
-                </AxisField>
-              </div>
-              <AxisField {...fieldTexts(t, 'fields.label')}>
-                <FieldLabel
-                  name={fieldTexts(t, 'fields.label').label}
-                  pointer={`${pointer}/label`}
-                  value={content.label}
-                  onChange={onChange}
-                />
-              </AxisField>
-              <div data-testid={`studio-field-${pointer}/type`}>
-                <AxisField {...fieldTexts(t, 'fields.type')} required>
-                  <Select
-                    showSearch
-                    optionFilterProp="label"
-                    virtual={false}
-                    value={type === '' ? undefined : type}
-                    options={fieldTypes.map((option) => ({ value: option, label: option }))}
-                    onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
+      <PartBoundary>
+        {index !== null && (
+          <Flex vertical gap="middle" data-testid="studio-field-drawer" key={index} ref={setRoot} tabIndex={-1}>
+            {warning && (
+              <AxisAlert
+                kind="warning"
+                data-testid={`studio-migration-warning-${pointer}`}
+                message={t(
+                  warning === 'enum'
+                    ? 'shell.studio.entity.migration.enumWarning'
+                    : 'shell.studio.entity.migration.uniqueWarning',
+                )}
+              />
+            )}
+            <AxisFieldGroup {...groupTexts(t, 'fields.group.general')}>
+              <Flex vertical gap="middle">
+                <div data-testid={`studio-field-${pointer}/name`}>
+                  <AxisField {...fieldTexts(t, 'fields.name')} required>
+                    <Input value={name} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
+                  </AxisField>
+                </div>
+                <AxisField {...fieldTexts(t, 'fields.label')}>
+                  <FieldLabel
+                    name={fieldTexts(t, 'fields.label').label}
+                    pointer={`${pointer}/label`}
+                    value={content.label}
+                    onChange={onChange}
                   />
                 </AxisField>
-              </div>
-              <AxisField {...fieldTexts(t, 'fields.helpText')}>
-                <FieldLabel
-                  name={fieldTexts(t, 'fields.helpText').label}
-                  pointer={`${pointer}/help`}
-                  value={content.help}
-                  onChange={onChange}
-                />
-              </AxisField>
-            </Flex>
-          </AxisFieldGroup>
-          <Settings
-            index={index}
-            field={content}
-            currencyNames={currencyNames}
-            matchSources={matchSources}
-            readOnly={readOnly}
-            validations={validations}
-            layer={layer}
-            onChange={onChange}
-          />
-        </Flex>
-      )}
+                <div data-testid={`studio-field-${pointer}/type`}>
+                  <AxisField {...fieldTexts(t, 'fields.type')} required>
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      virtual={false}
+                      value={type === '' ? undefined : type}
+                      options={fieldTypes.map((option) => ({ value: option, label: option }))}
+                      onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
+                    />
+                  </AxisField>
+                </div>
+                <AxisField {...fieldTexts(t, 'fields.helpText')}>
+                  <FieldLabel
+                    name={fieldTexts(t, 'fields.helpText').label}
+                    pointer={`${pointer}/help`}
+                    value={content.help}
+                    onChange={onChange}
+                  />
+                </AxisField>
+              </Flex>
+            </AxisFieldGroup>
+            <Settings
+              index={index}
+              field={content}
+              currencyNames={currencyNames}
+              matchSources={matchSources}
+              readOnly={readOnly}
+              validations={validations}
+              layer={layer}
+              onChange={onChange}
+            />
+          </Flex>
+        )}
+      </PartBoundary>
     </Drawer>
   )
 })

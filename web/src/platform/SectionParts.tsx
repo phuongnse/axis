@@ -2,14 +2,23 @@ import { Flex, Typography } from 'antd'
 import { Children, createContext, isValidElement, useContext, useId, useState, type ReactNode } from 'react'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { Chevron } from './Chevron'
+import { ContentInsetContext } from './contentInsetContext'
 import { useDesignTokens } from './themeMode'
 
 /** Whether the part that reads it draws a `borderSubtle` rule above itself. */
 const RuleAbove = createContext(false)
 
-/** A boundary a part does not draw its rule across, such as a tile: a part inside it draws no rule above itself. */
+/**
+ * A boundary that a part draws no rule across, such as a tile or a drawer's or a dialog's body: a part inside it draws no
+ * rule above itself. It gives no page inset either, so what is inside reads 0 from `ContentInsetContext`, see
+ * docs/reference/shell.md#layout.
+ */
 export function PartBoundary({ children }: { children: ReactNode }) {
-  return <RuleAbove.Provider value={false}>{children}</RuleAbove.Provider>
+  return (
+    <RuleAbove.Provider value={false}>
+      <ContentInsetContext.Provider value={0}>{children}</ContentInsetContext.Provider>
+    </RuleAbove.Provider>
+  )
 }
 
 /**

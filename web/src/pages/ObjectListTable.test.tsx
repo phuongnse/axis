@@ -1,9 +1,10 @@
 import { render, screen, within } from '@testing-library/react'
-import { useDeferredValue, type ComponentProps, type ReactNode } from 'react'
+import { useContext, useDeferredValue, type ComponentProps, type ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { Input } from 'antd'
 import { describe, expect, it, vi } from 'vitest'
 import english from '../../../src/Axis.Presentation/Texts/en.json'
+import { ContentInsetContext } from '../platform/contentInsetContext'
 import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
@@ -20,39 +21,52 @@ const columns: ObjectListColumn[] = [
   { key: 'connectors', title: 'Connectors', kind: 'freeText' },
 ]
 
-function renderList(onChange = vi.fn(), large = false, extra: Partial<ComponentProps<typeof ObjectListTable>> = {}) {
+function renderList(
+  onChange = vi.fn(),
+  large = false,
+  extra: Partial<ComponentProps<typeof ObjectListTable>> = {},
+  inset = 0,
+) {
   render(
-    <ThemeModeProvider initialMode="light">
-      <TextProvider catalogs={[{ texts: english, fallbackTexts: english }]} development={false}>
-        <ObjectListTable
-          pointer="/modules"
-          items={items}
-          columns={columns}
-          itemName="module"
-          required={['name']}
-          large={large}
-          newItem={() => ({ name: '', version: '' })}
-          onChange={onChange}
-          fields={(copy, change, _index, problem) => (
-            <>
-              {columns.map((column) => (
-                <div key={column.key}>
-                  <Input
-                    aria-label={column.title}
-                    value={String(copy[column.key] ?? '')}
-                    onChange={(event) => change(`/${column.key}`, event.target.value)}
-                  />
-                  {problem(column.key)}
-                </div>
-              ))}
-            </>
-          )}
-          {...extra}
-        />
-      </TextProvider>
-    </ThemeModeProvider>,
+    <ContentInsetContext.Provider value={inset}>
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={[{ texts: english, fallbackTexts: english }]} development={false}>
+          <ObjectListTable
+            pointer="/modules"
+            items={items}
+            columns={columns}
+            itemName="module"
+            required={['name']}
+            large={large}
+            newItem={() => ({ name: '', version: '' })}
+            onChange={onChange}
+            fields={(copy, change, _index, problem) => (
+              <>
+                {columns.map((column) => (
+                  <div key={column.key}>
+                    <Input
+                      aria-label={column.title}
+                      value={String(copy[column.key] ?? '')}
+                      onChange={(event) => change(`/${column.key}`, event.target.value)}
+                    />
+                    {problem(column.key)}
+                  </div>
+                ))}
+              </>
+            )}
+            {...extra}
+          />
+        </TextProvider>
+      </ThemeModeProvider>
+    </ContentInsetContext.Provider>,
   )
   return onChange
+}
+
+/** Shows the content inset that the context gives the element that reads it. */
+function InsetReader({ testId }: { testId: string }) {
+  const inset = useContext(ContentInsetContext)
+  return <span data-testid={testId}>{inset}</span>
 }
 
 const bodyRows = () => screen.getAllByRole('row').slice(1)
@@ -237,6 +251,24 @@ describe('the list of objects', () => {
 
     expect(within(bodyRows()[0]).queryByText('Added')).toBeNull()
     expect(within(bodyRows()[1]).getByText('Added')).toBeVisible()
+  })
+
+  it('gives the fields of the item dialog no page inset, beside a row of the list that keeps the inset of the page', async () => {
+    renderList(
+      vi.fn(),
+      false,
+      {
+        fields: () => <InsetReader testId="dialog" />,
+        firstCellMark: (index) => (index === 0 ? <InsetReader testId="page" /> : null),
+      },
+      24,
+    )
+
+    expect(screen.getByTestId('page')).toHaveTextContent('24')
+    await userEvent.click(screen.getByRole('button', { name: 'Add module…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Add module' })
+
+    expect(within(dialog).getByTestId('dialog')).toHaveTextContent('0')
   })
 
   it('gives the fields the index of the item to edit', async () => {

@@ -14,6 +14,7 @@ import {
   fieldTypes,
   type FieldSetting,
 } from '../platform/entityFields'
+import { ContentInsetContext } from '../platform/contentInsetContext'
 import { setAt } from '../platform/jsonPatch'
 import type { LayerElement } from '../platform/layerMarks'
 import { studioResourceAddress } from '../platform/studioAddress'
@@ -50,6 +51,27 @@ vi.mock('./ProcessFields', async (importOriginal) => {
         <actual.Expression {...props} />
       </Profiler>
     ),
+  }
+})
+
+// A group draws a hidden reader of the content inset it is given, so a test reads the inset of a group on the page and of one in a drawer.
+vi.mock('../platform/AxisFieldGroup', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../platform/AxisFieldGroup')>()
+  const { useContext } = await import('react')
+  const { ContentInsetContext } = await import('../platform/contentInsetContext')
+  return {
+    ...actual,
+    AxisFieldGroup: (props: ComponentProps<typeof actual.AxisFieldGroup>) => {
+      const inset = useContext(ContentInsetContext)
+      return (
+        <>
+          <span hidden data-testid="content-inset">
+            {inset}
+          </span>
+          <actual.AxisFieldGroup {...props} />
+        </>
+      )
+    },
   }
 })
 
@@ -942,6 +964,25 @@ describe('EntityDesigner', () => {
       ])
 
       expect(await screen.findByTestId('studio-field-drawer')).toHaveFocus()
+    })
+
+    it('gives the groups of the field drawer no page inset, and the groups of the General section the inset of the page', async () => {
+      const value = entity({ fields: [...entity().fields.slice(0, 2), { name: 'note', type: 'text' }] })
+      renderRouted(
+        <ContentInsetContext.Provider value={24}>
+          <EntityDesigner value={value} onChange={vi.fn()} application="Shop" />
+        </ContentInsetContext.Provider>,
+        ['/studio?app=Shop&field=note'],
+      )
+
+      const drawer = await screen.findByTestId('studio-field-drawer')
+      const drawerInsets = within(drawer).getAllByTestId('content-inset')
+      const generalInsets = within(screen.getByTestId('studio-section-general')).getAllByTestId('content-inset')
+
+      expect(drawerInsets.length).toBeGreaterThan(0)
+      drawerInsets.forEach((inset) => expect(inset).toHaveTextContent(/^0$/))
+      expect(generalInsets.length).toBeGreaterThan(0)
+      generalInsets.forEach((inset) => expect(inset).toHaveTextContent(/^24$/))
     })
   })
 
