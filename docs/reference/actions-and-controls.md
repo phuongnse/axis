@@ -134,7 +134,8 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   while a field inside a form is marked by its `requiredMessage` alone.
   It makes its select, number, date or text input, or a select joined with its action, as wide as the field.
   `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
-  group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
+  group that its title names and its help describes. It takes an `action` on its title row, drawn as a light text
+  button, and the group is still named by its title alone. A field that holds one input uses `AxisField`, and a
   field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
   `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` are built on `AxisField` and `AxisFieldGroup`.
   `AxisCheckboxField` and `AxisChoiceField` take the same two modes: with a `name` inside a form, or with the

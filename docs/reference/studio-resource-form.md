@@ -20,7 +20,7 @@ with no heading. A property that no section names goes to a last section with no
 - **One field in a section.** A section that holds one field names it in its heading, so the field has
   no label of its own. A section that holds one object shows the object's fields itself.
 - **One list in a section.** In the generic form's sections, a section that holds one list puts the list's Add…
-  on the right of its heading, and the table has no toolbar row.
+  on the right of its heading as a light text button, and the table has no toolbar row.
 - **One rhythm.** There is `spacing-md` on each side of the rule.
 - **One shared part.** The section is `SectionPart`, in `SectionParts`, one shared part that the generic form
   draws and the typed editors draw too.

@@ -2,7 +2,7 @@ import { DeleteOutlined } from '@ant-design/icons'
 import { Flex, Modal } from 'antd'
 import { useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AxisButton } from '../platform/AxisButton'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn, type ColumnKind } from '../platform/AxisTable'
 import { setAt } from '../platform/jsonPatch'
 import { useText } from '../platform/texts'
@@ -216,7 +216,8 @@ export function ObjectListTable({
           ],
         }}
       />
-      {addIn && createPortal(addButton, addIn)}
+      {/* The row wraps the button where the portal is made, as context follows the React tree, not the slot's DOM. */}
+      {addIn && createPortal(<AxisActionRow>{addButton}</AxisActionRow>, addIn)}
       <Modal
         open={editing !== null}
         width={large ? size.dialog.large : size.dialog.medium}
