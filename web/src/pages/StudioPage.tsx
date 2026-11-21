@@ -709,15 +709,9 @@ function StudioWorkspace() {
                           </AxisActionRow>
                         </PageActions>
                       )}
+                      {/* Proposed: an open resource shows no facts part, as its id is an internal code and its file
+                          is no concern of the page, see #3264. */}
                       <SectionParts>
-                        <SectionPart testName="facts">
-                          <TermList
-                            terms={[
-                              { key: 'id', term: t('shell.studio.id'), value: selected.id },
-                              { key: 'file', term: t('shell.studio.file'), value: selected.file },
-                            ]}
-                          />
-                        </SectionPart>
                         <SectionPart testName="editor">
                           <StudioApplicationContext.Provider value={application!}>
                             <StudioNamesContext.Provider value={names ?? undefined}>
@@ -775,7 +769,6 @@ function StudioWorkspace() {
                         <SectionPart testName="facts">
                           <TermList
                             terms={[
-                              { key: 'id', term: t('shell.studio.id'), value: selectedModuleItem.id },
                               { key: 'module', term: t('shell.studio.module'), value: selectedModuleItem.module },
                             ]}
                           />
