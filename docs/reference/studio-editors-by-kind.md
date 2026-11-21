@@ -114,14 +114,17 @@ itself with other parameters.
 
 ### Page parameters
 
-The Parameters section sits between General and Widgets. Its Add parameter button sits on the right of the
-heading, and a page with no parameters says so in one line. Each parameter has a name, a type picker over
-`text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `reference`, a Required switch
-and Remove. The name, type and Required switch sit one to a row. Add parameter appends a `text` parameter
+The Parameters section sits between General and Widgets. Its Add parameter is a light text button on the
+right of the heading, and a page with no parameters says so in one line. Each parameter is a row with no
+box. It has a name, a type picker over `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum`
+and `reference`, and a Required switch. The name, type and Required switch sit one to a row, each as wide as
+the field it fills. Remove parameter is an entry of the row's "…" menu at its top right, the same menu as a
+table's [row actions](actions-and-controls.md#tables). Add parameter appends a `text` parameter
 with an empty name. A `reference` parameter also has a target entity picker, and an `enum` parameter its
 values. A type change removes the `target` or the `values` that the new type does not take, and switching Required off removes the `required` key.
 The names answer lists each page's parameters, which is how a navigate action knows them. A
-`parameters` that is not a list points to the JSON view.
+`parameters` that is not a list points to the JSON view, and a parameter that is not an object shows that
+line with no menu.
 
 ### Widget tree
 
@@ -133,8 +136,11 @@ body as nested lists, and a row opens its widget's panel at its own pointer, suc
   `<type><n>`, such as `table1`, with the first `n` free on the page at any depth, ignoring letter case.
   A new `columns` starts with the columns `column1` and `column2` of width 6, a new `tabs` with `tab1`,
   and a new `section` empty.
-- **Moving.** Every row has Move up, Move down and Remove, which replace only the list that holds the
-  widget, and a Move to picker. Move to lists every other widget list as a path, such as
+- **Moving.** Every row has a Move to picker and a "…" menu at its end, with Move up, Move down and
+  Delete. The menu's actions replace only the list that holds the widget, Move up is off on the list's first
+  row and Move down on its last, and Delete is destructive. The row's button that selects the widget is
+  outlined in the primary colour while the widget is selected, with `aria-current`, and grey otherwise.
+  Move to lists every other widget list as a path, such as
   `Page › columns 1 › Column 2`, leaves out the widget's own list and the lists inside it, and replaces
   the page's `widgets` in one change. A type change or a move keeps the widget's name.
 - **Fixed containers.** A container's type is fixed. The compiler reports the depth limit and an empty

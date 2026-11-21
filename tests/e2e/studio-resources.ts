@@ -288,6 +288,17 @@ export async function entityFieldAction(page: Page, index: number, action: 'Move
 }
 
 /**
+ * Chooses Move up, Move down or Delete in the "…" menu of the widget row at `pointer` in `scope`, such as a page's design
+ * panel. It presses Enter on the entry, as `entityFieldAction` does, and waits until the menu has closed.
+ */
+export async function widgetRowAction(scope: Locator, pointer: string, action: 'Move up' | 'Move down' | 'Delete') {
+  await scope.getByTestId(`studio-widget-row-${pointer}`).getByRole('button', { name: 'Actions', exact: true }).click()
+  const menu = scope.page().getByRole('menu', { name: 'Actions', exact: true })
+  await menu.getByRole('menuitem', { name: action, exact: true }).press('Enter')
+  await expect(menu).toHaveCount(0)
+}
+
+/**
  * Clicks Save and waits for the save to finish. A save waits for the Studio write lock, which can take up to 10 seconds,
  * and the server then compiles the application, so this waits up to 30 seconds. A save error or a conflict fails at once
  * with the alert's text. It closes an open field first, so the save is not made from inside one.

@@ -1,6 +1,8 @@
 import { useDraggable } from '@dnd-kit/core'
-import { Button, Flex, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
+import type { PointerEventHandler } from 'react'
 import { Announcement } from '../platform/Announcement'
+import { AxisButton } from '../platform/AxisButton'
 import { getAt } from '../platform/jsonPatch'
 import {
   addableTypes,
@@ -107,17 +109,17 @@ function PaletteType({
   const reasonId = `studio-palette-reason-${type}`
   return (
     <Flex vertical>
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button
+      <AxisButton
+        role="secondary"
         ref={setNodeRef}
-        {...listeners}
+        onPointerDown={listeners?.onPointerDown as PointerEventHandler<HTMLElement> | undefined}
         disabled={limit !== undefined}
         aria-describedby={limit === undefined ? undefined : reasonId}
         data-testid={`studio-palette-${type}`}
         onClick={onInsert}
       >
         {type}
-      </Button>
+      </AxisButton>
       {limit !== undefined && (
         <Typography.Text type="secondary" id={reasonId}>
           {t(paletteReasons[limit])}

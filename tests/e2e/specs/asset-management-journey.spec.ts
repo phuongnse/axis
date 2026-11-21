@@ -28,6 +28,7 @@ import {
   openKind,
   openListItem,
   openTab,
+  widgetRowAction,
   writeLabel,
 } from '../studio-resources'
 
@@ -847,10 +848,7 @@ test.describe('the author builds the asset management application with Studio on
     await dragTo(page, 'studio-page-design', panel.getByTestId('studio-data-entity-Asset'), starter, 0.75)
     await chooseBinding(page, 'detail')
     await expect(frame(page, '/widgets/1')).toBeVisible()
-    await panel
-      .getByTestId('studio-widget-row-/widgets/0')
-      .getByRole('button', { name: 'Delete', exact: true })
-      .click()
+    await widgetRowAction(panel, '/widgets/0', 'Delete')
     await expect(panel.getByTestId('studio-widget-/widgets/1')).toHaveCount(0)
     await save(page)
   })
@@ -879,10 +877,7 @@ test.describe('the author builds the asset management application with Studio on
     await expect(frame(page, '/widgets/1')).toBeVisible()
     await dragOnto('studio-palette-columns', frame(page, '/widgets/0'), 0.25)
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toBeVisible()
-    await panel
-      .getByTestId('studio-widget-row-/widgets/1')
-      .getByRole('button', { name: 'Delete', exact: true })
-      .click()
+    await widgetRowAction(panel, '/widgets/1', 'Delete')
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toHaveCount(0)
     await panel.getByTestId('studio-widget-/widgets/0').click()
     await panel.getByTestId('studio-field-/widgets/0/columns/0/width').getByRole('spinbutton').fill('4')
