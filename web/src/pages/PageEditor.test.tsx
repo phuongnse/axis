@@ -101,6 +101,15 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
+/**
+ * Opens the "…" menu of the item `row` and returns its entry `name`. A row that holds a list has its own menu after the
+ * item's first one, so this takes the first menu of the row, which is the item's own.
+ */
+async function itemAction(row: HTMLElement, name: string) {
+  await userEvent.click(within(row).getAllByRole('button', { name: 'Actions' })[0])
+  return within(await shownMenu('Actions')).getByRole('menuitem', { name })
+}
+
 /** `resource` is false where the page editor has no resource to write texts to, as in the module editor. */
 function renderEditor(
   value: Record<string, unknown>,
@@ -541,6 +550,7 @@ describe('PageEditor sections', () => {
       },
       [
         ['textbox', 'widgets.type'],
+        ['group', 'widgets.columns'],
         ['spinbutton', 'widgets.columns.width'],
       ],
     ],
@@ -549,6 +559,7 @@ describe('PageEditor sections', () => {
       { type: 'tabs', tabs: [{ label: { textKey: 'pages.review.title' }, widgets: [{ type: 'taskInbox' }] }] },
       [
         ['textbox', 'widgets.type'],
+        ['group', 'widgets.tabs'],
         ['group', 'widgets.tabs.label'],
       ],
     ],
@@ -669,7 +680,7 @@ describe('PageEditor form panel', () => {
       { type: 'startProcess', name: 'startProcess1', process: '', label: { textKey: '' } },
     ])
 
-    await userEvent.click(within(screen.getByTestId('studio-action-0')).getByRole('button', { name: 'Remove action' }))
+    await userEvent.click(await itemAction(screen.getByTestId('studio-action-0'), 'Remove action'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/actions/0', undefined)
   })
 
@@ -776,7 +787,7 @@ describe('PageEditor delete actions', () => {
   it('removes a delete action', async () => {
     const onChange = renderEditor(page({ ...table, rowActions: [deleteAction] }))
 
-    await userEvent.click(within(screen.getByTestId('studio-action-0')).getByRole('button', { name: 'Remove action' }))
+    await userEvent.click(await itemAction(screen.getByTestId('studio-action-0'), 'Remove action'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions/0', undefined)
   })
 })
@@ -792,6 +803,17 @@ describe('PageEditor navigate actions', () => {
     expect(screen.getByTestId('studio-field-/widgets/0/toolbarActions')).toBeVisible()
     expect(screen.getAllByRole('button', { name: 'Add navigate action' })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Add action' })).not.toBeInTheDocument()
+  })
+
+  it('draws the Adds of the row actions as one group of text buttons on the title row', () => {
+    renderEditor(page(table))
+
+    const group = within(screen.getByTestId(rows)).getByRole('group', { name: 'Add an action' })
+    for (const name of ['Add navigate action', 'Add delete action']) {
+      const add = within(group).getByRole('button', { name })
+      expect(add.closest('legend')).not.toBeNull()
+      expect(add).toHaveClass('ant-btn-variant-text')
+    }
   })
 
   it('saves a row navigate with its page and record', async () => {
@@ -961,7 +983,7 @@ describe('PageEditor navigate actions', () => {
   it('removes an action by its index', async () => {
     const onChange = renderEditor(page({ ...table, rowActions: [navigate] }))
 
-    await userEvent.click(within(screen.getByTestId('studio-action-0')).getByRole('button', { name: 'Remove action' }))
+    await userEvent.click(await itemAction(screen.getByTestId('studio-action-0'), 'Remove action'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/rowActions/0', undefined)
   })
 })
@@ -1611,11 +1633,24 @@ describe('PageEditor kpi and chart panels', () => {
   it('adds and removes chart measures but keeps one', async () => {
     const saved = renderStateful(page(chart))
 
-    expect(screen.getByRole('button', { name: 'Remove measure' })).toBeDisabled()
+    expect(await itemAction(screen.getByTestId('studio-measure-0'), 'Remove measure')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+    await userEvent.keyboard('{Escape}')
     await userEvent.click(screen.getByRole('button', { name: 'Add measure' }))
     expect(saved()).toMatchObject({ widgets: [{ measures: [{ name: '' }, { name: '', label: { textKey: '' } }] }] })
-    await userEvent.click(screen.getAllByRole('button', { name: 'Remove measure' })[0])
+    await userEvent.click(await itemAction(screen.getByTestId('studio-measure-0'), 'Remove measure'))
     expect(saved()).toMatchObject({ widgets: [{ measures: [{ name: '' }] }] })
+  })
+
+  it('draws Add measure as a text button on the Measures title row, with no Remove button in a measure', () => {
+    renderEditor(page(chart))
+
+    const add = screen.getByRole('button', { name: 'Add measure' })
+    expect(add.closest('legend')).not.toBeNull()
+    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(within(screen.getByTestId('studio-measure-0')).queryByRole('button', { name: 'Remove measure' })).toBeNull()
   })
 
   it('keeps a measure the data source does not project and tags it unknown', () => {
@@ -1739,7 +1774,7 @@ describe('PageEditor container panels', () => {
       { name: 'column1', width: 4, widgets: [] },
     ])
 
-    await userEvent.click(within(screen.getByTestId('studio-column-0')).getByRole('button', { name: 'Remove column' }))
+    await userEvent.click(await itemAction(screen.getByTestId('studio-column-0'), 'Remove column'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns', [{ width: 4, widgets: [inbox], 'x-note': 'keep' }])
   })
 
@@ -1782,7 +1817,26 @@ describe('PageEditor container panels', () => {
   it('disables Remove column on the last column', async () => {
     await open({ type: 'columns', columns: [{ width: 12, widgets: [inbox] }] })
 
-    expect(screen.getByRole('button', { name: 'Remove column' })).toBeDisabled()
+    expect(await itemAction(screen.getByTestId('studio-column-0'), 'Remove column')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+  })
+
+  it('draws Add column and Add tab as text buttons on their title rows, with no Remove button in an item', async () => {
+    await open(columns)
+
+    const addColumn = screen.getByRole('button', { name: 'Add column' })
+    expect(addColumn.closest('legend')).not.toBeNull()
+    expect(addColumn).toHaveClass('ant-btn-variant-text')
+    expect(within(screen.getByTestId('studio-column-0')).queryByRole('button', { name: 'Remove column' })).toBeNull()
+    cleanup()
+
+    await open(tabs)
+    const addTab = screen.getByRole('button', { name: 'Add tab' })
+    expect(addTab.closest('legend')).not.toBeNull()
+    expect(addTab).toHaveClass('ant-btn-variant-text')
+    expect(within(screen.getByTestId('studio-tab-0')).queryByRole('button', { name: 'Remove tab' })).toBeNull()
   })
 
   it('sets the texts of a tab label in the draft', async () => {
@@ -1814,14 +1868,14 @@ describe('PageEditor container panels', () => {
       { name: 'tab1', label: { textKey: '' }, widgets: [] },
     ])
 
-    await userEvent.click(within(screen.getByTestId('studio-tab-0')).getByRole('button', { name: 'Remove tab' }))
+    await userEvent.click(await itemAction(screen.getByTestId('studio-tab-0'), 'Remove tab'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/tabs', [tabs.tabs[1]])
   })
 
   it('disables Remove tab on the last tab', async () => {
     await open({ type: 'tabs', tabs: [tabs.tabs[0]] })
 
-    expect(screen.getByRole('button', { name: 'Remove tab' })).toBeDisabled()
+    expect(await itemAction(screen.getByTestId('studio-tab-0'), 'Remove tab')).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('edits the key of the title of a section where there is no resource to write texts to', async () => {
@@ -1872,7 +1926,7 @@ describe('PageEditor container panels', () => {
     await userEvent.clear(width)
     await userEvent.type(width, '4')
     await userEvent.click(screen.getByRole('button', { name: 'Add column' }))
-    await userEvent.click(within(screen.getByTestId('studio-column-0')).getByRole('button', { name: 'Remove column' }))
+    await userEvent.click(await itemAction(screen.getByTestId('studio-column-0'), 'Remove column'))
 
     const pointers = onChange.mock.calls.map(([pointer]) => pointer)
     expect(pointers.every((pointer) => pointer.startsWith('/widgets/0/columns'))).toBe(true)
@@ -1887,7 +1941,7 @@ describe('PageEditor container panels', () => {
     const tabChange = await open(tabs)
     await userEvent.click(screen.getByRole('button', { name: 'Add tab' }))
     expect(tabChange.mock.lastCall![1]).toContainEqual(tabs.tabs[1])
-    await userEvent.click(within(screen.getByTestId('studio-tab-0')).getByRole('button', { name: 'Remove tab' }))
+    await userEvent.click(await itemAction(screen.getByTestId('studio-tab-0'), 'Remove tab'))
     expect(tabChange.mock.lastCall![1]).toContainEqual(tabs.tabs[1])
     cleanup()
 
@@ -1927,13 +1981,13 @@ describe('PageEditor container panels', () => {
     expect(onChange).toHaveBeenCalledWith('/widgets/0/collapsed', true)
   })
 
-  it('shows a malformed part as JSON only and keeps its Remove button', async () => {
+  it('shows a malformed part as JSON only and keeps its Remove column in its menu', async () => {
     const onChange = await open({ type: 'columns', columns: [{ width: 6, widgets: [inbox] }, 'oops'] })
 
     const part = within(screen.getByTestId('studio-column-1'))
     expect(part.getByTestId('studio-json-only')).toBeVisible()
-    const remove = part.getByRole('button', { name: 'Remove column' })
-    expect(remove).toBeEnabled()
+    const remove = await itemAction(screen.getByTestId('studio-column-1'), 'Remove column')
+    expect(remove).not.toHaveAttribute('aria-disabled', 'true')
     await userEvent.click(remove)
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns', [{ width: 6, widgets: [inbox] }])
   })
@@ -1962,7 +2016,7 @@ describe('PageEditor action selection', () => {
     return { onSelect, onChange }
   }
 
-  it('marks the card of the selected action and keeps its widget selected in the tree', () => {
+  it('marks the row of the selected action and keeps its widget selected in the tree', () => {
     renderSelecting(withActions, '/widgets/0/rowActions/1')
 
     const rows = within(screen.getByTestId('studio-field-/widgets/0/rowActions'))
@@ -1974,7 +2028,7 @@ describe('PageEditor action selection', () => {
     expect(screen.getByTestId('studio-field-/widgets/0')).toBeInTheDocument()
   })
 
-  it('marks no card when the pointer names an action that is not there, and still shows the widget', () => {
+  it('marks no row when the pointer names an action that is not there, and still shows the widget', () => {
     renderSelecting(withActions, '/widgets/0/rowActions/5')
 
     expect(screen.getByTestId('studio-field-/widgets/0')).toBeInTheDocument()
@@ -2021,9 +2075,9 @@ describe('PageEditor action selection', () => {
     const { onSelect, onChange } = renderSelecting(withActions, '/widgets/0/rowActions/1')
 
     await userEvent.click(
-      within(within(screen.getByTestId('studio-field-/widgets/0/rowActions')).getByTestId('studio-action-1')).getByRole(
-        'button',
-        { name: 'Remove action' },
+      await itemAction(
+        within(screen.getByTestId('studio-field-/widgets/0/rowActions')).getByTestId('studio-action-1'),
+        'Remove action',
       ),
     )
 
@@ -2031,7 +2085,7 @@ describe('PageEditor action selection', () => {
     expect(onSelect).toHaveBeenLastCalledWith('/widgets/0')
   })
 
-  it('scrolls the card of the selected action into view', () => {
+  it('scrolls the row of the selected action into view', () => {
     const scrollIntoView = vi.fn()
     Element.prototype.scrollIntoView = scrollIntoView
     try {

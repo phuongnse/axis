@@ -71,9 +71,11 @@ edits the same draft on a canvas.
 
 A `kpi` panel has a data source picker, a measure picker and a [label](studio-resource-form.md#labels).
 Add comparison adds a comparison with its own measure picker and label, and Add navigate action adds a
-[navigate action](#navigate-actions), each with Remove. A `chart` panel has a data source picker, a
-kind picker over `bar`, `line` and `pie`, a category picker, a title, and a list of measures, each with
-a picker and a label, with Add measure and Remove measure, which is off when one measure is left.
+[navigate action](#navigate-actions). Each of the two adds is a grey button, and each Remove comparison and
+Remove navigate action is a red button. A `chart` panel has a data source picker, a kind picker over `bar`,
+`line` and `pie`, a category picker, a title, and a list of measures, each with a picker and a label. Add
+measure is a light text button on the Measures title row, and each measure's Remove measure is in its "…"
+menu, which is off when one measure is left.
 Every field and group of both panels shows its label and help. A chart's title and a section's title
 share one text, Title, with one help.
 
@@ -100,9 +102,12 @@ expression and parameter expressions. The page picker, label, record and paramet
 label and help. The page picker lists every page, the current one included, because a page may open
 itself with other parameters.
 
-- **Adding one.** A table offers only Add navigate action, and a form also Add action for
-  `startProcess`. A new action is named `<action type><n>`, such as `navigate1`, with the first free
-  `n` in its list. A KPI's `navigate` has no name, because the schema refuses one.
+- **Adding one.** The Adds of an action list are one group of light text buttons on the list's title
+  row. A table's row actions offer Add navigate action and Add delete action, its toolbar actions offer
+  only Add navigate action, and a form or a detail also offers Add action for `startProcess`. Each
+  action is a row with no box, and its Remove action is in the row's "…" menu. A new action is named
+  `<action type><n>`, such as `navigate1`, with the first free `n` in its list. A KPI's `navigate` has no
+  name, because the schema refuses one.
 - **Record.** An empty Record box removes the `record` key.
 - **Parameters.** When the names list the target page, the action shows an expression box for each
   parameter the page declares, with the parameter's type and whether it is required. An empty box
@@ -154,11 +159,12 @@ tab or a section, stays in the saved file. A container whose parts are malformed
 that is not a list, points to the JSON view.
 
 - **Columns.** A `columns` panel shows a width box from 1 to 12 for each column, and the compiler
-  reports widths that do not add up to 12 after the save. Add column adds a column that takes what is
-  left of 12, or 1 when nothing is left, and keeps the other widths. Remove column drops a column with
-  its widgets.
-- **Tabs.** A `tabs` panel shows each tab's [label](studio-resource-form.md#labels), with Add tab
-  and Remove tab.
+  reports widths that do not add up to 12 after the save. Each column is a row with no box. Add column
+  is a light text button on the Columns title row, and it adds a column that takes what is left of 12,
+  or 1 when nothing is left, and keeps the other widths. Remove column is in the column's "…" menu and
+  drops a column with its widgets.
+- **Tabs.** A `tabs` panel shows each tab's [label](studio-resource-form.md#labels) as a row with no
+  box. Add tab is a light text button on the Tabs title row, and Remove tab is in the tab's "…" menu.
 - **Names.** An added column or tab is named with the first free `column<n>` or `tab<n>` among its
   siblings, ignoring letter case.
 - **Section.** A `section` panel shows the title as a tab's label shows, and a Collapsed switch.
@@ -207,8 +213,8 @@ panel, its undo and its drag and drop.
   placeholder data or a form action on an unsaved record. A click, Enter or Space on the button selects
   the action, by its JSON Pointer, such as `/widgets/0/rowActions/1`, or `/widgets/0/navigate` for a
   KPI, and not its widget. The button has `aria-current` and an outline in the primary colour, the
-  widget tree keeps its widget selected, and the panel shows the widget's panel with the action's card
-  marked by `aria-current` and scrolled into view. Adding a navigate, `startProcess` or `delete` action
+  widget tree keeps its widget selected, and the panel shows the widget's panel with the action's row
+  marked by `aria-current`, outlined in the primary colour and scrolled into view. Adding a navigate, `startProcess` or `delete` action
   in the panel selects the new action, and removing an action selects its widget. The button runs
   nothing: it does not navigate, start a process, open a delete confirmation or call `/api/apps/`.
 - **Actions that fold.** A KPI's navigate action is a link-style button on the label line, and the

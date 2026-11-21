@@ -279,8 +279,8 @@ module ([kind lists](studio.md#kind-lists-and-module-resources)), and each opens
   ceiling (`AXC0334`) shows in the Problems panel after the save.
 - **Module pages.** A module page opens in the page designer with every input on and a Save
   button, and with no Form tab, JSON tab, Undo or Delete. A widget, action, row action, toolbar action,
-  column or tab that the layer added or changed is marked on its tree row, its card or its row in the
-  container's panel, and a change inside a nested widget also marks every container that holds it as
+  column or tab that the layer added or changed is marked on its tree row or its row in the container's
+  panel, and a change inside a nested widget also marks every container that holds it as
   **Changed**. A label is a plain text key, with no box for each locale, so a save writes no text. The
   canvas draws the saved page from the [module page route](draft-page-metadata.md), so it changes after
   **Save** or a reset and not while the author types.
