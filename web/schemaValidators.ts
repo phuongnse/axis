@@ -65,3 +65,19 @@ export function schemaValidators(): Plugin {
     },
   }
 }
+
+/**
+ * Loads each generated validator as `undefined`, so `loadKindValidator` answers as for a kind without one and the
+ * bundle carries neither the validators nor Ajv's runtime helpers, see docs/reference/widget-previews.md#the-bundle.
+ */
+export function leaveOutSchemaValidators(): Plugin {
+  return {
+    name: 'axis-leave-out-schema-validators',
+    enforce: 'pre',
+    // Before the `load` of `schemaValidators`, which would generate the validator.
+    load: {
+      order: 'pre',
+      handler: (id) => (id.startsWith('\0') && id.endsWith(virtualEnd) ? 'export default undefined' : null),
+    },
+  }
+}

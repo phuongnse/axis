@@ -1,6 +1,7 @@
 import { defineConfig, mergeConfig, normalizePath, type Plugin } from 'vite'
 import { fileURLToPath } from 'node:url'
 import config from './vite.config.ts'
+import { leaveOutSchemaValidators } from './schemaValidators.ts'
 
 const textsFolder = normalizePath(fileURLToPath(new URL('../src/Axis.Presentation/Texts', import.meta.url)))
 
@@ -124,6 +125,8 @@ export default defineConfig(({ command }) =>
     // development mode.
     define: command === 'build' ? { 'process.env.NODE_ENV': JSON.stringify('production') } : {},
     plugins: [
+      // No preview state needs the JSON view's schema problems, see docs/reference/widget-previews.md#the-bundle.
+      leaveOutSchemaValidators(),
       dropRouteModuleImport(),
       inlineStyleSheets(),
       escapeScriptEndings(),

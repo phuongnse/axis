@@ -12,11 +12,15 @@ sign-in. Every other request goes to the page's own fetch, unchanged.
 
 `scripts/design-system.sh` builds the bundle into `artifacts/design-system/axis-design-system.js` and
 checks it with `scripts/check-design-system.mjs`: one classic script, no `import`, no literal
-`</script` or `<!--`, no font, at most 6 MB, and no HTML file in the folder. It needs no Playwright browser and
+`</script` or `<!--`, no font, at most 6 MB, and no HTML file in the folder. It warns when the bundle is within
+256 KB of the 6 MB cap, so a shrinking margin is seen before a change fails. It needs no Playwright browser and
 is not a NexKit check. The local agent session publishes the bundle as the Design System artifact.
 The bundle carries its own React and never uses one that the page provides, because React 19 ships no
 UMD build.
 
+- **What it leaves out.** The bundle loads none of the JSON Schema validators that Studio's JSON view
+  checks a resource against, since no preview state needs them. The JSON tab of a Studio preview
+  therefore shows JSON syntax problems only, while the SPA checks the schema too.
 - **Mounting.** The bundle sets `window.Axis`. `window.Axis.<name>(element)` mounts one preview into an
   element and returns a function that unmounts it. A preview draws each of its states under its caption
   in one card, except a preview whose states answer the same fixture paths, or whose several states
