@@ -240,17 +240,18 @@ export interface StatusTint {
  * Each tone's colours, read from the Ant Design theme in use, so a page's seed colours tint a tag too, see
  * docs/reference/shared-widgets.md#which-widget. The words take the tone's text token, which the theme maps above.
  * The fill and border are Ant Design's tints of the seed colours: `neutral` the secondary fill and `muted` no fill,
- * each with the secondary border.
+ * each edged with Ant Design's strongest fill, as heavy as the tints' borders: the secondary border barely shows, and
+ * `colorBorder` is a control's `border`.
  * Proposed: the status tag's look, design review #4765.
  */
 export function useStatusTints(): Record<StatusTone, StatusTint> {
   const { token } = theme.useToken()
   return {
-    neutral: { text: token.colorText, fill: token.colorFillSecondary, border: token.colorBorderSecondary },
+    neutral: { text: token.colorText, fill: token.colorFillSecondary, border: token.colorFill },
     attention: { text: token.colorWarningText, fill: token.colorWarningBg, border: token.colorWarningBorder },
     success: { text: token.colorSuccessText, fill: token.colorSuccessBg, border: token.colorSuccessBorder },
     danger: { text: token.colorErrorText, fill: token.colorErrorBg, border: token.colorErrorBorder },
-    muted: { text: token.colorTextSecondary, fill: 'transparent', border: token.colorBorderSecondary },
+    muted: { text: token.colorTextSecondary, fill: 'transparent', border: token.colorFill },
   }
 }
 
