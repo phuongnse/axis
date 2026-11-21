@@ -95,7 +95,7 @@ choices.
   icon-only trigger has none.
 - **Actions come after the choices.** In a menu that holds both, such as the
   application menu, the choices come first and an action, such as New application…, follows them.
-- **A select's own actions end its list** _(planned)_. Creating or managing a select's choices, such as New
+- **A select's own actions end its list**. Creating or managing a select's choices, such as New
   application… or Manage saved inputs…, comes after the choices and a divider, in the look of the list's own items,
   as actions come after the choices in a menu. `ChoiceActions` draws them.
 - **One look for a list's items** _(planned for M35)_. Every list of things to pick or open draws its

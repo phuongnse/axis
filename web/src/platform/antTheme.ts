@@ -232,6 +232,28 @@ export function useSelectedItemTint(): string {
 }
 
 /**
+ * The look of a select's own actions, see docs/reference/actions-and-controls.md#menus: a menu whose items are as tall
+ * and as inset as the select's own options, set apart from the choices by a divider with a small margin.
+ * `ChoiceActions` applies it through a nested ConfigProvider.
+ */
+export function useChoiceActionsTheme(): ThemeConfig {
+  const { token } = theme.useToken()
+  return {
+    components: {
+      Divider: { marginLG: token.marginXXS },
+      Menu: {
+        itemHeight: token.controlHeight,
+        itemMarginInline: 0,
+        itemMarginBlock: 0,
+        itemPaddingInline: token.controlPaddingHorizontal,
+        itemBorderRadius: token.borderRadiusSM,
+        itemHoverBg: token.controlItemBgHover,
+      },
+    },
+  }
+}
+
+/**
  * The cell padding of a table, see docs/reference/actions-and-controls.md#tables. A row is `spacing-xs` above and below
  * a line of the `smallControl` size, which a line of text and a small icon button both fill, and `spacing-lg` on each
  * side keeps columns apart. A compact table has `spacing-sm` on each side. `AxisTable` applies it through a nested
