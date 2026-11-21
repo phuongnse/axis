@@ -291,10 +291,11 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 
 - **The process.** The Form tab has the General, Subject and Steps [sections](studio-resource-form.md#sections),
   and each field has a [field text](studio-resource-form.md#fields).
-- **Lists.** The lists of a process's parameters, a decision's branches, a task's outcomes and an operation's
-  rows have Add on their title row as a light text button. Each row's actions, and each step card's, are entries
-  of its "…" menu, the table's [row actions](actions-and-controls.md#tables). A read-only tab, such as while the
-  JSON has an error, shows no Add and no menu.
+- **Lists.** The lists of a process's parameters, a decision's branches, a task's outcomes and escalations, and an
+  operation's rows have Add on their title row as a light text button. Each row's actions, and each step card's, are
+  entries of its "…" menu, the table's [row actions](actions-and-controls.md#tables). A task's deadline and a wait
+  for event's timeout have Add or Remove on their group's title row, also as a light text button. A read-only tab,
+  such as while the JSON has an error, shows no Add, no Remove and no menu.
 - **Subject.** A choice between Entity, which shows the entity picker, and Parameters, which shows rows
   of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, as the
   [Lists](#process-editor) bullet says. Switching replaces the draft in one change, so one undo brings it back: the

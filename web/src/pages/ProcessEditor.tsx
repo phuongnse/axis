@@ -1,4 +1,4 @@
-import { Button, Card, ConfigProvider, Flex, Input, Select, Typography } from 'antd'
+import { Card, ConfigProvider, Flex, Input, Select, Typography } from 'antd'
 import { useContext } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
@@ -620,7 +620,8 @@ function Task({
 
 /**
  * The optional deadline of a task: how long after the task opens it runs out, and the step it moves to. Adding it
- * writes empty values for the diagnostics to mark, and removing it removes the key.
+ * writes empty values for the diagnostics to mark, and removing it removes the key. Add deadline or Remove deadline is on
+ * the title row, and a read-only editor shows neither, see docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Deadline({
   pointer,
@@ -634,24 +635,28 @@ function Deadline({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   const { field, group } = useFieldTexts('process')
   const deadlinePointer = `${pointer}/deadline`
   if (step.deadline !== undefined && !isContent(step.deadline)) {
     return <JsonOnlyKeys pointer={pointer} keys={['deadline']} />
   }
   const deadline = step.deadline
+  const toggle =
+    deadline === undefined ? (
+      <AxisButton role="secondary" onClick={() => onChange(deadlinePointer, { after: '', next: '' })}>
+        {t('shell.studio.process.addDeadline')}
+      </AxisButton>
+    ) : (
+      <AxisButton role="destructive" onClick={() => onChange(deadlinePointer, undefined)}>
+        {t('shell.studio.process.removeDeadline')}
+      </AxisButton>
+    )
 
   return (
     <div data-testid={`studio-field-${deadlinePointer}`}>
-      <AxisFieldGroup {...group('steps.deadline')}>
-        {deadline === undefined ? (
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(deadlinePointer, { after: '', next: '' })}>
-              {t('shell.studio.process.addDeadline')}
-            </Button>
-          </div>
-        ) : (
+      <AxisFieldGroup {...group('steps.deadline')} action={componentDisabled ? undefined : toggle}>
+        {deadline === undefined ? null : (
           <Flex vertical gap="small">
             <div data-testid={`studio-field-${deadlinePointer}/after`}>
               <AxisField {...field('steps.deadline.after')} required>
@@ -668,12 +673,6 @@ function Deadline({
               names={names}
               onChange={onChange}
             />
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => onChange(deadlinePointer, undefined)}>
-                {t('shell.studio.process.removeDeadline')}
-              </Button>
-            </div>
           </Flex>
         )}
       </AxisFieldGroup>
@@ -687,10 +686,13 @@ const emptyNotify = { to: [], channels: [], message: { subject: { textKey: '' },
 /**
  * The escalations of a task as rows. Each has an `after` duration, and Reassign and Notify switches that add or remove
  * its `reassign` and `notify`. A new escalation holds only an empty `after`, which the diagnostics mark until one of
- * the switches is on. Removing the last escalation removes the `escalations` key.
+ * the switches is on. Removing the last escalation removes the `escalations` key. Add escalation is on the title row, and
+ * each escalation's Remove is in its "…" menu. A read-only editor shows neither, see
+ * docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Escalations({ pointer, step, onChange }: { pointer: string; step: Content; onChange: ChangeHandler }) {
   const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   const { field, group } = useFieldTexts('process')
   const { colour, radius, spacing } = useDesignTokens()
   const escalationsPointer = `${pointer}/escalations`
@@ -701,7 +703,24 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
 
   return (
     <div data-testid={`studio-field-${escalationsPointer}`}>
-      <AxisFieldGroup {...group('steps.escalations')}>
+      <AxisFieldGroup
+        {...group('steps.escalations')}
+        action={
+          componentDisabled ? undefined : (
+            <AxisButton
+              role="secondary"
+              onClick={() =>
+                onChange(escalationsPointer, [
+                  ...escalations,
+                  { name: uniqueStepName(escalations, 'escalation'), after: '' },
+                ])
+              }
+            >
+              {t('shell.studio.process.addEscalation')}
+            </AxisButton>
+          )
+        }
+      >
         <Flex vertical gap="small">
           {escalations.map((escalation, index) => {
             const rowPointer = `${escalationsPointer}/${index}`
@@ -715,7 +734,7 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
                 data-testid={`studio-field-${rowPointer}`}
               >
                 <Flex gap="small" align="flex-end" wrap>
-                  <div data-testid={`studio-field-${rowPointer}/after`}>
+                  <div data-testid={`studio-field-${rowPointer}/after`} style={{ flex: 1 }}>
                     <AxisField {...field('steps.escalations.after')} required>
                       <Input
                         value={text(row.after)}
@@ -723,12 +742,20 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
                       />
                     </AxisField>
                   </div>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button
-                    onClick={() => onChange(escalations.length === 1 ? escalationsPointer : rowPointer, undefined)}
-                  >
-                    {t('shell.studio.process.removeEscalation')}
-                  </Button>
+                  {componentDisabled ? null : (
+                    <RowActions
+                      fold
+                      actions={[
+                        {
+                          key: 'remove',
+                          labelKey: 'shell.studio.process.removeEscalation',
+                          destructive: true,
+                          onClick: () =>
+                            onChange(escalations.length === 1 ? escalationsPointer : rowPointer, undefined),
+                        },
+                      ]}
+                    />
+                  )}
                 </Flex>
                 <AxisCheckboxField
                   kind="switch"
@@ -770,19 +797,6 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
               </Flex>
             )
           })}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button
-              onClick={() =>
-                onChange(escalationsPointer, [
-                  ...escalations,
-                  { name: uniqueStepName(escalations, 'escalation'), after: '' },
-                ])
-              }
-            >
-              {t('shell.studio.process.addEscalation')}
-            </Button>
-          </div>
         </Flex>
       </AxisFieldGroup>
     </div>
@@ -870,8 +884,9 @@ function Timer({
 
 /**
  * The panel of a wait for event step: the event, an optional `when` over its payload, an optional timeout and the next
- * step. The event picker lists only the events about the process's subject entity. Remove timeout deletes the whole
- * `timeout` key, and Add timeout starts one empty.
+ * step. The event picker lists only the events about the process's subject entity. The timeout's group always shows its
+ * title, with Add timeout or Remove timeout on that title row. Remove timeout deletes the whole `timeout` key, and Add
+ * timeout starts one empty. A read-only editor shows neither, see docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function WaitEvent({
   pointer,
@@ -887,6 +902,7 @@ function WaitEvent({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   const { field, group } = useFieldTexts('process')
   const studioNames = useContext(StudioNamesContext)
   const timeout = isContent(step.timeout) ? step.timeout : undefined
@@ -921,13 +937,21 @@ function WaitEvent({
         </AxisField>
       </div>
       <div data-testid={`studio-field-${timeoutPointer}`}>
-        {timeout === undefined ? (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button onClick={() => onChange(timeoutPointer, { after: '', next: '' })}>
-            {t('shell.studio.process.addTimeout')}
-          </Button>
-        ) : (
-          <AxisFieldGroup {...group('steps.timeout')}>
+        <AxisFieldGroup
+          {...group('steps.timeout')}
+          action={
+            componentDisabled ? undefined : timeout === undefined ? (
+              <AxisButton role="secondary" onClick={() => onChange(timeoutPointer, { after: '', next: '' })}>
+                {t('shell.studio.process.addTimeout')}
+              </AxisButton>
+            ) : (
+              <AxisButton role="destructive" onClick={() => onChange(timeoutPointer, undefined)}>
+                {t('shell.studio.process.removeTimeout')}
+              </AxisButton>
+            )
+          }
+        >
+          {timeout === undefined ? null : (
             <Flex vertical gap="small">
               <div data-testid={`studio-field-${timeoutPointer}/after`}>
                 <AxisField {...field('steps.timeout.after')} required>
@@ -944,15 +968,9 @@ function WaitEvent({
                 names={names}
                 onChange={onChange}
               />
-              <div>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button danger onClick={() => onChange(timeoutPointer, undefined)}>
-                  {t('shell.studio.process.removeTimeout')}
-                </Button>
-              </div>
             </Flex>
-          </AxisFieldGroup>
-        )}
+          )}
+        </AxisFieldGroup>
       </div>
       <Transition pointer={`${pointer}/next`} path="steps.next" value={step.next} names={names} onChange={onChange} />
     </>
