@@ -7,6 +7,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
+import { ContentInsetContext } from '../platform/contentInsetContext'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames, StudioResourceItem } from '../platform/studio'
 import { colourTokens } from '../platform/designTokens'
@@ -92,23 +93,30 @@ function stub(seed: unknown, patch: () => Response = () => json({ version: 's2',
   return fetchMock
 }
 
-function renderEditor() {
+function renderEditor(inset?: number) {
+  const editor = (
+    <StudioEditor
+      application="Shop"
+      item={resources[0]}
+      resources={resources}
+      path={null}
+      diagnosticPaths={[]}
+      onOpen={vi.fn()}
+      onSaved={vi.fn()}
+      onTextsWritten={vi.fn()}
+      onDeleted={vi.fn()}
+    />
+  )
   render(
     <MemoryRouter>
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <ShellAsideHost>
-            <StudioEditor
-              application="Shop"
-              item={resources[0]}
-              resources={resources}
-              path={null}
-              diagnosticPaths={[]}
-              onOpen={vi.fn()}
-              onSaved={vi.fn()}
-              onTextsWritten={vi.fn()}
-              onDeleted={vi.fn()}
-            />
+            {inset === undefined ? (
+              editor
+            ) : (
+              <ContentInsetContext.Provider value={inset}>{editor}</ContentInsetContext.Provider>
+            )}
           </ShellAsideHost>
         </TextProvider>
       </ThemeModeProvider>
@@ -336,6 +344,23 @@ describe('StudioEditor for a seed', () => {
     renderEditor()
 
     await expectPart('Records', 'records', 'studio-field-/records')
+  })
+
+  it('draws its tab row with the workspace look, reaching the page inset', async () => {
+    stub(seedContent('order', []))
+    renderEditor(16)
+
+    const tabBar = (await screen.findByRole('tab', { name: 'Form' }, slow)).closest('.ant-tabs-nav')
+    expect(tabBar).toHaveStyle({
+      height: '40px',
+      borderBottom: `1px solid ${colourTokens.borderSubtle.light}`,
+      paddingLeft: '16px',
+      paddingRight: '16px',
+      marginLeft: '-16px',
+      marginRight: '-16px',
+      marginTop: '-12px',
+      marginBottom: '16px',
+    })
   })
 })
 
