@@ -104,14 +104,27 @@ public sealed record BuildProblem(string File, string Message, int? Line = null,
 /// </summary>
 public sealed record TestMessage(Dictionary<string, byte[]> Files) : RunnerMessage;
 
-/// <summary>The host ran the package's tests. <paramref name="Tests"/> holds the outcome of each test that ran.</summary>
-public sealed record TestedMessage(IReadOnlyList<PackageTestOutcome> Tests) : RunnerMessage;
+/// <summary>
+/// The host ran the package's tests. <paramref name="Tests"/> holds the outcome of each test that ran, and <paramref name="Output"/> the last
+/// lines that the tests wrote to the console, or <see langword="null"/> from a host that predates it.
+/// </summary>
+public sealed record TestedMessage(IReadOnlyList<PackageTestOutcome> Tests, IReadOnlyList<string>? Output = null) : RunnerMessage;
 
 /// <summary>
 /// The outcome of one test: its <paramref name="Name"/>, its <paramref name="Outcome"/>, <see cref="Passed"/> or <see cref="Failed"/>, and
 /// for a failed test the last line of its traceback in <paramref name="Message"/>, or <see langword="null"/>, which the line writes out.
+/// <paramref name="DurationMs"/> is the whole milliseconds the test took. A failed test with a place has the <paramref name="File"/> in the
+/// package, and the <paramref name="Line"/> and <paramref name="Column"/> in it, counted from 1. All four are <see langword="null"/> when a
+/// host that predates them answered.
 /// </summary>
-public sealed record PackageTestOutcome(string Name, string Outcome, [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Message)
+public sealed record PackageTestOutcome(
+    string Name,
+    string Outcome,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Message,
+    long? DurationMs = null,
+    string? File = null,
+    int? Line = null,
+    int? Column = null)
 {
     public const string Passed = "passed";
 

@@ -40,7 +40,7 @@ namespace Axis.PackageHost;
 /// a relative path inside the package is refused before anything is written. A build that cannot run is logged, and the
 /// connection closes with no answer.
 /// The first line may also be a <c>test</c>, which is as long as a <c>build</c> may be. The host builds the package as for a <c>build</c>,
-/// then runs the tests of a Python package in the built copy with <see cref="PackageTests"/>, and answers <c>tested</c> with the outcome of each test,
+/// then runs the tests of a Python package in the built copy with <see cref="PackageTests"/>, and answers <c>tested</c> with the outcome and the duration of each test, a failed test's place and the lines the tests wrote,
 /// or <c>refused</c> when the build fails, the package is not a Python package, or the tests do not finish in time. It deletes its copies whatever the answer.
 /// For a runner started from files the host reads the lines both ways. It measures the runner process's own CPU time from each line to the
 /// runner and sends a <c>usage</c> line right after each <c>result</c>, <c>retryable</c> or <c>failure</c> that the runner writes, and it
@@ -366,7 +366,7 @@ internal sealed partial class RunnerHost(
                 return;
             }
 
-            await RunnerProtocol.WriteAsync(socket, new TestedMessage(run.Tests!), _stopping.Token);
+            await RunnerProtocol.WriteAsync(socket, new TestedMessage(run.Tests!, run.Output ?? []), _stopping.Token);
             LogTested(manifest.Id, manifest.Version);
         });
 
