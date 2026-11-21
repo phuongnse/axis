@@ -207,7 +207,7 @@ public sealed class PublisherRunRequestTests(PostgreSqlFixture database) : IClas
     }
 
     // The Python starter of Studio, filled in as a package tools: its file names and texts.
-    private static Dictionary<string, string> StarterFiles()
+    internal static Dictionary<string, string> StarterFiles()
     {
         var starters = JsonNode.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Starters", "packageStarters.json")))!.AsObject();
         return starters["python"]!.AsObject().ToDictionary(

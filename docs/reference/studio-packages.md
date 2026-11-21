@@ -166,7 +166,7 @@ developer role and the switch as a write has, and answers `403` otherwise.
 | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /api/studio/apps/{application}/build`                        | `202` with the request and a `Location` header for `.../requests/{id}`. The body is `{ package }`. The request ends with `diagnostics` and `output`, see A build without a publish below       |
 | `POST /api/studio/apps/{application}/test`                         | `202` as above. The body is `{ package }`, as the MCP server's `test_package` takes, and the request ends with `package`, `packageTests` and `output`, see A package's tests from Studio below |
-| `POST /api/studio/apps/{application}/run` _(planned for M37)_      | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run`, see A run of one operation below                                                                 |
+| `POST /api/studio/apps/{application}/run`                          | `202` as above. The body is `{ package, operation, input }`, and the request ends with `run` and `output`, see A run of one operation below                                                    |
 | `GET /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ items: [{ name, operation, input }] }`. The version is the `ETag`, which comes once the inputs are saved, see Saved run inputs below                                             |
 | `PUT /api/studio/apps/{application}/packages/{package}/run-inputs` | `200` with `{ version }` and an `ETag`. The body is `{ items }`, with `If-None-Match: *` for the first save or `If-Match` of the version, and a stale version answers `409`                    |
 | `POST /api/studio/apps/{application}/packages/{package}/move`      | `200` with `{ diagnostics }`. The body is `{ moves: [{ from, to, version }] }`, see Moves below                                                                                                |
@@ -234,11 +234,15 @@ developer role and the switch as a write has, and answers `403` otherwise.
   route answers `403` otherwise, checked once the body is read. No quota is checked. Without `package` the request
   is the application's scenario test, which needs the author role only, see
   [test](authoring-publishing.md#test).
-- **A run of one operation** _(planned for M37)_. `POST .../run` with `{ package, operation, input }` queues a `run`
+- **A run of one operation.** `POST .../run` with `{ package, operation, input }` queues a `run`
   request. The host builds the package's working files and calls the operation with the folder's bindings for its
-  capabilities. The request ends with `run`, which has `operation`, `outcome`, `output`, `error` (`code` and
-  `message`) and `durationMs`. The run's CPU seconds count in the tenant's
-  [package run time](tenant-quotas.md#package-run-time-a-day), and the answer carries no CPU time.
+  capabilities. The route needs the developer role and the switch, as a write does, and answers `403` otherwise. The
+  body is exactly `{ package, operation, input }` with a string `package`, a string `operation` and an object
+  `input`, and anything else answers `400`. A body that is not `application/json` answers `415`, and a package with
+  no file in the working folder answers `404`. The route checks no quota. The request ends with `run`, which has
+  `operation`, `outcome`, `output`, `error` (`code` and `message`) and `durationMs`, and with `output`, the lines the
+  host wrote. Its `run` is `null` until it ends and for every other kind of request, and its `output` is an empty list
+  until it ends. The answer carries no CPU time, and how a run counts is in [package run time a day](tenant-quotas.md#package-run-time-a-day).
 - **Saved run inputs.** `GET` and `PUT .../packages/{package}/run-inputs` read and replace the application's named
   inputs for the package, `{ items: [{ name, operation, input }] }`, under the [versions](authoring.md#versions) as a
   file is. The package must be a plain folder name, but it needs no files. The inputs are the file
