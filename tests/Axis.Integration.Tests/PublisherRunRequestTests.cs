@@ -207,7 +207,7 @@ public sealed class PublisherRunRequestTests(PostgreSqlFixture database) : IClas
     }
 
     // The Python starter of Studio, filled in as a package tools: its file names and texts.
-    private static Dictionary<string, string> StarterFiles()
+    internal static Dictionary<string, string> StarterFiles()
     {
         var starters = JsonNode.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Starters", "packageStarters.json")))!.AsObject();
         return starters["python"]!.AsObject().ToDictionary(
@@ -216,7 +216,7 @@ public sealed class PublisherRunRequestTests(PostgreSqlFixture database) : IClas
             StringComparer.Ordinal);
     }
 
-    private static string WithOperation(string manifest, string operation)
+    internal static string WithOperation(string manifest, string operation)
     {
         var node = JsonNode.Parse(manifest)!.AsObject();
         node["operations"]!.AsArray().Add(JsonNode.Parse(operation));
@@ -224,7 +224,7 @@ public sealed class PublisherRunRequestTests(PostgreSqlFixture database) : IClas
     }
 
     // Stores a queued run request as the route of a later part will: the files of packages/tools in the snapshot, the package, the operation and the input.
-    private static async Task<Guid> QueueAsync(string connectionString, Dictionary<string, string> files, string operation, string input)
+    internal static async Task<Guid> QueueAsync(string connectionString, Dictionary<string, string> files, string operation, string input)
     {
         var snapshot = new JsonArray([.. files.OrderBy(file => file.Key, StringComparer.Ordinal).Select(file => (JsonNode)new JsonObject
         {
@@ -251,7 +251,7 @@ public sealed class PublisherRunRequestTests(PostgreSqlFixture database) : IClas
     }
 
     // Polls the row until it is succeeded or failed.
-    private static async Task WaitForFinalAsync(string connectionString, Guid request)
+    internal static async Task WaitForFinalAsync(string connectionString, Guid request)
     {
         var deadline = DateTime.UtcNow.AddSeconds(180);
         while (DateTime.UtcNow < deadline)
@@ -267,7 +267,7 @@ public sealed class PublisherRunRequestTests(PostgreSqlFixture database) : IClas
         Assert.Fail("The request did not end in time. Is the publisher running?");
     }
 
-    private static async Task<string?> ColumnAsync(string connectionString, Guid request, string column) =>
+    internal static async Task<string?> ColumnAsync(string connectionString, Guid request, string column) =>
         (string?)await PostgreSqlServer.AdminScalarAsync(connectionString, $"SELECT {column}::text FROM axis.publish_requests WHERE id = '{request}'", CancellationToken);
 
     private static async Task<long> CountAsync(string connectionString, string table) =>

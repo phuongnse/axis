@@ -1524,7 +1524,9 @@ internal static partial class AdminCommands
             storage is null ? null : new TenantExportSweep(storage),
             studio,
             builds,
-            runs).RunAsync();
+            runs,
+            // Only a cell counts the package run time of a run, see docs/reference/tenant-quotas.md#package-run-time-a-day.
+            cell.IsCell ? new TenantDailyCounterStore(leaseSource) : null).RunAsync();
     }
 
     // A blank setting is no annotations. The value is a JSON object of strings and is never echoed.
