@@ -391,6 +391,7 @@ function Workspace({
         return 'stop'
       }
       console.warn(`Checking the build '${build?.id}' of the package '${row.id}' failed`, error)
+      setBuild(null)
       setSaveError(t('shell.studio.request.sendFailed'))
       return 'stop'
     },

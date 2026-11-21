@@ -49,9 +49,13 @@ const failedBuild = {
  * Stubs a package `tools` with five files, and answers a file's read from `contents`. A write answers
  * `{ version: 'new-<path>' }` unless `writes` has a response for its path. The writes are recorded in `puts`. Each write
  * and each build post is also recorded in `calls`, in order, as `PUT <path>` and `POST build <body>`. A build post answers
- * the queued build `b1`, and its read answers `failedBuild`.
+ * the queued build `b1`, and its read answers `failedBuild` unless `readBuild` answers otherwise.
  */
-function stubPackage(writes: Record<string, () => Response> = {}, calls: string[] = []) {
+function stubPackage(
+  writes: Record<string, () => Response> = {},
+  calls: string[] = [],
+  readBuild: () => Response = () => json(failedBuild),
+) {
   const puts: { path: string; ifMatch: string | null; body: { content: string } }[] = []
   vi.stubGlobal(
     'fetch',
@@ -61,7 +65,7 @@ function stubPackage(writes: Record<string, () => Response> = {}, calls: string[
         return json(queuedBuild, 202)
       }
       if (input === '/api/studio/apps/Shop/requests/b1') {
-        return json(failedBuild)
+        return readBuild()
       }
       if (input === files) {
         return json({ items: Object.keys(contents).map((path) => ({ package: 'tools', path, version: `v-${path}` })) })
@@ -497,6 +501,21 @@ describe('StudioPackageWorkspace', () => {
         expect(within(screen.getByTestId('studio-package-status')).getByText('Line 2, column 1')).toBeInTheDocument(),
       )
       expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(2)
+    })
+
+    it('shows the alert and turns Build back on when reading the build fails', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      stubPackage({}, [], () => new Response(null, { status: 500 }))
+      renderWorkspace(true)
+      await screen.findByTestId('studio-package-tree')
+
+      await userEvent.click(buildButton())
+
+      expect(
+        await screen.findByText('The request could not be sent or checked.', {}, { timeout: 3000 }),
+      ).toBeInTheDocument()
+      await waitFor(() => expect(buildButton()).toBeEnabled())
+      expect(buildButton()).not.toHaveAttribute('aria-busy', 'true')
     })
 
     it('says no build has run before the first one, and leaves Run tests off', async () => {
