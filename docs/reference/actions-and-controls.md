@@ -234,7 +234,7 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   role, see [buttons](#buttons).
 - **A status is a `StatusTag` with five tones, and any other enum value is text** _(planned for M35)_. A
   status shows as a tag in one of five tones. Any other value of an enum shows as plain text.
-- **Every tag is a `StatusTag`** _(planned)_. Any tag on any screen is a `StatusTag`: a status, a mark or a value's
+- **Every tag is a `StatusTag`**. Any tag on any screen is a `StatusTag`: a status, a mark or a value's
   name. Nothing else draws a tag, neither Ant Design's `Tag` outside `StatusTag` nor a span drawn as one. Its tone says
   what it asks of the reader:
   - `attention` for what a person should look at: Off-standard, "Missing read on …", "Unaccepted action …", "Unknown
@@ -244,11 +244,11 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   - `neutral` for a value's name or a mark that only informs: a policy's actions and fields, a grant's module and Shared,
     a layer's mark and Customized, a condition's mark on the form canvas, a field's properties, an expression's kind,
     a choice's mark, and a lifecycle state's Initial and Deletable.
-- **A tag is never a link** _(planned)_. A references field on a record's page shows its links in a row, with no tag
+- **A tag is never a link**. A references field on a record's page shows its links in a row, with no tag
   round each.
-- **A tag that stands for more than its words names itself** _(planned)_. A layer's mark takes `role="note"` and an
+- **A tag that stands for more than its words names itself**. A layer's mark takes `role="note"` and an
   accessible name such as "supplier, added by this application", which `StatusTag` passes to its tag.
-- **A removable filter chip is a control** _(planned)_. The table filter's chip is no tag and keeps Ant Design's
+- **A removable filter chip is a control**. The table filter's chip is no tag and keeps Ant Design's
   closable `Tag`.
 
 ## What comes next

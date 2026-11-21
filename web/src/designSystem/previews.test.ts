@@ -121,7 +121,7 @@ describe('design-system previews', () => {
     }
   })
 
-  test('the cards have the 30 names of the Design System artifact, in group order', () => {
+  test('the cards have the 31 names of the Design System artifact, in group order', () => {
     expect(cardGroups.flatMap(({ previews: group }) => group).map(cardName)).toEqual([
       'TextField',
       'IntegerField',
@@ -145,6 +145,7 @@ describe('design-system previews', () => {
       'Tabs',
       'Section',
       'States',
+      'StatusTag',
       'Shell',
       'SignIn',
       'IdentitySignIn',

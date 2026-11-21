@@ -66,6 +66,10 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
     page
       .getByRole("alert")
       .filter({ hasText: "The records could not be loaded." }),
+  statusTag: (page) =>
+    page
+      .getByTestId("status-tag-surface")
+      .getByText("neutral", { exact: true }),
   "field-text": (page) =>
     figure(page, "Editable").getByLabel(fieldLabel("Title")),
   "field-integer": (page) =>

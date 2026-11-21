@@ -2668,6 +2668,8 @@
   "shell.studio.problems.errors": "{count} errors",
   "shell.studio.problems.warning": "1 warning",
   "shell.studio.problems.warnings": "{count} warnings",
+  "shell.studio.problems.severity.error": "Error",
+  "shell.studio.problems.severity.warning": "Warning",
   "shell.studio.problems.title": "Problems",
   "shell.sidePanel.resize": "Resize panel",
   "shell.studio.problems.close": "Close problems",

@@ -19,6 +19,7 @@ import {
 import { getAt, parameterType, referenceOptions, StudioNamesContext, textsOf } from '../platform/studioNames'
 import { studioResourceAddress } from '../platform/studioAddress'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
+import { StatusTag } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { AxisButton } from '../platform/AxisButton'
@@ -837,7 +838,6 @@ function ObjectList({
   const catalog = useContext(StudioCatalogContext)
   const relaxed = useContext(StudioRelaxedContext)
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour } = useDesignTokens()
   const [held, setHeld] = useState<Record<string, { pointer: string; texts: Record<string, string> }>>({})
   const kind = root.properties?.kind?.const
   const items = (Array.isArray(value) ? value : []).filter(isRecord)
@@ -896,7 +896,7 @@ function ObjectList({
                     {typeof role === 'string' && role !== '' ? (
                       role
                     ) : (
-                      <span style={{ color: colour.warningText }}>{t('shell.studio.module.notMapped')}</span>
+                      <StatusTag tone="attention">{t('shell.studio.module.notMapped')}</StatusTag>
                     )}
                   </span>
                 )

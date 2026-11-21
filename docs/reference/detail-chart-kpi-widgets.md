@@ -41,7 +41,7 @@ A `detail` widget shows one record read-only, read through the record API, and w
   `steps`.
 - **Reference links**. A `reference` value is a link to its record page, and so is each entry of a
   `references` field, see [opening things](actions-and-controls.md#opening-things).
-- **A references field's links in a row** _(planned)_. Its links sit in a row with no tag round each, as a tag is never
+- **A references field's links in a row**. Its links sit in a row with no tag round each, as a tag is never
   a link, see [text](actions-and-controls.md#text).
 - **Sections as parts.** With a `form`, each titled section is a part, as a form's sections are: its
   title is drawn by `SectionPart`, and a `borderSubtle` rule sits above a section drawn after another.

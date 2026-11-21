@@ -62,6 +62,14 @@ describe('StudioProblems', () => {
     expect(screen.queryByText('No problems.')).not.toBeInTheDocument()
   })
 
+  it('shows an error as a danger tag reading "Error" and a warning as an attention tag reading "Warning"', () => {
+    renderProblems([error, { ...error, code: 'AXIS-W201', severity: 'warning' }])
+
+    expect(screen.getByText('Error')).toHaveAttribute('data-tone', 'danger')
+    expect(screen.getByText('Warning')).toHaveAttribute('data-tone', 'attention')
+    expect(screen.queryByText('error')).not.toBeInTheDocument()
+  })
+
   it('stops the panel at its end, so the page does not scroll', () => {
     renderProblems([error])
 
