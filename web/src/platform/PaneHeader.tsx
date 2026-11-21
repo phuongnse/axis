@@ -5,9 +5,8 @@ import { workspaceRowHeight } from './workspaceTabRow'
 
 /**
  * The title row of a pane of a workspace, such as the explorer's Files, see docs/reference/shared-widgets.md#which-widget.
- * The title is a level-two heading at the body size, with an optional `tag` beside it, such as a run's outcome as a
- * `StatusTag`, and the pane's light `actions` sit on the right. The row has the pane's inset and a `borderSubtle` rule
- * under it, and no box.
+ * The title is a level-two heading at the body size, with an optional status `tag` beside it, and the pane's light
+ * `actions` sit on the right. The row has the pane's inset and a `borderSubtle` rule under it, and no box.
  */
 export function PaneHeader({ title, tag, actions }: { title: string; tag?: ReactNode; actions?: ReactNode }) {
   const tokens = useDesignTokens()
