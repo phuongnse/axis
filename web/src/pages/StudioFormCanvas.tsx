@@ -1,8 +1,9 @@
 import { useDndContext, useDroppable } from '@dnd-kit/core'
-import { Flex, Segmented, Tag } from 'antd'
+import { Flex, Segmented } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
 import { fillText } from '../platform/fillText'
+import { StatusTag } from '../platform/StatusTag'
 import { FormCanvasContext, type FormCanvas } from '../platform/formCanvas'
 import { FormWidget } from '../platform/FormWidget'
 import { getAt } from '../platform/jsonPatch'
@@ -392,9 +393,9 @@ function FormElementFrame({
       }}
     >
       {texts.map(({ key, text }) => (
-        <Tag key={key} data-testid="studio-condition-mark" data-condition={key}>
+        <StatusTag key={key} tone="neutral" data-testid="studio-condition-mark" data-condition={key}>
           {fillText(t('shell.studio.design.conditionMark'), { condition: t(`shell.studio.design.${key}`), text })}
-        </Tag>
+        </StatusTag>
       ))}
       {children}
     </div>

@@ -306,6 +306,7 @@ export function TableFilterChips({
   return (
     <Flex gap="small" align="center" wrap>
       {nodes.map((node, index) => (
+        // oxlint-disable-next-line axis/no-antd-tag -- A removable filter chip is a control, not a tag, see docs/reference/actions-and-controls.md#text.
         <Tag
           key={index}
           closable={{ 'aria-label': t('shell.table.filterRemove') }}

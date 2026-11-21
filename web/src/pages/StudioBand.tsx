@@ -1,7 +1,8 @@
 import { Flex, Typography } from 'antd'
 import type { ReactNode } from 'react'
+import { useStatusTints } from '../platform/antTheme'
 import { AxisButton } from '../platform/AxisButton'
-import { folderDiffers, type StudioDiagnostic, type StudioReleases } from '../platform/studio'
+import { folderDiffers, severityTone, type StudioDiagnostic, type StudioReleases } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 
@@ -32,6 +33,7 @@ export function StudioBand({
 }) {
   const t = useText()
   const { colour, size, spacing } = useDesignTokens()
+  const tints = useStatusTints()
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length
   const warnings = diagnostics.length - errors
   const counts = (count: number, one: string, many: string) =>
@@ -64,13 +66,13 @@ export function StudioBand({
             onClick={onToggleProblems}
           >
             {errors > 0 && (
-              <span style={{ color: colour.dangerText }}>
+              <span style={{ color: tints[severityTone('error')].text }}>
                 {counts(errors, 'shell.studio.problems.error', 'shell.studio.problems.errors')}
               </span>
             )}
             {errors > 0 && warnings > 0 && ', '}
             {warnings > 0 && (
-              <span style={{ color: colour.warningText }}>
+              <span style={{ color: tints[severityTone('warning')].text }}>
                 {counts(warnings, 'shell.studio.problems.warning', 'shell.studio.problems.warnings')}
               </span>
             )}

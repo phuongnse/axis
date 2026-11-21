@@ -106,37 +106,38 @@ describe('axis/no-prototype-write', () => {
   })
 })
 
-describe('axis/no-preset-tag-colour', () => {
-  const rules = { 'axis/no-preset-tag-colour': 'error' }
+describe('axis/no-antd-tag', () => {
+  const rules = { 'axis/no-antd-tag': 'error' }
 
-  it('reports a preset colour as a string, in an expression and in a condition', () => {
+  it('reports each Tag imported from antd, also under another name', () => {
     const source = [
-      'const a = <Tag color="blue">a</Tag>',
-      "const b = <Tag color={'success'}>b</Tag>",
-      "const c = <Tag color={on ? 'red-inverse' : colour.text}>c</Tag>",
+      "import { Tag, Tag as Chip } from 'antd'",
+      'const a = <Tag>a</Tag>',
+      'const b = (',
+      '  <Chip',
+      '    color="blue"',
+      '  />',
+      ')',
       '',
     ].join('\n')
-    expect(lint(source, { rules })).toEqual([
-      'axis(no-preset-tag-colour):1',
-      'axis(no-preset-tag-colour):2',
-      'axis(no-preset-tag-colour):3',
-    ])
+    expect(lint(source, { rules })).toEqual(['axis(no-antd-tag):2', 'axis(no-antd-tag):4'])
   })
 
-  it('allows a token, a lookup and a hex colour', () => {
+  it('allows StatusTag, TagList and a Tag from elsewhere', () => {
     const source = [
-      'const a = <Tag color={colour.dangerText}>a</Tag>',
-      'const b = <Tag color={map[value]}>b</Tag>',
-      'const c = <Tag color="#ff0000">c</Tag>',
-      'const d = <Tag>d</Tag>',
-      'const e = <Badge color="blue" />',
+      "import { Tag } from './elsewhere'",
+      "import { Space } from 'antd'",
+      'const a = <Tag>a</Tag>',
+      'const b = <StatusTag tone="neutral">b</StatusTag>',
+      'const c = <TagList />',
       '',
     ].join('\n')
     expect(lint(source, { rules })).toEqual([])
   })
 
-  it('does not report a comment that names a preset tag', () => {
-    expect(lint('// <Tag color="blue">\nconst a = \'<Tag color="blue">\'\n', { rules })).toEqual([])
+  it('does not report a comment that names a Tag', () => {
+    const source = "import { Tag } from 'antd'\n// <Tag>a</Tag>\nconst a = '<Tag>'\n"
+    expect(lint(source, { rules })).toEqual([])
   })
 })
 

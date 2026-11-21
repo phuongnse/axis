@@ -56,7 +56,7 @@
     // Shared widgets (AGENTS.md: one concern has one mechanism).
     "axis/no-antd-button": "error",
     "axis/no-antd-alert": "error",
-    "axis/no-preset-tag-colour": "error",
+    "axis/no-antd-tag": "error",
     "axis/field-label-through-axis-field": "error",
     "no-restricted-imports": [
       "error",
@@ -73,6 +73,11 @@
       // AxisAlert wraps the Alert of antd.
       "files": ["src/platform/AxisAlert.tsx"],
       "rules": { "axis/no-antd-alert": "off" }
+    },
+    {
+      // StatusTag wraps the Tag of antd.
+      "files": ["src/platform/StatusTag.tsx"],
+      "rules": { "axis/no-antd-tag": "off" }
     },
     {
       // AxisTable wraps the Table of antd.
@@ -116,7 +121,7 @@
         "axis/no-prototype-write": "off",
         "axis/no-antd-button": "off",
         "axis/no-antd-alert": "off",
-        "axis/no-preset-tag-colour": "off",
+        "axis/no-antd-tag": "off",
         "axis/field-label-through-axis-field": "off",
         "axis/no-card-panel": "off",
         "no-restricted-imports": "off",

@@ -1,5 +1,6 @@
 import { theme, type ConfigProviderProps, type ThemeConfig } from 'antd'
 import { colourTokens, designTokensFor, type ColourName, type DesignTokens, type PageTokenValues } from './designTokens'
+import type { StatusTone } from './statusTones'
 import type { ThemeMode } from './themeMode'
 
 // The only file that names Ant Design tokens. It maps the Axis tokens to Ant Design's theme.
@@ -229,6 +230,29 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
  */
 export function useSelectedItemTint(): string {
   return theme.useToken().token.controlItemBgActive
+}
+
+/** A status tag's text, fill and border colours. */
+export interface StatusTint {
+  text: string
+  fill: string
+  border: string
+}
+
+/**
+ * Each tone's tint in the theme in use, which follows the page's seed colours: Ant Design's tint of the tone's seed for a
+ * fill and its border, the secondary fill edged with the strongest fill for a neutral tag, and no fill for a muted one.
+ * See docs/reference/shared-widgets.md#which-widget.
+ */
+export function useStatusTints(): Record<StatusTone, StatusTint> {
+  const { token } = theme.useToken()
+  return {
+    neutral: { text: token.colorText, fill: token.colorFillSecondary, border: token.colorFill },
+    attention: { text: token.colorWarningText, fill: token.colorWarningBg, border: token.colorWarningBorder },
+    success: { text: token.colorSuccessText, fill: token.colorSuccessBg, border: token.colorSuccessBorder },
+    danger: { text: token.colorErrorText, fill: token.colorErrorBg, border: token.colorErrorBorder },
+    muted: { text: token.colorTextSecondary, fill: 'transparent', border: token.colorFill },
+  }
 }
 
 /**

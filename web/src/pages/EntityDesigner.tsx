@@ -1,6 +1,7 @@
-import { Button, ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Tag, Typography, DatePicker } from 'antd'
+import { Button, ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
+import { StatusTag } from '../platform/StatusTag'
 import dayjs from 'dayjs'
 import { memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -833,7 +834,9 @@ const PropertiesCell = memo(function PropertiesCell({ field }: { field: unknown 
   return (
     <Flex gap="small" wrap>
       {properties.map((name) => (
-        <Tag key={name}>{t(`shell.studio.entity.property.${name}`)}</Tag>
+        <StatusTag key={name} tone="neutral">
+          {t(`shell.studio.entity.property.${name}`)}
+        </StatusTag>
       ))}
     </Flex>
   )
