@@ -412,9 +412,9 @@ be kept right.
   of the role `icon` with `Chevron`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
   first column's padding, every row's words start where the heading does, and each level of rows starts one fold
   further in. A table that groups rows uses this, and never a list inside a cell.
-- **A row's details** _(planned)_. A row with more to show than its columns, such as a call's attempt, folds open to
-  its details from a fold in its first cell, drawn as a group row's fold, named "Show the details", with no column of
-  its own. `AxisTable`'s `details` and its group rows open a row one way.
+- **A row's details**. A row with more to show than its columns, such as a call's attempt, folds open to
+  its details from a fold in its first cell, drawn as a group row's fold, named "Show the details" or "Hide the details"
+  while open, with no column of its own. `AxisTable`'s `details` and its group rows open a row one way.
 
 The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md),
 and the reasons for each person's columns and saved views are in [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md),

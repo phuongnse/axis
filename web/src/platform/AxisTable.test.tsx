@@ -53,6 +53,8 @@ const texts = {
   'shell.table.viewsDeleteConfirm': 'Delete the view {name}?',
   'shell.table.viewsDeleteFailed': 'The view could not be deleted.',
   'shell.table.selectRow': 'Select row',
+  'shell.table.showDetails': 'Show the details',
+  'shell.table.hideDetails': 'Hide the details',
   'row.archive': 'Archive',
   'row.delete': 'Delete',
   'row.open': 'Open',
@@ -175,6 +177,46 @@ describe('AxisTable', () => {
       renderTable({ columns: [{ ...nameColumn, render: () => null }] })
 
       expect(screen.getAllByText('—')).toHaveLength(2)
+    })
+  })
+
+  describe('details', () => {
+    const detailed = [
+      { id: '1', name: 'Buy paper', amount: 12 },
+      { id: '2', name: 'Buy ink', amount: 8 },
+      { id: '3', name: 'Nothing more', amount: 1 },
+    ]
+    const details = (row: Row) => (row.id === '3' ? null : <span>{`More about ${row.name}`}</span>)
+
+    it("opens and closes a row's details from the fold in its first cell, and leaves the other rows closed", async () => {
+      renderTable({ dataSource: detailed, details })
+
+      expect(screen.queryByText('More about Buy paper')).not.toBeInTheDocument()
+      const [first] = screen.getAllByRole('button', { name: 'Show the details' })
+      expect(first).toHaveAttribute('aria-expanded', 'false')
+      expect(within(first.closest('td')!).getByText('Buy paper')).toBeVisible()
+
+      await userEvent.click(first)
+
+      expect(screen.getByText('More about Buy paper')).toBeVisible()
+      expect(screen.queryByText('More about Buy ink')).not.toBeInTheDocument()
+      const open = screen.getByRole('button', { name: 'Hide the details' })
+      expect(open).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getAllByRole('button', { name: 'Show the details' })).toHaveLength(1)
+
+      await userEvent.click(open)
+
+      expect(screen.queryByText('More about Buy paper')).not.toBeVisible()
+      expect(screen.getAllByRole('button', { name: 'Show the details' })).toHaveLength(2)
+    })
+
+    it('draws no fold, and no column for it, in a row whose details are null', () => {
+      renderTable({ dataSource: detailed, details })
+
+      expect(screen.getAllByRole('button', { name: 'Show the details' })).toHaveLength(2)
+      expect(screen.getAllByRole('columnheader')).toHaveLength(2)
+      const row = screen.getByRole('cell', { name: 'Nothing more' }).closest('tr')!
+      expect(within(row).queryByRole('button')).not.toBeInTheDocument()
     })
   })
 
