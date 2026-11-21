@@ -346,8 +346,8 @@ be kept right.
   they do on Save view. After the overwrite the line shows the view again and the dialog stays open. A write the
   server refuses leaves the dialog open with "The view could not be overwritten.", and the list stays as it was.
 - **Views in the saved items dialog.** A table's Views opens the one
-  [dialog that keeps saved items](#fields), in place of the icons a view's line has. Each line is one split button,
-  Overwrite with Rename and Delete in the menu of its joined caret.
+  [dialog that keeps saved items](#fields). Each line is one split button, Overwrite with Rename and Delete in the
+  menu of its joined caret.
 - **Which tables keep a choice.** A table whose view `useTableView` keeps in the address, and that
   has a key, keeps its columns and views on the server. A table in a dialog keeps its view in the dialog and keeps
   nothing. The cell console's tables pass no key, because its host has no tenant database. Studio's page canvas
