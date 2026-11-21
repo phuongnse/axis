@@ -66,7 +66,10 @@ function escapeScriptEndings(): Plugin {
 // the dev server never serves a stale bundle unnoticed.
 function serveBundleFromSource(): Plugin {
   const bundleTag = '<script src="../artifacts/design-system/axis-design-system.js"></script>'
+  // Proposed, #3264: the harness also loads the app's fonts, as the bundle carries none, so a preview shows the text
+  // as the app does and its spacing can be judged to the pixel.
   const sourceModule = `<script type="module">
+      import '/src/fonts.css'
       import Axis from '/src/designSystem/bundle.ts'
       window.Axis = Axis
     </script>`
