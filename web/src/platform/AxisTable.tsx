@@ -907,8 +907,12 @@ function MovedCells({
   )
 }
 
-/** A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. */
-function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold: boolean }) {
+/**
+ * A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. It is exported for a list
+ * that is not a table, such as the resource form's rows, which passes `fold` to keep its actions in the "…" menu, see
+ * docs/reference/actions-and-controls.md#tables.
+ */
+export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold: boolean }) {
   const t = useText()
   if (actions === null || actions.length === 0) {
     return null

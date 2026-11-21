@@ -584,13 +584,42 @@ describe('SchemaForm lists of objects', () => {
     expect(within(rowOf(1)).queryByText('Nghỉ phép')).toBeNull()
   })
 
-  it('keeps a list of plain values as inline rows of inputs', () => {
+  it('keeps a list of plain values as inline rows of inputs, with Add as a text button on its title row', () => {
     renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] })
 
     const plain = screen.getByTestId('studio-field-/plain')
     expect(within(plain).getAllByRole('textbox')).toHaveLength(2)
     expect(within(plain).queryByRole('table')).toBeNull()
-    expect(within(plain).getByRole('button', { name: 'Add' })).toBeVisible()
+    const add = within(screen.getByRole('group', { name: 'plain' })).getByRole('button', { name: 'Add' })
+    expect(add.closest('legend')).not.toBeNull()
+    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(within(plain).queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(within(plain).getAllByRole('button', { name: 'Actions' })).toHaveLength(2)
+  })
+
+  it("removes a row of a list of plain values from the row's Actions menu, and Add appends an item", async () => {
+    const onChange = vi.fn()
+    renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] }, onChange)
+
+    const plain = screen.getByTestId('studio-field-/plain')
+    await userEvent.click(within(plain).getAllByRole('button', { name: 'Actions' })[0])
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
+    expect(onChange).toHaveBeenLastCalledWith('/plain/0', undefined)
+
+    await userEvent.click(within(screen.getByRole('group', { name: 'plain' })).getByRole('button', { name: 'Add' }))
+    expect(onChange).toHaveBeenLastCalledWith('/plain', ['x', 'y', ''])
+  })
+
+  it('shows a list of plain values named read-only as text, with no Add, Remove or Actions button', () => {
+    renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] }, vi.fn(), {
+      readOnlyNames: new Set(['plain']),
+    })
+
+    const plain = screen.getByTestId('studio-field-/plain')
+    expect(within(plain).queryByRole('textbox')).toBeNull()
+    expect(within(plain).queryByRole('button', { name: 'Add' })).toBeNull()
+    expect(within(plain).queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(within(plain).queryByRole('button', { name: 'Actions' })).toBeNull()
   })
 
   it('shows the layer tag in the first cell and the removed rows below the table', async () => {

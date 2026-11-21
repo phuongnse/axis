@@ -322,7 +322,8 @@ picks what exists.
   and again after a save, a text write, a delete and a reconnect.
 - **Maps with marked keys.** A map whose keys carry a mark, such as a trigger's `parameters`, shows one
   row for each entry, in the order of the file: a key select that offers the names no other row uses, a
-  value box and Remove. Add appends the first name that is not used and is off when none is left. A
+  value box and a "…" menu with Remove. Add on the map's title row appends the first name that is not used,
+  and is off when none is left. A
   parameter's value box follows its type: a number box for `integer` and `decimal`, a checkbox for
   `boolean` and a text box for the rest. Picking another key keeps the value when it fits the new type.
   A `null` value is edited in the JSON view.
