@@ -74,7 +74,7 @@ the changes of every step.
   [start process actions](form-widget.md#start-process-actions) rules say. Back and Next stay under the step's fields.
 - **Task page.** The task page shows the steps of the task's form the same way. The outcome buttons
   are on the last step, and Enter on the last step does nothing.
-- **The task's last step** _(planned)_. The outcomes group on the task's heading and the save bar show on the last
+- **The task's last step.** The outcomes group on the task's heading and the save bar show on the last
   step, and Back and Next stay under the step's fields, see [task page](task-inbox-widget.md#task-page).
 
 ## Steps bar

@@ -85,6 +85,9 @@ export interface TaskItem {
 /** The outcome of completing a task, or the problem the server reported. */
 export type CompleteResult = { ok: true } | { ok: false; problem: RecordProblem }
 
+/** The record's new `version` after a save that left the task open, or the problem the server reported. */
+export type SaveTaskResult = { ok: true; version: number } | { ok: false; problem: RecordProblem }
+
 /** The task after a claim or release, or the status the task API refused it with. */
 export type TaskCommandResult = { ok: true; task: TaskItem } | { ok: false; status: number }
 
@@ -140,14 +143,43 @@ export async function completeTask(tasksPath: string, id: string, body: string):
   if (response.ok) {
     return { ok: true }
   }
-  if (response.status === 400 || response.status === 403 || response.status === 409) {
-    const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
-    return {
-      ok: false,
-      problem: { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} },
-    }
+  const problem = await taskProblem(response)
+  if (problem) {
+    return { ok: false, problem }
   }
   throw new Error(`Completing the task '${id}' of '${tasksPath}' failed with status ${response.status}.`)
+}
+
+/**
+ * Saves the changed values of a task's subject record without deciding the task. `body` is the prepared body text, so
+ * number text reaches the server unchanged. A 400, 403 or 409 comes back as the problem. A 401 shows the sign-in prompt
+ * and throws, as any other failure does.
+ */
+export async function saveTask(tasksPath: string, id: string, body: string): Promise<SaveTaskResult> {
+  const response = await apiFetch(`${tasksPath}/${id}/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  })
+  if (response.ok) {
+    // A save answers only the version, so a plain number is safe.
+    const { version } = JSON.parse(await response.text()) as { version: number }
+    return { ok: true, version }
+  }
+  const problem = await taskProblem(response)
+  if (problem) {
+    return { ok: false, problem }
+  }
+  throw new Error(`Saving the task '${id}' of '${tasksPath}' failed with status ${response.status}.`)
+}
+
+// The problem of a 400, 403 or 409 answer of the task API, which a completion and a save share, or `null` for any other.
+async function taskProblem(response: Response): Promise<RecordProblem | null> {
+  if (response.status !== 400 && response.status !== 403 && response.status !== 409) {
+    return null
+  }
+  const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
+  return { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} }
 }
 
 /**
