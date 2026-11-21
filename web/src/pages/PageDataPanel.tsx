@@ -1,6 +1,7 @@
 import { useDraggable } from '@dnd-kit/core'
-import { Button, Flex, Modal, Typography } from 'antd'
-import { useContext } from 'react'
+import { Flex, Modal, Typography } from 'antd'
+import { useContext, type PointerEventHandler } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
@@ -85,15 +86,15 @@ function DataList({
 function DataName({ binding, onPick }: { binding: DataBinding; onPick: (binding: DataBinding) => void }) {
   const { setNodeRef, listeners } = useDraggable({ id: `data:${binding.kind}:${binding.name}`, data: { binding } })
   return (
-    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-    <Button
+    <AxisButton
+      role="secondary"
       ref={setNodeRef}
-      {...listeners}
+      onPointerDown={listeners?.onPointerDown as PointerEventHandler<HTMLElement> | undefined}
       data-testid={`studio-data-${binding.kind}-${binding.name}`}
       onClick={() => onPick(binding)}
     >
       {binding.name}
-    </Button>
+    </AxisButton>
   )
 }
 
@@ -124,8 +125,11 @@ export function BindingChoice({
       open={binding !== undefined}
       width={size.dialog.medium}
       title={binding === undefined ? '' : fillText(t('shell.studio.data.bindTitle'), { name: binding.name })}
-      // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-      footer={<Button onClick={onCancel}>{t('shell.studio.data.cancel')}</Button>}
+      footer={
+        <AxisButton role="secondary" onClick={onCancel}>
+          {t('shell.studio.data.cancel')}
+        </AxisButton>
+      }
       onCancel={onCancel}
     >
       {binding !== undefined && names !== undefined && (
@@ -135,15 +139,15 @@ export function BindingChoice({
             const reasonId = `studio-binding-reason-${type}`
             return (
               <Flex vertical key={type}>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button
+                <AxisButton
+                  role="secondary"
                   disabled={limit !== undefined}
                   aria-describedby={limit === undefined ? undefined : reasonId}
                   data-testid={`studio-binding-${type}`}
                   onClick={() => onChoose(type)}
                 >
                   {type}
-                </Button>
+                </AxisButton>
                 {limit !== undefined && (
                   <Typography.Text type="secondary" id={reasonId}>
                     {t(paletteReasons[limit])}

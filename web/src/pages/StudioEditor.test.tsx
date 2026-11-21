@@ -16,7 +16,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { ShellAsideHost } from '../test/shellAsideHost'
 import { loadKindSchema } from '../platform/studioSchemas'
-import { chooseOption, selectRoot } from '../test/antd'
+import { chooseOption, selectRoot, shownMenu } from '../test/antd'
 import {
   addEntityField,
   entityFieldAction,
@@ -1841,8 +1841,9 @@ describe('StudioEditor for a page', () => {
 
       await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
       await userEvent.click(
-        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Delete' }),
+        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Actions' }),
       )
+      await userEvent.click(within(await shownMenu('Actions')).getByRole('menuitem', { name: 'Delete' }))
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(screen.queryByTestId('studio-widget-/widgets/1')).not.toBeInTheDocument()
@@ -1890,8 +1891,9 @@ describe('StudioEditor for a page', () => {
 
       await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
       await userEvent.click(
-        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Move up' }),
+        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Actions' }),
       )
+      await userEvent.click(within(await shownMenu('Actions')).getByRole('menuitem', { name: 'Move up' }))
       expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('table')
 
       await userEvent.click(undoButton())

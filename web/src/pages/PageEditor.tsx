@@ -4,6 +4,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField, type AxisFieldProps } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { RowActions } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { getAt } from '../platform/jsonPatch'
@@ -70,11 +71,11 @@ function JsonOnly() {
 /**
  * The editor of a page. Its General section shows the page's name, title and description, its Parameters section lists the
  * parameters, and its Widgets section shows the widgets as a tree, and a panel for the selected widget. Each parameter
- * has a name, a type, a Required switch and Remove. A `reference` parameter also
- * has a target entity and an `enum` parameter has its values, and a type change removes the one the new type does not
- * take. The tree nests the widgets inside `columns`, `tabs` and `section`. Every list has an Add widget picker,
- * and every widget has Move up, Move down, Remove and a Move to picker that lists the other widget lists. A new
- * container starts with two columns of width 6, one tab, or an empty section. A container's type is fixed. Its panel
+ * is a row with a name, a type, a Required switch and a "…" menu that holds Remove parameter. A `reference` parameter
+ * also has a target entity and an `enum` parameter has its values, and a type change removes the one the new type does
+ * not take. The tree nests the widgets inside `columns`, `tabs` and `section`. Every list has an Add widget picker, and
+ * every widget has a Move to picker that lists the other widget lists and a "…" menu with Move up, Move down and Delete.
+ * A new container starts with two columns of width 6, one tab, or an empty section. A container's type is fixed. Its panel
  * edits the width of each column, the label of each tab and the title and collapsed state of a section, and adds
  * or removes columns and tabs. The panel of a `table`, `form`, `taskInbox`, `processInspector`, `kpi`, `chart` or `detail` widget
  * shows its type with every property that type takes. A `detail` panel has a record picker over the page's required
@@ -229,7 +230,10 @@ export function PageWidgets({
   )
 }
 
-/** The parameters a page declares, each as a card of a name, a type, a Required switch and the fields its type takes. */
+/**
+ * The parameters a page declares, each as a row with no box: a name, a type, a Required switch and the fields its type
+ * takes, with Remove parameter in the row's "…" menu, see docs/reference/studio-editors-by-kind.md#page-parameters.
+ */
 function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeHandler }) {
   const t = useText()
   const list = Array.isArray(value) ? value : []
@@ -259,16 +263,30 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
             {list.map((parameter, index) => {
               const base = `/parameters/${index}`
               if (!isContent(parameter)) {
+                // A parameter that is not an object has no Remove, as before, so it keeps its line only.
                 return (
-                  <Card size="small" key={index} data-testid={`studio-field-${base}`}>
+                  <div key={index} data-testid={`studio-field-${base}`}>
                     <JsonOnly />
-                  </Card>
+                  </div>
                 )
               }
               return (
-                <Card size="small" key={index} data-testid={`studio-field-${base}`}>
-                  <PageParameter base={base} parameter={parameter} onChange={onChange} />
-                </Card>
+                <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-${base}`}>
+                  <div style={{ flex: 1 }}>
+                    <PageParameter base={base} parameter={parameter} onChange={onChange} />
+                  </div>
+                  <RowActions
+                    fold
+                    actions={[
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.studio.page.removeParameter',
+                        destructive: true,
+                        onClick: () => onChange(base, undefined),
+                      },
+                    ]}
+                  />
+                </Flex>
               )
             })}
           </Flex>
@@ -279,7 +297,6 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
 }
 
 function PageParameter({ base, parameter, onChange }: { base: string; parameter: Content; onChange: ChangeHandler }) {
-  const t = useText()
   const { field } = useFieldTexts('page')
   const type = typeof parameter.type === 'string' ? parameter.type : undefined
   const values = Array.isArray(parameter.values) ? parameter.values.filter((item) => typeof item === 'string') : []
@@ -295,7 +312,6 @@ function PageParameter({ base, parameter, onChange }: { base: string; parameter:
         <AxisField {...field('parameters.type')}>
           <Select
             virtual={false}
-            style={{ minWidth: 160 }}
             value={type}
             options={parameterTypes.map((option) => ({ value: option, label: option }))}
             onChange={(next: string) => {
@@ -332,7 +348,6 @@ function PageParameter({ base, parameter, onChange }: { base: string; parameter:
           <AxisField {...field('parameters.values')}>
             <Select
               mode="tags"
-              style={{ minWidth: 240 }}
               open={false}
               value={values}
               onChange={(next: string[]) => onChange(`${base}/values`, next.length === 0 ? undefined : next)}
@@ -340,12 +355,6 @@ function PageParameter({ base, parameter, onChange }: { base: string; parameter:
           </AxisField>
         </div>
       )}
-      <div>
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button danger onClick={() => onChange(base, undefined)}>
-          {t('shell.studio.page.removeParameter')}
-        </Button>
-      </div>
     </Flex>
   )
 }
@@ -388,7 +397,10 @@ function WidgetList({ pointer, widgets, tree }: { pointer: string; widgets: unkn
   )
 }
 
-/** One widget: the button that selects it, its move and remove buttons, and the lists inside a container. */
+/**
+ * One widget: the button that selects it, a Move to picker, a "…" menu with Move up, Move down and Delete, and the lists
+ * inside a container. See docs/reference/studio-editors-by-kind.md#widget-tree.
+ */
 function WidgetRow({
   listPointer,
   index,
@@ -440,38 +452,18 @@ function WidgetRow({
     <div role="listitem">
       <Flex vertical gap="small">
         <Flex gap="small" wrap align="center" data-testid={`studio-widget-row-${pointer}`}>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button
-            type={pointer === tree.selected ? 'primary' : 'default'}
+          <AxisButton
+            role={pointer === tree.selected ? 'main' : 'secondary'}
             aria-current={pointer === tree.selected}
             data-testid={`studio-widget-${pointer}`}
             style={{ textAlign: 'left' }}
             onClick={() => tree.onSelect(pointer)}
           >
             {content !== undefined ? widgetSummary(content) : ''}
-          </Button>
+          </AxisButton>
           {tree.layer !== undefined && typeof content?.name === 'string' && (
             <LayerMarkTag layer={tree.layer} list={listPointer} index={index} name={content.name} />
           )}
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button disabled={index === 0} onClick={() => move(-1)}>
-            {t('shell.studio.page.moveUp')}
-          </Button>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button disabled={index === widgets.length - 1} onClick={() => move(1)}>
-            {t('shell.studio.page.moveDown')}
-          </Button>
-          <AxisButton
-            role="destructive"
-            onClick={() =>
-              tree.onChange(
-                listPointer,
-                widgets.filter((_, at) => at !== index),
-              )
-            }
-          >
-            {t('shell.studio.delete')}
-          </AxisButton>
           <Select
             aria-label={t('shell.studio.page.moveTo')}
             placeholder={t('shell.studio.page.moveTo')}
@@ -488,6 +480,33 @@ function WidgetRow({
                 tree.onSelect(moved.pointer)
               }
             }}
+          />
+          <RowActions
+            fold
+            actions={[
+              {
+                key: 'moveUp',
+                labelKey: 'shell.studio.page.moveUp',
+                disabled: index === 0,
+                onClick: () => move(-1),
+              },
+              {
+                key: 'moveDown',
+                labelKey: 'shell.studio.page.moveDown',
+                disabled: index === widgets.length - 1,
+                onClick: () => move(1),
+              },
+              {
+                key: 'delete',
+                labelKey: 'shell.studio.delete',
+                destructive: true,
+                onClick: () =>
+                  tree.onChange(
+                    listPointer,
+                    widgets.filter((_, at) => at !== index),
+                  ),
+              },
+            ]}
           />
         </Flex>
         {container !== undefined && (
@@ -648,7 +667,6 @@ function WidgetPanel({
       <PageField pointer={`${base}/type`}>
         <Select
           virtual={false}
-          style={{ minWidth: 240 }}
           value={type}
           options={widgetTypes.map((option) => ({ value: option, label: option }))}
           onChange={(next: string) => {
@@ -1063,7 +1081,6 @@ function ChartPanel({
       <PageField pointer={`${base}/kind`}>
         <Select
           virtual={false}
-          style={{ minWidth: 240 }}
           value={typeof widget.kind === 'string' ? widget.kind : undefined}
           options={chartKinds.map((kind) => ({ value: kind, label: kind }))}
           onChange={(next: string) => onChange(`${base}/kind`, next)}

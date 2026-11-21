@@ -4,14 +4,13 @@ import { type ReactNode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
-import { designTokensFor } from '../platform/designTokens'
 import { setAt } from '../platform/jsonPatch'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, clearButton, clearSelect, optionTexts, selectRoot, shownDropdown } from '../test/antd'
+import { chooseOption, clearButton, clearSelect, optionTexts, selectRoot, shownDropdown, shownMenu } from '../test/antd'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 
@@ -1050,11 +1049,28 @@ describe('PageEditor parameters', () => {
     expect(onChange).toHaveBeenLastCalledWith('/parameters/0/values', undefined)
   })
 
-  it('removes a parameter', async () => {
+  it('draws Add parameter as a text button in the title row, and keeps no Remove button in a parameter row', () => {
+    renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
+
+    const section = screen.getByTestId('studio-section-parameters')
+    expect(within(section).getByRole('button', { name: 'Add parameter' })).toHaveClass('ant-btn-variant-text')
+    expect(within(screen.getByTestId(`${parameters}/0`)).queryByRole('button', { name: 'Remove parameter' })).toBeNull()
+  })
+
+  it('removes a parameter from its "…" menu', async () => {
     const onChange = renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove parameter' }))
+    await userEvent.click(within(screen.getByTestId(`${parameters}/0`)).getByRole('button', { name: 'Actions' }))
+    await userEvent.click(within(await shownMenu('Actions')).getByRole('menuitem', { name: 'Remove parameter' }))
     expect(onChange).toHaveBeenLastCalledWith('/parameters/0', undefined)
+  })
+
+  it('shows a parameter that is not an object as a line with no menu', () => {
+    renderEditor(page(table, { parameters: ['request'] }))
+
+    const item = screen.getByTestId(`${parameters}/0`)
+    expect(within(item).getByTestId('studio-json-only')).toBeVisible()
+    expect(within(item).queryByRole('button', { name: 'Actions' })).toBeNull()
   })
 
   it('points to the JSON view when the parameters are not a list', () => {
@@ -1261,39 +1277,83 @@ describe('PageEditor widget tree', () => {
     expect(within(screen.getByTestId('studio-widget-list-/widgets')).getAllByTestId('studio-json-only')).toHaveLength(2)
   })
 
-  it('draws Delete in dangerText in dark mode, so it passes contrast on a dark surface', () => {
+  /** Opens the "…" menu of a widget row and returns its entry named `name`. */
+  async function rowAction(pointer: string, name: string) {
+    await userEvent.click(row(pointer).getByRole('button', { name: 'Actions' }))
+    return within(await shownMenu('Actions')).getByRole('menuitem', { name })
+  }
+
+  it('draws Delete as a danger entry of the row menu in dark mode, so it passes contrast on a dark surface', async () => {
     localStorage.setItem('axis.themeMode', 'dark')
     renderEditor(tree())
 
-    expect(row('/widgets/1').getByRole('button', { name: 'Delete' })).toHaveStyle({
-      color: designTokensFor('dark').colour.dangerText,
-    })
+    expect(await rowAction('/widgets/1', 'Delete')).toHaveClass('ant-dropdown-menu-item-danger')
   })
 
-  it('moves up, moves down and removes in the list that holds the widget', async () => {
+  it('lists Move up, Move down and Delete in the "…" menu of a row, in that order', async () => {
+    renderEditor(tree())
+
+    await userEvent.click(row('/widgets/0').getByRole('button', { name: 'Actions' }))
+    expect(
+      within(await shownMenu('Actions'))
+        .getAllByRole('menuitem')
+        .map((entry) => entry.textContent),
+    ).toEqual(['Move up', 'Move down', 'Delete'])
+  })
+
+  it('keeps no button of its own for Move up, Move down or Delete in any row', () => {
+    renderEditor(tree())
+
+    for (const pointer of ['/widgets/0', '/widgets/1', '/widgets/0/columns/0/widgets/0']) {
+      expect(row(pointer).queryByRole('button', { name: 'Move up' })).toBeNull()
+      expect(row(pointer).queryByRole('button', { name: 'Move down' })).toBeNull()
+      expect(row(pointer).queryByRole('button', { name: 'Delete' })).toBeNull()
+    }
+  })
+
+  it('draws the selected row in the main role with aria-current, and another row in the secondary role', async () => {
+    renderEditor(tree())
+
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveClass('ant-btn-color-primary')
+    expect(screen.getByTestId('studio-widget-/widgets/1')).not.toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('studio-widget-/widgets/1')).not.toHaveClass('ant-btn-color-primary')
+
+    await userEvent.click(screen.getByTestId('studio-widget-/widgets/1'))
+
+    expect(screen.getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('studio-widget-/widgets/1')).toHaveClass('ant-btn-color-primary')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).not.toHaveClass('ant-btn-color-primary')
+  })
+
+  it('moves up, moves down and deletes in the list that holds the widget, from the row menu', async () => {
     const onChange = renderEditor(tree())
 
-    expect(row('/widgets/0').getByRole('button', { name: 'Move up' })).toBeDisabled()
-    expect(row('/widgets/1').getByRole('button', { name: 'Move down' })).toBeDisabled()
-    expect(row('/widgets/0/columns/0/widgets/0').getByRole('button', { name: 'Move up' })).toBeDisabled()
-    expect(row('/widgets/0/columns/0/widgets/0').getByRole('button', { name: 'Move down' })).toBeDisabled()
+    expect(await rowAction('/widgets/0', 'Move up')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
+    expect(await rowAction('/widgets/1', 'Move down')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
+    expect(await rowAction('/widgets/0/columns/0/widgets/0', 'Move up')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
+    expect(await rowAction('/widgets/0/columns/0/widgets/0', 'Move down')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
 
-    await userEvent.click(row('/widgets/0').getByRole('button', { name: 'Move down' }))
+    await userEvent.click(await rowAction('/widgets/0', 'Move down'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets', [inbox, columns])
-    await userEvent.click(row('/widgets/1').getByRole('button', { name: 'Move up' }))
+    await userEvent.click(await rowAction('/widgets/1', 'Move up'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets', [inbox, columns])
-    await userEvent.click(row('/widgets/1').getByRole('button', { name: 'Delete' }))
+    await userEvent.click(await rowAction('/widgets/1', 'Delete'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets', [columns])
-    await userEvent.click(row('/widgets/0/columns/1/widgets/0').getByRole('button', { name: 'Delete' }))
+    await userEvent.click(await rowAction('/widgets/0/columns/1/widgets/0', 'Delete'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns/1/widgets', [])
   })
 
-  it('reorders the widgets of a list inside a container', async () => {
+  it('reorders the widgets of a list inside a container from the row menu', async () => {
     const onChange = renderEditor(
       page(columns, { widgets: [{ type: 'section', title: { textKey: '' }, widgets: [table, noted] }] }),
     )
 
-    await userEvent.click(row('/widgets/0/widgets/0').getByRole('button', { name: 'Move down' }))
+    await userEvent.click(await rowAction('/widgets/0/widgets/0', 'Move down'))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/widgets', [noted, table])
   })
 
