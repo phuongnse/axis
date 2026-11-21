@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 /// <c>activate</c> and the publisher read <c>Extensions:ApplicationPackages</c> for the compile that stores a release, see
 /// docs/reference/package-runners.md#an-applications-packages. Unset is off, and a value that is not <c>true</c> or <c>false</c>
 /// is a problem that names the setting. A publisher with the setting on also needs <c>Extensions:Runners:Application</c>, the
-/// host that builds the packages, and stops at start without it.
+/// host that builds the packages, and stops at start without it. A publisher with the setting on also stops at start on an <c>Extensions:Runners:ProxyPort</c> that is not a port.
 /// </summary>
 public sealed class AdminApplicationPackagesSettingTests
 {
@@ -62,5 +62,31 @@ public sealed class AdminApplicationPackagesSettingTests
 
         Assert.Equal(2, exit);
         Assert.Contains("Extensions:Runners:Application", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_publisher_with_the_setting_on_and_a_proxy_port_that_is_not_a_port_stops_with_code_2_naming_the_setting_and_not_its_value()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Extensions:ApplicationPackages"] = "true",
+                ["Extensions:Runners:Application"] = "127.0.0.1:5310",
+                ["Extensions:Runners:ProxyPort"] = "70000",
+            })
+            .Build();
+        var error = new StringWriter();
+
+        var exit = await AdminCommands.RunAsync(
+            ["publisher"],
+            configuration,
+            TextReader.Null,
+            new StringWriter(),
+            error,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, exit);
+        Assert.Contains("Extensions:Runners:ProxyPort", error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("70000", error.ToString(), StringComparison.Ordinal);
     }
 }

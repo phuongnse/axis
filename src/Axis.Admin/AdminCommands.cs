@@ -9,6 +9,7 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Templates;
 using Axis.Data;
 using Axis.Data.Records;
+using Axis.Processes.Instances;
 using Axis.Studio;
 using Axis.Tenancy;
 using Axis.Tenancy.Keys;
@@ -1305,18 +1306,31 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        // With the setting on, a publish builds each application package in application-package-host.
+        // With the setting on, a publish builds each application package in application-package-host, and a run request builds one and calls an
+        // operation of it in a runner, through an egress proxy of the publisher's own on Extensions:Runners:ProxyPort.
         ApplicationPackageBuilds? builds;
+        ApplicationPackageRuns? runs = null;
         try
         {
             var packages = ApplicationPackageSettings.Load(configuration);
             builds = packages.On ? new ApplicationPackageBuilds(packages.RunnerHost!, packages.RunnerPort, ApplicationPackageBuilds.Wait) : null;
+            if (builds is not null)
+            {
+                var proxy = new EgressProxy(PackageIsolation.LoadProxyPort(configuration), (configuration[DotnetEnvironmentSetting] ?? Environments.Production) == Environments.Development);
+                runs = new ApplicationPackageRuns(
+                    builds,
+                    new PackageRunners(ApplicationPackageSettings.RunnerSetting, packages.RunnerHost, packages.RunnerPort, proxy),
+                    proxy,
+                    ApplicationPackageBuilds.Wait);
+            }
         }
         catch (InvalidOperationException exception)
         {
             error.WriteLine(exception.Message);
             return 2;
         }
+
+        await using var _ = runs;
 
         // A setting's own message holds its value, so these say only which setting is wrong.
         TenancySource source;
@@ -1358,8 +1372,8 @@ internal static partial class AdminCommands
                 studioPlatform is null ? null : new PlatformStudioWriteLock(studioPlatform, NullLogger<PlatformStudioWriteLock>.Instance));
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, cell, studio, builds, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, routeWriter, cancellationToken)
-            : await ConfigurationPublisherAsync(configuration, studio, builds, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
+            ? await DirectoryPublisherAsync(configuration, cell, studio, builds, runs, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, routeWriter, cancellationToken)
+            : await ConfigurationPublisherAsync(configuration, studio, builds, runs, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
     }
 
     private static async Task<int> DirectoryPublisherAsync(
@@ -1367,6 +1381,7 @@ internal static partial class AdminCommands
         CellOptions cell,
         PublisherStudio? studio,
         ApplicationPackageBuilds? builds,
+        ApplicationPackageRuns? runs,
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
@@ -1508,7 +1523,8 @@ internal static partial class AdminCommands
                 routes),
             storage is null ? null : new TenantExportSweep(storage),
             studio,
-            builds).RunAsync();
+            builds,
+            runs).RunAsync();
     }
 
     // A blank setting is no annotations. The value is a JSON object of strings and is never echoed.
@@ -1610,6 +1626,7 @@ internal static partial class AdminCommands
         IConfiguration configuration,
         PublisherStudio? studio,
         ApplicationPackageBuilds? builds,
+        ApplicationPackageRuns? runs,
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
@@ -1666,7 +1683,8 @@ internal static partial class AdminCommands
             error,
             cancellationToken,
             studio: studio,
-            packageBuilds: builds).RunAsync();
+            packageBuilds: builds,
+            packageRuns: runs).RunAsync();
     }
 
     // An empty value is no setting: a test request then fails with AXC0217. A value that is no connection string stops the

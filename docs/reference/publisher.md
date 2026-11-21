@@ -13,7 +13,7 @@ runs until it is stopped. It has no HTTP endpoint and listens on no port, so not
 The `axis-admin` image runs it. Both production installs start one, see
 [installation](installation.md), and `scripts/dev.sh`, the Docker Compose file in the repository root
 and the E2E script each start one too. It runs `publish`, `validate`,
-[`activate`](authoring-publishing.md#publishing), `accept`, `test` and `build` requests under both tenancy sources, and `publish`
+[`activate`](authoring-publishing.md#publishing), `accept`, `test`, `build` and `run` requests under both tenancy sources, and `publish`
 requests with the target `preview`, see [preview requests](#preview-requests).
 
 One process runs these loops:
@@ -85,13 +85,13 @@ publisher. The `directory` source writes neither line.
 
 Each poll round, for each served tenant, the requests loop claims the oldest `queued` `publish`,
 `validate`, `activate` or `accept` request with `FOR UPDATE SKIP LOCKED`, and the tests loop does the same for
-`test` and `build` requests. A claim sets the request `running`, `claimed_by` to the publisher's own name and
+`test`, `build` and `run` requests. A claim sets the request `running`, `claimed_by` to the publisher's own name and
 `lease_until`, and adds 1 to `claims`. A `running` request whose lease has run out is claimed the same
 way.
 
-- **Test requests.** `test` and `build` requests form their own queue for each tenant and application. At most
-  one of them runs at a time, oldest first, independent of the other kinds. A `test` or `build` does not wait behind a
-  running `publish`, `validate`, `activate` or `accept`, and none of them waits behind a `test` or `build`, so a long test
+- **Test requests.** `test`, `build` and `run` requests form their own queue for each tenant and application. At most
+  one of them runs at a time, oldest first, independent of the other kinds. A `test`, `build` or `run` does not wait behind a
+  running `publish`, `validate`, `activate` or `accept`, and none of them waits behind a `test`, `build` or `run`, so a long test
   holds up no publish. The claim that skips an application with a `running` request therefore counts
   only the requests of the same queue.
 - **Target.** A request with target `tenant` is claimed as above. A request with target `preview` is

@@ -103,7 +103,7 @@ What each kind does:
   used it ends the request `failed` with one `AXC0377` for each such resource or file. An author's `accept` comes from the [accept route](authoring-requests.md#routes).
 - **Order.** For one tenant and application the publisher runs `publish`, `validate`, `activate` and
   `accept` requests one at a time, oldest first, so when two publishes are queued, the newer one ends
-  up live. A `test` and a `build` share a queue of their own.
+  up live. A `test`, a `build` and a `run` share a queue of their own.
 
 ### Preview
 
@@ -164,7 +164,7 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
   that runs fails, its database is dropped and the request ends `failed` with `AXC0219`. A stop of the
   publisher (`SIGTERM`) does the same at once, with `AXC0220`. The scenarios that finished keep their
   outcomes, and the one that was cut is stored as `failed` with no `step` and no `path`.
-- **Order.** At most one `test` or `build` request per application runs at a time, oldest first. Their queue is
+- **Order.** At most one `test`, `build` or `run` request per application runs at a time, oldest first. Their queue is
   separate from `validate`, `publish` and `activate`, so a `test` never waits behind a `publish`.
 - **A package's tests.** A `test` whose request names a `package` tests that one application package, see
   [an application's packages](package-runners.md#an-applications-packages). The publisher compiles
