@@ -550,9 +550,7 @@ export function StudioPackageRun({
             )}
             <div style={{ borderTop: rule }}>
               <PaneHeader title={t('shell.studio.packages.run.log')} />
-              <div style={{ padding: spacing.md }}>
-                <CodeBlock wrap testId="studio-run-log" text={request.output?.join('\n') ?? null} />
-              </div>
+              <CodeBlock plain wrap testId="studio-run-log" text={request.output?.join('\n') ?? null} />
             </div>
           </div>
         )}
