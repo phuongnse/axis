@@ -177,6 +177,32 @@ describe('checkDesignSystemBundle', () => {
     assert.deepEqual(problems, ['axis-design-system.js has a literal <!--.'])
   })
 
+  test('fails a @font-face rule', () => {
+    write('axis-design-system.js', valid + "var css = '@font-face{font-family:x}'\n")
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /holds a font/)
+  })
+
+  test('fails a data:font/ URL', () => {
+    write('axis-design-system.js', valid + "var url = 'data:font/woff2;base64,AA'\n")
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /holds a font/)
+  })
+
+  test('passes library code that names @font-face without a rule', () => {
+    write('axis-design-system.js', valid + 'var fontRules = rules.filter((rule) => rule.cssText.startsWith(`@font-face`))\n')
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.deepEqual(problems, [])
+  })
+
   test('fails a script over 6 MB', () => {
     write('axis-design-system.js', header + `var Axis = '${'a'.repeat(6 * 1024 * 1024)}'\n`)
 

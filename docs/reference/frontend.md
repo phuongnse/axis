@@ -86,7 +86,8 @@ component holds a number of its own.
   the subsets a page uses. The fonts are under the SIL Open Font License 1.1, whose texts ship at
   `/fonts/OFL-IBM-Plex-Sans.txt` and `/fonts/OFL-IBM-Plex-Mono.txt`, from `web/public/fonts`. The font files are part
   of the build output and load from the SPA's own origin (`font-src 'self'`), so an installation with no internet
-  shows them too. The design-system bundle carries no fonts.
+  shows them too. The design-system bundle carries no fonts, and only the local preview server loads them, see
+  [widget previews](../development.md#widget-previews).
 - **Ant Design reads the tokens through one file.** `web/src/platform/antTheme.ts` is the only file that maps the
   tokens to Ant Design tokens. A component that needs a theme value reads Axis tokens through `useDesignTokens`, never
   through Ant Design's `theme.useToken`. A Vitest test fails on a hard-coded colour, font family or radius in

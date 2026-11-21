@@ -50,6 +50,7 @@ describe('the design-system dev server', () => {
       const proxy = /src="([^"]*html-proxy[^"]*)"/.exec(page.body)
       const code = proxy === null ? page.body : (await fetchText(proxy[1].replaceAll('&amp;', '&'))).body
       expect(code).toContain('/src/designSystem/bundle.ts')
+      expect(code).toContain('/src/fonts.css')
     },
     timeout,
   )
