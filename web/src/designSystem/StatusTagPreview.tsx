@@ -40,7 +40,7 @@ function ComparedTag({ look, tone, children }: { look: Look; tone: StatusTone; c
 }
 
 const looks: readonly { look: Look; title: string }[] = [
-  { look: 'fillAndBorder', title: 'Proposed, as step 11 of #3263: tinted fill and border' },
+  { look: 'fillAndBorder', title: 'Proposed, as the AI in Studio review agreed: tinted fill and border' },
   { look: 'fill', title: 'Tinted fill, no border' },
   { look: 'outlined', title: 'On main today: outlined' },
 ]
