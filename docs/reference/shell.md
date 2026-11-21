@@ -93,7 +93,10 @@ their own controls where they expect them.
   A small block that stands for one thing, such as a home page tile or a dashboard's KPI or chart, keeps its own
   `borderSubtle` border and `radius-base` corners.
 - **Parts a rule apart.** A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
-  drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
+  drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule. On a page the
+  rule reaches past the page's padding to the page area's edges. In a drawer, a dialog, the side panel, the sidebar, a
+  tile or a column of a grid it stays inside. A runtime page's widget list, a record's detail and a record form also
+  keep it inside for now.
 - **Rules, not boxes** _(planned)_. One `borderSubtle` rule parts a block from the one beside it, and no border, box
   or rounded corner goes round a region. It follows dividers over containers, as Material's containment has it, and a
   code editor's split panes, and keeps clear of boxes inside boxes.
