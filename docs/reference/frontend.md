@@ -48,6 +48,10 @@ component holds a number of its own.
   keyboard focus of every control. `onPrimary` colours text and icons on a `primary` fill.
 - **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface` and `canvas` in both
   modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. [Each preview](widget-previews.md#the-spec) is checked.
+- **A tag's border** _(planned)_. A status tag is no control, and its words carry its meaning, so its border is not
+  held to the 3:1 of a control's edge. Each tone's words reach 4.5:1 on its fill, on `surface` and on `canvas` in both
+  modes. The tints come from the Ant Design theme in use, through `useStatusTints()` in `antTheme.ts`, see
+  [which widget](shared-widgets.md#which-widget).
 - **Rules on a flush page** _(planned)_. `borderSubtle` stands apart from `surface` about as much in light mode as in
   dark, because on a flush page a rule is all that parts two areas. `border` stays for controls.
 - **One meaning, one sign** _(planned)_. A sign means one thing and looks one way. The same icon for the same meaning

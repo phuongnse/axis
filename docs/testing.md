@@ -289,6 +289,15 @@ because no ready authoring request owns an outside client's draft, and the newes
 each agent host once its request reads Ready or Failed, because the scripted answers are used up by then. Both AI authoring specs hold one exclusive lock, `holdAiSpecLock`, for their
 whole run, because an agent host serves every directory tenant, so the two specs run one after the other in a shard.
 
+**The package run spec** runs on the tenant `packages-run`, on the host `packages-run.localhost`, with its server on the
+port offset 12. The shared publisher of the E2E stack has application packages off and reads no directory tenant, so the
+spec starts its own Node.js package host, `Axis.PackageHost host`, with a stub Trivy that reports no findings. It also
+starts its own publisher with `Extensions:ApplicationPackages` on and `Extensions:Runners:Application` set to that host. The publisher takes the
+publishers' lock alone, so no cell spec runs with it. A developer with the author and developer roles makes a TypeScript
+package from the starter. The first test saves the input `{ "text": "hello" }` as `greeting` through Manage saved inputs…,
+reloads and finds it in Saved input. The second test runs the starter's `echo` and expects Succeeded, the output JSON with
+`"text": "hello"`, and the host's line in the Log that says it installed the dependencies of the lock.
+
 **The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
 `Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the
 `axis-cell-console` client. The spec's browser maps `console.localhost` and the tenant host on

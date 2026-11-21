@@ -270,6 +270,8 @@ module ([kind lists](studio.md#kind-lists-and-module-resources)), and each opens
 - **Marks.** An element that the layer added shows **Added**, one it changed **Changed**, and one it
   removed stays listed as **Removed**, in a muted row. When the resource has a layer, its header shows
   a Customized tag and **Reset all**.
+- **A mark names itself** _(planned)_. A layer's mark is `LayerMarkLabel`, a `StatusTag` in `neutral` with `role="note"`
+  and an accessible name such as "supplier, added by this application", see [which widget](shared-widgets.md#which-widget).
 - **Names.** In the schema form editors `name` shows as text, because the save route refuses a renamed
   module resource.
 - **Module policies.** The module editor edits a grant's actions and deletes grants, and shows a
