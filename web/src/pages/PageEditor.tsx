@@ -32,7 +32,7 @@ import { referenceOptions, StudioNamesContext, type ReferenceOption } from '../p
 import type { StudioNamePage, StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { WarningLine } from './CatalogControls'
+import { WarningLine } from '../platform/WarningLine'
 import { LabelTexts } from './LabelTexts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { useFieldTexts } from './fieldTexts'
@@ -461,9 +461,8 @@ function WidgetRow({
           <Button disabled={index === widgets.length - 1} onClick={() => move(1)}>
             {t('shell.studio.page.moveDown')}
           </Button>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button
-            danger
+          <AxisButton
+            role="destructive"
             onClick={() =>
               tree.onChange(
                 listPointer,
@@ -472,7 +471,7 @@ function WidgetRow({
             }
           >
             {t('shell.studio.delete')}
-          </Button>
+          </AxisButton>
           <Select
             aria-label={t('shell.studio.page.moveTo')}
             placeholder={t('shell.studio.page.moveTo')}

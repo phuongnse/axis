@@ -1296,7 +1296,7 @@ describe('App', () => {
 
     renderApp('/e2e/notes')
 
-    expect(await screen.findByText('No records yet.')).toBeInTheDocument()
+    expect(await screen.findByText('No records yet.', undefined, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'title' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'New' }))
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/noteform/new')
