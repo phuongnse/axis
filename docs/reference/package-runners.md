@@ -123,7 +123,7 @@ implements the operation context over it.
 | `build` | A caller, to the host | `files`, mapping each relative path of the package, written with `/`, to its content in base64 |
 | `built` | The host | `files`, as in `build`, for every file of the built package, and `output`, the lines the build steps wrote |
 | `test` | A caller, to the host | `files`, as in `build` |
-| `tested` | The host | `tests`, each with the `name` of the test, its `outcome`, `passed` or `failed`, and its `message`, the last line of a failed test's traceback cut at 1000 characters, or null |
+| `tested` | The host | `tests`, each with the `name` of the test, its `outcome`, `passed` or `failed`, its `message`, the last line of a failed test's traceback cut at 1000 characters, or null, and its `durationMs`, a whole number. A failed test with a place also has its `file`, a path in the package written with `/`, and its `line` and `column`, counted from 1. `output`, the last 1000 lines that the tests wrote, each cut at 1000 characters |
 | `refused` | The host | `problems`, each with the `file` it is about, a `message` and, when the problem has a place in the file, a `line` and a `column` counted from 1, and `output`, the lines the build steps wrote |
 
 - **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection is neither encrypted nor
@@ -178,7 +178,12 @@ implements the operation context over it.
   tree, and a stopped run answers `refused` with one problem at `axis-package.json`. A package with no test files answers `tested`
   with no tests. The answer is `tested`, whose `name` is the `unittest` id of the test, such as
   `test_sample.SampleTests.test_fails`. A skipped test is left out, an expected failure is `passed` and an unexpected success is
-  `failed`. A run that ends with no valid result, such as a test that exits the process, answers `refused` at `axis-package.json`. A
+  `failed`. Each test has `durationMs`, the whole milliseconds it took. A failed test has `file`, `line` and `column`, where it failed:
+  the last frame of its traceback inside the built copy, as a path in the package such as `test_sample.py`. The column is 1 when
+  Python gives none, and a failure with no such frame, such as an unexpected success, has no place. A failure raised inside a
+  dependency that pip installed into the copy has the dependency's file as its place, such as `phonenumbers/util.py`, which is
+  not in the working folder. `output` holds the last 1000 lines that the tests wrote to the console, each cut
+  at 1000 characters. A `tested` from a host that predates these fields lacks them, and a reader treats them as optional. A run that ends with no valid result, such as a test that exits the process, answers `refused` at `axis-package.json`. A
   run that cannot start is the operator's problem and gets no answer, as for a `build`. The host logs `Tested package <id>
   <version>.` and deletes its copies whatever the answer. The tests run the author's code in the host's own container, so a caller
   sends `test` only to a host that runs under gVisor, such as `application-package-host`.

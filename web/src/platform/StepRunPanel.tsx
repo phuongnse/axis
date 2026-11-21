@@ -22,6 +22,8 @@ import {
 import { inspectorPath } from './inspectorPages'
 import { PersonName } from './PersonName'
 import { SidePanel } from './SidePanel'
+import { runHasInput, runHasOutput } from './runPanelParts'
+import { RunAttempts, RunInput, RunOutput } from './StepRunParts'
 import { StatusTag } from './StatusTag'
 import { TermList, type Term } from './TermList'
 import { useText } from './texts'
@@ -50,17 +52,26 @@ interface StepRunPanelProps {
   onClose: () => void
 }
 
-/** The tabs of the panel for a run: Overview, and Error for a failed run. Input, Output and Attempts come with their rules. */
-function runTabs(run: StepRun): string[] {
-  return ['overview', ...(run.state === 'failed' ? ['error'] : [])]
+/**
+ * The tabs of the panel for a run, in their order: Overview, Input for a run with a call or a decision's read values,
+ * Output for a run that made something, Attempts for a run with a call, and Error for a failed run.
+ */
+function runTabs(instance: InstanceDetail, runs: readonly StepRun[], run: StepRun): string[] {
+  return [
+    'overview',
+    ...(runHasInput(instance, runs, run) ? ['input'] : []),
+    ...(runHasOutput(instance, runs, run) ? ['output'] : []),
+    ...(runParts(instance, runs, run).calls.length > 0 ? ['attempts'] : []),
+    ...(run.state === 'failed' ? ['error'] : []),
+  ]
 }
 
 /**
  * The side panel of a step's run on a process instance's page, shared by the site's page and the operator console's,
  * see docs/reference/process-inspector-widget.md#instance-page. Its title is the step's label with the run's state as a
  * `StatusTag`, and its line is the step's kind, or what its operation does. A step run more than once has a run chooser
- * on top. The tabs are Overview and, for a failed run, Error, kept in the address as `stepTab`, and a run with one tab has
- * no tab bar. A step the instance has not reached shows "This step has not run." Overview is a `TermList` of the run's
+ * on top. The tabs are Overview, Input, Output, Attempts and, for a failed run, Error, those that apply to the run, kept
+ * in the address as `stepTab`, and a run with one tab has no tab bar. A step the instance has not reached shows "This step has not run." Overview is a `TermList` of the run's
  * facts. A sub-process names its child by its process title, as a link where `inspectors` knows its process.
  */
 export function StepRunPanel({
@@ -79,7 +90,7 @@ export function StepRunPanel({
   const t = useText()
   const { spacing } = useDesignTokens()
   const empty = useEmptyStyle()
-  const keys = run ? runTabs(run) : ['overview']
+  const keys = run ? runTabs(instance, runs, run) : ['overview']
   const [tab, selectTab] = useAddressTab('stepTab', keys)
 
   const type = instance.graph.steps.find((candidate) => candidate.name === step)?.type ?? ''
@@ -101,8 +112,12 @@ export function StepRunPanel({
         search={search}
       />
     )
+    const pane = { instance, runs, run, locale }
     const panes: Record<string, ReactNode> = {
       overview,
+      input: <RunInput {...pane} />,
+      output: <RunOutput {...pane} />,
+      attempts: <RunAttempts {...pane} />,
       error: <div>{runProblem(t, locale, instance, runs, run) ?? <NotSet />}</div>,
     }
     body =

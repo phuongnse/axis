@@ -211,9 +211,17 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         var passed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsCase.test_passes")!;
         Assert.Equal("passed", passed["outcome"]!.GetValue<string>());
         Assert.Null(passed["message"]);
+        Assert.True(passed["durationMs"]!.GetValue<long>() >= 0);
+        Assert.Null(passed["file"]);
+        Assert.Null(passed["line"]);
+        Assert.Null(passed["column"]);
         var failed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsCase.test_fails")!;
         Assert.Equal("failed", failed["outcome"]!.GetValue<string>());
         Assert.StartsWith("AssertionError", failed["message"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.True(failed["durationMs"]!.GetValue<long>() >= 0);
+        Assert.Equal("test_tools.py", failed["file"]!.GetValue<string>());
+        Assert.Equal(9, failed["line"]!.GetValue<int>());
+        Assert.Equal(9, failed["column"]!.GetValue<int>());
         Assert.Empty(await DiagnosticsAsync(scenario, tenant, request));
         Assert.Contains(result.Output, line => line == $"{tenant} package failed: 1 of 2 tests failed.");
         Assert.Equal([("tools", "1.0.0")], host.Tests());
