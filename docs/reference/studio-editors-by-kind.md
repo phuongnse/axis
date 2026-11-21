@@ -304,6 +304,10 @@ sub-process and wait for event steps and of a task's deadline and escalations.
   `raiseEvent`, `createRecord`, `notify` or Package operation, above its transition. Changing the
   operation removes only the keys the new one forbids and adds no empty key, so the compiler reports
   what is still missing, and every other key, unknown keys included, stays.
+  - **Rows.** Each list of rows, `set`, `input` and its nested `fields`, `output`, an event's `fields`, a
+    notification's `values` and a page's parameters, has Add row on its title row as a light text button, or the add
+    choice of the unmapped keys where the keys are known. Each row's "…" menu, the table's row actions, holds
+    Remove. A read-only tab, such as while the JSON has an error, shows neither.
   - `updateRecord` shows `set` as rows of a field of the process's entity and an expression.
   - `callConnector` shows the connector and its operation as pickers, its
     [`input`](process-designer.md#connector-input), `output` as rows of a typed connector output name

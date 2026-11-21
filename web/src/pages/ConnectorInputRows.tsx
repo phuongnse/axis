@@ -1,8 +1,10 @@
-import { Button, Flex, Input, Typography } from 'antd'
+import { ConfigProvider, Flex, Input, Typography } from 'antd'
 import { useContext } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { RowActions } from '../platform/AxisTable'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { useFieldTexts } from './fieldTexts'
@@ -45,7 +47,9 @@ function kindOf(entry: unknown): Kind | undefined {
  * A value is an expression, an object is nested rows over the same record, and a list picks a child collection of
  * `entity` with `from` and has nested rows over a row of it. Nested rows use the same fields and nest further. The step
  * keeps the shape the author switched to, and the compiler reports what is missing. A value that is not a plain object
- * is left to the JSON view.
+ * is left to the JSON view. Add sits on each list's title row as a light text button and each row's Remove is in the row's
+ * "…" menu, which removes what is nested in the row too. A read-only editor, Ant Design's `componentDisabled`, shows
+ * neither, see docs/reference/studio-editors-by-kind.md#process-editor.
  */
 export function ConnectorInputRows({
   pointer,
@@ -64,6 +68,7 @@ export function ConnectorInputRows({
 }) {
   const t = useText()
   const { field, group } = useFieldTexts('process')
+  const { componentDisabled } = ConfigProvider.useConfig()
 
   if (value !== undefined && !isContent(value)) {
     return <JsonOnly pointer={pointer} title={title} help={help} />
@@ -90,71 +95,89 @@ export function ConnectorInputRows({
     }
   }
 
+  const add = (
+    <AxisButton
+      role="secondary"
+      disabled={entries.some(([key]) => key === '')}
+      onClick={() => onChange(`${pointer}/`, '')}
+    >
+      {t('shell.studio.process.addMapping')}
+    </AxisButton>
+  )
+
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisFieldGroup title={title} help={help}>
+      <AxisFieldGroup title={title} help={help} action={componentDisabled ? undefined : add}>
         <Flex vertical gap="small">
           {entries.map(([key, entry], index) => {
             const rowPointer = `${pointer}/${escapeSegment(key)}`
             const kind = kindOf(entry)
             return (
-              <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
-                <AxisField {...field('steps.input.name')} required>
-                  <Input value={key} onChange={(event) => rename(key, event.target.value)} />
-                </AxisField>
-                <AxisChoiceField
-                  {...field('steps.input.kind')}
-                  required
-                  value={kind}
-                  options={kinds.map((candidate) => ({ value: candidate, ...field(`steps.input.kind.${candidate}`) }))}
-                  onChange={(next) => {
-                    if (next !== kind) {
-                      switchTo(rowPointer, entry, next as Kind)
-                    }
-                  }}
-                />
-                {kind === 'value' && (
-                  <AxisField {...expressionField} required>
-                    <Expression
-                      pointer={rowPointer}
-                      name={expressionField.label}
-                      value={text(entry)}
-                      onChange={onChange}
-                    />
+              <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-${rowPointer}`}>
+                <Flex vertical gap="small" style={{ flex: 1 }}>
+                  <AxisField {...field('steps.input.name')} required>
+                    <Input value={key} onChange={(event) => rename(key, event.target.value)} />
                   </AxisField>
-                )}
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button onClick={() => onChange(rowPointer, undefined)}>
-                  {t('shell.studio.process.removeMapping')}
-                </Button>
-                {kind === undefined && (
-                  <Typography.Text type="secondary" data-testid="studio-json-only">
-                    {t('shell.studio.editInJson')}
-                  </Typography.Text>
-                )}
-                {kind === 'object' && (
-                  <div style={{ marginInlineStart: 24 }}>
-                    <ConnectorInputRows
-                      pointer={`${rowPointer}/fields`}
-                      {...group('steps.input.fields')}
-                      value={(entry as Content).fields}
-                      entity={entity}
-                      onChange={onChange}
-                    />
-                  </div>
-                )}
-                {kind === 'list' && (
-                  <ListRows pointer={rowPointer} value={entry as Content} entity={entity} onChange={onChange} />
+                  <AxisChoiceField
+                    {...field('steps.input.kind')}
+                    required
+                    value={kind}
+                    options={kinds.map((candidate) => ({
+                      value: candidate,
+                      ...field(`steps.input.kind.${candidate}`),
+                    }))}
+                    onChange={(next) => {
+                      if (next !== kind) {
+                        switchTo(rowPointer, entry, next as Kind)
+                      }
+                    }}
+                  />
+                  {kind === 'value' && (
+                    <AxisField {...expressionField} required>
+                      <Expression
+                        pointer={rowPointer}
+                        name={expressionField.label}
+                        value={text(entry)}
+                        onChange={onChange}
+                      />
+                    </AxisField>
+                  )}
+                  {kind === undefined && (
+                    <Typography.Text type="secondary" data-testid="studio-json-only">
+                      {t('shell.studio.editInJson')}
+                    </Typography.Text>
+                  )}
+                  {kind === 'object' && (
+                    <div style={{ marginInlineStart: 24 }}>
+                      <ConnectorInputRows
+                        pointer={`${rowPointer}/fields`}
+                        {...group('steps.input.fields')}
+                        value={(entry as Content).fields}
+                        entity={entity}
+                        onChange={onChange}
+                      />
+                    </div>
+                  )}
+                  {kind === 'list' && (
+                    <ListRows pointer={rowPointer} value={entry as Content} entity={entity} onChange={onChange} />
+                  )}
+                </Flex>
+                {componentDisabled ? null : (
+                  <RowActions
+                    fold
+                    actions={[
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.studio.process.removeMapping',
+                        destructive: true,
+                        onClick: () => onChange(rowPointer, undefined),
+                      },
+                    ]}
+                  />
                 )}
               </Flex>
             )
           })}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button disabled={entries.some(([key]) => key === '')} onClick={() => onChange(`${pointer}/`, '')}>
-              {t('shell.studio.process.addMapping')}
-            </Button>
-          </div>
         </Flex>
       </AxisFieldGroup>
     </div>

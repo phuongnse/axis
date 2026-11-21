@@ -1,6 +1,7 @@
 import { EditorView } from '@codemirror/view'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import { useState, type ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import raw from '../../../src/Axis.Configuration/Schemas/process.schema.json'
@@ -160,25 +161,30 @@ function ThemeRoot({ children }: { children: ReactNode }) {
 
 let schema: JsonSchema
 
-/** Renders the editor. With `known` false it has no check context, so the names are unknown and every picker is a name box. */
-function renderEditor(known = true, value: Record<string, unknown> = process, onChange = vi.fn()) {
+/**
+ * Renders the editor. With `known` false it has no check context, so the names are unknown and every picker is a name
+ * box. With `readOnly` it is under Ant Design's `componentDisabled`, as the Studio editor sets it while the JSON has an error.
+ */
+function renderEditor(known = true, value: Record<string, unknown> = process, onChange = vi.fn(), readOnly = false) {
   const editor = <ProcessEditor schema={schema} value={value} onChange={onChange} />
   render(
-    <ThemeModeProvider>
-      <ThemeRoot>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          {known ? (
-            <ExpressionCheckContext.Provider
-              value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: () => value, names }}
-            >
-              {editor}
-            </ExpressionCheckContext.Provider>
-          ) : (
-            editor
-          )}
-        </TextProvider>
-      </ThemeRoot>
-    </ThemeModeProvider>,
+    <ConfigProvider componentDisabled={readOnly}>
+      <ThemeModeProvider>
+        <ThemeRoot>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            {known ? (
+              <ExpressionCheckContext.Provider
+                value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: () => value, names }}
+              >
+                {editor}
+              </ExpressionCheckContext.Provider>
+            ) : (
+              editor
+            )}
+          </TextProvider>
+        </ThemeRoot>
+      </ThemeModeProvider>
+    </ConfigProvider>,
   )
   return onChange
 }
@@ -367,6 +373,12 @@ describe('The operations of the process schema', () => {
   })
 })
 
+/** Opens a row's Actions menu and chooses its entry, the way an author removes a row. */
+async function chooseRowAction(row: ReturnType<typeof within>, name: string) {
+  await userEvent.click(row.getByRole('button', { name: 'Actions' }))
+  await userEvent.click(await screen.findByRole('menuitem', { name }))
+}
+
 describe('A notify step', () => {
   const notify = {
     name: 'tell',
@@ -410,7 +422,8 @@ describe('A notify step', () => {
 
     await userEvent.click(field('/steps/0/to').getByRole('button', { name: 'Add recipient' }))
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/to', [{ user: 'requester' }, { user: '' }])
-    await userEvent.click(field('/steps/0/to').getByRole('button', { name: 'Remove recipient' }))
+    expect(field('/steps/0/to').queryByRole('button', { name: 'Remove recipient' })).toBeNull()
+    await chooseRowAction(field('/steps/0/to/0'), 'Remove recipient')
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0', undefined)
   })
 
@@ -553,6 +566,61 @@ describe('A notify step', () => {
   })
 })
 
+describe('A read-only operation panel', () => {
+  const notify = {
+    name: 'tell',
+    type: 'operation',
+    operation: 'notify',
+    to: [{ user: 'requester' }],
+    channels: ['inApp'],
+    message: { subject: { textKey: 's' }, body: { textKey: 'b' }, values: { n: 'number' } },
+    open: { page: 'P', parameters: { id: 'number' } },
+    next: 'call',
+  }
+  const call = {
+    name: 'call',
+    type: 'operation',
+    operation: 'callConnector',
+    connector: { name: 'PurchasingSystem', operation: 'createPurchaseOrder' },
+    input: { amount: 'totalAmount', address: { fields: { city: 'status' } } },
+    output: { orderNumber: 'purchaseOrderNumber' },
+    next: 'done',
+  }
+  const readOnly = { ...process, steps: [notify, call, { name: 'done', type: 'end' }] }
+
+  it('shows the recipients, the connector input and output and the notification values with no Add and no row menu', () => {
+    renderEditor(false, readOnly, vi.fn(), true)
+
+    for (const pointer of [
+      '/steps/0/to/0',
+      '/steps/0/message/values/n',
+      '/steps/1/input/amount',
+      '/steps/1/input/address/fields/city',
+      '/steps/1/output/orderNumber',
+    ]) {
+      expect(
+        within(screen.getByTestId(`studio-field-${pointer}`)).queryByRole('button', { name: 'Actions' }),
+      ).toBeNull()
+    }
+    expect(screen.getByTestId('studio-field-/steps/1/input/address/fields')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Add recipient' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add row' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull()
+  })
+
+  it('shows them again when the editor is editable', () => {
+    renderEditor(false, readOnly)
+
+    expect(screen.getByRole('button', { name: 'Add recipient' })).toBeVisible()
+    expect(
+      within(screen.getByTestId('studio-field-/steps/1/input')).getAllByRole('button', { name: 'Add row' }),
+    ).toHaveLength(2)
+    expect(
+      within(screen.getByTestId('studio-field-/steps/0/to/0')).getByRole('button', { name: 'Actions' }),
+    ).toBeVisible()
+  })
+})
+
 describe('An updateRecord step', () => {
   it('shows its set rows', async () => {
     renderEditor()
@@ -563,7 +631,8 @@ describe('An updateRecord step', () => {
       const row = within(screen.getByTestId(`studio-field-/steps/0/set/${key}`))
       expect(row.getByRole('combobox', { name: 'Field' })).toBeVisible()
       expect(row.getByRole('textbox', { name: 'Expression' })).toBeVisible()
-      expect(row.getByRole('button', { name: 'Remove' })).toBeVisible()
+      expect(row.getByRole('button', { name: 'Actions' })).toBeVisible()
+      expect(row.queryByRole('button', { name: 'Remove' })).toBeNull()
     }
     expect(step(0).queryByTestId('studio-json-only')).toBeNull()
   })
@@ -591,7 +660,7 @@ describe('An updateRecord step', () => {
     })
     expect(Object.keys(onChange.mock.calls[0][1] as object)).toEqual(['purchaseOrderNumber', 'totalAmount'])
 
-    await userEvent.click(row.getByRole('button', { name: 'Remove' }))
+    await chooseRowAction(row, 'Remove')
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/set/status', undefined)
   })
 
@@ -612,7 +681,7 @@ describe('An updateRecord step', () => {
 
     const row = within(screen.getByTestId('studio-field-/steps/0/set/status'))
     await userEvent.type(row.getByRole('textbox', { name: 'Expression' }), 'a')
-    await userEvent.click(row.getByRole('button', { name: 'Remove' }))
+    await chooseRowAction(row, 'Remove')
 
     const pointers = onChange.mock.calls.map(([pointer]) => pointer as string)
     expect(pointers.length).toBeGreaterThan(0)
@@ -670,7 +739,9 @@ describe('A callConnector step', () => {
   it('draws an input row as a name, a kind and an expression, one to a line, each with its label and help', () => {
     renderEditor(false)
     const row = screen.getByTestId('studio-field-/steps/1/input/amount')
-    const [name, kind, expression] = Array.from(row.children) as HTMLElement[]
+    // The fields sit in a column that fills the row, and the row's menu is beside it.
+    const fields = row.children[0] as HTMLElement
+    const [name, kind, expression] = Array.from(fields.children) as HTMLElement[]
     const texts = platformEnglish as Record<string, string>
 
     expect(within(name).getByRole('textbox', { name: 'Name' })).toHaveAccessibleDescription(
@@ -688,7 +759,9 @@ describe('A callConnector step', () => {
     expect(within(expression).getByRole('textbox', { name: 'Expression' })).toHaveAccessibleDescription(
       texts['shell.studio.field.process.steps.input.value.help'],
     )
-    expect(row.children).toHaveLength(4)
+    expect(fields.children).toHaveLength(3)
+    expect(row.children).toHaveLength(2)
+    expect(row.children[1]).toBe(within(row).getByRole('button', { name: 'Actions' }))
   })
 
   it('marks the name, the kind and the expression of an input row required, and says so to a screen reader', () => {
@@ -759,7 +832,7 @@ describe('A callConnector step', () => {
       await editExpression(`studio-field-/steps/1/input/lines/fields/${name}`, name)
     }
 
-    await userEvent.click(input().getAllByRole('button', { name: 'Add row' }).at(-1)!)
+    await userEvent.click(input().getAllByRole('button', { name: 'Add row' })[0])
     await userEvent.type(screen.getByTestId('studio-field-/steps/1/input/').querySelector('input')!, 'address')
     await pick('studio-field-/steps/1/input/address', /^Object/)
     const address = () => within(screen.getByTestId('studio-field-/steps/1/input/address/fields'))
@@ -873,9 +946,7 @@ describe('A callConnector step', () => {
       within(screen.getByTestId('studio-field-/steps/1/input')).getByRole('button', { name: 'Add row' }),
     )
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/', '')
-    await userEvent.click(
-      within(screen.getByTestId('studio-field-/steps/1/input/amount')).getByRole('button', { name: 'Remove' }),
-    )
+    await chooseRowAction(within(screen.getByTestId('studio-field-/steps/1/input/amount')), 'Remove')
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/amount', undefined)
   })
 

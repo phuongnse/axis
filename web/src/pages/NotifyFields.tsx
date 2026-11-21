@@ -1,9 +1,11 @@
-import { Button, Checkbox, Flex, Typography } from 'antd'
+import { Checkbox, ConfigProvider, Flex, Typography } from 'antd'
 import { useContext } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { RowActions } from '../platform/AxisTable'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useFieldTexts } from './fieldTexts'
@@ -70,6 +72,8 @@ export function NotifyFields({
 /**
  * The recipients as rows. A row is a choice of its recipient type, User, Role or Email, then the field of that type: a
  * user expression, a role picker or an email expression. A switch keeps one key, and each field sits on its own line.
+ * Add recipient sits on the title row as a light text button and each row's Remove recipient is in its "…" menu. A
+ * read-only editor, Ant Design's `componentDisabled`, shows neither, see docs/reference/process-designer.md#notify.
  */
 function Recipients({
   pointer,
@@ -84,15 +88,22 @@ function Recipients({
 }) {
   const t = useText()
   const { field, group } = useFieldTexts('process')
+  const { componentDisabled } = ConfigProvider.useConfig()
   const recipientsGroup = group(`${path}.to`)
   if (value !== undefined && !Array.isArray(value)) {
     return <JsonOnly pointer={pointer} {...recipientsGroup} />
   }
   const recipients: unknown[] = value ?? []
 
+  const add = (
+    <AxisButton role="secondary" onClick={() => onChange(pointer, [...recipients, { user: '' }])}>
+      {t('shell.studio.process.addRecipient')}
+    </AxisButton>
+  )
+
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisFieldGroup {...recipientsGroup}>
+      <AxisFieldGroup {...recipientsGroup} action={componentDisabled ? undefined : add}>
         <Flex vertical gap="small">
           {recipients.map((recipient, index) => {
             const row = isContent(recipient) ? recipient : {}
@@ -100,51 +111,56 @@ function Recipients({
             const kind = recipientKinds.find((candidate) => row[candidate] !== undefined) ?? 'user'
             const entry = field(`${path}.to.${kind}`)
             return (
-              <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
-                <AxisChoiceField
-                  {...field(`${path}.to.kind`)}
-                  required
-                  value={kind}
-                  options={recipientKinds.map((candidate) => ({
-                    value: candidate,
-                    ...field(`${path}.to.kind.${candidate}`),
-                  }))}
-                  onChange={(next) => onChange(rowPointer, { [next]: text(row[next]) })}
-                />
-                {kind === 'role' ? (
-                  <NamePicker
-                    pointer={`${rowPointer}/role`}
-                    {...field(`${path}.to.role`)}
-                    kind="role"
-                    value={row.role}
+              <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-${rowPointer}`}>
+                <Flex vertical gap="small" style={{ flex: 1 }}>
+                  <AxisChoiceField
+                    {...field(`${path}.to.kind`)}
                     required
-                    onPick={(next) => onChange(`${rowPointer}/role`, next)}
+                    value={kind}
+                    options={recipientKinds.map((candidate) => ({
+                      value: candidate,
+                      ...field(`${path}.to.kind.${candidate}`),
+                    }))}
+                    onChange={(next) => onChange(rowPointer, { [next]: text(row[next]) })}
                   />
-                ) : (
-                  <div data-testid={`studio-field-${rowPointer}/${kind}`}>
-                    <AxisField {...entry} required>
-                      <Expression
-                        pointer={`${rowPointer}/${kind}`}
-                        name={entry.label}
-                        value={text(row[kind])}
-                        onChange={onChange}
-                      />
-                    </AxisField>
-                  </div>
+                  {kind === 'role' ? (
+                    <NamePicker
+                      pointer={`${rowPointer}/role`}
+                      {...field(`${path}.to.role`)}
+                      kind="role"
+                      value={row.role}
+                      required
+                      onPick={(next) => onChange(`${rowPointer}/role`, next)}
+                    />
+                  ) : (
+                    <div data-testid={`studio-field-${rowPointer}/${kind}`}>
+                      <AxisField {...entry} required>
+                        <Expression
+                          pointer={`${rowPointer}/${kind}`}
+                          name={entry.label}
+                          value={text(row[kind])}
+                          onChange={onChange}
+                        />
+                      </AxisField>
+                    </div>
+                  )}
+                </Flex>
+                {componentDisabled ? null : (
+                  <RowActions
+                    fold
+                    actions={[
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.studio.process.removeRecipient',
+                        destructive: true,
+                        onClick: () => onChange(rowPointer, undefined),
+                      },
+                    ]}
+                  />
                 )}
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button onClick={() => onChange(rowPointer, undefined)}>
-                  {t('shell.studio.process.removeRecipient')}
-                </Button>
               </Flex>
             )
           })}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(pointer, [...recipients, { user: '' }])}>
-              {t('shell.studio.process.addRecipient')}
-            </Button>
-          </div>
         </Flex>
       </AxisFieldGroup>
     </div>
