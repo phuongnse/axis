@@ -229,35 +229,29 @@ export function selectedItemTint(mode: ThemeMode): string {
   return theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
 }
 
-/** A status tag's fill and border, Ant Design's tints of the seed colours. No fill is `transparent`. */
+/** A status tag's colours: its words, its fill and its border. No fill is `transparent`. */
 export interface StatusTint {
+  text: string
   fill: string
   border: string
 }
 
-const statusTintCache = new Map<ThemeMode, Record<StatusTone, StatusTint>>()
-
 /**
- * Each tone's fill and border, read from Ant Design's tints of the seed colours as `selectedItemTint` reads a
- * selected item's, see docs/reference/shared-widgets.md#which-widget. `neutral` takes the secondary fill and `muted` no
- * fill, and each keeps the secondary border.
- * Proposed: the status tag's look, design review #4765. Which tints a tag draws is the owner's choice in that review.
+ * Each tone's colours, read from the Ant Design theme in use, so a page's seed colours tint a tag too, see
+ * docs/reference/shared-widgets.md#which-widget. The words take the tone's text token, which the theme maps above.
+ * The fill and border are Ant Design's tints of the seed colours: `neutral` the secondary fill and `muted` no fill,
+ * each with the secondary border.
+ * Proposed: the status tag's look, design review #4765.
  */
-export function statusTints(mode: ThemeMode): Record<StatusTone, StatusTint> {
-  const cached = statusTintCache.get(mode)
-  if (cached) {
-    return cached
+export function useStatusTints(): Record<StatusTone, StatusTint> {
+  const { token } = theme.useToken()
+  return {
+    neutral: { text: token.colorText, fill: token.colorFillSecondary, border: token.colorBorderSecondary },
+    attention: { text: token.colorWarningText, fill: token.colorWarningBg, border: token.colorWarningBorder },
+    success: { text: token.colorSuccessText, fill: token.colorSuccessBg, border: token.colorSuccessBorder },
+    danger: { text: token.colorErrorText, fill: token.colorErrorBg, border: token.colorErrorBorder },
+    muted: { text: token.colorTextSecondary, fill: 'transparent', border: token.colorBorderSecondary },
   }
-  const token = theme.getDesignToken(antThemeFor(mode))
-  const tints: Record<StatusTone, StatusTint> = {
-    neutral: { fill: token.colorFillSecondary, border: token.colorBorderSecondary },
-    attention: { fill: token.colorWarningBg, border: token.colorWarningBorder },
-    success: { fill: token.colorSuccessBg, border: token.colorSuccessBorder },
-    danger: { fill: token.colorErrorBg, border: token.colorErrorBorder },
-    muted: { fill: 'transparent', border: token.colorBorderSecondary },
-  }
-  statusTintCache.set(mode, tints)
-  return tints
 }
 
 /**

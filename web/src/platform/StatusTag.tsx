@@ -1,8 +1,7 @@
 import { Tag } from 'antd'
-import { useContext, type ReactNode } from 'react'
-import { statusTints } from './antTheme'
-import { toneColours, type StatusTone } from './statusTones'
-import { ThemeModeContext, useDesignTokens } from './themeMode'
+import type { ReactNode } from 'react'
+import { useStatusTints } from './antTheme'
+import type { StatusTone } from './statusTones'
 
 export type { StatusTone }
 
@@ -19,20 +18,13 @@ export function StatusTag({
   tone: StatusTone
   children: ReactNode
 } & Record<`data-${string}`, string | undefined>) {
-  const { colour } = useDesignTokens()
-  const mode = useContext(ThemeModeContext)?.mode ?? 'light'
-  const { fill, border } = statusTints(mode)[tone]
+  const { text, fill, border } = useStatusTints()[tone]
   return (
     <Tag
       variant="outlined"
       data-tone={tone}
       {...data}
-      style={{
-        color: colour[toneColours[tone].text],
-        borderColor: border,
-        background: fill,
-        marginInlineEnd: 0,
-      }}
+      style={{ color: text, borderColor: border, background: fill, marginInlineEnd: 0 }}
     >
       {children}
     </Tag>
