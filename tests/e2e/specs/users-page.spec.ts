@@ -25,7 +25,7 @@ test("an administrator opens Users from the app switcher and finds a user by ema
   await expect(page).toHaveURL(/\/users$/);
   const main = page.getByRole("main");
   await expect(
-    main.getByRole("cell", { name: "Administrator User", exact: true }),
+    main.getByRole("cell", { name: "Administrator User (you)", exact: true }),
   ).toBeVisible();
   await expect(
     main.getByRole("cell", { name: "auditor@axis.local", exact: true }),
@@ -40,7 +40,7 @@ test("an administrator opens Users from the app switcher and finds a user by ema
     main.getByRole("row").filter({ hasText: "Auditor User" }),
   ).toHaveCount(1);
   await expect(
-    main.getByRole("cell", { name: "Administrator User", exact: true }),
+    main.getByRole("cell", { name: "Administrator User (you)", exact: true }),
   ).toHaveCount(0);
 });
 

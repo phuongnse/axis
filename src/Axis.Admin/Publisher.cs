@@ -51,8 +51,8 @@ namespace Axis.Admin;
 /// tenant database except to store the request's status and results, and writes no audit record and no release id. Without the
 /// setting it fails with <c>AXC0217</c>, and an unknown scenario name fails it with <c>AXC0218</c>.
 /// A <c>test</c> that names a package compiles nothing and runs no scenario. It sends that package's files from the snapshot to
-/// <c>application-package-host</c> as a <c>test</c>, see <see cref="ApplicationPackageBuilds"/>, and stores each test's outcome on the
-/// request. It ends <c>succeeded</c> when every test passed. A refused or unanswered test fails it with <c>AXC0149</c> or <c>AXC0152</c>, and without
+/// <c>application-package-host</c> as a <c>test</c>, see <see cref="ApplicationPackageBuilds"/>, and stores each test's outcome and the lines the host wrote
+/// as the request's <c>output</c>. It ends <c>succeeded</c> when every test passed. A refused or unanswered test fails it with <c>AXC0149</c> or <c>AXC0152</c>, and without
 /// <c>Extensions:ApplicationPackages</c> it fails with <c>AXC0148</c> and sends nothing. A stop ends it at once with <c>AXC0220</c>.
 /// A <c>build</c> names a package. It sends that package's files from the snapshot to <c>application-package-host</c> as a <c>build</c>, see
 /// <see cref="ApplicationPackageBuilds"/>, and stores the lines the host wrote as the request's <c>output</c>. It stores no release, writes
@@ -540,9 +540,10 @@ internal sealed class Publisher(
             if (request.Package is { } package)
             {
                 var packageTests = new JsonArray();
-                var passed = await TestPackageAsync(tenant.Id, files, package, diagnostics, packageTests);
+                var lines = new JsonArray();
+                var passed = await TestPackageAsync(tenant.Id, files, package, diagnostics, packageTests, lines);
                 await StopRenewalAsync(renewing, renewal);
-                await FinishAsync(tenant.Id, connections, request, new ReleaseRun(passed, null), diagnostics, audit: false, scenarioResults: null, packageTests: packageTests.ToJsonString());
+                await FinishAsync(tenant.Id, connections, request, new ReleaseRun(passed, null), diagnostics, audit: false, scenarioResults: null, packageTests: packageTests.ToJsonString(), output: lines.ToJsonString());
                 return;
             }
 
@@ -643,7 +644,7 @@ internal sealed class Publisher(
     // Sends the one package of a test request to application-package-host to test, see
     // docs/reference/package-runners.md#an-applications-packages. It compiles nothing and runs no scenario, so it needs no scenario
     // server, and it touches no tenant data. The host's wait bounds it, so the test limit never applies. A stop ends it at once.
-    private async Task<bool> TestPackageAsync(string tenantId, IReadOnlyList<ResourceContent>? files, string package, List<Diagnostic> diagnostics, JsonArray tests)
+    private async Task<bool> TestPackageAsync(string tenantId, IReadOnlyList<ResourceContent>? files, string package, List<Diagnostic> diagnostics, JsonArray tests, JsonArray lines)
     {
         if (packageBuilds is null || !settings.ApplicationPackages)
         {
@@ -676,6 +677,11 @@ internal sealed class Publisher(
                     }
 
                     tests.Add(test);
+                }
+
+                foreach (var line in result.Output)
+                {
+                    lines.Add(line);
                 }
             }
             catch (OperationCanceledException) when (stopping.IsCancellationRequested)

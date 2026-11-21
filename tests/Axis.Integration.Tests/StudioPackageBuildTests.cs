@@ -17,7 +17,8 @@ using Npgsql;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// <c>POST /api/studio/apps/{application}/build</c> builds one package of the working folder without a publish, see
+/// <c>POST /api/studio/apps/{application}/build</c> builds one package of the working folder without a publish, and
+/// <c>POST /api/studio/apps/{application}/test</c> with <c>{ package }</c> tests it, see
 /// <c>docs/reference/studio-packages.md#the-authoring-api</c>. The server is tenant <c>default</c> on a real PostgreSQL database and
 /// the publisher runs the request against the host of the test process, with a stub Trivy and the real pip, while the publisher's
 /// <c>PackageBuild:Python</c> names a missing command. The test identity <c>developer</c> holds the author and developer roles and
@@ -28,7 +29,23 @@ public sealed class StudioPackageBuildTests(PostgreSqlFixture database) : IClass
 {
     private const string BuildUrl = "/api/studio/apps/PurchaseRequests/build";
 
+    private const string TestUrl = "/api/studio/apps/PurchaseRequests/test";
+
     private const string NoDeveloper = "You do not hold the developer role.";
+
+    // Two tests, one printing a line and one failing at line 10, column 9.
+    private const string ToolsTests = """
+        import unittest
+
+
+        class ToolsCase(unittest.TestCase):
+            def test_passes(self):
+                print("checking the sum")
+                self.assertEqual(2, 1 + 1)
+
+            def test_fails(self):
+                self.assertEqual(1, 2)
+        """;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -160,8 +177,119 @@ public sealed class StudioPackageBuildTests(PostgreSqlFixture database) : IClass
         Assert.Equal(requests, await CountAsync("axis.publish_requests"));
     }
 
-    // The sample folder with the package tools: a manifest, the adapter and an empty lock file.
-    private static TemporaryFolder NewPackageFolder(string adapter)
+    [Fact]
+    public async Task A_test_of_a_package_ends_failed_with_each_tests_duration_and_a_failed_tests_place_and_the_output()
+    {
+        using var folder = NewPackageFolder("import sys\n", ToolsTests);
+        await using var factory = await CreateFactoryAsync(folder.Path, switchOn: true);
+        using var client = factory.CreateClient().SignedInAs("developer");
+        using var trivy = new StubTrivy(StubTrivy.NoFindings);
+        using var extensions = new TemporaryFolder();
+        await using var host = await TestPackageHost.StartAsync(
+            extensions.Path, settings: new Dictionary<string, string?> { ["PackageBuild:Trivy"] = trivy.Command });
+
+        using var accepted = await PostAsync(client, """{"package":"tools"}""", url: TestUrl);
+
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        using var queued = await ReadAsync(accepted);
+        Assert.Equal("test", queued.RootElement.GetProperty("kind").GetString());
+        Assert.Equal("tools", queued.RootElement.GetProperty("package").GetString());
+        Assert.Empty(queued.RootElement.GetProperty("packageTests").EnumerateArray());
+        Assert.Empty(queued.RootElement.GetProperty("output").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, queued.RootElement.GetProperty("scenarios").ValueKind);
+        await using var publisher = RunPublisher(host);
+        using var finished = await WaitForFinalAsync(client, accepted.Headers.Location!.OriginalString);
+
+        var root = finished.RootElement;
+        Assert.Equal("failed", root.GetProperty("status").GetString());
+        Assert.Equal("tools", root.GetProperty("package").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("scenarios").ValueKind);
+        Assert.Empty(root.GetProperty("diagnostics").EnumerateArray());
+        var tests = root.GetProperty("packageTests").EnumerateArray().ToList();
+        Assert.Equal(2, tests.Count);
+        var passed = Assert.Single(tests, test => test.GetProperty("name").GetString() == "test_tools.ToolsCase.test_passes");
+        Assert.Equal("passed", passed.GetProperty("outcome").GetString());
+        Assert.Equal(JsonValueKind.Null, passed.GetProperty("message").ValueKind);
+        Assert.True(passed.GetProperty("durationMs").GetInt64() >= 0);
+        Assert.False(passed.TryGetProperty("file", out _));
+        var failed = Assert.Single(tests, test => test.GetProperty("name").GetString() == "test_tools.ToolsCase.test_fails");
+        Assert.Equal("failed", failed.GetProperty("outcome").GetString());
+        Assert.StartsWith("AssertionError", failed.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.True(failed.GetProperty("durationMs").GetInt64() >= 0);
+        Assert.Equal("test_tools.py", failed.GetProperty("file").GetString());
+        Assert.Equal(10, failed.GetProperty("line").GetInt32());
+        Assert.Equal(9, failed.GetProperty("column").GetInt32());
+        Assert.Contains(root.GetProperty("output").EnumerateArray(), line => line.GetString()!.Contains("checking the sum", StringComparison.Ordinal));
+        Assert.Equal([("tools", "1.0.0")], host.Tests());
+    }
+
+    [Fact]
+    public async Task A_test_of_a_package_needs_the_developer_role_and_the_switch_and_a_scenario_test_needs_the_author_role_only()
+    {
+        using var folder = NewPackageFolder("import sys\n", ToolsTests);
+        await using var factory = await CreateFactoryAsync(folder.Path, switchOn: true);
+        await using var off = await CreateFactoryAsync(folder.Path, switchOn: false);
+        var requests = await CountAsync("axis.publish_requests");
+
+        foreach (var identity in new[] { "author", "outsider" })
+        {
+            using var client = factory.CreateClient().SignedInAs(identity);
+            using var response = await PostAsync(client, """{"package":"tools"}""", url: TestUrl);
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            if (identity == "author")
+            {
+                using var problem = await ReadAsync(response);
+                Assert.Equal(NoDeveloper, problem.RootElement.GetProperty("title").GetString());
+            }
+        }
+
+        using (var developer = off.CreateClient().SignedInAs("developer"))
+        {
+            using var response = await PostAsync(developer, """{"package":"tools"}""", url: TestUrl);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        Assert.Equal(requests, await CountAsync("axis.publish_requests"));
+
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var scenarios = await PostAsync(author, "{}", url: TestUrl);
+        Assert.Equal(HttpStatusCode.Accepted, scenarios.StatusCode);
+        using var queued = await ReadAsync(scenarios);
+        Assert.Equal("test", queued.RootElement.GetProperty("kind").GetString());
+        Assert.Empty(queued.RootElement.GetProperty("scenarios").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, queued.RootElement.GetProperty("package").ValueKind);
+        Assert.Equal(JsonValueKind.Null, queued.RootElement.GetProperty("packageTests").ValueKind);
+        Assert.Equal(JsonValueKind.Null, queued.RootElement.GetProperty("output").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_test_body_with_a_package_and_scenarios_or_a_package_that_is_not_a_string_answers_400_an_unknown_package_404_and_none_is_stored()
+    {
+        using var folder = NewPackageFolder("import sys\n", ToolsTests);
+        await using var factory = await CreateFactoryAsync(folder.Path, switchOn: true);
+        using var client = factory.CreateClient().SignedInAs("developer");
+        var requests = await CountAsync("axis.publish_requests");
+
+        foreach (var body in new[] { """{"package":"tools","scenarios":[]}""", """{"package":1}""", """{"package":"tools","extra":"x"}""", """{"scenarios":["a"],"package":"tools"}""" })
+        {
+            using var response = await PostAsync(client, body, url: TestUrl);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        foreach (var package in new[] { "other", "..", "" })
+        {
+            using var response = await PostAsync(client, $$"""{"package":"{{package}}"}""", url: TestUrl);
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            using var problem = await ReadAsync(response);
+            Assert.Equal("The application has no package with this id.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        Assert.Equal(requests, await CountAsync("axis.publish_requests"));
+    }
+
+    // The sample folder with the package tools: a manifest, the adapter, an empty lock file and, when given, test_tools.py.
+    private static TemporaryFolder NewPackageFolder(string adapter, string? tests = null)
     {
         var folder = StudioPublishTests.NewFolder();
         var package = Path.Combine(folder.Path, "packages", "tools");
@@ -169,6 +297,11 @@ public sealed class StudioPackageBuildTests(PostgreSqlFixture database) : IClass
         File.WriteAllText(Path.Combine(package, "axis-package.json"), McpTestPackageTests.Manifest);
         File.WriteAllText(Path.Combine(package, "adapter.py"), adapter);
         File.WriteAllText(Path.Combine(package, "requirements.txt"), McpTestPackageTests.NoDependencies);
+        if (tests is not null)
+        {
+            File.WriteAllText(Path.Combine(package, "test_tools.py"), tests);
+        }
+
         return folder;
     }
 
@@ -185,9 +318,9 @@ public sealed class StudioPackageBuildTests(PostgreSqlFixture database) : IClass
                 ["PackageBuild:Python"] = "axis-no-such-python-9183746520",
             });
 
-    private static async Task<HttpResponseMessage> PostAsync(HttpClient client, string body, string contentType = "application/json")
+    private static async Task<HttpResponseMessage> PostAsync(HttpClient client, string body, string contentType = "application/json", string url = BuildUrl)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(BuildUrl, UriKind.Relative))
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(url, UriKind.Relative))
         {
             Content = new StringContent(body, Encoding.UTF8, new MediaTypeHeaderValue(contentType)),
         };
