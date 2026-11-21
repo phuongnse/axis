@@ -1,6 +1,6 @@
-import { Button, Card, Flex, Input, InputNumber, Select, Typography } from 'antd'
+import { Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { AxisButton } from '../platform/AxisButton'
+import { AxisButton, AxisButtonGroup } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField, type AxisFieldProps } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
@@ -94,7 +94,7 @@ function JsonOnly() {
  * on the page or on a widget, stays as it is. A widget of a type it has no panel for shows its type and points to the
  * JSON view. The caller can keep the selected widget and pass it as `selected` and `onSelect`. The selection can also
  * name an action of a widget, such as `/widgets/0/rowActions/1`, or `/widgets/0/navigate` for a KPI. The tree and the
- * panel are then those of the widget, and the panel marks the action's card with `aria-current`, scrolls it into view
+ * panel are then those of the widget, and the panel marks the action's row with `aria-current`, scrolls it into view
  * and, when the action is new, selects it. Removing an action selects its widget.
  *
  * The editor does not mark a customization layer. A caller that shows one uses {@link PageWidgets}.
@@ -166,7 +166,7 @@ export function PageEditor({
  *
  * With `layer`, the tree shows a module page with the application's customization layer applied. A widget the layer
  * added or changed is marked Added or Changed on its row, and so are the actions, row actions and toolbar actions on
- * their cards and the columns and tabs on their rows in the panel, each with Reset to module. An element the layer
+ * their rows and the columns and tabs on their rows in the panel, each with Reset to module. An element the layer
  * removed is a muted row marked Removed under the list that held it, with Reset to module.
  */
 export function PageWidgets({
@@ -548,12 +548,17 @@ function PageField({ pointer, children }: { pointer: string; children: AxisField
   )
 }
 
-/** A group of the page property at `pointer`, titled and helped by its path, see {@link pageFieldPath}. */
-function PageFieldGroup({ pointer, children }: { pointer: string; children: ReactNode }) {
+/**
+ * A group of the page property at `pointer`, titled and helped by its path, see {@link pageFieldPath}. An `action` sits
+ * on its title row as a light text button.
+ */
+function PageFieldGroup({ pointer, action, children }: { pointer: string; action?: ReactNode; children: ReactNode }) {
   const { group } = useFieldTexts('page')
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisFieldGroup {...group(pageFieldPath(pointer))}>{children}</AxisFieldGroup>
+      <AxisFieldGroup {...group(pageFieldPath(pointer))} action={action}>
+        {children}
+      </AxisFieldGroup>
     </div>
   )
 }
@@ -620,7 +625,7 @@ function WidgetPanel({
   widget: unknown
   /** The page's parameters, which a detail's record names and a KPI or chart binds. */
   parameters: unknown
-  /** The pointer of the selected action of the widget, which its card marks. */
+  /** The pointer of the selected action of the widget, which its row marks. */
   selectedAction: string | undefined
   /** The customization layer to mark, when the page is a module page. */
   layer?: DesignerLayer
@@ -922,8 +927,6 @@ function KpiPanel({
       : (dataSourceColumns(names, widget.dataSource)?.measures.map((measure) => measure.name) ?? [])
   const { comparison, navigate } = widget
   const navigateSelected = selectedAction === `${base}/navigate`
-  const navigateRef = useScrolledTo<HTMLDivElement>(navigateSelected)
-  const { colour, radius } = useDesignTokens()
 
   return (
     <>
@@ -955,10 +958,12 @@ function KpiPanel({
         <Flex vertical gap="small">
           {comparison === undefined ? (
             <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => onChange(`${base}/comparison`, { measure: '', label: { textKey: '' } })}>
+              <AxisButton
+                role="secondary"
+                onClick={() => onChange(`${base}/comparison`, { measure: '', label: { textKey: '' } })}
+              >
                 {t('shell.studio.page.addComparison')}
-              </Button>
+              </AxisButton>
             </div>
           ) : isContent(comparison) ? (
             <>
@@ -972,10 +977,9 @@ function KpiPanel({
                 <LabelTexts pointer={`${base}/comparison/label`} value={comparison.label} onChange={onChange} />
               </PageFieldGroup>
               <div>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button danger onClick={() => onChange(`${base}/comparison`, undefined)}>
+                <AxisButton role="destructive" onClick={() => onChange(`${base}/comparison`, undefined)}>
                   {t('shell.studio.page.removeComparison')}
-                </Button>
+                </AxisButton>
               </div>
             </>
           ) : (
@@ -983,44 +987,34 @@ function KpiPanel({
           )}
         </Flex>
       </PageFieldGroup>
-      <div
-        ref={navigateRef}
-        data-testid={`studio-field-${base}/navigate`}
-        aria-current={navigateSelected ? 'true' : undefined}
-        style={
-          navigateSelected
-            ? { border: `1px solid ${colour.primary}`, borderRadius: radius.base, padding: 8 }
-            : undefined
-        }
-      >
+      <SelectedMark testId={`studio-field-${base}/navigate`} selected={navigateSelected}>
         <AxisFieldGroup {...group(pageFieldPath(`${base}/navigate`))}>
           <Flex vertical gap="small">
             {navigate === undefined ? (
               <div>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button
+                <AxisButton
+                  role="secondary"
                   onClick={() => {
                     onChange(`${base}/navigate`, { type: 'navigate', page: '', label: { textKey: '' } })
                     onSelect(`${base}/navigate`)
                   }}
                 >
                   {t('shell.studio.page.addNavigateAction')}
-                </Button>
+                </AxisButton>
               </div>
             ) : isContent(navigate) ? (
               <>
                 <NavigateFields pointer={`${base}/navigate`} action={navigate} onChange={onChange} />
                 <div>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button
-                    danger
+                  <AxisButton
+                    role="destructive"
                     onClick={() => {
                       onChange(`${base}/navigate`, undefined)
                       onSelect(base)
                     }}
                   >
                     {t('shell.studio.page.removeNavigate')}
-                  </Button>
+                  </AxisButton>
                 </div>
               </>
             ) : (
@@ -1028,7 +1022,7 @@ function KpiPanel({
             )}
           </Flex>
         </AxisFieldGroup>
-      </div>
+      </SelectedMark>
     </>
   )
 }
@@ -1095,66 +1089,69 @@ function ChartPanel({
       <PageFieldGroup pointer={`${base}/title`}>
         <LabelTexts pointer={`${base}/title`} value={widget.title} onChange={onChange} />
       </PageFieldGroup>
-      <PageFieldGroup pointer={`${base}/measures`}>
-        <Flex vertical gap="small">
-          {!Array.isArray(measures) ? (
-            <JsonOnly />
-          ) : (
-            <>
-              {measures.map((measure, index) => (
-                <Card size="small" key={index} data-testid={`studio-measure-${index}`}>
-                  <Flex vertical gap="small">
-                    {isContent(measure) ? (
-                      <>
-                        <ColumnField
-                          pointer={`${base}/measures/${index}/name`}
-                          current={measure.name}
-                          options={numbers}
-                          onPick={(next) => onChange(`${base}/measures/${index}/name`, next)}
+      <PageFieldGroup
+        pointer={`${base}/measures`}
+        action={
+          Array.isArray(measures) ? (
+            <AxisButton
+              role="secondary"
+              onClick={() => onChange(`${base}/measures`, [...measures, { name: '', label: { textKey: '' } }])}
+            >
+              {t('shell.studio.page.addMeasure')}
+            </AxisButton>
+          ) : undefined
+        }
+      >
+        {!Array.isArray(measures) ? (
+          <JsonOnly />
+        ) : (
+          <Flex vertical gap="small">
+            {measures.map((measure, index) => (
+              <Flex key={index} gap="small" align="flex-start" data-testid={`studio-measure-${index}`}>
+                <Flex vertical gap="small" style={{ flex: 1, minWidth: 0 }}>
+                  {isContent(measure) ? (
+                    <>
+                      <ColumnField
+                        pointer={`${base}/measures/${index}/name`}
+                        current={measure.name}
+                        options={numbers}
+                        onPick={(next) => onChange(`${base}/measures/${index}/name`, next)}
+                      />
+                      <PageFieldGroup pointer={`${base}/measures/${index}/label`}>
+                        <LabelTexts
+                          // The label editors keep their state by position, so they remount when a measure is
+                          // added or removed.
+                          key={`${index}:${measures.length}`}
+                          pointer={`${base}/measures/${index}/label`}
+                          value={measure.label}
+                          onChange={onChange}
                         />
-                        <PageFieldGroup pointer={`${base}/measures/${index}/label`}>
-                          <LabelTexts
-                            // The label editors keep their state by position, so they remount when a measure is
-                            // added or removed.
-                            key={`${index}:${measures.length}`}
-                            pointer={`${base}/measures/${index}/label`}
-                            value={measure.label}
-                            onChange={onChange}
-                          />
-                        </PageFieldGroup>
-                      </>
-                    ) : (
-                      <JsonOnly />
-                    )}
-                    <div>
-                      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                      <Button
-                        danger
-                        disabled={measures.length === 1}
-                        onClick={() =>
-                          onChange(
-                            `${base}/measures`,
-                            measures.filter((_, at) => at !== index),
-                          )
-                        }
-                      >
-                        {t('shell.studio.page.removeMeasure')}
-                      </Button>
-                    </div>
-                  </Flex>
-                </Card>
-              ))}
-              <div>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button
-                  onClick={() => onChange(`${base}/measures`, [...measures, { name: '', label: { textKey: '' } }])}
-                >
-                  {t('shell.studio.page.addMeasure')}
-                </Button>
-              </div>
-            </>
-          )}
-        </Flex>
+                      </PageFieldGroup>
+                    </>
+                  ) : (
+                    <JsonOnly />
+                  )}
+                </Flex>
+                <RowActions
+                  fold
+                  actions={[
+                    {
+                      key: 'remove',
+                      labelKey: 'shell.studio.page.removeMeasure',
+                      destructive: true,
+                      disabled: measures.length === 1,
+                      onClick: () =>
+                        onChange(
+                          `${base}/measures`,
+                          measures.filter((_, at) => at !== index),
+                        ),
+                    },
+                  ]}
+                />
+              </Flex>
+            ))}
+          </Flex>
+        )}
       </PageFieldGroup>
     </>
   )
@@ -1202,7 +1199,11 @@ function RecordField({
   )
 }
 
-/** The width of each column of a columns widget, and the buttons that add and remove columns. */
+/**
+ * The width of each column of a columns widget. Each column is a row with no box, and its Remove column is in the row's
+ * "…" menu, off when one column is left. Add column is a light text button on the Columns title row, see
+ * docs/reference/studio-editors-by-kind.md#container-panels.
+ */
 function ColumnsPanel({
   base,
   columns,
@@ -1220,61 +1221,68 @@ function ColumnsPanel({
   }
 
   return (
-    <Flex vertical gap="small">
-      {columns.map((column, index) => (
-        <Card size="small" key={index} data-testid={`studio-column-${index}`}>
-          <Flex vertical gap="small">
-            <Typography.Text>{fillText(t('shell.studio.page.column'), { number: index + 1 })}</Typography.Text>
-            {layer !== undefined && isContent(column) && typeof column.name === 'string' && (
-              <LayerMarkTag layer={layer} list={`${base}/columns`} index={index} name={column.name} />
-            )}
-            {isContent(column) ? (
-              <PageField pointer={`${base}/columns/${index}/width`}>
-                <InputNumber
-                  min={1}
-                  max={12}
-                  precision={0}
-                  value={typeof column.width === 'number' ? column.width : null}
-                  onChange={(next) => {
-                    if (typeof next === 'number') {
-                      onChange(`${base}/columns/${index}/width`, next)
-                    }
-                  }}
-                />
-              </PageField>
-            ) : (
-              <JsonOnly />
-            )}
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button
-                danger
-                disabled={columns.length === 1}
-                onClick={() =>
-                  onChange(
-                    `${base}/columns`,
-                    columns.filter((_, at) => at !== index),
-                  )
-                }
-              >
-                {t('shell.studio.page.removeColumn')}
-              </Button>
-            </div>
-          </Flex>
-        </Card>
-      ))}
-      <RemovedRows layer={layer} list={`${base}/columns`} />
-      <div>
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button onClick={() => onChange(`${base}/columns`, [...columns, newColumn(columns)])}>
+    <PageFieldGroup
+      pointer={`${base}/columns`}
+      action={
+        <AxisButton role="secondary" onClick={() => onChange(`${base}/columns`, [...columns, newColumn(columns)])}>
           {t('shell.studio.page.addColumn')}
-        </Button>
-      </div>
-    </Flex>
+        </AxisButton>
+      }
+    >
+      <Flex vertical gap="small">
+        {columns.map((column, index) => (
+          <Flex key={index} gap="small" align="flex-start" data-testid={`studio-column-${index}`}>
+            <Flex vertical gap="small" style={{ flex: 1, minWidth: 0 }}>
+              <Typography.Text>{fillText(t('shell.studio.page.column'), { number: index + 1 })}</Typography.Text>
+              {layer !== undefined && isContent(column) && typeof column.name === 'string' && (
+                <LayerMarkTag layer={layer} list={`${base}/columns`} index={index} name={column.name} />
+              )}
+              {isContent(column) ? (
+                <PageField pointer={`${base}/columns/${index}/width`}>
+                  <InputNumber
+                    min={1}
+                    max={12}
+                    precision={0}
+                    value={typeof column.width === 'number' ? column.width : null}
+                    onChange={(next) => {
+                      if (typeof next === 'number') {
+                        onChange(`${base}/columns/${index}/width`, next)
+                      }
+                    }}
+                  />
+                </PageField>
+              ) : (
+                <JsonOnly />
+              )}
+            </Flex>
+            <RowActions
+              fold
+              actions={[
+                {
+                  key: 'remove',
+                  labelKey: 'shell.studio.page.removeColumn',
+                  destructive: true,
+                  disabled: columns.length === 1,
+                  onClick: () =>
+                    onChange(
+                      `${base}/columns`,
+                      columns.filter((_, at) => at !== index),
+                    ),
+                },
+              ]}
+            />
+          </Flex>
+        ))}
+        <RemovedRows layer={layer} list={`${base}/columns`} />
+      </Flex>
+    </PageFieldGroup>
   )
 }
 
-/** The label of each tab of a tabs widget, and the buttons that add and remove tabs. */
+/**
+ * The label of each tab of a tabs widget. Each tab is a row with no box, and its Remove tab is in the row's "…" menu, off
+ * when one tab is left. Add tab is a light text button on the Tabs title row.
+ */
 function TabsPanel({
   base,
   tabs,
@@ -1292,53 +1300,57 @@ function TabsPanel({
   }
 
   return (
-    <Flex vertical gap="small">
-      {tabs.map((tab, index) => (
-        <Card size="small" key={index} data-testid={`studio-tab-${index}`}>
-          <Flex vertical gap="small">
-            <Typography.Text>{fillText(t('shell.studio.page.tab'), { number: index + 1 })}</Typography.Text>
-            {layer !== undefined && isContent(tab) && typeof tab.name === 'string' && (
-              <LayerMarkTag layer={layer} list={`${base}/tabs`} index={index} name={tab.name} />
-            )}
-            {isContent(tab) ? (
-              <PageFieldGroup pointer={`${base}/tabs/${index}/label`}>
-                <LabelTexts
-                  // The label editors keep their state by position, so they remount when a tab is added or removed.
-                  key={`${index}:${tabs.length}`}
-                  pointer={`${base}/tabs/${index}/label`}
-                  value={tab.label}
-                  onChange={onChange}
-                />
-              </PageFieldGroup>
-            ) : (
-              <JsonOnly />
-            )}
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button
-                danger
-                disabled={tabs.length === 1}
-                onClick={() =>
-                  onChange(
-                    `${base}/tabs`,
-                    tabs.filter((_, at) => at !== index),
-                  )
-                }
-              >
-                {t('shell.studio.page.removeTab')}
-              </Button>
-            </div>
-          </Flex>
-        </Card>
-      ))}
-      <RemovedRows layer={layer} list={`${base}/tabs`} />
-      <div>
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button onClick={() => onChange(`${base}/tabs`, [...tabs, newTab(tabs)])}>
+    <PageFieldGroup
+      pointer={`${base}/tabs`}
+      action={
+        <AxisButton role="secondary" onClick={() => onChange(`${base}/tabs`, [...tabs, newTab(tabs)])}>
           {t('shell.studio.page.addTab')}
-        </Button>
-      </div>
-    </Flex>
+        </AxisButton>
+      }
+    >
+      <Flex vertical gap="small">
+        {tabs.map((tab, index) => (
+          <Flex key={index} gap="small" align="flex-start" data-testid={`studio-tab-${index}`}>
+            <Flex vertical gap="small" style={{ flex: 1, minWidth: 0 }}>
+              <Typography.Text>{fillText(t('shell.studio.page.tab'), { number: index + 1 })}</Typography.Text>
+              {layer !== undefined && isContent(tab) && typeof tab.name === 'string' && (
+                <LayerMarkTag layer={layer} list={`${base}/tabs`} index={index} name={tab.name} />
+              )}
+              {isContent(tab) ? (
+                <PageFieldGroup pointer={`${base}/tabs/${index}/label`}>
+                  <LabelTexts
+                    // The label editors keep their state by position, so they remount when a tab is added or removed.
+                    key={`${index}:${tabs.length}`}
+                    pointer={`${base}/tabs/${index}/label`}
+                    value={tab.label}
+                    onChange={onChange}
+                  />
+                </PageFieldGroup>
+              ) : (
+                <JsonOnly />
+              )}
+            </Flex>
+            <RowActions
+              fold
+              actions={[
+                {
+                  key: 'remove',
+                  labelKey: 'shell.studio.page.removeTab',
+                  destructive: true,
+                  disabled: tabs.length === 1,
+                  onClick: () =>
+                    onChange(
+                      `${base}/tabs`,
+                      tabs.filter((_, at) => at !== index),
+                    ),
+                },
+              ]}
+            />
+          </Flex>
+        ))}
+        <RemovedRows layer={layer} list={`${base}/tabs`} />
+      </Flex>
+    </PageFieldGroup>
   )
 }
 
@@ -1506,10 +1518,9 @@ function ParameterExpressions({
                     />
                   </AxisField>
                 </div>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button onClick={() => onChange(rowPointer, undefined)}>
+                <AxisButton role="destructive" onClick={() => onChange(rowPointer, undefined)}>
                   {t('shell.studio.process.removeMapping')}
-                </Button>
+                </AxisButton>
               </Flex>
               <WarningLine testId="studio-parameter-undeclared">
                 {t('shell.studio.page.undeclaredParameter')}
@@ -1525,11 +1536,12 @@ function ParameterExpressions({
 /**
  * A list of actions of a widget, each with its fields. A `navigate` action has a page, a label, a `record` and
  * parameters. A `startProcess` action has a process and a label. A `delete` action has a label and a `visibleWhen`.
- * Any other action is JSON only, and can be removed. The list always offers Add navigate action, offers Add action
- * for `startProcess` only when `startProcess` is set and offers Add delete action only when `deleteAction` is set.
- * The card of the action at `selected` has `aria-current` and a border in the primary colour, and scrolls into view.
- * An Add button selects the new action, and Remove selects the `widget`. With `layer`, a card of an action that the layer
- * added or changed is marked, and a removed action is a muted row under the cards.
+ * Any other action is JSON only, and can be removed. The Adds are one group of light text buttons on the list's title
+ * row: Add navigate action always, Add action for `startProcess` only when `startProcess` is set, and Add delete action
+ * only when `deleteAction` is set. Each action is a row with no box, and Remove action is in its "…" menu. The row of
+ * the action at `selected` has `aria-current` and a border in the primary colour, and scrolls into view. An Add
+ * selects the new action, and Remove selects the `widget`. With `layer`, a row of an action that the layer added or
+ * changed is marked, and a removed action is a muted row under the rows.
  */
 function Actions({
   pointer,
@@ -1562,102 +1574,131 @@ function Actions({
     onSelect(`${pointer}/${list.length}`)
   }
 
+  const adds = [
+    ...(startProcess
+      ? [
+          {
+            key: 'startProcess',
+            label: t('shell.studio.page.addAction'),
+            onClick: () => add({ type: 'startProcess', process: '', label: { textKey: '' } }),
+          },
+        ]
+      : []),
+    {
+      key: 'navigate',
+      label: t('shell.studio.page.addNavigateAction'),
+      onClick: () => add({ type: 'navigate', page: '', label: { textKey: '' } }),
+    },
+    ...(deleteAction
+      ? [
+          {
+            key: 'delete',
+            label: t('shell.studio.page.addDeleteAction'),
+            onClick: () => add({ type: 'delete', label: { textKey: '' } }),
+          },
+        ]
+      : []),
+  ]
+
+  /** Remove action in the row's "…" menu, which selects the widget. */
+  function removeMenu(actionPointer: string) {
+    return (
+      <RowActions
+        fold
+        actions={[
+          {
+            key: 'remove',
+            labelKey: 'shell.studio.page.removeAction',
+            destructive: true,
+            onClick: () => {
+              onChange(actionPointer, undefined)
+              onSelect(widget)
+            },
+          },
+        ]}
+      />
+    )
+  }
+
   return (
-    <PageFieldGroup pointer={pointer}>
-      <Flex vertical gap="small">
-        {actions !== undefined && !Array.isArray(actions) ? (
-          <JsonOnly />
-        ) : (
-          <>
-            {list.map((action, position) => {
-              const actionPointer = `${pointer}/${position}`
-              if (!isContent(action)) {
-                return (
-                  <ActionCard key={position} position={position} selected={actionPointer === selected}>
+    <PageFieldGroup
+      pointer={pointer}
+      action={
+        actions === undefined || Array.isArray(actions) ? (
+          <AxisButtonGroup role="secondary" nameKey="shell.studio.page.addActions" actions={adds} />
+        ) : undefined
+      }
+    >
+      {actions !== undefined && !Array.isArray(actions) ? (
+        <JsonOnly />
+      ) : (
+        <Flex vertical gap="small">
+          {list.map((action, position) => {
+            const actionPointer = `${pointer}/${position}`
+            if (!isContent(action)) {
+              return (
+                <SelectedMark key={position} testId={`studio-action-${position}`} selected={actionPointer === selected}>
+                  <Flex vertical gap="small">
+                    <Flex justify="flex-end">{removeMenu(actionPointer)}</Flex>
                     <div data-testid={`studio-field-${actionPointer}`}>
                       <JsonOnly />
                     </div>
-                  </ActionCard>
-                )
-              }
-              return (
-                <ActionCard key={position} position={position} selected={actionPointer === selected}>
-                  <Flex vertical gap="small">
-                    <Typography.Text>{text(action.type)}</Typography.Text>
-                    {layer !== undefined && typeof action.name === 'string' && (
-                      <LayerMarkTag layer={layer} list={pointer} index={position} name={action.name} />
-                    )}
-                    {action.type === 'navigate' ? (
-                      <NavigateFields pointer={actionPointer} action={action} onChange={onChange} />
-                    ) : action.type === 'startProcess' ? (
-                      <>
-                        <NameField
-                          pointer={`${actionPointer}/process`}
-                          kind="process"
-                          current={action.process}
-                          required
-                          onPick={(next) => onChange(`${actionPointer}/process`, next)}
-                        />
-                        <ActionLabel pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
-                      </>
-                    ) : action.type === 'delete' ? (
-                      <>
-                        <ActionLabel pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
-                        <PageField pointer={`${actionPointer}/visibleWhen`}>
-                          <Input
-                            value={text(action.visibleWhen)}
-                            onChange={(event) =>
-                              onChange(
-                                `${actionPointer}/visibleWhen`,
-                                event.target.value === '' ? undefined : event.target.value,
-                              )
-                            }
-                          />
-                        </PageField>
-                      </>
-                    ) : (
-                      <div data-testid={`studio-field-${actionPointer}`}>
-                        <JsonOnly />
-                      </div>
-                    )}
-                    <div>
-                      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                      <Button
-                        danger
-                        onClick={() => {
-                          onChange(actionPointer, undefined)
-                          onSelect(widget)
-                        }}
-                      >
-                        {t('shell.studio.page.removeAction')}
-                      </Button>
-                    </div>
                   </Flex>
-                </ActionCard>
+                </SelectedMark>
               )
-            })}
-            <RemovedRows layer={layer} list={pointer} />
-            <Flex gap="small" wrap>
-              {startProcess && (
-                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                <Button onClick={() => add({ type: 'startProcess', process: '', label: { textKey: '' } })}>
-                  {t('shell.studio.page.addAction')}
-                </Button>
-              )}
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => add({ type: 'navigate', page: '', label: { textKey: '' } })}>
-                {t('shell.studio.page.addNavigateAction')}
-              </Button>
-              {deleteAction && (
-                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                <Button onClick={() => add({ type: 'delete', label: { textKey: '' } })}>
-                  {t('shell.studio.page.addDeleteAction')}
-                </Button>
-              )}
-            </Flex>
-          </>
-        )}
-      </Flex>
+            }
+            return (
+              <SelectedMark key={position} testId={`studio-action-${position}`} selected={actionPointer === selected}>
+                <Flex vertical gap="small">
+                  <Flex gap="small" align="center" justify="space-between">
+                    <Flex gap="small" align="center" wrap>
+                      <Typography.Text>{text(action.type)}</Typography.Text>
+                      {layer !== undefined && typeof action.name === 'string' && (
+                        <LayerMarkTag layer={layer} list={pointer} index={position} name={action.name} />
+                      )}
+                    </Flex>
+                    {removeMenu(actionPointer)}
+                  </Flex>
+                  {action.type === 'navigate' ? (
+                    <NavigateFields pointer={actionPointer} action={action} onChange={onChange} />
+                  ) : action.type === 'startProcess' ? (
+                    <>
+                      <NameField
+                        pointer={`${actionPointer}/process`}
+                        kind="process"
+                        current={action.process}
+                        required
+                        onPick={(next) => onChange(`${actionPointer}/process`, next)}
+                      />
+                      <ActionLabel pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
+                    </>
+                  ) : action.type === 'delete' ? (
+                    <>
+                      <ActionLabel pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
+                      <PageField pointer={`${actionPointer}/visibleWhen`}>
+                        <Input
+                          value={text(action.visibleWhen)}
+                          onChange={(event) =>
+                            onChange(
+                              `${actionPointer}/visibleWhen`,
+                              event.target.value === '' ? undefined : event.target.value,
+                            )
+                          }
+                        />
+                      </PageField>
+                    </>
+                  ) : (
+                    <div data-testid={`studio-field-${actionPointer}`}>
+                      <JsonOnly />
+                    </div>
+                  )}
+                </Flex>
+              </SelectedMark>
+            )
+          })}
+          <RemovedRows layer={layer} list={pointer} />
+        </Flex>
+      )}
     </PageFieldGroup>
   )
 }
@@ -1673,19 +1714,21 @@ function useScrolledTo<T extends HTMLElement>(selected: boolean) {
   return ref
 }
 
-/** The card of an action. The selected one has `aria-current` and a border in the primary colour. */
-function ActionCard({ position, selected, children }: { position: number; selected: boolean; children: ReactNode }) {
-  const { colour } = useDesignTokens()
+/**
+ * The row of a selectable action or KPI navigate action. The selected one has `aria-current`, scrolls into view and has
+ * an outline in the primary colour. An unselected row has no border, see docs/reference/studio-editors-by-kind.md#navigate-actions.
+ */
+function SelectedMark({ testId, selected, children }: { testId: string; selected: boolean; children: ReactNode }) {
+  const { colour, radius } = useDesignTokens()
   const ref = useScrolledTo<HTMLDivElement>(selected)
   return (
-    <Card
+    <div
       ref={ref}
-      size="small"
-      data-testid={`studio-action-${position}`}
+      data-testid={testId}
       aria-current={selected ? 'true' : undefined}
-      style={selected ? { borderColor: colour.primary } : undefined}
+      style={selected ? { border: `1px solid ${colour.primary}`, borderRadius: radius.base, padding: 8 } : undefined}
     >
       {children}
-    </Card>
+    </div>
   )
 }

@@ -34,7 +34,7 @@ async function adminToken(): Promise<string> {
   return ((await response.json()) as { access_token: string }).access_token
 }
 
-/** Calls the admin API of Keycloak. A failure names the step and the HTTP status. */
+/** Calls the admin API of Keycloak. A failure names the step, the HTTP status and Keycloak's reason when it gives one. */
 async function admin(step: string, method: string, apiPath: string, body?: unknown): Promise<Response> {
   const keycloakUrl = required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')
   const response = await fetch(`${keycloakUrl}/admin/realms${apiPath}`, {
@@ -45,7 +45,14 @@ async function admin(step: string, method: string, apiPath: string, body?: unkno
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  if (!response.ok) throw new Error(`${step} failed with HTTP ${response.status}.`)
+  if (!response.ok) {
+    // Keycloak's errorMessage says why it refused, such as a password that breaks the realm's policy.
+    const reason = await response
+      .json()
+      .then((failure: { errorMessage?: string }) => failure.errorMessage)
+      .catch(() => undefined)
+    throw new Error(`${step} failed with HTTP ${response.status}${reason ? `: ${reason}` : ''}.`)
+  }
   return response
 }
 

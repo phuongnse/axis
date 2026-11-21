@@ -14,7 +14,7 @@ import { newWidget } from '../platform/pageWidgets'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
-import { chooseOption } from '../test/antd'
+import { chooseOption, shownMenu } from '../test/antd'
 import { StudioEditor } from './StudioEditor'
 import { StudioPageCanvas } from './StudioPageCanvas'
 import { editJson, jsonText } from '../test/jsonView'
@@ -849,7 +849,7 @@ describe('the Design tab of a page', () => {
       expect(button(design, '/widgets/1', 'actions/1')).toHaveTextContent('Show tickets')
     })
 
-    it('marks the card of an added action and selects it, and selects the widget when the action is removed', async () => {
+    it('marks the row of an added action and selects it, and selects the widget when the action is removed', async () => {
       const { design } = await openActions()
       const list = within(design).getByTestId('studio-field-/widgets/0/rowActions')
 
@@ -858,9 +858,9 @@ describe('the Design tab of a page', () => {
       expect(within(list).getByTestId('studio-action-2')).toHaveAttribute('aria-current', 'true')
       expect(within(list).getByTestId('studio-action-1')).not.toHaveAttribute('aria-current')
 
-      await userEvent.click(
-        within(within(list).getByTestId('studio-action-2')).getByRole('button', { name: 'Remove action' }),
-      )
+      const action = within(list).getByTestId('studio-action-2')
+      await userEvent.click(within(action).getAllByRole('button', { name: 'Actions' })[0])
+      await userEvent.click(within(await shownMenu('Actions')).getByRole('menuitem', { name: 'Remove action' }))
 
       expect(within(list).queryByTestId('studio-action-2')).not.toBeInTheDocument()
       expect(within(list).getByTestId('studio-action-1')).not.toHaveAttribute('aria-current')
