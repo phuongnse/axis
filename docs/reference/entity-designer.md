@@ -148,8 +148,9 @@ These settings take a control of their own:
   only checks on an entered value.
 - **A validation at its field**. A validation is a rule on the whole record, and its `field` only says
   where its message shows. The file stays as it is, and the designer shows it twice: the drawer's
-  Validation group lists the validations at this field, each a box with its name, Remove validation, its
-  expression and its message, typed as texts, and Add validation fills `field`. A validation is at the field when its
+  Validation group lists the validations at this field, each with its name, its expression and its message,
+  typed as texts, and a "…" menu that holds Remove validation alone, as the drawer does not move a validation.
+  Add validation is on the group's title row and fills `field`. A validation is at the field when its
   `field` is the field's name, letter case included, and a field with no name yet lists none and has no Add validation.
   The entity's [Validations](#validations) section keeps every one.
 - **A default has no record in scope,** so its editor offers rules and functions but no field names and
@@ -182,19 +183,22 @@ validation is read-only text and has no mark. A field's name and type, which the
 
 The Indexes section, after Validations, adds, moves and removes the entity's `indexes`. Each index shows its
 name as read-only text, picks the entity's fields in order and has a Unique checkbox. A row shows its name
-and, with a customization layer, its mark on top, then one field to a line, then its buttons below. Add index writes
-the name `index1`, `index2` and so on, the first one that no index of the entity has, ignoring letter
-case. The picker offers only fields that have a column, so it leaves out `child-collection`,
+and, with a customization layer, its mark on top, with a "…" menu at the end of that line. The menu holds Move up,
+Move down and Remove index, as a table's [row actions](actions-and-controls.md#tables) do: Move up is off on the first
+index, Move down on the last, and Remove is destructive. Then one field to a line. Add index is a light text button on
+the section's title row, and writes the name `index1`, `index2` and so on, the first one that no index of the entity
+has, ignoring letter case. The picker offers only fields that have a column, so it leaves out `child-collection`,
 `references` and `file` fields (`AXC0276`). Each change writes the whole `indexes` array, and removing
 the last index removes the key.
 
 ## Validations
 
 Each validation shows its name as read-only text, its expression in the expression editor, a message
-key picker and a field picker, and can be added and removed. A row shows its name and mark on top, then
-one field to a line, then its buttons below. Add validation writes the name
-`validation1`, `validation2` and so on, the first one that no validation of the entity has, ignoring
-letter case.
+key picker and a field picker, and can be added, moved and removed. A row shows its name and, with a customization
+layer, its mark on top, with a "…" menu at the end of that line. The menu holds Move up, Move down and Remove
+validation, with Move up off on the first validation and Move down on the last, as an index's menu does. Then one
+field to a line. Add validation is a light text button on the section's title row, and writes the name
+`validation1`, `validation2` and so on, the first one that no validation of the entity has, ignoring letter case.
 
 ## Diagnostics
 
