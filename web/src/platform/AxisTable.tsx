@@ -1,5 +1,15 @@
 import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Dropdown, Flex, Input, Table, type TableColumnType, type TableProps } from 'antd'
+import {
+  Button,
+  ConfigProvider,
+  Dropdown,
+  Flex,
+  Input,
+  Pagination,
+  Table,
+  type TableColumnType,
+  type TableProps,
+} from 'antd'
 import {
   useContext,
   useEffect,
@@ -181,6 +191,14 @@ export interface AxisTableProps<T> {
    * with none. A fold in the row's first cell opens and closes it, see docs/reference/actions-and-controls.md#tables.
    */
   details?: (row: T) => ReactNode | null
+  /**
+   * The rows a row folds open to, or `null` for a row with none: its group rows, closed at first, which open from the
+   * fold in its first cell and may have rows of their own, see docs/reference/actions-and-controls.md#tables. Paging, search,
+   * filter and sort work on the rows of `dataSource` alone, and a row's rows follow it. Every row's key must be unique in the
+   * table, so a caller prefixes the key of a row inside another with the key of the row that holds it. A row that has rows
+   * in it opens those, so `details` is for the rows that have none.
+   */
+  rowsIn?: (row: T) => readonly T[] | null
   /** Attributes for the row's element, such as test ids and data attributes. */
   rowAttributes?: (row: T, index?: number) => HTMLAttributes<HTMLElement>
   /** The test id of the table's outer element. */
@@ -241,6 +259,7 @@ export function AxisTable<T extends object>({
   bulkActions,
   blankRow,
   details,
+  rowsIn,
   rowAttributes,
   testId,
 }: AxisTableProps<T>) {
@@ -257,6 +276,7 @@ export function AxisTable<T extends object>({
   }
   const [selectedKeys, setSelectedKeys] = useState<Key[]>([])
   const [openRows, setOpenRows] = useState<string[]>([])
+  const [openGroups, setOpenGroups] = useState<string[]>([])
   const tableRef = useRef<HTMLDivElement>(null)
   // Ant Design has no prop for the focus of its scrolling region, so the attribute is set on the element.
   useEffect(() => {
@@ -266,6 +286,10 @@ export function AxisTable<T extends object>({
   // The same theme object between draws, so the cells under the table are not drawn again for nothing.
   const theme = useMemo(() => tableTheme(tokens, compact), [tokens, compact])
   const cellPadding = compact ? tokens.spacing.sm : tokens.spacing.lg
+  // A table with folds gives its first column a start padding as wide as a fold and the gap after it, and the folds sit in it.
+  const foldable = rowsIn !== undefined || details !== undefined
+  const foldWidth = tokens.size.smallControl
+  const foldIndent = foldWidth + tokens.spacing.xs
   const narrow = useNarrowWidth()
   // The widths the columns need when drawn and not stretched. A moved column is not drawn, so it is remembered.
   const naturalWidths = useRef(new Map<string, number>())
@@ -319,7 +343,11 @@ export function AxisTable<T extends object>({
       const { moved, scrolls } = makeRoom(available, others, sizes)
       // The moved lines of a row are as wide as the row's content, which starts after the checkbox and its padding.
       const selection = root.querySelector<HTMLElement>('th.ant-table-selection-column')?.offsetWidth ?? 0
-      const next = { moved, scrolls, lineWidth: Math.max(0, available - selection - 2 * cellPadding) }
+      const next = {
+        moved,
+        scrolls,
+        lineWidth: Math.max(0, available - selection - 2 * cellPadding - (foldable ? foldIndent : 0)),
+      }
       setRoom((current) =>
         current.scrolls === next.scrolls &&
         current.lineWidth === next.lineWidth &&
@@ -395,6 +423,26 @@ export function AxisTable<T extends object>({
     }
   }
 
+  // The rows of the page, each followed by the rows of its open groups, and how far in each row is.
+  const depths = new Map<string, number>()
+  let tableRows = pageRows
+  if (rowsIn && pageRows) {
+    const flat: T[] = []
+    const add = (rows: readonly T[], depth: number) => {
+      for (const item of rows) {
+        const key = rowKey(item)
+        flat.push(item)
+        depths.set(key, depth)
+        const inner = openGroups.includes(key) ? rowsIn(item) : null
+        if (inner) {
+          add(inner, depth + 1)
+        }
+      }
+    }
+    add(pageRows, 0)
+    tableRows = flat
+  }
+
   const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
   // The cells that stay leave room under their content for the moved lines, which run across the whole row.
   const staysRoom: CSSProperties = { paddingBottom: `calc(${tokens.spacing.xs}px + var(${movedHeight}, 0px))` }
@@ -431,11 +479,18 @@ export function AxisTable<T extends object>({
             : {}),
           onHeaderCell: (data, index) => {
             const own = onHeaderCell?.(data, index)
-            return { ...own, 'data-column-key': column.key, style: { ...sizing, ...own?.style } }
+            const folds: CSSProperties =
+              position === 0 && foldable ? { paddingInlineStart: cellPadding + foldIndent } : {}
+            return { ...own, 'data-column-key': column.key, style: { ...sizing, ...folds, ...own?.style } }
           },
           onCell: (row, index) => {
             const own = onCell?.(row, index)
-            return { ...own, style: { ...sizing, ...(position === 0 ? {} : staysRoom), ...own?.style } }
+            // Each level of rows starts one fold further in.
+            const folds: CSSProperties =
+              position === 0 && foldable
+                ? { paddingInlineStart: cellPadding + foldIndent + (depths.get(rowKey(row)) ?? 0) * foldWidth }
+                : {}
+            return { ...own, style: { ...sizing, ...(position === 0 ? {} : staysRoom), ...folds, ...own?.style } }
           },
           render: (_value: unknown, row: T, index: number) => {
             const content = contentOf(original, row, index)
@@ -468,22 +523,30 @@ export function AxisTable<T extends object>({
                   <MovedCells lines={lines} width={room.lineWidth} />
                 </>
               )
-            // The fold sits before the first cell's content, for a row that has details.
-            if (position !== 0 || details === undefined || details(row) == null) {
+            // The fold sits in the first cell's start padding, for a row that has rows in it or details.
+            if (position !== 0 || !foldable) {
               return cell
             }
             const key = rowKey(row)
-            const open = openRows.includes(key)
+            const group = (rowsIn?.(row)?.length ?? 0) > 0
+            if (!group && (details === undefined || details(row) == null)) {
+              return cell
+            }
+            const [folded, setFolded] = group ? [openGroups, setOpenGroups] : [openRows, setOpenRows]
+            const open = folded.includes(key)
             return (
-              <Flex align="start" gap={tokens.spacing.xs}>
-                <RowFold
-                  open={open}
-                  onToggle={() =>
-                    setOpenRows((rows) => (open ? rows.filter((candidate) => candidate !== key) : [...rows, key]))
-                  }
-                />
-                <div style={{ minWidth: 0 }}>{cell}</div>
-              </Flex>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', insetInlineStart: -foldIndent, top: 0 }}>
+                  <RowFold
+                    group={group}
+                    open={open}
+                    onToggle={() =>
+                      setFolded((keys) => (open ? keys.filter((candidate) => candidate !== key) : [...keys, key]))
+                    }
+                  />
+                </span>
+                {cell}
+              </div>
             )
           },
         }
@@ -522,6 +585,23 @@ export function AxisTable<T extends object>({
   const sizes = paging?.pageSizeOptions ?? []
   const picker = sizes.length > 0
   const number = new Intl.NumberFormat(locale)
+  const grouped = rowsIn !== undefined
+  const pagerProps = paging && {
+    current: paging.current,
+    pageSize: paging.pageSize,
+    total: paging.total,
+    showSizeChanger: picker,
+    hideOnSinglePage: !picker,
+    itemRender: paginationItems(paging.current, t),
+    // A shared widget keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
+    style: { marginBottom: 0 },
+    showTotal: (all: number, [from, to]: [number, number]) =>
+      t('shell.table.range')
+        .replace('{from}', number.format(from))
+        .replace('{to}', number.format(to))
+        .replace('{total}', number.format(all)),
+    ...(picker ? { pageSizeOptions: sizes } : {}),
+  }
   // A new sort or page size starts again at page 1.
   const onViewChange: TableProps<T>['onChange'] = (next, _filters, sorter) => {
     if (!view || !query) {
@@ -532,6 +612,14 @@ export function AxisTable<T extends object>({
     const pageSize = next.pageSize ?? query.pageSize
     const reset = !sameSort(sort, query.sort) || pageSize !== query.pageSize
     view.onChange({ ...query, page: reset ? 1 : (next.current ?? 1), pageSize, sort })
+  }
+  // The pager of a table with group rows, which Ant Design cannot page: a new page size starts again at page 1.
+  const onPage = (page: number, pageSize: number) => {
+    if (view && query) {
+      view.onChange({ ...query, page: pageSize !== query.pageSize ? 1 : page, pageSize })
+    } else {
+      onChange?.({ current: page, pageSize }, {}, [], { action: 'paginate', currentDataSource: [] })
+    }
   }
   // A new search starts again at page 1. An empty text means no search.
   const onSearch = (value: string) => {
@@ -659,7 +747,7 @@ export function AxisTable<T extends object>({
               scroll={{ x: true }}
               // Ant Design otherwise switches to a fixed layout once a column is fixed.
               tableLayout="auto"
-              dataSource={pageRows as T[] | undefined}
+              dataSource={tableRows as T[] | undefined}
               loading={loading}
               // The table gives the space that EmptyState no longer keeps, so an empty table keeps its height.
               locale={{
@@ -669,31 +757,18 @@ export function AxisTable<T extends object>({
                   </div>
                 ),
               }}
-              pagination={
-                paging
-                  ? {
-                      current: paging.current,
-                      pageSize: paging.pageSize,
-                      total: paging.total,
-                      showSizeChanger: picker,
-                      hideOnSinglePage: !picker,
-                      itemRender: paginationItems(paging.current, t),
-                      // A shared widget keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
-                      style: { marginBottom: 0 },
-                      showTotal: (all, [from, to]) =>
-                        t('shell.table.range')
-                          .replace('{from}', number.format(from))
-                          .replace('{to}', number.format(to))
-                          .replace('{total}', number.format(all)),
-                      ...(picker ? { pageSizeOptions: sizes } : {}),
-                    }
-                  : false
-              }
+              // Ant Design pages the rows it is given, which here include open group rows, so a table with them draws its pager below.
+              pagination={paging && !grouped ? pagerProps : false}
               onRow={rowAttributes}
               onChange={view ? onViewChange : onChange}
               styles={{ header: { row }, body: { row } }}
             />
           </ConfigProvider>
+          {grouped && pagerProps && (
+            <Flex justify="flex-end">
+              <Pagination {...pagerProps} onChange={onPage} />
+            </Flex>
+          )}
         </>
       )}
     </Flex>
@@ -701,15 +776,20 @@ export function AxisTable<T extends object>({
 }
 
 /**
- * The fold of a row, an `AxisButton` of the role `icon` with `Chevron`, named "Show the details" or "Hide the details",
- * see docs/reference/actions-and-controls.md#tables.
+ * The fold of a row, an `AxisButton` of the role `icon` with `Chevron`: named "Show the rows in it" or "Hide the rows in it"
+ * for a row with group rows, and "Show the details" or "Hide the details" for a row with details, see
+ * docs/reference/actions-and-controls.md#tables.
  */
-function RowFold({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+function RowFold({ group, open, onToggle }: { group: boolean; open: boolean; onToggle: () => void }) {
+  const names = group
+    ? { show: 'shell.table.showRows', hide: 'shell.table.hideRows' }
+    : { show: 'shell.table.showDetails', hide: 'shell.table.hideDetails' }
   return (
     <AxisButton
       role="icon"
+      size="small"
       icon={<Chevron point={open ? 'down' : 'right'} />}
-      nameKey={open ? 'shell.table.hideDetails' : 'shell.table.showDetails'}
+      nameKey={open ? names.hide : names.show}
       aria-expanded={open}
       onClick={onToggle}
     />

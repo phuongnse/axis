@@ -100,18 +100,20 @@ wrong form show the not-found page, and the instance is not requested.
   Output reads Not set for an instance that failed or was cancelled. A hidden value follows
   [values and masking](process-inspection.md#values-and-masking).
 
-- **History** _(planned)_. One timeline of the instance's runs, newest first, through `AxisTable`'s group rows, in
+- **History**. One timeline of the instance's runs, newest first, through `AxisTable`'s group rows, in
   place of separate history, task, call and sub-process tables. A run of a step is a row. It opens to a row for each
   task, call and sub-process it started, in the same columns, and a call opens to a row for each attempt. A call's
   row holds its Resolve button, see [Resolve](#resolve). Its columns are:
   - **Step**, the step's label with its kind under it, and "(run 2)" after the kind where the step ran more than once.
+    In a row inside a run, Step names what the row is: the task's type, the call's operation, the sub-process's
+    title, or the attempt or lookup, such as "Attempt 3".
   - **What happened**, one sentence from fixed texts through `useRunWords`, never free text, such as "createPurchaseOrder (ERP) succeeded on attempt 3."
   - **State**, a `StatusTag` in the tone that `stateText` gives. A kind, such as a call's, is plain text.
   - **Started**, through `EventTime`, and **Duration**.
 
   The toolbar's search, filter, sort and page are in the address under the `history.` prefix. Search goes through the
-  words of a run and of the rows inside it. Filter has Step, State, Started and Duration, shown as chips, and a date
-  filters on the local day of its time. Sort is by State, in the order Failed, Waiting, Running and Done, or by Started
+  words of a run and of the rows inside it. Filter has Step, State, Started and Duration, shown as chips, a date
+  filters on the local day of its time, and Duration filters in seconds. Sort is by State, in the order Failed, Waiting, Running and Done, or by Started
   or Duration. Paging and Refresh complete the toolbar. The timeline holds its rows and does these itself. A click on
   a run's step opens that run in the side panel, as the step's run rule below says.
 
@@ -328,9 +330,10 @@ The widget shows a failure where it happens, and its words come from the platfor
   one link, "Go to {page}" ("Đi tới {page}", `shell.record.goToList`), as a missing record's line does, see
   [routing](frontend.md#routing). No save bar and no action shows.
 - **Texts.** The platform texts `shell.inspector.*` hold the column headers, the section titles, the
-  instance states, the call states (`shell.inspector.callStates.*`), the run states (`shell.inspector.runStates.*`), the attempt
-  outcomes (`shell.inspector.attemptOutcomes.*`), the step types (`shell.inspector.stepTypes.*`), the "hidden" text, the "No subject" text, the Process and Sub-processes
-  labels, the empty texts and the messages. `shell.inspector.deadLetters.*` hold the dead letter
+  instance states, the call states (`shell.inspector.callStates.*`), the run states (`shell.inspector.runStates.*`), the task
+  states (`shell.inspector.taskStates.*`), the attempt outcomes (`shell.inspector.attemptOutcomes.*`), the step types
+  (`shell.inspector.stepTypes.*`), the timeline's sentences (`shell.inspector.happened.*`), the "hidden" text, the "No subject" text, the Process
+  label, the empty texts and the messages. `shell.inspector.deadLetters.*` hold the dead letter
   section's title, column headers, empty text and load error. `shell.inspector.commands.*` hold the
   command buttons, the dialog's labels, the reason errors, the retry warning and the resolve labels and
   errors.

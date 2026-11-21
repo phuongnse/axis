@@ -1,5 +1,5 @@
 // What a step's run panel shows for a run, see docs/reference/process-inspector-widget.md#instance-page.
-import { runParts, type InstanceCall, type InstanceDetail, type StepRun } from './inspection'
+import { runParts, stepTypeText, type InstanceCall, type InstanceDetail, type StepRun } from './inspection'
 
 /** The call a run's Input, Output and Attempts read: the last call of the run, since an operation step makes one. */
 export function callOf(instance: InstanceDetail, runs: readonly StepRun[], run: StepRun): InstanceCall | undefined {
@@ -35,4 +35,41 @@ export function runHasOutput(instance: InstanceDetail, runs: readonly StepRun[],
     Boolean(made?.notified) ||
     Boolean(made?.created)
   )
+}
+
+/**
+ * The panel's line, and the kind under a run's step in History: what an operation step's run did, such as "Calls a connector", worked out from the run's call, its
+ * child instance and what it made, since the graph gives every operation the type `operation`. Any other step, and an
+ * operation that shows none of these, reads its type's word.
+ */
+export function runKindText(
+  t: (key: string) => string,
+  instance: InstanceDetail,
+  runs: readonly StepRun[],
+  run: StepRun | undefined,
+  type: string,
+): string {
+  if (type === 'operation' && run !== undefined) {
+    const { calls, subProcesses } = runParts(instance, runs, run)
+    const made = run.entries.at(-1)?.made
+    const operation = calls[0]
+      ? calls[0].kind === 'package'
+        ? 'package'
+        : 'connector'
+      : subProcesses.length > 0
+        ? 'subProcess'
+        : made?.event
+          ? 'event'
+          : made?.notified
+            ? 'notify'
+            : made?.created
+              ? 'create'
+              : made?.changes
+                ? 'change'
+                : undefined
+    if (operation !== undefined) {
+      return t(`shell.inspector.run.operations.${operation}`)
+    }
+  }
+  return stepTypeText(t, type)
 }
