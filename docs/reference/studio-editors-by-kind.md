@@ -356,8 +356,12 @@ Operations heading, and the JSON view stays as the second view of the same draft
   Audience boxes that remove their key when empty, see [OAuth2 auth](integration-resources.md#oauth2-auth).
 - **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from
   the connector's other operations. Its input and output fields are rows of name, type and required,
-  one field to a line, and the schema's required keys carry the shared required mark. Operations and rows
-  can be added and deleted. A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
+  one field to a line, and the schema's required keys carry the shared required mark. Add operation sits
+  on the Operations heading. Each input, output and nested field list has its Add on its title row, as a
+  light text button. Each operation's Delete operation is in its "…" menu at its top right, and each row's
+  Delete is in its "…" menu, which also removes the fields nested in the row. A read-only tab, such as while the JSON has
+  an error, shows no Add and no menu, as the Rows bullet of the [process editor](#process-editor) says.
+  A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
 - **Placement and nesting.** A scalar input has a Sent in choice of `body`, `path`, `query` or
   `header`, which shows `body` when the file has no `in` key and removes the key when `body` is chosen.
   `object` and `list` inputs show nested field rows instead, down to four levels with the input as
@@ -388,28 +392,36 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim
-  value and a role picked from the application's roles, one field to a line, with Add claim value and Delete. With no rows, a claim
-  value gives the role of the same name, and the editor says so.
-- **Assurance.** `acr` is a list of text rows, each with Delete below, and with none the key is removed.
+  value and a role picked from the application's roles, one field to a line. Add claim value sits on the
+  title row, and each row's Delete is in its "…" menu. With no rows, a claim value gives the role of the
+  same name, and the editor says so.
+- **Assurance.** `acr` is a list of text rows. Add assurance level sits on the Assurance heading, and each
+  row's Delete is in its "…" menu. With none the key is removed. A read-only tab, such as while the JSON
+  has an error, shows no Add and no menu, as the Rows bullet of the [process editor](#process-editor) says.
 - **Unknown keys.** A key the editor does not show is saved unchanged.
 
 ### A site's sign-in
 
 On a `site`, `signIn` is a list of the application's identity providers, picked by name, with add and
-remove. An empty list removes `signIn`, so the site allows every provider, and the form says so.
+remove. Add provider sits on the heading, and each row's Remove is in its "…" menu. A read-only tab shows
+neither. An empty list removes `signIn`, so the site allows every provider, and the form says so.
 
 ## Scenario editor
 
 The scenario editor's Form tab has four sections: General, with the scenario's name, its [description](studio.md#editor)
 and `now`; Users, with their roles; Stubs; and Steps, a list with a panel for each step type. Add user,
-Add stub and Add step sit on their section's heading. The JSON view stays as the second view of the same
-draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
+Add stub and Add step sit on their section's heading, and a read-only tab shows none of them. The JSON view
+stays as the second view of the same draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
 
 - **Field names.** Every field, stub and step property shows a label and help text in the app's
   languages, so a person sees "Moves time by" and not the property name `by`.
 - **Steps.** Each step has a type. Changing the type keeps the properties the new type takes and drops
-  the others, and keys the editor does not show stay in the file. A step can be removed or moved up or
-  down.
+  the others, and keys the editor does not show stay in the file. A step's Move up, Move down and Delete
+  are in its "…" menu on the card's title row. Move up is off on the first step and Move down on the last.
+  A read-only tab shows no menu.
+- **Rows.** A key and value list, such as an expected notification's values or a stub's output, has Add on
+  its title row, and each row's Delete is in its "…" menu. Users and stubs keep their Delete in a menu too.
+  A read-only tab shows neither, as the Rows bullet of the [process editor](#process-editor) says.
 - **Pickers.** Entities, processes, roles and connectors are picked by name. A `record` is picked from
   the aliases that earlier `createRecord` steps save, and a `step` and its `outcome` come from the
   processes that the record started.

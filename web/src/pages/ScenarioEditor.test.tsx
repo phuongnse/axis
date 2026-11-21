@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import { type ReactNode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -19,7 +20,7 @@ import {
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { flexOf } from '../test/antd'
+import { flexOf, shownMenu } from '../test/antd'
 import { ScenarioEditor } from './ScenarioEditor'
 
 const english: Record<string, string> = platformEnglish
@@ -531,19 +532,50 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/by', 'PT1H0')
   })
 
-  it('titles the second step "Step 2" and deletes that step with its Delete button', async () => {
+  it('titles the second step "Step 2" and deletes that step from its menu', async () => {
     const { onChange } = renderHarness(scenario([fixtures.advanceTime, fixtures.expectRecord]))
 
     const cards = screen.getAllByTestId('studio-scenario-step')
     expect(cards).toHaveLength(2)
     expect(cards[1]).toHaveTextContent('Step 2')
-    await userEvent.click(within(cards[1]).getByRole('button', { name: 'Delete' }))
+    await userEvent.click(within(cards[1]).getByRole('button', { name: 'Actions' }))
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/steps/1', undefined)
     const remaining = screen.getAllByTestId('studio-scenario-step')
     expect(remaining).toHaveLength(1)
     expect(remaining[0]).toHaveTextContent('Step 1')
     expect(screen.getByRole('textbox', { name: 'Moves time by' })).toHaveValue('PT1H')
+  })
+
+  it('keeps Move up, Move down and Delete in a step menu, with Move down off on the last step', async () => {
+    renderHarness(scenario([fixtures.advanceTime, fixtures.expectRecord]))
+
+    const cards = screen.getAllByTestId('studio-scenario-step')
+    for (const name of ['Move up', 'Move down', 'Delete']) {
+      expect(within(cards[1]).queryByRole('button', { name })).toBeNull()
+    }
+    await userEvent.click(within(cards[1]).getByRole('button', { name: 'Actions' }))
+    const menu = within(await shownMenu('Actions'))
+    expect(menu.getByRole('menuitem', { name: 'Move up' })).not.toHaveAttribute('aria-disabled', 'true')
+    expect(menu.getByRole('menuitem', { name: 'Move down' })).toHaveAttribute('aria-disabled', 'true')
+    expect(menu.getByRole('menuitem', { name: 'Delete' })).toBeVisible()
+  })
+
+  it('shows no Add and no "…" menu on a step, user or stub while the editor is read-only', () => {
+    render(
+      providers(
+        <ConfigProvider componentDisabled>
+          <ScenarioEditor value={scenario([fixtures.advanceTime, fixtures.expectRecord])} onChange={vi.fn()} />
+        </ConfigProvider>,
+      ),
+    )
+
+    expect(screen.queryByRole('button', { name: 'Add step' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add user' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add stub' })).toBeNull()
+    expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
   })
 
   it('adds an advanceTime step at the end', async () => {
@@ -577,8 +609,8 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(input).toHaveValue('author')
   })
 
-  it('stacks a user ID and its roles, with Delete under them', () => {
-    renderEditor(scenario([fixtures.advanceTime]))
+  it('stacks a user ID and its roles, with a Delete menu beside them', async () => {
+    const { onChange } = renderEditor(scenario([fixtures.advanceTime]))
 
     const row = screen.getByTestId('studio-field-/users/author')
     const id = within(row).getByRole('textbox', { name: labelOf('users.id') })
@@ -586,7 +618,11 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(stack).toHaveClass('ant-flex-vertical')
     expect(stack.children[0]).toContainElement(id)
     expect(stack.children[1]).toContainElement(within(row).getByRole('combobox', { name: 'Roles' }))
-    expect(stack.lastElementChild).toContainElement(within(row).getByRole('button', { name: 'Delete' }))
+    expect(stack.parentElement).toContainElement(within(row).getByRole('button', { name: 'Actions' }))
+    await userEvent.click(within(row).getByRole('button', { name: 'Actions' }))
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(onChange).toHaveBeenLastCalledWith('/users/author', undefined)
   })
 
   it('stacks the connector name and the operation of a stub', () => {
