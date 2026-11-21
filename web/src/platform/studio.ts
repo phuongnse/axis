@@ -1390,10 +1390,26 @@ export interface StudioRunResult {
 }
 
 /**
+ * One test of a package's `test` request, see docs/reference/studio-packages.md#the-authoring-api. `outcome` is `passed`
+ * or `failed`. `durationMs` is there when the host sent it. `file`, `line` and `column` are there for a failed test with
+ * a place, and `file` is a path inside the package.
+ */
+export interface StudioPackageTestResult {
+  name: string
+  outcome: 'passed' | 'failed'
+  message: string | null
+  durationMs?: number
+  file?: string
+  line?: number
+  column?: number
+}
+
+/**
  * A request, as `GET /api/studio/apps/{application}/requests/{id}` answers. The diagnostics are empty until it ends.
  * `scenarios` holds the stored results of a `test`, `publish` or `validate`, and is `null` when none were stored. For a
- * `test` it is empty until the request ends. A `build` of one package names it in `package`, and its `output` is the lines
- * the host wrote, see docs/reference/studio-packages.md#the-authoring-api. A `run` ends with `run` and with `output`, the
+ * `test` it is empty until the request ends. A `build` or a `test` of one package names it in `package`, and its `output` is
+ * the lines the host wrote. A package `test` holds its results in `packageTests` and has no `scenarios`, see
+ * docs/reference/studio-packages.md#the-authoring-api. A `run` ends with `run` and with `output`, the
  * lines the package host wrote.
  */
 export interface StudioRequest {
@@ -1408,6 +1424,7 @@ export interface StudioRequest {
   diagnostics: StudioDiagnostic[]
   scenarios: (StudioScenarioResult | StudioSkippedScenarioResult)[] | null
   package?: string | null
+  packageTests?: StudioPackageTestResult[] | null
   run?: StudioRunResult | null
   output?: string[] | null
 }
@@ -1598,8 +1615,20 @@ export async function testStudioApp(application: string, scenarios?: string[]): 
  * Sends a build request, which builds the package `pkg` of the working folder and publishes no release. It answers at
  * once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
-export async function buildStudioPackage(application: string, pkg: string): Promise<StudioRequest> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/build`
+export function buildStudioPackage(application: string, pkg: string): Promise<StudioRequest> {
+  return postPackageRequest(application, 'build', pkg)
+}
+
+/**
+ * Sends a test request, which tests the package `pkg` of the working folder. It answers at once with the queued request.
+ * A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export function testStudioPackage(application: string, pkg: string): Promise<StudioRequest> {
+  return postPackageRequest(application, 'test', pkg)
+}
+
+async function postPackageRequest(application: string, route: 'build' | 'test', pkg: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/${route}`
   const response = await studioFetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -21,6 +21,7 @@ import {
   ServerUnreachableError,
   type StudioDiagnostic,
   type StudioRequest,
+  testStudioPackage,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
@@ -33,6 +34,7 @@ import { fileLanguage } from './fileLanguage'
 import { useFillHeight } from './jsonViewHeight'
 import { StudioPackageRun } from './StudioPackageRun'
 import { StudioProblemList } from './StudioProblems'
+import { StudioTestResults } from './StudioTestResults'
 import { useStudioPackages, type PackageRow } from './useStudioPackages'
 
 const CodeEditor = lazy(() => import('./CodeEditor'))
@@ -51,6 +53,14 @@ const buildStates: Record<StudioRequest['status'], { tone: StatusTone; text: str
   running: { tone: 'neutral', text: 'shell.studio.packages.buildRunning' },
   succeeded: { tone: 'success', text: 'shell.studio.packages.buildSucceeded' },
   failed: { tone: 'danger', text: 'shell.studio.packages.buildFailed' },
+}
+
+/** The tone and the text key of a package test's state in the Output tab. */
+const testStates: Record<StudioRequest['status'], { tone: StatusTone; text: string }> = {
+  queued: { tone: 'neutral', text: 'shell.studio.packages.testQueued' },
+  running: { tone: 'neutral', text: 'shell.studio.packages.testRunning' },
+  succeeded: { tone: 'success', text: 'shell.studio.packages.testSucceeded' },
+  failed: { tone: 'danger', text: 'shell.studio.packages.testFailed' },
 }
 
 /** A file the workspace has read: its `saved` text, the `text` the editor shows and its `version`, or `failed` when it did not load. */
@@ -137,14 +147,17 @@ function EmptyEditorArea({ boundary }: { boundary: React.RefObject<HTMLElement |
  * A package's workspace, `&view=packages&package=<id>`: the package's label as the heading with its kind and version
  * under it, the explorer's tree of its files on the left, the open files as tabs over the code editor, the status line
  * under them and the output panel, whose Problems tab lists the package's problems: the `diagnostics` whose file is under
- * `packages/<id>/` and the problems of the last build, each file a link that opens it in the workspace at the problem's
- * line, or at the top. Its Output tab shows the last build: the Build title row with its state as a status tag, then the
- * lines the host wrote. An id that names no package shows a warning. Without `canDevelop` the editor is
- * read-only and an info alert says why. With it, Ctrl+S and the save bar save every changed file, one after another, each
- * with the version it was read at, and `onWritten` hears the last answer's diagnostics. With it the heading also has
- * Build and Run tests as one group. Build, or Ctrl+Shift+B, saves every changed file first, and a file that cannot be
- * saved stops it with that file's notice. Then it sends `POST .../build` with the package, follows the request until it
- * ends, opens the Output tab and keeps the build's problems until the next build. Run tests is off until it runs tests.
+ * `packages/<id>/` and the problems of the last build or test, each file a link that opens it in the workspace at the
+ * problem's line, or at the top. Its Output tab shows the last build or test: the Build or Tests title row with its state
+ * as a status tag, then the lines the host wrote. Its Tests tab lists the last package test, one row a test, and a failed
+ * test's place opens its file at that line. An id that names no package shows a warning. Without `canDevelop` the editor
+ * is read-only and an info alert says why. With it, Ctrl+S and the save bar save every changed file, one after another,
+ * each with the version it was read at, and `onWritten` hears the last answer's diagnostics. With it the heading also has
+ * Build and Run tests as one group. Build, or Ctrl+Shift+B, and Run tests save every changed file first, and a file that
+ * cannot be saved stops them with that file's notice. Then Build sends `POST .../build` and Run tests `POST .../test`,
+ * each with the package, and follows the request until it ends. A build opens the Output tab and a test the Tests tab,
+ * and each keeps its problems until the next build or test. Only one of them runs at a time, so both are off while either
+ * saves, sends or runs.
  * The workspace reads and writes the working folder, see docs/reference/studio-packages.md#a-packages-files.
  */
 export function StudioPackageWorkspace({
@@ -219,16 +232,18 @@ function Workspace({
   const [conflicts, setConflicts] = useState<Record<string, true>>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [build, setBuild] = useState<StudioRequest | null>(null)
-  const [buildProblems, setBuildProblems] = useState<StudioDiagnostic[]>([])
-  const [building, setBuilding] = useState(false)
-  const [panelTab, setPanelTab] = useState<'problems' | 'output' | 'run'>('problems')
+  // The last build or test, which the one follower below keeps up to date, and the last package test, for the Tests tab.
+  const [job, setJob] = useState<StudioRequest | null>(null)
+  const [testRun, setTestRun] = useState<StudioRequest | null>(null)
+  const [runProblems, setRunProblems] = useState<StudioDiagnostic[]>([])
+  const [starting, setStarting] = useState<'build' | 'test' | null>(null)
+  const [panelTab, setPanelTab] = useState<'problems' | 'output' | 'tests' | 'run'>('problems')
   const editors = useRef(new Map<string, CodeEditorHandle>())
   const pending = useRef<{ path: string; line: number } | null>(null)
   const [jump, setJump] = useState(0)
   const prefix = `packages/${row.id}/`
-  const problems = [...diagnostics, ...buildProblems].filter((diagnostic) => diagnostic.file.startsWith(prefix))
-  const running = build !== null && (build.status === 'queued' || build.status === 'running')
+  const problems = [...diagnostics, ...runProblems].filter((diagnostic) => diagnostic.file.startsWith(prefix))
+  const running = job !== null && (job.status === 'queued' || job.status === 'running')
   const isUnsaved = (path: string) => {
     const file = files[path]
     return file !== undefined && file !== 'failed' && file.text !== file.saved
@@ -379,51 +394,66 @@ function Workspace({
     return !failed && conflicted.length === 0
   }
 
-  useFollowJob(running ? `${application}/${build.id}/${generation}` : null, {
-    read: (signal) => fetchStudioRequest(application, build!.id, signal),
+  const keepJob = (next: StudioRequest) => {
+    setJob(next)
+    if (next.kind === 'test') {
+      setTestRun(next)
+    }
+  }
+
+  useFollowJob(running ? `${application}/${job.id}/${generation}` : null, {
+    read: (signal) => fetchStudioRequest(application, job!.id, signal),
     ends: (next) => next.status !== 'queued' && next.status !== 'running',
     interval: 1000,
     waitFirst: true,
-    onAnswer: setBuild,
+    onAnswer: keepJob,
     onEnd: (next) => {
-      setBuild(next)
-      setBuildProblems(next.diagnostics)
+      keepJob(next)
+      setRunProblems(next.diagnostics)
     },
     onError: (error) => {
       if (error instanceof ServerUnreachableError) {
         lost()
         return 'stop'
       }
-      console.warn(`Checking the build '${build?.id}' of the package '${row.id}' failed`, error)
-      setBuild(null)
+      console.warn(`Checking the request '${job?.id}' of the package '${row.id}' failed`, error)
+      setTestRun((current) => (current?.id === job?.id ? null : current))
+      setJob(null)
       setSaveError(t('shell.studio.request.sendFailed'))
       return 'stop'
     },
   })
 
-  /** Saves every changed file, and only when all are saved sends the build and opens the Output tab. */
-  async function startBuild() {
-    if (!canDevelop || building || saving || reconnecting || running) {
+  /** Saves every changed file, and only when all are saved sends the build or the test and opens its tab. */
+  async function start(kind: 'build' | 'test') {
+    if (!canDevelop || starting !== null || saving || reconnecting || running) {
       return
     }
-    setBuilding(true)
+    setStarting(kind)
     setSaveError(null)
     try {
       if (!(await saveAll())) {
         return
       }
-      setBuildProblems([])
-      setPanelTab('output')
-      setBuild(await buildStudioPackage(application, row.id))
+      setRunProblems([])
+      if (kind === 'build') {
+        setPanelTab('output')
+        setJob(await buildStudioPackage(application, row.id))
+      } else {
+        setPanelTab('tests')
+        const posted = await testStudioPackage(application, row.id)
+        setTestRun(posted)
+        setJob(posted)
+      }
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
         lost()
       } else {
-        console.warn(`Building the package '${row.id}' failed`, error)
+        console.warn(`Starting a ${kind} of the package '${row.id}' failed`, error)
         setSaveError(t('shell.studio.request.sendFailed'))
       }
     } finally {
-      setBuilding(false)
+      setStarting(null)
     }
   }
 
@@ -439,12 +469,12 @@ function Workspace({
       return before?.line === cursor.line && before.column === cursor.column ? current : { ...current, [path]: cursor }
     })
 
-  // The latest saveAll and startBuild, so the key listener below is set up once.
+  // The latest saveAll and start, so the key listener below is set up once. Ctrl+Shift+B only builds, as Run tests has no key.
   const latest = useRef(saveAll)
-  const latestBuild = useRef(startBuild)
+  const latestBuild = useRef(() => start('build'))
   useEffect(() => {
     latest.current = saveAll
-    latestBuild.current = startBuild
+    latestBuild.current = () => start('build')
   })
   // With the developer role Ctrl+S, or Cmd+S, saves every changed file anywhere on the page and Ctrl+Shift+B builds, and
   // the browser's own actions stay shut. Without it the browser keeps its keys, see
@@ -504,11 +534,17 @@ function Workspace({
               {
                 key: 'build',
                 label: t('shell.studio.packages.build'),
-                loading: building || running,
-                disabled: saving || reconnecting || building || running,
-                onClick: () => void startBuild(),
+                loading: starting === 'build' || (running && job.kind === 'build'),
+                disabled: saving || reconnecting || starting !== null || running,
+                onClick: () => void start('build'),
               },
-              { key: 'test', label: t('shell.studio.runTests'), disabled: true, onClick: () => undefined },
+              {
+                key: 'test',
+                label: t('shell.studio.runTests'),
+                loading: starting === 'test' || (running && job.kind === 'test'),
+                disabled: saving || reconnecting || starting !== null || running,
+                onClick: () => void start('test'),
+              },
               { key: 'run', label: t('shell.studio.packages.run.open'), onClick: () => setPanelTab('run') },
             ]}
           />
@@ -664,7 +700,7 @@ function Workspace({
               type="line"
               {...workspaceTabRow(tokens)}
               activeKey={panelTab}
-              onChange={(key) => setPanelTab(key === 'output' || key === 'run' ? key : 'problems')}
+              onChange={(key) => setPanelTab(key === 'output' || key === 'tests' || key === 'run' ? key : 'problems')}
               items={[
                 {
                   key: 'problems',
@@ -696,24 +732,50 @@ function Workspace({
                         overscrollBehavior: 'contain',
                       }}
                     >
-                      {build === null ? (
+                      {job === null ? (
                         <EmptyState text={t('shell.studio.packages.noBuild')} />
                       ) : (
                         <>
                           <PaneHeader
-                            title={t('shell.studio.packages.buildTitle')}
+                            title={t(
+                              job.kind === 'test'
+                                ? 'shell.studio.packages.testTitle'
+                                : 'shell.studio.packages.buildTitle',
+                            )}
                             tag={
-                              <StatusTag tone={buildStates[build.status].tone} data-testid="studio-package-build-state">
-                                {t(buildStates[build.status].text)}
+                              <StatusTag
+                                tone={(job.kind === 'test' ? testStates : buildStates)[job.status].tone}
+                                data-testid="studio-package-build-state"
+                              >
+                                {t((job.kind === 'test' ? testStates : buildStates)[job.status].text)}
                               </StatusTag>
                             }
                           />
                           <CodeBlock
                             plain
-                            text={(build.output ?? []).join('\n') || null}
+                            text={(job.output ?? []).join('\n') || null}
                             testId="studio-package-build-output"
                           />
                         </>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  key: 'tests',
+                  label: t('shell.studio.packages.tests'),
+                  children: (
+                    <div
+                      style={{
+                        height: outputHeight - workspaceRowHeight(tokens),
+                        overflowY: 'auto',
+                        overscrollBehavior: 'contain',
+                      }}
+                    >
+                      {testRun === null ? (
+                        <EmptyState text={t('shell.studio.packages.noTests')} />
+                      ) : (
+                        <StudioTestResults request={testRun} onOpenFile={openAt} titled={false} />
                       )}
                     </div>
                   ),

@@ -4,9 +4,15 @@ import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { formatDuration } from '../platform/formatValue'
 import { StatusTag } from '../platform/StatusTag'
-import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
+import type {
+  StudioPackageTestResult,
+  StudioRequest,
+  StudioScenarioResult,
+  StudioSkippedScenarioResult,
+} from '../platform/studio'
 import { useText } from '../platform/texts'
 import { PlatformContext } from './context'
+import { FileAtLine } from './FileAtLine'
 import { ResourceReference } from './ResourceReference'
 
 /**
@@ -17,24 +23,49 @@ import { ResourceReference } from './ResourceReference'
  * the name is plain text. A skipped contract scenario shows the relaxed point it covers and opens nothing. While the
  * request is queued or running it shows a note instead of rows, so an empty list never reads as a pass. An ended request
  * with no scenario results says that no scenario ran.
+ *
+ * A package's `test` request, which holds `packageTests`, shows one row a test instead: passed or failed, the name, the
+ * duration when the host sent it, and for a failure its message with its place after it, `packages/<id>/<file>, line N`.
+ * The place is a link through `FileAtLine` when `onOpenFile` is given, and it calls it with that path and line. An ended
+ * run with no test says that no test ran. With `titled` false the section has no heading, for a place that is named
+ * already, such as the Tests tab. See docs/reference/studio-packages.md#a-packages-files.
  */
 export function StudioTestResults({
   request,
   onSelect,
+  onOpenFile,
+  titled = true,
 }: {
-  request: Pick<StudioRequest, 'kind' | 'status' | 'scenarios'>
+  request: Pick<StudioRequest, 'kind' | 'status' | 'scenarios' | 'package' | 'packageTests'>
   onSelect?: (resourceId: string, path: string) => void
+  onOpenFile?: (file: string, line?: number) => void
+  titled?: boolean
 }) {
   const t = useText()
   const pending = request.status === 'queued' || request.status === 'running'
   const scenarios = request.scenarios ?? []
+  const packageTests = request.packageTests ?? null
   return (
     <section data-testid="studio-test-results" data-status={request.status}>
-      <Typography.Title level={5}>
-        {t(request.kind === 'test' ? 'shell.studio.tests.title' : 'shell.studio.tests.contractTitle')}
-      </Typography.Title>
+      {titled && (
+        <Typography.Title level={5}>
+          {t(request.kind === 'test' ? 'shell.studio.tests.title' : 'shell.studio.tests.contractTitle')}
+        </Typography.Title>
+      )}
       {pending ? (
         <Typography.Text type="secondary">{t('shell.studio.tests.pending')}</Typography.Text>
+      ) : packageTests !== null ? (
+        packageTests.length === 0 ? (
+          <EmptyState text={t('shell.studio.tests.noPackageTests')} />
+        ) : (
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {packageTests.map((test, index) => (
+              <li key={`${index}:${test.name}`} data-testid="studio-test-result" data-outcome={test.outcome}>
+                <PackageTestRow test={test} packageId={request.package ?? ''} onOpenFile={onOpenFile} />
+              </li>
+            ))}
+          </ul>
+        )
       ) : scenarios.length === 0 ? (
         <EmptyState text={t('shell.studio.tests.none')} />
       ) : (
@@ -93,6 +124,46 @@ function ScenarioRow({
           <Typography.Text>{fillText(t('shell.studio.tests.step'), { number: scenario.step + 1 })}</Typography.Text>
         )}
         {failed && scenario.message !== null && <Typography.Text type="danger">{scenario.message}</Typography.Text>}
+      </Flex>
+    </div>
+  )
+}
+
+function PackageTestRow({
+  test,
+  packageId,
+  onOpenFile,
+}: {
+  test: StudioPackageTestResult
+  packageId: string
+  onOpenFile?: (file: string, line?: number) => void
+}) {
+  const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const failed = test.outcome === 'failed'
+  const file = test.file === undefined ? null : `packages/${packageId}/${test.file}`
+  return (
+    <div style={{ padding: '4px 15px' }}>
+      <Flex vertical align="flex-start">
+        <Flex gap="small" align="center" wrap>
+          <StatusTag tone={failed ? 'danger' : 'success'}>
+            {t(failed ? 'shell.studio.tests.failed' : 'shell.studio.tests.passed')}
+          </StatusTag>
+          <strong>{test.name}</strong>
+          {test.durationMs !== undefined && (
+            <Typography.Text type="secondary">{formatDuration(test.durationMs, locale, t)}</Typography.Text>
+          )}
+        </Flex>
+        {(test.message !== null || file !== null) && (
+          <Flex gap="small" align="baseline" wrap>
+            {test.message !== null && (
+              <Typography.Text type={failed ? 'danger' : 'secondary'}>{test.message}</Typography.Text>
+            )}
+            {file !== null && (
+              <FileAtLine file={file} line={test.line} onOpen={onOpenFile && (() => onOpenFile(file, test.line))} />
+            )}
+          </Flex>
+        )}
       </Flex>
     </div>
   )
