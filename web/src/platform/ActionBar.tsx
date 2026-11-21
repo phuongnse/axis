@@ -10,19 +10,25 @@ import { useDesignTokens } from './themeMode'
  * `AxisActionRow` folds them. The bar has no margin and no position, so its caller places it. A bar that must stay at
  * the foot of the window draws in `ShellBarSlot`. `data-testid` names the bar. With `pane`, it is a bar at the foot of one
  * pane that holds the pane's main action: its sides take the pane's `spacing-md` inset instead of a page's, and its
- * actions keep their outlines, as it has no finish button, see docs/reference/shell.md#layout.
+ * actions keep their outlines, as it has no finish button, see docs/reference/shell.md#layout. Proposed, #4934: `inset`
+ * sets its sides' inset in place of the pane's or the page's, and `gutter` adds the width a body above it keeps for its
+ * scrollbar to its end, so its actions end where the body's content ends, as in a side panel.
  */
 export function ActionBar({
   start,
   fold,
   end,
   pane,
+  inset,
+  gutter = 0,
   'data-testid': testId,
 }: {
   start?: ReactNode
   fold?: AxisFoldAction[]
   end?: ReactNode
   pane?: boolean
+  inset?: number
+  gutter?: number
   'data-testid'?: string
 }): ReactNode {
   const { size, colour, spacing } = useDesignTokens()
@@ -37,7 +43,8 @@ export function ActionBar({
         minHeight: size.bar,
         boxSizing: 'border-box',
         paddingBlock: spacing.xs,
-        paddingInline: pane ? spacing.md : spacing.lg,
+        paddingInlineStart: inset ?? (pane ? spacing.md : spacing.lg),
+        paddingInlineEnd: (inset ?? (pane ? spacing.md : spacing.lg)) + gutter,
         background: colour.surface,
         borderTop: `1px solid ${colour.borderSubtle}`,
       }}
