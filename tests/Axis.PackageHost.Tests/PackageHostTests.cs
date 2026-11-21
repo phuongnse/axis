@@ -739,7 +739,75 @@ public sealed class PackageHostTests : IAsyncLifetime
         var problem = Assert.Single(refused.Problems);
         Assert.Equal(path, problem.File);
         Assert.Contains(path, problem.Message, StringComparison.Ordinal);
+        Assert.Equal([problem.Message], refused.Output);
         Assert.False(File.Exists(outside));
+        Assert.Null(await connection.ReceiveAsync());
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_build_of_a_Python_package_answers_built_with_its_output()
+    {
+        SkipOnWindows();
+        using var package = BuildTest.Python(NoFindings);
+        await using var host = await StartBuildHostAsync(package.Scripts);
+        using var connection = Connect(host.Endpoint);
+
+        await connection.SendAsync(new BuildMessage(SourceFiles(package, [])));
+
+        var built = Assert.IsType<BuiltMessage>(await connection.ReceiveAsync());
+        Assert.NotNull(built.Output);
+        Assert.Contains(built.Output, line => line.StartsWith("Compiled ", StringComparison.Ordinal));
+        Assert.DoesNotContain(built.Output, line => line.Contains(Path.GetTempPath(), StringComparison.Ordinal));
+        Assert.Null(await connection.ReceiveAsync());
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_build_of_a_Python_package_with_a_syntax_error_is_refused_at_its_file_line_and_column()
+    {
+        SkipOnWindows();
+        using var package = BuildTest.Python(NoFindings);
+        await using var host = await StartBuildHostAsync(package.Scripts);
+        using var connection = Connect(host.Endpoint);
+
+        await connection.SendAsync(new BuildMessage(SourceFiles(package, new()
+        {
+            ["adapter.py"] = "value = 1\nvalue = = 2\n"u8.ToArray(),
+        })));
+
+        var refused = Assert.IsType<RefusedMessage>(await connection.ReceiveAsync());
+        var problem = Assert.Single(refused.Problems);
+        Assert.Equal("adapter.py", problem.File);
+        Assert.Equal(2, problem.Line);
+        Assert.True(problem.Column >= 1);
+        Assert.StartsWith("adapter.py:2:", problem.Message, StringComparison.Ordinal);
+        Assert.NotNull(refused.Output);
+        Assert.Equal(problem.Message, refused.Output[^1]);
+        Assert.Contains("Checked the lock file 'requirements.txt'.", refused.Output);
+        Assert.DoesNotContain(refused.Output, line => line.StartsWith("Compiled ", StringComparison.Ordinal));
+        Assert.Null(await connection.ReceiveAsync());
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_test_of_a_Python_package_with_a_syntax_error_is_refused_with_the_same_problem_and_output()
+    {
+        SkipOnWindows();
+        using var package = BuildTest.Python(NoFindings);
+        await using var host = await StartBuildHostAsync(package.Scripts);
+        using var connection = Connect(host.Endpoint);
+
+        await connection.SendAsync(new PackageTestMessage(SourceFiles(package, new()
+        {
+            ["test_broken.py"] = "def test(:\n"u8.ToArray(),
+        })));
+
+        var refused = Assert.IsType<RefusedMessage>(await connection.ReceiveAsync());
+        var problem = Assert.Single(refused.Problems);
+        Assert.Equal("test_broken.py", problem.File);
+        Assert.Equal(1, problem.Line);
+        Assert.Equal(problem.Message, refused.Output![^1]);
         Assert.Null(await connection.ReceiveAsync());
     }
 

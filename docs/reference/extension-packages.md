@@ -240,7 +240,7 @@ every host reads. An installation's package is trusted code that the operator re
 The operator builds a C#, Node.js or Python package once, with `Axis.PackageHost build <source>`. The source is the
 folder that the developer published in locked mode. For `node` it holds the compiled adapter, `package.json` and
 `package-lock.json`. For Python it is the folder of the adapter and `requirements.txt`. The build writes the folder
-that `Extensions:Path` names and compiles nothing.
+that `Extensions:Path` names and compiles nothing, except that it checks that each `.py` file of a Python package compiles.
 A [`build` message](package-runners.md#the-runner-protocol) runs the same checks in a package host, on files that a caller sends. A `test` message runs them too, before the tests.
 
 - **In the host image.** The build runs in the package's own host image,
@@ -265,8 +265,9 @@ A [`build` message](package-runners.md#the-runner-protocol) runs the same checks
   2. The lock file, which the manifest's `lock` names: `packages.lock.json` for C#, `package-lock.json` for
      `node` and `requirements.txt` for Python.
   3. An existing `<id>/<version>/` folder.
-  4. For `node` and Python, the install.
-  5. The scan.
+  4. For Python, the syntax check.
+  5. For `node` and Python, the install.
+  6. The scan.
 - **Lock file.** A missing lock file is refused. A lock file is stale when the runtime dependency list,
   the `.deps.json` beside the assembly, names a NuGet package whose version the lock file does not
   resolve, and a stale lock file is refused. A lock file entry that has no runtime asset, such as an
@@ -275,6 +276,11 @@ A [`build` message](package-runners.md#the-runner-protocol) runs the same checks
   `package-lock.json` that does not list the dependencies of `package.json` at the same ranges. The
   check compares `dependencies`, `devDependencies`, `optionalDependencies` and `peerDependencies`
   with the lock file's root entry, in both directions, before npm runs.
+- **Syntax check** (Python). It copies the source to a temporary folder and byte-compiles each `.py` file of the
+  copy with Python's `compile()`, before the install, so a dependency's files are never compiled. It runs the
+  `PackageBuild:Python` command with `-I -B` and an empty environment, so it runs no package code and writes no
+  `.pyc` file. It refuses each file that does not compile, at its path, `line` and `column` counted from 1, with
+  Python's own message. A column that Python does not give is 1. A Python that cannot start is a setup error.
 - **Install** (`node`). It copies the source to a temporary folder and runs `npm ci --ignore-scripts` there,
   with `npm` from the `PATH`. The install reads the lock file alone, and no install script of a
   dependency ever runs. The temporary folder is deleted afterwards, so the source never changes. A
@@ -295,7 +301,7 @@ A [`build` message](package-runners.md#the-runner-protocol) runs the same checks
   It never overwrites an existing folder. Then it loads the extensions folder as the hosts do, and if
   that load rejects the new version it deletes the version again and refuses.
 - **Exit code.** `0` when the package is built, `1` when it is refused and `2` for a setup error: a wrong
-  argument, a missing source or extensions folder, an install that cannot start, or a scan that did not
+  argument, a missing source or extensions folder, a Python or an install that cannot start, or a scan that did not
   complete.
 - **Python hashes.** Every requirement line of `requirements.txt` must carry a `--hash`, and a line without
   one is refused before anything is installed, with the line number and the dependency. The file is read as
@@ -311,7 +317,7 @@ The build reads these settings, and a package host reads `PackageBuild:Trivy` an
 | --- | --- | --- | --- |
 | `Extensions:Path` | `Extensions__Path` | none | The existing folder that the build writes the package to |
 | `PackageBuild:Trivy` | `PackageBuild__Trivy` | `trivy` | The Trivy command that scans the dependencies |
-| `PackageBuild:Python` | `PackageBuild__Python` | `python3` | The Python command that runs pip for a Python package, and that runs its tests |
+| `PackageBuild:Python` | `PackageBuild__Python` | `python3` | The Python command that checks the syntax of a Python package, runs pip for it, and runs its tests |
 
 ## Versions and pinning
 
