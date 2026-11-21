@@ -4,7 +4,7 @@ import { ConfigProvider } from 'antd'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
-import { optionTexts } from '../test/antd'
+import { optionTexts, shownMenu } from '../test/antd'
 import { SiteSignIn } from './SiteSignIn'
 
 function renderPicker(value: unknown, providers = ['accounts', 'company'], readOnly = false) {
@@ -33,10 +33,12 @@ describe('SiteSignIn', () => {
     ).toBeTruthy()
   })
 
-  it('keeps Add provider off when the editor is read-only', () => {
+  it('shows no Add provider and no "…" menu when the editor is read-only', () => {
     renderPicker(['company'], ['accounts', 'company'], true)
 
-    expect(screen.getByRole('button', { name: 'Add provider' })).toBeDisabled()
+    expect(screen.getByTestId('studio-field-/signIn/0')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Add provider' })).toBeNull()
+    expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
   })
 
   it('lists only the providers it was given', async () => {
@@ -67,7 +69,9 @@ describe('SiteSignIn', () => {
   it('removes a row and keeps the others', async () => {
     const onChange = renderPicker(['accounts', 'company'])
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/signIn/0')).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(screen.getByTestId('studio-field-/signIn/0')).getByRole('button', { name: 'Actions' }))
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/signIn', ['company'])
   })
@@ -76,7 +80,9 @@ describe('SiteSignIn', () => {
     const onChange = renderPicker(['company'])
     expect(screen.queryByTestId('studio-sign-in-all')).not.toBeInTheDocument()
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/signIn/0')).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(screen.getByTestId('studio-field-/signIn/0')).getByRole('button', { name: 'Actions' }))
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/signIn', undefined)
   })
