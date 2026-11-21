@@ -204,7 +204,7 @@ tenant's schema role unless it says otherwise.
    `application-package-host` as a `test`, see [test](authoring-publishing.md#test). It writes
    `<tenant> package ok`, `<tenant> package failed: <n> of <m> tests failed.` or, for each
    diagnostic, `<tenant> package failed: <code> <message>`, then stores the outcomes in
-   `package_tests` and the status over the tenant's schema role.
+   `package_tests`, the lines the host wrote in `output` and the status over the tenant's schema role.
 
    A `build` request runs only the step `build`. It sends the named package to `application-package-host` as a
    `build`, see [build](authoring-publishing.md#build), and stores no release and no audit record. It writes

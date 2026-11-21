@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
+import { AxisActionRow, AxisButton, AxisButtonGroup, AxisSplitButton } from './AxisButton'
 import { buttonRoles } from './buttonRoles'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
@@ -495,5 +495,63 @@ describe('the button group', () => {
 
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument()
     expect(screen.queryByRole('group')).not.toBeInTheDocument()
+  })
+})
+
+describe('the split button', () => {
+  const split = (onClick = vi.fn()) => (
+    <AxisSplitButton
+      nameSuffix="Mine"
+      action={{ key: 'overwrite', label: 'Overwrite', onClick: () => onClick('overwrite') }}
+      menu={[
+        { key: 'rename', label: 'Rename', onClick: () => onClick('rename') },
+        { key: 'delete', label: 'Delete', destructive: true, onClick: () => onClick('delete') },
+      ]}
+    />
+  )
+
+  it('does the main action from its text and opens no menu', async () => {
+    const onClick = vi.fn()
+    renderIn('light', split(onClick))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Overwrite Mine' }))
+
+    expect(onClick.mock.calls).toEqual([['overwrite']])
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('opens the other actions from its caret in their order, and does the one chosen', async () => {
+    const onClick = vi.fn()
+    renderIn('light', split(onClick))
+
+    await userEvent.click(screen.getByRole('button', { name: 'More actions Mine' }))
+
+    const menu = await screen.findByRole('menu', { name: 'More actions' })
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Rename', 'Delete'])
+    expect(onClick).not.toHaveBeenCalled()
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Delete' }))
+    expect(onClick.mock.calls).toEqual([['delete']])
+  })
+
+  it('is one joined shape of the text and the caret', () => {
+    const { container } = renderIn('light', split())
+
+    const compact = container.querySelector('.ant-space-compact')
+    expect(compact).not.toBeNull()
+    expect(within(compact as HTMLElement).getAllByRole('button')).toHaveLength(2)
+  })
+
+  it('draws a destructive action of its menu as a danger entry, which the theme draws in dangerText', async () => {
+    renderIn('dark', split())
+
+    await userEvent.click(screen.getByRole('button', { name: 'More actions Mine' }))
+
+    const menu = await screen.findByRole('menu', { name: 'More actions' })
+    expect(within(menu).getByRole('menuitem', { name: 'Delete' })).toHaveClass('ant-dropdown-menu-item-danger')
+    expect(within(menu).getByRole('menuitem', { name: 'Rename' })).not.toHaveClass('ant-dropdown-menu-item-danger')
   })
 })

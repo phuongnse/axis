@@ -16,6 +16,7 @@ import type { ButtonRole } from './buttonRoles'
 import { fillText } from './fillText'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { menuOf, type MenuAction } from './menuActions'
 import { focusFollowsTab } from './tabFocus'
 
 type Base = Omit<ButtonProps, 'type' | 'color' | 'variant' | 'danger' | 'role' | 'icon'> & {
@@ -224,12 +225,7 @@ export function AxisActionRow({
               trigger={['click']}
               autoFocus
               menu={{
-                items: fold.map((action) => ({
-                  key: action.key,
-                  label: t(action.labelKey),
-                  disabled: action.disabled,
-                  onClick: action.onClick,
-                })),
+                items: menuOf(fold.map((action) => ({ ...action, label: t(action.labelKey) }))),
                 'aria-label': t('shell.actionRow.more'),
               }}
             >
@@ -360,6 +356,40 @@ export function AxisButtonGroup({
       style={{ display: 'inline-grid', gridAutoFlow: 'column', gridAutoColumns: '1fr' }}
     >
       {buttons}
+    </Space.Compact>
+  )
+}
+
+/**
+ * Actions that manage one thing as one split button, see docs/reference/actions-and-controls.md#buttons. The text of
+ * `action` does it, and the joined caret opens `menu`, in its order, a destructive entry in `dangerText`. They are one
+ * shape in Ant Design's `Space.Compact`. `nameSuffix` goes after the names of the text and of the caret for assistive
+ * technology, such as the name of the item the actions manage.
+ */
+export function AxisSplitButton({
+  action,
+  menu,
+  nameSuffix,
+}: {
+  action: MenuAction
+  menu: readonly MenuAction[]
+  nameSuffix?: string
+}) {
+  const t = useText()
+  return (
+    <Space.Compact>
+      <AxisButton
+        role="secondary"
+        aria-label={nameSuffix ? `${action.label} ${nameSuffix}` : undefined}
+        disabled={action.disabled}
+        onClick={action.onClick}
+        {...action.attributes}
+      >
+        {action.label}
+      </AxisButton>
+      <Dropdown trigger={['click']} autoFocus menu={{ items: menuOf(menu), 'aria-label': t('shell.actionRow.more') }}>
+        <AxisButton role="icon" joined nameKey="shell.actionRow.more" nameSuffix={nameSuffix} icon={<Chevron />} />
+      </Dropdown>
     </Space.Compact>
   )
 }

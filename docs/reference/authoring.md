@@ -197,7 +197,8 @@ a caller without the roles cannot find out which applications, resources, reques
 3. The author role, `403`. It needs Studio to be on and `Studio:AuthorRole` to be set and held in
    the session's roles, see [Settings](#settings). A package file write or a `build` then needs the developer role, `403`, which needs
    `Studio:DeveloperRole` to be set and held in the session's roles, and the tenant's
-   [application packages](user-administration.md#application-packages) switch on, `403`.
+   [application packages](user-administration.md#application-packages) switch on, `403`. A `test` whose body names a `package`
+   needs both too, but only the body says so, so they are checked once the body is read, after the manifest check (`409`) of step 7.
 4. The publisher role, `403`, on `publish`, `activate` and the settings `PUT` only. It needs
    `Studio:PublisherRole` to be set and held in the session's roles.
 5. An unknown application, `404`: one that Studio does not list, see
