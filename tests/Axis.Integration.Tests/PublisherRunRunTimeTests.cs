@@ -12,6 +12,7 @@ namespace Axis.Integration.Tests;
 /// PostgreSQL database against <c>TestPackageHost</c> with a stub Trivy, and use the Python starter of <see cref="PublisherRunRequestTests"/> with an
 /// operation that spins for a given number of CPU milliseconds. They use a stub shell script for Trivy, so they are skipped on Windows.
 /// </summary>
+[Collection(PackageBuilds.Name)]
 [UnsupportedOSPlatform("windows")]
 public sealed class PublisherRunRunTimeTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {

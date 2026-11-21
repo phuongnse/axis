@@ -17,6 +17,7 @@ namespace Axis.Integration.Tests;
 /// The package is the Python starter of Studio, and the publisher's <c>PackageBuild:Python</c> names a missing command. The tests use a stub shell
 /// script for Trivy, so they are skipped on Windows.
 /// </summary>
+[Collection(PackageBuilds.Name)]
 [UnsupportedOSPlatform("windows")]
 public sealed class PublisherRunRequestTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {

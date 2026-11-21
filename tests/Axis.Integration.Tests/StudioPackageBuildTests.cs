@@ -24,6 +24,7 @@ namespace Axis.Integration.Tests;
 /// <c>PackageBuild:Python</c> names a missing command. The test identity <c>developer</c> holds the author and developer roles and
 /// <c>author</c> the author role only. The tests use a stub shell script for Trivy, so they are skipped on Windows.
 /// </summary>
+[Collection(PackageBuilds.Name)]
 [UnsupportedOSPlatform("windows")]
 public sealed class StudioPackageBuildTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
