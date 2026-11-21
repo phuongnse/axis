@@ -43,6 +43,14 @@ export function SidePanel({
   const { colour, spacing } = useDesignTokens()
   const { width, min, max, set } = useSidePanelWidth()
   const panel = useRef<HTMLElement>(null)
+  // The width the body keeps for its scrollbar, none where scrollbars overlay the content. The action bar keeps it too,
+  // so its actions end where the body's inputs end.
+  const [gutter, setGutter] = useState(0)
+  const measureGutter = useCallback((element: HTMLDivElement | null) => {
+    if (element !== null) {
+      setGutter(element.offsetWidth - element.clientWidth)
+    }
+  }, [])
 
   const onKeyDown = (event: KeyboardEvent) => {
     // The handle is on the panel's start edge, so the arrow that moves the edge away from the page widens it.
@@ -72,12 +80,10 @@ export function SidePanel({
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
-          gap: spacing.sm,
           width,
           // Proposed, #4934: as tall as the shell's column under the header, which does not scroll.
           height: '100%',
           boxSizing: 'border-box',
-          padding: spacing.sm,
         }}
       >
         <style>{`[data-side-panel-handle]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: -2px; }`}</style>
@@ -102,37 +108,57 @@ export function SidePanel({
             touchAction: 'none',
           }}
         />
-        <Flex justify="space-between" align="center" gap={spacing.sm} style={{ flex: 'none' }}>
-          <Flex vertical style={{ minWidth: 0 }}>
-            <Flex align="center" gap={spacing.sm}>
-              <Typography.Title level={5} style={{ margin: 0 }}>
-                {title}
-              </Typography.Title>
-              {status}
-            </Flex>
-            {line !== undefined && <span style={{ color: colour.textMuted }}>{line}</span>}
-          </Flex>
-          {onClose !== undefined && (
-            <AxisButton
-              role="icon"
-              nameKey={closeNameKey}
-              icon={<CloseOutlined />}
-              data-testid={closeTestId}
-              onClick={onClose}
-            />
-          )}
-        </Flex>
-        {/* A scroll area stops at its end, so the page does not scroll, see docs/reference/actions-and-controls.md#scroll-areas. */}
+        {/* A scroll area stops at its end, so the page does not scroll, see docs/reference/actions-and-controls.md#scroll-areas.
+            Proposed, #4934: the panel scrolls from its top, its scrollbar at its edge as the menu's and the page's stand at
+            theirs, with its head held at the top. */}
         <div
           style={{
             flex: 1,
             minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: spacing.sm,
+            padding: spacing.sm,
             overflowY: 'auto',
             overscrollBehavior: 'contain',
             scrollbarGutter: 'stable',
           }}
         >
-          {children}
+          {/* The head stays at the top of the scroll, on the panel's surface, as the page's band stays at the top of the
+              page's, so the panel's name and its close button never scroll away. */}
+          <Flex
+            justify="space-between"
+            align="center"
+            gap={spacing.sm}
+            style={{
+              position: 'sticky',
+              top: -spacing.sm,
+              zIndex: 1,
+              margin: `-${spacing.sm}px -${spacing.sm}px 0`,
+              padding: spacing.sm,
+              background: colour.surface,
+            }}
+          >
+            <Flex vertical style={{ minWidth: 0 }}>
+              <Flex align="center" gap={spacing.sm}>
+                <Typography.Title level={5} style={{ margin: 0 }}>
+                  {title}
+                </Typography.Title>
+                {status}
+              </Flex>
+              {line !== undefined && <span style={{ color: colour.textMuted }}>{line}</span>}
+            </Flex>
+            {onClose !== undefined && (
+              <AxisButton
+                role="icon"
+                nameKey={closeNameKey}
+                icon={<CloseOutlined />}
+                data-testid={closeTestId}
+                onClick={onClose}
+              />
+            )}
+          </Flex>
+          <div>{children}</div>
         </div>
       </aside>
     </ShellAside>
