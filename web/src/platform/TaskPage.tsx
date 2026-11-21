@@ -5,13 +5,14 @@ import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { PageActions, PageLayout } from './PageLayout'
 import { formatValue } from './formatValue'
-import { buildCompleteBody } from './recordBody'
+import { buildCompleteBody, buildRecordBody } from './recordBody'
 import { fetchRecord, type RecordProblem } from './records'
 import { ReassignDialog } from './ReassignDialog'
 import { RecordLink } from './RecordLink'
 import { RecordList } from './recordList'
 import { RecordNotFound } from './RecordNotFound'
 import { requiredMark } from './requiredMark'
+import { SaveBar } from './SaveBar'
 import { SectionPart, SectionParts } from './SectionParts'
 import { StatusTag } from './StatusTag'
 import { TermList } from './TermList'
@@ -22,6 +23,7 @@ import {
   fetchTask,
   reassignTask,
   runTaskCommand,
+  saveTask,
   usersPath,
   type ReassignBody,
   type ReassignRole,
@@ -33,6 +35,7 @@ import { useReleaseTexts } from './useReleaseTexts'
 import { useFormSteps } from './useFormSteps'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 import { siteAddress } from './siteLinks'
+import { leaveWithoutAsking, useUnsavedChanges } from './unsavedChanges'
 
 interface TaskPageProps {
   sitePath: string
@@ -64,6 +67,14 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * endpoint: a field the answer hides or locks is not sent. A task that is not open, or that another completion decided
  * first, shows that it is already completed, with no form or buttons. An expired task shows that its deadline passed,
  * with no form or buttons.
+ *
+ * A change to the form shows the save bar, on a wizard's last step. Save sends the changed values and the record's
+ * `version` to the task's save route and leaves the task open: the page reads the subject record again and the form
+ * starts from it, so the bar goes away and a later outcome sends the new version. Discard asks first, then puts back
+ * the values the form started from. A save's 400, and its 409 that names keys, show as a completion's do, under their
+ * field or above the form. A 409 that names no key shows that the task is completed, and a 403 that it is assigned to
+ * someone else. While the form has a change, a link, Back or the browser asks "Leave without saving?" on every step,
+ * but an outcome and a reassign go to the inbox without asking.
  *
  * Until the task loads, and for a task that is not shown, the page is headed by the inbox page's title. A task the task
  * API has none for shows that it does not exist, or that the person cannot open it, with a link back to the inbox. A
@@ -145,7 +156,7 @@ export function TaskPage({ sitePath, pageName, titleKey, widget, taskId, locale,
   const onReassign = async (body: ReassignBody): Promise<ReassignAnswer> => {
     const result = await reassignTask(tasksPath, taskId, body)
     if (result.ok) {
-      navigate(inboxPath)
+      navigate(inboxPath, { state: leaveWithoutAsking })
       return null
     }
     if ('problem' in result) {
@@ -189,7 +200,7 @@ export function TaskPage({ sitePath, pageName, titleKey, widget, taskId, locale,
             tasksPath={tasksPath}
             locale={locale}
             open={task.state === 'open' && !decided}
-            onDone={() => navigate(inboxPath)}
+            onDone={() => navigate(inboxPath, { state: leaveWithoutAsking })}
             onAssignedElsewhere={() => setTask(assignedElsewhere)}
             onDecided={() => void onDecided()}
             onCommand={onCommand}
@@ -431,6 +442,10 @@ function OpenTaskForm({
   const [ready, setReady] = useState<boolean | 'failed'>(false)
   // The outcome being sent, so every button waits for its answer.
   const [sending, setSending] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const unsaved = ready === true && Object.keys(form.changed()).length > 0
+  // The guard asks on every step of a wizard, though the save bar shows only on the last.
+  useUnsavedChanges(unsaved)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -452,8 +467,19 @@ function OpenTaskForm({
     return () => controller.abort()
   }, [entity.recordsPath, entity.name, task.subject.id, start])
 
+  // A 403 means the task is assigned to someone else, and a 409 that names no field that it is no longer open.
+  const showProblem = (problem: RecordProblem) => {
+    if (problem.status === 403) {
+      onAssignedElsewhere()
+    } else if (problem.status === 409 && Object.keys(problem.errors).length === 0) {
+      onDecided()
+    } else {
+      steps.openFirstWith(form.showProblem(problem))
+    }
+  }
+
   const complete = async (outcome: string) => {
-    if (sending !== null) {
+    if (sending !== null || saving) {
       return
     }
     const body = buildCompleteBody(outcome, entity.fields, form.changed(), form.version)
@@ -465,20 +491,45 @@ function OpenTaskForm({
         onDone()
         return
       }
-      const { problem } = result
-      if (problem.status === 403) {
-        onAssignedElsewhere()
-      } else if (problem.status === 409 && Object.keys(problem.errors).length === 0) {
-        // The task API answers a task that is no longer open with a 409 that names no field.
-        onDecided()
-      } else {
-        steps.openFirstWith(form.showProblem(problem))
-      }
+      showProblem(result.problem)
     } catch (error) {
       console.warn(`Completing the task '${task.id}' failed`, error)
       setFormErrors([t('shell.task.completeFailed')])
     } finally {
       setSending(null)
+    }
+  }
+
+  // The form starts from the saved record, read again because a save can change computed fields.
+  const save = async () => {
+    if (saving || sending !== null || !unsaved) {
+      return
+    }
+    const body = buildRecordBody(entity.fields, form.changed(), form.version)
+    setSaving(true)
+    form.clearErrors()
+    try {
+      const result = await saveTask(tasksPath, task.id, body)
+      if (!result.ok) {
+        showProblem(result.problem)
+        return
+      }
+      try {
+        const record = await fetchRecord(entity.recordsPath, task.subject.id)
+        if (record) {
+          start(record)
+        } else {
+          setFormErrors([t('shell.form.loadFailed')])
+        }
+      } catch (error) {
+        console.warn(`Loading the subject record '${task.subject.id}' of '${entity.name}' failed`, error)
+        setFormErrors([t('shell.form.loadFailed')])
+      }
+    } catch (error) {
+      console.warn(`Saving the task '${task.id}' failed`, error)
+      setFormErrors([t('shell.form.saveFailed')])
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -494,7 +545,7 @@ function OpenTaskForm({
               key: outcome.name,
               label: t(outcome.labelKey),
               loading: sending === outcome.name,
-              disabled: sending !== null && sending !== outcome.name,
+              disabled: saving || (sending !== null && sending !== outcome.name),
               onClick: () => void complete(outcome.name),
             }))}
           />
@@ -540,6 +591,17 @@ function OpenTaskForm({
           </AxisActionRow>
         )}
       </Flex>
+      {steps.last && (
+        <SaveBar
+          unsaved={unsaved}
+          saveable={!saving && sending === null}
+          busy={saving || sending !== null}
+          onDiscard={form.discard}
+          onSave={() => void save()}
+          data-testid="task-save-bar"
+          saveTestId="task-save"
+        />
+      )}
     </>
   )
 }

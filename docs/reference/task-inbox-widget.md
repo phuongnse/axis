@@ -103,9 +103,14 @@ form of its step over the subject record and a button for each outcome.
 - **Actions on the heading.** Release, Claim and Reassign… are secondary buttons on the heading's right.
   The outcomes follow them as one group named Decision ("Quyết định", `shell.task.outcomes`), see
   [buttons](actions-and-controls.md#buttons). A group of one is a plain `main` button.
-- **Saving** _(planned)_. A change to the form saves through the [save bar](studio-resource-form.md#save-bar), which
-  sends the changed values to [saving a task](task-api.md#saving-a-task). That leaves the task open. A wizard's Back
-  and Next stay under the step's fields, through `AxisActionRow`.
+- **Saving.** A change to the form saves through the [save bar](studio-resource-form.md#save-bar), which
+  sends the changed values and the record's `version` to [saving a task](task-api.md#saving-a-task). That leaves the
+  task open, and the page shows the saved record as the form's new start, so the bar goes away and a later outcome sends
+  the new `version`. Discard asks first, then puts back the values the form started from. The bar shows on a wizard's
+  last step, and Back and Next stay under the step's fields, through `AxisActionRow`. A `400`, and a `409` that names
+  keys, show as a completion's do. A `409` with no keys shows that the task is completed, and a `403` that it is
+  assigned to someone else. While the form has a change, a link, Back or the browser asks
+  [Leave without saving?](studio.md#editor) on every step.
 - **A missing task.** A task that the task API answers `404` for shows under the inbox page's
   heading "This task does not exist, or you cannot open it." ("Công việc này không tồn tại hoặc bạn không có quyền
   mở.", `shell.task.notFound`), and one link, Go to Tasks (`shell.record.goToList`). `RecordNotFound` draws it and
@@ -122,7 +127,8 @@ form of its step over the subject record and a button for each outcome.
 - **Outcomes.** The page has one button per outcome, with the outcome's label. A click sends the
   outcome, the changed editable values and the record's `version` to the complete endpoint. The
   `version` is sent even when no field changed, and the task API then ignores it. On success the page
-  goes to the inbox page's plain address, without the paging the person came from.
+  goes to the inbox page's plain address, without the paging the person came from, and without asking
+  [Leave without saving?](studio.md#editor).
 - **Claim and Release.** An open task shows a Claim button and a Release button, each only when the
   task read's `commands` lists it, so none when `commands` is empty. `reassign` is ignored here. A click
   posts to the claim or release route, see [task deadlines](task-deadlines.md#claim-and-release), and
