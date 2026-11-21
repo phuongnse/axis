@@ -1101,3 +1101,25 @@ describe('SchemaForm controls that know what they hold', () => {
     expect(within(screen.getByTestId('studio-field-/packages')).getByText('3.1.0 and later 3.x')).toBeVisible()
   })
 })
+
+describe('SchemaForm field widths', () => {
+  beforeEach(() => localStorage.setItem('axis.themeMode', 'light'))
+
+  it('makes a select and a text box of one section as wide as each other', () => {
+    renderForm(
+      {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['open', 'closed'] },
+          title: { type: 'string' },
+        },
+      },
+      {},
+    )
+
+    const status = within(screen.getByTestId('studio-field-/status')).getByRole('combobox')
+    const title = within(screen.getByTestId('studio-field-/title')).getByRole('textbox')
+    expect(status.closest('.ant-select')).toHaveStyle({ width: '100%' })
+    expect(title).toHaveStyle({ width: '100%' })
+  })
+})

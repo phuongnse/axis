@@ -1671,12 +1671,11 @@ const Indexes = memo(function Indexes({
                   </Typography.Text>
                   {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
                 </Flex>
-                <div data-testid={`studio-field-${pointer}/fields`} style={{ minWidth: 240 }}>
+                <div data-testid={`studio-field-${pointer}/fields`}>
                   <AxisField {...fieldTexts(t, 'indexes.fields')} required>
                     <Select
                       mode="multiple"
                       virtual={false}
-                      style={{ width: '100%' }}
                       value={
                         Array.isArray(content.fields) ? content.fields.filter((item) => typeof item === 'string') : []
                       }
@@ -1824,7 +1823,7 @@ const ValidationRow = memo(function ValidationRow({
         </Typography.Text>
         {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
       </Flex>
-      <div data-testid={`studio-field-${pointer}/expression`} style={{ minWidth: 240 }}>
+      <div data-testid={`studio-field-${pointer}/expression`}>
         <AxisField {...expression} required>
           <Expression
             pointer={`${pointer}/expression`}

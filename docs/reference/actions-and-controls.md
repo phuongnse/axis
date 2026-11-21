@@ -132,6 +132,7 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   handler, and `AxisField` still ties the label to the input and makes the help its description. Such a field
   takes `required`, which draws the shared required mark after its label and sets `aria-required` on the input,
   while a field inside a form is marked by its `requiredMessage` alone.
+  It makes its select, number, date or text input, or a select joined with its action, as wide as the field.
   `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
   group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
   field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
