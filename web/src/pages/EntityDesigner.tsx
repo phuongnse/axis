@@ -692,7 +692,7 @@ const Fields = memo(function Fields({
       action={
         readOnly ? undefined : (
           <AxisActionRow>
-            <AxisButton role="secondary" onClick={() => setAdding(true)}>
+            <AxisButton role="main" onClick={() => setAdding(true)}>
               {t('shell.studio.entity.addField')}
             </AxisButton>
           </AxisActionRow>
@@ -1442,7 +1442,7 @@ function Settings({
               group === 'validation' && canAdd && list !== undefined ? (
                 <AxisActionRow>
                   <AxisButton
-                    role="secondary"
+                    role="main"
                     onClick={() =>
                       onChange('/validations', [
                         ...list,
@@ -1811,7 +1811,7 @@ const Indexes = memo(function Indexes({
         readOnly ? undefined : (
           <AxisActionRow>
             <AxisButton
-              role="secondary"
+              role="main"
               onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}
             >
               {t('shell.studio.entity.addIndex')}
@@ -1929,7 +1929,7 @@ const Validations = memo(function Validations({
         readOnly ? undefined : (
           <AxisActionRow>
             <AxisButton
-              role="secondary"
+              role="main"
               onClick={() =>
                 onChange('/validations', [
                   ...list,
