@@ -4,6 +4,7 @@ import { type ReactNode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { designTokensFor } from '../platform/designTokens'
 import { setAt } from '../platform/jsonPatch'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames } from '../platform/studio'
@@ -1258,6 +1259,15 @@ describe('PageEditor widget tree', () => {
     renderEditor(page(columns, { widgets: [{ type: 'columns', columns: 'oops' }, { type: 'section' }] }))
 
     expect(within(screen.getByTestId('studio-widget-list-/widgets')).getAllByTestId('studio-json-only')).toHaveLength(2)
+  })
+
+  it('draws Delete in dangerText in dark mode, so it passes contrast on a dark surface', () => {
+    localStorage.setItem('axis.themeMode', 'dark')
+    renderEditor(tree())
+
+    expect(row('/widgets/1').getByRole('button', { name: 'Delete' })).toHaveStyle({
+      color: designTokensFor('dark').colour.dangerText,
+    })
   })
 
   it('moves up, moves down and removes in the list that holds the widget', async () => {
