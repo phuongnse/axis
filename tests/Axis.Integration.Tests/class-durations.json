@@ -319,6 +319,7 @@
   "Axis.Integration.Tests.RecordChildReferenceEndpointTests": 0,
   "Axis.Integration.Tests.RecordChildRowEndpointTests": 1,
   "Axis.Integration.Tests.RecordCommandTests": 0,
+  "Axis.Integration.Tests.RecordComputedFieldEndpointTests": 1,
   "Axis.Integration.Tests.RecordCreatorEndpointTests": 0,
   "Axis.Integration.Tests.RecordDefaultEndpointTests": 0,
   "Axis.Integration.Tests.RecordDeleteEndpointTests": 0,
