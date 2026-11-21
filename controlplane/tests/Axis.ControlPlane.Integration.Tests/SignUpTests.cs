@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -22,7 +23,7 @@ namespace Axis.ControlPlane.Integration.Tests;
 
 /// <summary>
 /// Sign-up on a real PostgreSQL and a real Mailpit: the pending sign-up, its confirm email, the hold on its subdomain and the
-/// expiry. The hosted job runner of the service sends the email, so a test waits for it with a deadline. Each test class instance
+/// expiry. The hosted job runner of the service sends the email, so a test waits for it with a deadline. The recurring jobs are not started, so a test runs the expiry handler itself. Each test class instance
 /// has a container of its own, as the subdomain check tests have, and each test an address and a subdomain of its own.
 /// </summary>
 public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
@@ -117,6 +118,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
             cancellation);
         Assert.True((await CheckAsync(client, subdomain)).GetProperty("free").GetBoolean());
         Assert.Equal("pending", await Scalar<string>($"SELECT state FROM control_plane.sign_ups WHERE email = '{first}'"));
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'expireSignUps'"));
 
         var expiry = factory.Services.GetServices<IJobHandler>().Single(handler => handler.Kind == "expireSignUps");
         await expiry.RunAsync(new ClaimedJob(Guid.CreateVersion7(), "expireSignUps", [], 1), cancellation);
@@ -1335,7 +1337,12 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
             // The test server has no client address, so the filter gives every request the one proxy the control plane trusts.
             // A test then picks the client address with X-Forwarded-For. A request without the header shares one address.
             builder.UseSetting("ForwardedHeaders:KnownProxies:0", Proxy);
-            builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, ProxyStartupFilter>());
+            // The recurring jobs are removed, so the expiry of pending sign-ups runs only when a test runs its handler.
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IStartupFilter, ProxyStartupFilter>();
+                services.RemoveAll<RecurringJob>();
+            });
         });
     }
 
