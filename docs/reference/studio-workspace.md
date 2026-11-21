@@ -109,8 +109,9 @@ end, as [scroll areas](actions-and-controls.md#scroll-areas) say. A package's wo
 same list in its output panel, where a package file's problem is a link that opens the file in the workspace, see
 [a package's files](studio-packages.md#a-packages-files).
 
-- **A problem's row** _(planned)_. Its severity is a status tag set apart from its code, and its resource or file
-  follows its message on the row when the row fits it.
+- **A problem's row** _(planned)_. Its severity is a status tag in words, Error in `danger` or Warning in `attention`,
+  from the texts `shell.studio.problems.severity.error` and `shell.studio.problems.severity.warning`. Its code and
+  message follow it, and its resource or file follows its message when the row fits it.
 - **The shared frame.** The panel is drawn in `SidePanel`, the one side panel frame of every page, at the
   width the person last chose, see [layout](shell.md#layout).
 

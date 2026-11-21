@@ -99,7 +99,7 @@ resource opens it alone, under its [name](studio-workspace.md#names), with its e
 - **The server builds the rows**. The [kind list route](studio-resource-form.md#kind-list) answers one page with
   its names in the UI locale. A failed load shows one error above the table.
 - **A module's resources**. The resources of the modules that the application uses are in the same list. Each is
-  named by its label, else without the `<module>/` prefix, and has a neutral tag of its module's label, else the
+  named by its label, else without the `<module>/` prefix, and has a tag of its module's label, else the
   module's id. There is no Module column. A kind with no label, such as a policy, keeps its name. A text resource
   shows its language, such as Vietnamese. A module's resource has a status, as a new module version or a layer changes it.
 - **Status**. New, Changed or Published, as the [resource activity](studio-resource-form.md#resource-activity) reads

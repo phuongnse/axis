@@ -35,12 +35,14 @@ A `detail` widget shows one record read-only, read through the record API, and w
   [routing](frontend.md#routing).
 - **Fields.** With a `form`, the widget shows its sections in order under their titles. Without one, it shows every
   readable field in declaration order. Every value is read-only and formatted as a table cell shows it. A `references`
-  field shows its labels in order as tags, or a record's id where it has no label. An empty value, an empty set of
+  field shows its labels in order, or a record's id where it has no label. An empty value, an empty set of
   references and a file that is not set among them, shows "Not set" in muted italics, see
   [shown values](frontend.md#shown-values). The widget ignores `visibleWhen`, `requiredWhen`, `readOnlyWhen` and
   `steps`.
 - **Reference links**. A `reference` value is a link to its record page, and so is each entry of a
   `references` field, see [opening things](actions-and-controls.md#opening-things).
+- **A references field's links in a row** _(planned)_. Its links sit in a row with no tag round each, as a tag is never
+  a link, see [text](actions-and-controls.md#text).
 - **Sections as parts.** With a `form`, each titled section is a part, as a form's sections are: its
   title is drawn by `SectionPart`, and a `borderSubtle` rule sits above a section drawn after another.
 - **Layout.** The fields are a description list (`dl`, `dt`, `dd`). Each label sits above its value, as a read-only
