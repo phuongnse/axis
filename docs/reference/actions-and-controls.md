@@ -40,7 +40,7 @@ widget names a role, never an Ant Design button type.
   with a `borderSubtle` rule above it, folds the actions it names into one More actions menu through
   `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width. A bar that stays at the foot of the window as the page
   scrolls draws in the shell's [bar slot](shell.md#layout), above the footer, instead of at the foot of its page.
-- **Actions of equal weight are one group** _(planned)_. A screen keeps one main action. Actions of equal weight that
+- **Actions of equal weight are one group**. A screen keeps one main action. Actions of equal weight that
   together are a region's main action, such as a task's outcomes, are one joined group in the `main` role, in the order
   the process gives them. Actions of equal weight in any other role, such as a package's Build, Run tests and Run…,
   are one joined group in their role. Each button of the group is as wide as the widest, stays a button of its own
@@ -57,7 +57,7 @@ widget names a role, never an Ant Design button type.
   room.
 - **All text or all icons** _(planned)_. A group of actions is all text or all icons. The "…" or the caret that opens
   a menu is no action of its own, so it stays an icon beside text or icons alike.
-- **A page's actions and a tree's rows keep their own rules** _(planned)_. A page's actions keep the page's rules, and
+- **A page's actions and a tree's rows keep their own rules**. A page's actions keep the page's rules, and
   a file tree's node keeps its actions on a right click, Shift+F10 or the menu key.
 - **Text or an icon, never both.** An action shows its text or its icon. An icon goes with text only
   where it does what text cannot: navigation that collapses to icons, a status or a severity, and the
@@ -141,9 +141,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   `AxisCheckboxField` and `AxisChoiceField` take the same two modes: with a `name` inside a form, or with the
   value and `onChange` the screen holds. A choice the screen holds gives its radio group a name of its own, so
   two choices on one panel never join.
-- **An action on an input's value** _(planned)_. It is an icon inside the input, at its end, such as Clear, Copy, Show
+- **An action on an input's value**. It is an icon inside the input, at its end, such as Clear, Copy, Show
   password or a label's Translations.
-- **An action on a select's value** _(planned)_. It is an icon joined after the select, such as a reference's Open, the
+- **An action on a select's value**. It is an icon joined after the select, such as a reference's Open, the
   two as wide as the field.
 - **One dialog keeps saved items.** Saved items that a person names, such as a table's views and a package's saved run
   inputs, are kept in one dialog, `SavedItemsDialog`. Each name opens its item, its line holds one split button,
