@@ -200,6 +200,20 @@ describe('SectionPart', () => {
     expect(rules[1]).toHaveStyle(rule)
   })
 
+  it('gives the rule no side margin with no ContentInsetContext, so it stays inside its boundary', () => {
+    renderSections(
+      ['one', 'two'].map((name) => (
+        <SectionPart key={name} testName={name} heading={{ title: name }}>
+          <span>Fields</span>
+        </SectionPart>
+      )),
+    )
+
+    const rule = screen.getByRole('separator')
+    expect(rule.style.marginLeft).toBe('')
+    expect(rule.style.marginRight).toBe('')
+  })
+
   it('draws no extra rule for a component child that renders nothing, in the middle or at the end', () => {
     const Hidden = () => null
     const part = (name: string) => (

@@ -54,7 +54,8 @@ type SectionPartName = { testName: string; testId?: undefined } | { testId: stri
  * an optional heading, its optional line and a slot for an action on the right of the heading, with no panel. A part with no
  * heading is its fields alone. It draws the `borderSubtle` rule above itself when `SectionParts` says a part comes before it.
  * Its action is drawn through `AxisActionRow`, so a `main`, `secondary` or `destructive` button is a text button, see
- * docs/reference/shell.md#layout ('A title row's actions are light').
+ * docs/reference/shell.md#layout ('A title row's actions are light'). Its rule reaches past the shell's content inset to the
+ * page area's edges, and stays inside where the inset is 0, see docs/reference/shell.md#layout ('Parts a rule apart').
  */
 export function SectionPart({
   testName,
@@ -84,6 +85,7 @@ export function SectionPart({
 }) {
   const { colour, spacing } = useDesignTokens()
   const ruled = useContext(RuleAbove)
+  const inset = useContext(ContentInsetContext)
   const headingId = useId()
   const bodyId = useId()
   const [slot, setSlot] = useState<HTMLElement | null>(null)
@@ -102,7 +104,14 @@ export function SectionPart({
       {heading?.line !== undefined && <Typography.Text type="secondary">{heading.line}</Typography.Text>}
     </div>
   )
-  const rule = ruled && <div role="separator" style={{ borderTop: `1px solid ${colour.borderSubtle}` }} />
+  // Negative side margins reach the edges of the content area, see docs/reference/shell.md#layout. Inside a boundary the
+  // inset is 0, so no margin is set.
+  const rule = ruled && (
+    <div
+      role="separator"
+      style={{ borderTop: `1px solid ${colour.borderSubtle}`, margin: inset ? `0 -${inset}px` : undefined }}
+    />
+  )
   if (heading === undefined) {
     return (
       <>
