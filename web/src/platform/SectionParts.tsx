@@ -147,7 +147,11 @@ export function SectionPart({
           {typeof children === 'function' ? (
             <div ref={setSlot} />
           ) : (
-            action !== null && action !== undefined && <AxisActionRow>{action}</AxisActionRow>
+            action !== null &&
+            action !== undefined && (
+              // Proposed, #4902: a title row's main and secondary actions keep their borders; its tools stay subtle.
+              <AxisActionRow outlined>{action}</AxisActionRow>
+            )
           )}
         </Flex>
         {body}

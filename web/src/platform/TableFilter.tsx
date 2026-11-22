@@ -159,11 +159,15 @@ function GroupEditor({
           ),
         )}
         <Flex gap="small">
-          <AxisButton role="subtle" onClick={() => onChange(makeGroup(mode, [...nodes, blankCondition(columns[0])]))}>
+          {/* Proposed, #4902: an Add is a secondary button, so it reads as a button where it stands. */}
+          <AxisButton
+            role="secondary"
+            onClick={() => onChange(makeGroup(mode, [...nodes, blankCondition(columns[0])]))}
+          >
             {t('shell.table.filterAddCondition')}
           </AxisButton>
           <AxisButton
-            role="subtle"
+            role="secondary"
             onClick={() => onChange(makeGroup(mode, [...nodes, makeGroup('all', [blankCondition(columns[0])])]))}
           >
             {t('shell.table.filterAddGroup')}

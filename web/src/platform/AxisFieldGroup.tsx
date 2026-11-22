@@ -43,7 +43,8 @@ export function AxisFieldGroup({
           }}
         >
           <span id={titleId}>{title}</span>
-          <AxisActionRow>{action}</AxisActionRow>
+          {/* Proposed, #4902: a title row's main and secondary actions keep their borders; its tools stay subtle. */}
+          <AxisActionRow outlined>{action}</AxisActionRow>
         </legend>
       ) : (
         <legend style={legendStyle}>{title}</legend>

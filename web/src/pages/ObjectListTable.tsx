@@ -218,7 +218,8 @@ export function ObjectListTable({
         }}
       />
       {/* The row wraps the button where the portal is made, as context follows the React tree, not the slot's DOM. */}
-      {addIn && createPortal(<AxisActionRow>{addButton}</AxisActionRow>, addIn)}
+      {/* Proposed, #4902: a section's Add is a secondary button that keeps its border in the title row. */}
+      {addIn && createPortal(<AxisActionRow outlined>{addButton}</AxisActionRow>, addIn)}
       <Modal
         open={editing !== null}
         width={large ? size.dialog.large : size.dialog.medium}
