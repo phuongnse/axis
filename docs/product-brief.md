@@ -76,7 +76,7 @@ application up in Studio. They need:
 - **A built-in application to start from,** changed to fit in Studio, that keeps its upgrades.
 - **Vietnamese and English.**
 - **Axis as a service that an operator runs**, with nothing to install.
-- **Sign-up and a trial** _(planned for M33)_, so they try Axis before they pay.
+- **Sign-up and a trial**, so they try Axis before they pay.
 - **A plan from the operator's billing system** _(planned for M34)_. The operator's own system takes
   the payments, and Axis keeps the plans as sets of quotas and the subscription's clock.
 - **Their data kept safe** as Vietnam's personal data rules ask.
