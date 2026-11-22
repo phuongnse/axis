@@ -102,7 +102,8 @@ binding in [widget binding](../reference/data-sources.md#widget-binding) and the
   a page works as a link and survives a reload.
 - A record page reads as one place, with its related lists, and a new related record starts filled in.
 - A row can open any page with any values, and the compiler checks the link. A reference path in an
-  action is read on click, one record at a time.
+  action is read one record at a time: the identifying cell reads it when its row draws, and a row
+  action reads it on click.
 - A board and a calendar change records through the same writes, grants and contracts as a form, so
   a drag can be refused for the same reasons a save can.
 - Every page has the same phone behaviour, with nothing to set.

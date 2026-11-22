@@ -81,7 +81,7 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
   Nothing else on the page names an AI.
 - The page checks the request every second until it waits for its author or ends.
 - An unknown request shows "This request does not exist."
-- **The link to the request panel** _(planned for M35)_. The unknown request's line also has an Ask AI link,
+- **The button to the request panel** _(planned for M35)_. The unknown request's line also has an Ask AI button,
   which opens [the request panel](#the-request-panel).
 - A failed action shows "That did not work. Try again." in an
   [alert](shared-widgets.md#which-widget) above the plan. A failed reply shows it inside its dialog instead, see
