@@ -50,6 +50,14 @@ describe('DialogFooter', () => {
     expect(onFinish).toHaveBeenCalledOnce()
   })
 
+  it('draws no Cancel when cancelText is left out, and the finish still calls onFinish', async () => {
+    const { onFinish } = renderFooter({ cancelText: undefined })
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Delete'])
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(onFinish).toHaveBeenCalledOnce()
+  })
+
   it('draws the other actions before Cancel in the same row', () => {
     renderFooter({ actions: <AxisButton role="secondary">Reset</AxisButton> })
 
