@@ -1064,11 +1064,12 @@ const focusableInput = 'input, textarea, [contenteditable="true"]'
 
 /**
  * Moves focus into the drawer: to the input of the field at `path`, scrolled to, or to the drawer when the path shows no
- * input. Without a path it is the name input, unless the drawer is read-only, when it is the drawer. The drawer takes
- * focus when no input does, see docs/reference/actions-and-controls.md#fields.
+ * input. Without a path it is the first input, the label's, unless the drawer is read-only, when it is the drawer.
+ * The drawer takes focus when no input does, see docs/reference/actions-and-controls.md#fields.
  */
 function focusInDrawer(root: HTMLElement, path: string | null, pointer: string, readOnly: boolean) {
-  const target = path === null && readOnly ? undefined : fieldElement(root, path ?? `${pointer}/name`)
+  // Proposed, #3264: the label comes first, so the panel opens on it.
+  const target = path === null && readOnly ? undefined : fieldElement(root, path ?? `${pointer}/label`)
   if (path !== null) {
     target?.scrollIntoView?.({ block: 'center' })
   }
@@ -1212,20 +1213,22 @@ const FieldDrawer = memo(function FieldDrawer({
     setTyped({ index })
     onClose()
   }
-  const wasOpen = useRef(false)
+  // The field the panel last moved focus into, so opening another field in the open panel moves focus into it too.
+  const wasOpen = useRef<number | null>(null)
   const wantFocus = useRef(false)
 
   useEffect(() => {
     if (!open) {
-      wasOpen.current = false
+      wasOpen.current = null
       wantFocus.current = false
       return
     }
-    if (!wasOpen.current) {
-      wasOpen.current = true
+    if (wasOpen.current !== index) {
+      wasOpen.current = index
       wantFocus.current = true
     }
-    if (root === null || !(wantFocus.current || focusPath !== null) || index === null) {
+    // Another field's content draws anew, so the root of the last one may be gone until the new one is set.
+    if (root === null || !root.isConnected || !(wantFocus.current || focusPath !== null) || index === null) {
       return
     }
     wantFocus.current = false
