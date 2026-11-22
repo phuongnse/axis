@@ -1,7 +1,6 @@
 import { ConfigProvider, Flex, Input, InputNumber, Select, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
-import { StatusTag } from '../platform/StatusTag'
 import dayjs from 'dayjs'
 import {
   createContext,
@@ -435,24 +434,10 @@ function yesNoColumn(setting: 'required' | 'unique', title: string, t: (key: str
   }
 }
 
-/**
- * The property names a field shows as tags: the way its value comes from, which for an entered value is User or Default
- * when it has one, then Searchable and Sensitive.
- */
-function fieldProperties(field: unknown): string[] {
-  if (!isContent(field)) {
-    return []
-  }
-  const source = valueSourceOf(field)
-  const way =
-    source !== 'entered'
-      ? source
-      : field.userId === true
-        ? 'user'
-        : typeof field.default === 'string'
-          ? 'default'
-          : null
-  return [...(way ? [way] : []), ...['searchable', 'sensitive'].filter((name) => field[name] === true)]
+/** Where a field's value comes from, or `null` for a value people enter. */
+function comesFrom(field: unknown): Exclude<ValueSource, 'entered'> | null {
+  const source = isContent(field) ? valueSourceOf(field) : 'entered'
+  return source === 'entered' ? null : source
 }
 
 /** The Fields table keeps no data source parameter in the address, only its view. */
@@ -812,11 +797,24 @@ const Fields = memo(function Fields({
     },
     yesNoColumn('required', t('shell.studio.entity.required'), t),
     yesNoColumn('unique', t('shell.studio.entity.unique'), t),
+    // Proposed, #3264: where the value comes from, in the panel's words, with the dash for a value people enter; the
+    // panel keeps search and privacy, which no longer share the column under a name that said nothing.
     {
-      key: 'properties',
+      key: 'comesFrom',
       kind: 'fixed',
-      title: t('shell.studio.entity.properties'),
-      render: (_, { field }) => <PropertiesCell field={field} />,
+      title: t('shell.studio.field.entity.fields.valueSource'),
+      filter: {
+        kind: 'enum',
+        value: ({ field }) => comesFrom(field),
+        options: (['computed', 'sequence', 'creator', 'matched'] as const).map((source) => ({
+          value: source,
+          label: t(`shell.studio.field.entity.fields.valueSource.${source}`),
+        })),
+      },
+      render: (_, { field }) => {
+        const source = comesFrom(field)
+        return source === null ? <EmptyDash /> : t(`shell.studio.field.entity.fields.valueSource.${source}`)
+      },
     },
   ]
 
@@ -1186,24 +1184,6 @@ const TypeCell = memo(function TypeCell({ field, application }: { field: unknown
       text={t(`shell.studio.entity.typeOf.${type}`)}
       parts={{ target: <Link to={studioResourceAddress(application, entity.id)}>{label}</Link> }}
     />
-  )
-})
-
-/** The properties of a field as tags, or the dash when it has none, see docs/reference/entity-designer.md#fields. */
-const PropertiesCell = memo(function PropertiesCell({ field }: { field: unknown }) {
-  const t = useText()
-  const properties = fieldProperties(field)
-  if (properties.length === 0) {
-    return <EmptyDash />
-  }
-  return (
-    <Flex gap="small" wrap>
-      {properties.map((name) => (
-        <StatusTag key={name} tone="neutral">
-          {t(`shell.studio.entity.property.${name}`)}
-        </StatusTag>
-      ))}
-    </Flex>
   )
 })
 
