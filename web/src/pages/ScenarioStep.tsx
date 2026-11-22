@@ -7,6 +7,7 @@ import { useContext, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import type { StudioNameField } from '../platform/studio'
 import {
   changeStepType,
@@ -93,7 +94,8 @@ export function KeyInput({
 /**
  * Rows of a key and a value, each removable. Add sits on the group's title row and adds a row under a fresh key. Each
  * row's Delete is in its "…" menu, and a read-only editor, Ant Design's `componentDisabled`, shows neither, see
- * docs/reference/studio-editors-by-kind.md#scenario-editor.
+ * docs/reference/studio-editors-by-kind.md#scenario-editor. Empty, the rows draw `emptyText` in place of a row, see
+ * docs/reference/actions-and-controls.md#showing-what-is-empty.
  */
 export function KeyValueRows({
   pointer,
@@ -102,6 +104,7 @@ export function KeyValueRows({
   keyField,
   addLabel,
   prefix,
+  emptyText,
   onChange,
 }: {
   pointer: string
@@ -110,6 +113,7 @@ export function KeyValueRows({
   keyField: Texts
   addLabel: string
   prefix: string
+  emptyText: string
   onChange: ChangeHandler
 }) {
   const { componentDisabled } = ConfigProvider.useConfig()
@@ -125,6 +129,7 @@ export function KeyValueRows({
       }
     >
       <Flex vertical gap="small">
+        {Object.keys(values).length === 0 && <EmptyState text={emptyText} />}
         {Object.keys(values).map((key) => (
           <Flex key={key} gap="small" align="flex-start">
             <Flex gap="small" align="flex-end" style={{ flex: 1 }}>
@@ -282,6 +287,7 @@ export function ScenarioStep({
           keyField={fieldText('values.name')}
           addLabel={t('shell.studio.scenario.addValue')}
           prefix="value"
+          emptyText={t('shell.studio.scenario.noValues')}
           onChange={onChange}
         />
       )
@@ -318,6 +324,7 @@ export function ScenarioStep({
     return (
       <AxisFieldGroup {...groupText('values')} action={addValue}>
         <Flex vertical gap="small">
+          {Object.keys(values).length === 0 && <EmptyState text={t('shell.studio.scenario.noValues')} />}
           {fields
             .filter((field) => Object.hasOwn(values, field.name))
             .map((field) => (

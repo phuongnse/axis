@@ -132,14 +132,15 @@ public sealed class KeycloakFixture : IAsyncDisposable
             .WithPassword(DatabaseName)
             .Build();
 
-        // The builder already runs start-dev, and the command adds --import-realm to it.
+        // The builder already runs start-dev, and the command adds --import-realm to it. The breached-password list refuses
+        // one random password in 10,000 by default, and the tests make random passwords, so the fixture asks for one in ten million.
         var keycloak = new KeycloakBuilder(Image)
             .WithNetwork(network)
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-realm.json")), "/opt/keycloak/data/import/")
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "company-realm.json")), "/opt/keycloak/data/import/")
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-breached-passwords.txt")), "/opt/keycloak/data/password-blacklists/")
             .WithResourceMapping(theme, "/opt/keycloak/themes/")
-            .WithCommand("--import-realm")
+            .WithCommand("--import-realm", "--spi-password-policy-password-blacklist-false-positive-probability=0.0000001")
             .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_ID", AdminClientId)
             .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_SECRET", AdminClientSecret)
             .WithEnvironment("KC_DB", "postgres")

@@ -421,6 +421,8 @@ export async function startStack({ binding, answersFile } = {}) {
     const keycloakUrl = `http://127.0.0.1:${keycloakPort}`
     const keycloak = `axis-ai-eval-keycloak-${suffix}`
     containers.push(keycloak)
+    // The breached-password list is a Bloom filter that refuses one random password in 10,000 by default. The specs make
+    // many random passwords, so this run asks for one in ten million.
     run('docker', [
       'run', '-d', '--name', keycloak,
       '-e', 'KC_BOOTSTRAP_ADMIN_USERNAME=admin', '-e', `KC_BOOTSTRAP_ADMIN_PASSWORD=${secret()}`,
@@ -429,6 +431,7 @@ export async function startStack({ binding, answersFile } = {}) {
       '-v', `${join(root, 'artifacts/keycloak-theme')}:/opt/keycloak/themes:ro`,
       '-p', `127.0.0.1:${keycloakPort}:${keycloakPort}`,
       listedImage(root, 'quay.io/keycloak/keycloak'), 'start-dev', `--http-port=${keycloakPort}`,
+      '--spi-password-policy-password-blacklist-false-positive-probability=0.0000001',
     ])
 
     // Check over TCP: the image's initialization server listens only on the Unix socket, so the check
