@@ -300,7 +300,7 @@ export function Shell({
                 <Layout data-shell-scroll style={{ minWidth: 0, height: '100%', overflowY: 'auto' }}>
                   {!hasAccount && <ReadOnlyBanner />}
                   <Layout.Content
-                    // The page grows with its content inside its scroll, so the save bar's slot follows it.
+                    // The page grows with its content inside its scroll, so the footer follows it.
                     style={{ flex: '1 0 auto', background: colour.surface, padding: inset }}
                   >
                     <ContentInsetContext.Provider value={inset}>
@@ -312,6 +312,7 @@ export function Shell({
                     </ContentInsetContext.Provider>
                   </Layout.Content>
                   <div ref={setBarTarget} data-shell-bar-slot style={{ position: 'sticky', bottom: 0, zIndex: 10 }} />
+                  <ShellFooter legal={legal} />
                 </Layout>
                 {asideClaimed && (
                   <div
@@ -329,11 +330,6 @@ export function Shell({
               </Layout>
             </Layout>
           </Layout>
-          {/* Proposed, #4934: the footer runs across the window at its foot, under the sidebar, the page and the side
-              panel, as the header runs across its top, see docs/reference/shell.md#layout. */}
-          <div style={{ flex: 'none' }}>
-            <ShellFooter legal={legal} />
-          </div>
         </Layout>
       </ConfigProvider>
     </div>
