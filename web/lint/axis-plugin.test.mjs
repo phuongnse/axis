@@ -211,6 +211,41 @@ describe('axis/no-antd-alert', () => {
   })
 })
 
+describe('axis/no-antd-empty', () => {
+  const rules = { 'axis/no-antd-empty': 'error' }
+
+  it('reports each Empty imported from antd, also under another name', () => {
+    const source = [
+      "import { Empty, Empty as Nothing } from 'antd'",
+      'const a = <Empty />',
+      'const b = (',
+      '  <Nothing',
+      '    image={Empty.PRESENTED_IMAGE_SIMPLE}',
+      '  />',
+      ')',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual(['axis(no-antd-empty):2', 'axis(no-antd-empty):4'])
+  })
+
+  it('allows EmptyState, the member of an Empty, and an Empty from elsewhere', () => {
+    const source = [
+      "import { Empty } from './elsewhere'",
+      "import { Space } from 'antd'",
+      'const a = <Empty />',
+      'const b = <EmptyState text="a" />',
+      'const c = <Space />',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual([])
+  })
+
+  it('does not report a comment that names an Empty', () => {
+    const source = "import { Empty } from 'antd'\n// <Empty />\nconst a = '<Empty>'\n"
+    expect(lint(source, { rules })).toEqual([])
+  })
+})
+
 describe('axis/no-card-panel', () => {
   const rules = { 'axis/no-card-panel': 'error' }
 
@@ -476,6 +511,23 @@ describe('the rules of web/.oxlintrc.json', () => {
       ).diagnostics.map((diagnostic) => diagnostic.code)
     expect(run('src/platform/AxisAlert.tsx')).toEqual([])
     expect(run('src/pages/Other.tsx')).toEqual(['axis(no-antd-alert)'])
+  })
+
+  it('refuses an Empty outside EmptyState.tsx and allows it inside', () => {
+    const copy = path.join(folder, 'real-config-empty')
+    mkdirSync(path.join(copy, 'src/platform'), { recursive: true })
+    mkdirSync(path.join(copy, 'src/pages'), { recursive: true })
+    const configFile = path.join(copy, '.oxlintrc.json')
+    const source = "import { Empty } from 'antd'\nexport function Page() {\n  return <Empty />\n}\n"
+    writeFileSync(configFile, JSON.stringify(realConfig))
+    writeFileSync(path.join(copy, 'src/platform/EmptyState.tsx'), source)
+    writeFileSync(path.join(copy, 'src/pages/Other.tsx'), source)
+    const run = (file) =>
+      JSON.parse(
+        spawnSync(oxlint, ['-c', configFile, '--format', 'json', file], { cwd: copy, encoding: 'utf8' }).stdout,
+      ).diagnostics.map((diagnostic) => diagnostic.code)
+    expect(run('src/platform/EmptyState.tsx')).toEqual([])
+    expect(run('src/pages/Other.tsx')).toEqual(['axis(no-antd-empty)'])
   })
 
   it('refuses a hand-drawn field label outside the sign-in pages and allows it inside', () => {

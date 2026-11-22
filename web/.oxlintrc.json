@@ -57,6 +57,7 @@
     "axis/no-antd-button": "error",
     "axis/no-antd-alert": "error",
     "axis/no-antd-tag": "error",
+    "axis/no-antd-empty": "error",
     "axis/field-label-through-axis-field": "error",
     "no-restricted-imports": [
       "error",
@@ -78,6 +79,11 @@
       // StatusTag wraps the Tag of antd.
       "files": ["src/platform/StatusTag.tsx"],
       "rules": { "axis/no-antd-tag": "off" }
+    },
+    {
+      // EmptyState wraps the Empty of antd.
+      "files": ["src/platform/EmptyState.tsx"],
+      "rules": { "axis/no-antd-empty": "off" }
     },
     {
       // AxisTable wraps the Table of antd.
@@ -122,6 +128,7 @@
         "axis/no-antd-button": "off",
         "axis/no-antd-alert": "off",
         "axis/no-antd-tag": "off",
+        "axis/no-antd-empty": "off",
         "axis/field-label-through-axis-field": "off",
         "axis/no-card-panel": "off",
         "no-restricted-imports": "off",
