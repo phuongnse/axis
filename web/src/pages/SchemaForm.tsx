@@ -533,12 +533,11 @@ function SchemaNode({
               />
             </div>
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',
                   labelKey: 'shell.studio.removeItem',
-                  destructive: true,
+                  meaning: 'remove',
                   onClick: () => onChange(`${pointer}/${index}`, undefined),
                 },
               ]}
@@ -1118,12 +1117,11 @@ function MarkedMap({
               />
             </div>
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',
                   labelKey: 'shell.studio.removeItem',
-                  destructive: true,
+                  meaning: 'remove',
                   onClick: () => onChange(`${pointer}/${escapeSegment(key)}`, undefined),
                 },
               ]}

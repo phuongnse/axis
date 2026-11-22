@@ -708,7 +708,7 @@ const Fields = memo(function Fields({
                       {
                         key: 'remove',
                         labelKey: 'shell.studio.entity.removeField',
-                        destructive: true,
+                        meaning: 'remove',
                         onClick: () => onRemove(index),
                       },
                     ],
@@ -1689,7 +1689,6 @@ const Indexes = memo(function Indexes({
                   </Flex>
                   {readOnly ? null : (
                     <RowActions
-                      fold
                       actions={[
                         {
                           key: 'moveUp',
@@ -1706,7 +1705,7 @@ const Indexes = memo(function Indexes({
                         {
                           key: 'remove',
                           labelKey: 'shell.studio.entity.removeIndex',
-                          destructive: true,
+                          meaning: 'remove',
                           onClick: () => write(list.filter((_, other) => other !== position)),
                         },
                       ]}
@@ -1866,7 +1865,6 @@ const ValidationRow = memo(function ValidationRow({
         </Flex>
         {readOnly ? null : (
           <RowActions
-            fold
             actions={[
               ...(onMove === undefined
                 ? []
@@ -1887,7 +1885,7 @@ const ValidationRow = memo(function ValidationRow({
               {
                 key: 'remove',
                 labelKey: 'shell.studio.entity.removeValidation',
-                destructive: true,
+                meaning: 'remove',
                 onClick: () => onChange(pointer, undefined),
               },
             ]}

@@ -24,7 +24,17 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import { PlatformContext, type Platform } from './context'
-import { chooseOption, clearPicker, clearSelect, openDropdown, optionTexts, removeTag, shownMenu } from '../test/antd'
+import {
+  chooseOption,
+  chooseRowAction,
+  clearPicker,
+  clearSelect,
+  openDropdown,
+  optionTexts,
+  removeTag,
+  shownMenu,
+  tabTo,
+} from '../test/antd'
 import {
   addEntityField,
   entityFieldAction,
@@ -492,9 +502,12 @@ async function itemMenuItem(pointer: string, action: string, scope: HTMLElement 
   return within(await shownMenu('Actions')).getByRole('menuitem', { name: action })
 }
 
-/** Clicks `action` in the "…" menu of the index or validation at `pointer` in `scope`. */
+/**
+ * Chooses `action` on the index or validation at `pointer` in `scope`: from its "…" menu when it has one, or its own
+ * button when it has a single action.
+ */
 async function itemAction(pointer: string, action: string, scope: HTMLElement = document.body): Promise<void> {
-  await userEvent.click(await itemMenuItem(pointer, action, scope))
+  await chooseRowAction(within(scope).getByTestId(`studio-field-${pointer}`), action)
 }
 
 describe('EntityDesigner', () => {
@@ -1141,9 +1154,13 @@ describe('EntityDesigner', () => {
       expect(item.queryByRole('button', { name: remove })).toBeNull()
 
       await userEvent.click(item.getByRole('button', { name: 'Actions' }))
-      const menu = within(await shownMenu('Actions'))
-      expect(menu.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(['Move up', 'Move down', remove])
-      expect(menu.getByRole('menuitem', { name: remove })).toHaveClass('ant-dropdown-menu-item-danger')
+      const menu = await shownMenu('Actions')
+      // A separator sits between the moves and the destructive Remove, which comes last.
+      const entries = menu.querySelectorAll('[role="menuitem"], [role="separator"]')
+      expect(
+        Array.from(entries, (entry) => (entry.getAttribute('role') === 'separator' ? '---' : entry.textContent)),
+      ).toEqual(['Move up', 'Move down', '---', remove])
+      expect(within(menu).getByRole('menuitem', { name: remove })).toHaveClass('ant-dropdown-menu-item-danger')
       await userEvent.click(document.body)
     }
   })
@@ -2080,7 +2097,7 @@ describe('the groups of the field drawer', () => {
       expect(onChange).toHaveBeenLastCalledWith('/validations/2', undefined)
     })
 
-    it('puts Add validation on the Validation group title row as a secondary button, and its menu has only Remove validation', async () => {
+    it('puts Add validation on the Validation group title row as a secondary button, and draws its single Remove validation as the trash icon', async () => {
       const onChange = renderDesigner(entity({ validations: [validations[0]] }))
 
       const drawer = await openEntityField(0)
@@ -2090,12 +2107,18 @@ describe('the groups of the field drawer', () => {
       expect(add).toHaveClass('ant-btn-variant-outlined')
       expect(add).not.toHaveClass('ant-btn-variant-text')
 
-      await userEvent.click(
-        within(within(drawer).getByTestId('studio-field-/validations/0')).getByRole('button', { name: 'Actions' }),
+      // The row has one action, so it has no "…" menu and Remove validation is a button with the trash icon.
+      const row = within(within(drawer).getByTestId('studio-field-/validations/0'))
+      const remove = row.getByRole('button', { name: 'Remove validation' })
+      expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+      expect(row.queryByRole('button', { name: 'Actions' })).toBeNull()
+
+      await tabTo(remove)
+      // Other tooltips the tab passed may stay open, so the one of Remove validation is found among them.
+      await waitFor(() =>
+        expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toContain('Remove validation'),
       )
-      const menu = within(await shownMenu('Actions'))
-      expect(menu.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(['Remove validation'])
-      await userEvent.click(menu.getByRole('menuitem', { name: 'Remove validation' }))
+      await userEvent.click(remove)
       expect(onChange).toHaveBeenLastCalledWith('/validations/0', undefined)
     })
 

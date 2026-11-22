@@ -593,8 +593,13 @@ describe('SchemaForm lists of objects', () => {
     const add = within(screen.getByRole('group', { name: 'plain' })).getByRole('button', { name: 'Add' })
     expect(add.closest('legend')).not.toBeNull()
     expect(add).toHaveClass('ant-btn-variant-outlined')
-    expect(within(plain).queryByRole('button', { name: 'Remove' })).toBeNull()
-    expect(within(plain).getAllByRole('button', { name: 'Actions' })).toHaveLength(2)
+    // Each row has a single Remove, drawn as the trash icon button rather than a "…" menu.
+    const removes = within(plain).getAllByRole('button', { name: 'Remove' })
+    expect(removes).toHaveLength(2)
+    for (const remove of removes) {
+      expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+    }
+    expect(within(plain).queryByRole('button', { name: 'Actions' })).toBeNull()
   })
 
   it('says "Nothing added yet." under a list of plain values that has no items', () => {
@@ -603,13 +608,12 @@ describe('SchemaForm lists of objects', () => {
     expect(emptyDescription('Nothing added yet.', screen.getByTestId('studio-field-/plain'))).toBeVisible()
   })
 
-  it("removes a row of a list of plain values from the row's Actions menu, and Add appends an item", async () => {
+  it('removes a row of a list of plain values with its Remove button, and Add appends an item', async () => {
     const onChange = vi.fn()
     renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] }, onChange)
 
     const plain = screen.getByTestId('studio-field-/plain')
-    await userEvent.click(within(plain).getAllByRole('button', { name: 'Actions' })[0])
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
+    await userEvent.click(within(plain).getAllByRole('button', { name: 'Remove' })[0])
     expect(onChange).toHaveBeenLastCalledWith('/plain/0', undefined)
 
     await userEvent.click(within(screen.getByRole('group', { name: 'plain' })).getByRole('button', { name: 'Add' }))
