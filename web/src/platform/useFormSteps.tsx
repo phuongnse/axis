@@ -14,7 +14,7 @@ const focusable = 'input:not([type=hidden]), textarea, [role=combobox], button'
  * moves on, and stays when one has an error. Back never checks. Moving keeps every typed value,
  * because the values live in `recordForm`. A step whose fields the form state answer all hides is
  * skipped and left out of the progress bar. After a move, focus goes to the step's first field in error,
- * or else to its first input, unless an error shows above the form. A form without steps is one page:
+ * or else to its first input, unless an error above the form holds the focus. A form without steps is one page:
  * `fields` holds every section and `last` is always true.
  *
  * Inside the Studio form canvas, the canvas picks the step. Hidden steps are not skipped and focus does not move.
@@ -32,6 +32,7 @@ export function useFormSteps(
   const [checking, setChecking] = useState(false)
   const container = useRef<HTMLDivElement>(null)
   const previous = useRef(current)
+  const { formErrorFocused } = recordForm
 
   const fieldNamesOf = (index: number) =>
     sections
@@ -57,11 +58,11 @@ export function useFormSteps(
       return
     }
     previous.current = index
-    // An error above the form keeps the focus, as it does after a refused save, see
+    // An error above the form keeps the focus when it holds it now, as after a refused save, see
     // docs/reference/form-widget.md#saving. Otherwise a step with a field in error takes the focus
     // there, as after a refused Next or save, see docs/reference/form-widget-conditions.md#steps.
     // Else its first input does.
-    if (recordForm.formErrorShown) {
+    if (formErrorFocused()) {
       return
     }
     if (focusFirstError(container.current)) {
@@ -69,7 +70,7 @@ export function useFormSteps(
     }
     const inputs = [...(container.current?.querySelectorAll<HTMLElement>(focusable) ?? [])]
     inputs.find((element) => !element.matches(':disabled, [readonly]'))?.focus()
-  }, [index, canvas, recordForm.formErrorShown])
+  }, [index, canvas, formErrorFocused])
 
   const next = async () => {
     if (last || checking) {

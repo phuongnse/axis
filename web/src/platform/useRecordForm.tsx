@@ -756,6 +756,8 @@ export function useRecordForm(
     focusFirstError(fieldsRoot.current)
   }, [refusals])
 
+  const formErrorFocused = useCallback(() => formErrorRef.current?.contains(document.activeElement) === true, [])
+
   // The newest body is read when the timer fires. A write in an effect keeps the render pure.
   useEffect(() => {
     draft.current = conditions
@@ -814,9 +816,9 @@ export function useRecordForm(
     showProblem,
     clearErrors,
     formError,
-    // Whether an error shows above the form. It takes the focus before any field, see
+    // Whether the error above the form holds the focus now. A step move keeps that focus, see
     // docs/reference/form-widget.md#saving.
-    formErrorShown: formErrors.length > 0,
+    formErrorFocused,
     setFormErrors,
   }
 }

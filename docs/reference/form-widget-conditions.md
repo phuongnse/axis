@@ -64,9 +64,10 @@ the changes of every step.
 - **Failed check.** When the call for Next fails, by a network error or any answer but `200`, the form
   logs a warning and moves on to the next step, because the server checks the save again.
 - **Focus.** After Next or Back, focus moves to the step's first field in error when it has one, or else
-  to its first input, so a keyboard user types on at once. A refused Next moves the focus to its first
-  field in error, unless an error above the form shows. Nothing is focused when the form first opens. Enter on a step before the last acts as
-  Next.
+  to its first input, so a keyboard user types on at once. The one exception is an error above the form
+  that holds the focus when the step moves, such as after a refused save: the focus stays there. A refused
+  Next moves the focus to its first field in error, unless an error above the form shows. Nothing is
+  focused when the form first opens. Enter on a step before the last acts as Next.
 - **Last step.** The save bar and the `startProcess` actions are on the last step. The `navigate`
   actions are on every step, because a navigate action uses the record as loaded and not the draft.
   After a failed save, the form opens the first step that has an error and focuses its first field in

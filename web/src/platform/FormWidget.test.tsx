@@ -2541,6 +2541,25 @@ describe('FormWidget', () => {
       expect(title).not.toHaveFocus()
     })
 
+    it('focuses the first input of the step after a refused save with an error above the form, on Back and on Next', async () => {
+      stateAnswers = [emptyStateJson, emptyStateJson]
+      stubFetch({
+        status: 400,
+        body: '{"title":"Invalid","status":400,"errors":{"":["Save refused."]}}',
+      })
+      const user = await renderSteps()
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      await user.type(await screen.findByLabelText('Priority'), '5')
+      await user.click(await screen.findByRole('button', { name: 'Save' }))
+      expect(await screen.findByTestId('form-error')).toHaveFocus()
+
+      await user.click(screen.getByRole('button', { name: 'Back' }))
+      expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveFocus()
+
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      expect(await screen.findByLabelText('Priority')).toHaveFocus()
+    })
+
     it('replaces the message of a refused save with the answer message while the typed value is still wrong', async () => {
       stateAnswers = [emptyStateJson, emptyStateJson, titleRequired]
       stubFetch({
