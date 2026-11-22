@@ -717,6 +717,15 @@ public sealed class ControlPlaneOptionsTests
 
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("Bearer", Assert.Single(response.Headers.WwwAuthenticate).Scheme);
+
+        var end = await client.PostAsync("/api/billing/v1/tenants/acme/subscription/end", null, TestContext.Current.CancellationToken);
+        var read = await client.GetAsync("/api/billing/v1/tenants/acme/subscription", TestContext.Current.CancellationToken);
+
+        foreach (var refused in new[] { end, read })
+        {
+            Assert.Equal(System.Net.HttpStatusCode.Unauthorized, refused.StatusCode);
+            Assert.Equal("Bearer", Assert.Single(refused.Headers.WwwAuthenticate).Scheme);
+        }
     }
 
     [Fact]

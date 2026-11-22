@@ -82,6 +82,9 @@ internal sealed class CellTestServer : IAsyncDisposable
     /// <summary>The <c>status</c> that the tenant read route answers. Null answers <c>404</c>.</summary>
     public string? TenantStatus { get; set; }
 
+    /// <summary>The <c>usage</c> that the tenant read route answers, or none when null.</summary>
+    public object? TenantUsage { get; set; }
+
     /// <summary>When set, the tenant read route answers this status and no tenant.</summary>
     public int? TenantReadStatus { get; set; }
 
@@ -239,7 +242,7 @@ internal sealed class CellTestServer : IAsyncDisposable
             }
 
             return TenantStatus is { } tenantStatus
-                ? Results.Json(new { id, status = tenantStatus, application = (string?)null, hosts = Array.Empty<string>(), failedWork = (object?)null })
+                ? Results.Json(new { id, status = tenantStatus, application = (string?)null, hosts = Array.Empty<string>(), failedWork = (object?)null, usage = TenantUsage })
                 : Results.StatusCode(StatusCodes.Status404NotFound);
         });
 

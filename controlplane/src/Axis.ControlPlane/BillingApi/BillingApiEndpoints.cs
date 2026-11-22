@@ -3,7 +3,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.ControlPlane.Audit;
+using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Plans;
+using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.Subscriptions;
 using Npgsql;
 
@@ -12,9 +14,10 @@ namespace Axis.ControlPlane.BillingApi;
 /// <summary>
 /// The routes of the billing API under <c>/api/billing/v1/</c>, see <c>docs/reference/billing-api.md</c>. The group needs the billing client's token and its
 /// scope, see <see cref="BillingApiClient"/>. Without complete <c>ControlPlane:Billing</c> settings every route answers <c>401</c> with
-/// <c>WWW-Authenticate: Bearer</c>. This part holds the call that sets the paid-through date and the call that sets the plan and the add-ons.
+/// <c>WWW-Authenticate: Bearer</c>. This part holds the call that sets the paid-through date, the call that sets the plan and the add-ons, the call that ends
+/// a subscription and the call that reads a tenant with the usage its cell reports.
 /// </summary>
-internal static class BillingApiEndpoints
+internal static partial class BillingApiEndpoints
 {
     private const string IdempotencyKeyHeader = "Idempotency-Key";
 
@@ -23,6 +26,10 @@ internal static class BillingApiEndpoints
     private const string PaidThroughKind = "paid-through";
 
     private const string PlanKind = "plan";
+
+    private const string EndKind = "end";
+
+    private const string Deleted = "deleted";
 
     private const string DateFormat = "yyyy-MM-dd";
 
@@ -41,7 +48,15 @@ internal static class BillingApiEndpoints
 
         group.MapPut("/tenants/{tenantId}/subscription/paid-through", SetPaidThroughAsync);
         group.MapPut("/tenants/{tenantId}/subscription/plan", SetPlanAsync);
+        group.MapPost("/tenants/{tenantId}/subscription/end", EndAsync);
+        group.MapGet("/tenants/{tenantId}/subscription", ReadAsync);
     }
+
+    [LoggerMessage(LogLevel.Warning, "The billing API could not read the usage of the subscription {SubscriptionId}: its tenant has no row in the region directory, or its cell is not one of the region's, does not know the tenant or sent no usage.")]
+    private static partial void LogNoUsage(ILogger logger, Guid subscriptionId);
+
+    [LoggerMessage(LogLevel.Warning, "The billing API could not read the usage of the subscription {SubscriptionId}, as the cell {CellId} did not answer the read.")]
+    private static partial void LogReadFailed(ILogger logger, Exception exception, Guid subscriptionId, string cellId);
 
     private static Task<IResult> SetPaidThroughAsync(
         string tenantId,
@@ -133,9 +148,106 @@ internal static class BillingApiEndpoints
             },
             cancellationToken);
 
+    // Ends the subscription at its paid-through date, see docs/reference/billing-api.md#ending-a-subscription. The call has no body, so every body hashes alike.
+    // A subscription that is cancelled already answers 200 and keeps nothing under the key, as a refusal does.
+    private static Task<IResult> EndAsync(
+        string tenantId,
+        HttpContext httpContext,
+        NpgsqlDataSource controlPlane,
+        CancellationToken cancellationToken) =>
+        HandleAsync(
+            EndKind,
+            tenantId,
+            httpContext,
+            controlPlane,
+            ReadEnd,
+            async move =>
+            {
+                if (move.State == "cancelled")
+                {
+                    var answer = await ReadAnswerAsync(move.Transaction.Connection!, move.Transaction, move.SubscriptionId, cancellationToken);
+                    return Results.Text(answer, "application/json");
+                }
+
+                if (move.State != "active")
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Only an active subscription can be ended.");
+                }
+
+                return await SubscriptionCancel.CancelAsync(move.Transaction, move.SubscriptionId, AuditActorKind.Billing, move.Client, cancellationToken)
+                    ? null
+                    : Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Only an active subscription can be ended.");
+            },
+            cancellationToken);
+
+    // Reads the tenant's subscription and the usage its cell reports, see docs/reference/billing-api.md#reading-a-tenant. It changes nothing and writes no
+    // audit record. A deleted subscription has no usage and makes no cell call. Any other answers 502 when the cell gives no usage.
+    private static async Task<IResult> ReadAsync(
+        string tenantId,
+        HttpContext httpContext,
+        NpgsqlDataSource controlPlane,
+        CellClients cells,
+        ILoggerFactory loggers,
+        CancellationToken cancellationToken)
+    {
+        if (await FindSubscriptionAsync(controlPlane, tenantId, cancellationToken) is not { } subscriptionId)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The region holds no subscription for the tenant.");
+        }
+
+        BillingSubscription subscription;
+        await using (var connection = await controlPlane.OpenConnectionAsync(cancellationToken))
+        {
+            subscription = await ReadSubscriptionAsync(connection, null, subscriptionId, cancellationToken);
+        }
+
+        CellTenantUsage? usage = null;
+        if (subscription.State != Deleted)
+        {
+            var logger = loggers.CreateLogger(typeof(BillingApiEndpoints).FullName!);
+            var directory = httpContext.RequestServices.GetKeyedService<NpgsqlDataSource>("directory");
+            var cell = directory is null ? null : TenantCells.Client(cells, await TenantCells.FindCellIdAsync(directory, tenantId, cancellationToken));
+            if (cell is not null)
+            {
+                try
+                {
+                    usage = (await cell.GetTenantAsync(tenantId, cancellationToken))?.Usage;
+                }
+                catch (Exception exception) when (exception is CellCallException or TimeoutException)
+                {
+                    LogReadFailed(logger, exception, subscriptionId, cell.CellId);
+                    return CellUnreadable();
+                }
+            }
+
+            if (usage is null)
+            {
+                LogNoUsage(logger, subscriptionId);
+                return CellUnreadable();
+            }
+        }
+
+        return Results.Text(
+            JsonSerializer.Serialize(
+                new BillingTenant(
+                    subscription.TenantId,
+                    subscription.State,
+                    subscription.NextAt,
+                    subscription.TrialEndsAt,
+                    subscription.PaidThrough,
+                    subscription.Plan,
+                    subscription.AddOns,
+                    usage),
+                JsonSerializerOptions.Web),
+            "application/json");
+    }
+
+    private static IResult CellUnreadable() =>
+        Results.Problem(statusCode: StatusCodes.Status502BadGateway, title: "The tenant's cell could not be read.");
+
     // The flow that every call that changes a subscription shares, see docs/reference/billing-api.md#answers-every-call-shares and #idempotency. The checks run in
     // this order, and the first that fails answers: the key, the tenant, the body, the replay, then the subscription and the call's own checks. The call's
-    // move returns null when it moved the subscription, and else the refusal. A refusal commits nothing and keeps nothing under the key.
+    // move returns null when it moved the subscription, and else the refusal. A refusal, or an answer that the move returns instead, commits nothing and keeps nothing under the key.
     private static async Task<IResult> HandleAsync<TBody>(
         string kind,
         string tenantId,
@@ -252,6 +364,8 @@ internal static class BillingApiEndpoints
         return await command.ExecuteScalarAsync(cancellationToken) as Guid?;
     }
 
+    private static (EndBody? Body, IResult? Refusal) ReadEnd(byte[] body) => (new EndBody(), null);
+
     private static (PaidThroughBody? Body, IResult? Refusal) ReadPaidThrough(byte[] body)
     {
         try
@@ -337,7 +451,11 @@ internal static class BillingApiEndpoints
         Convert.ToHexStringLower(SHA256.HashData([.. Encoding.UTF8.GetBytes($"{kind}\n{tenantId}\n"), .. body]));
 
     // The subscription as the page shows it when it reads a tenant, without the usage, see docs/reference/billing-api.md#answers-every-call-shares.
-    private static async Task<string> ReadAnswerAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid subscriptionId, CancellationToken cancellationToken)
+    private static async Task<string> ReadAnswerAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid subscriptionId, CancellationToken cancellationToken) =>
+        JsonSerializer.Serialize(await ReadSubscriptionAsync(connection, transaction, subscriptionId, cancellationToken), JsonSerializerOptions.Web);
+
+    private static async Task<BillingSubscription> ReadSubscriptionAsync(
+        NpgsqlConnection connection, NpgsqlTransaction? transaction, Guid subscriptionId, CancellationToken cancellationToken)
     {
         string tenantId;
         string state;
@@ -378,7 +496,7 @@ internal static class BillingApiEndpoints
             }
         }
 
-        return JsonSerializer.Serialize(new BillingSubscription(tenantId, state, nextAt, trialEndsAt, paidThrough, plan, addOns), JsonSerializerOptions.Web);
+        return new BillingSubscription(tenantId, state, nextAt, trialEndsAt, paidThrough, plan, addOns);
     }
 
     private sealed record PaidThroughBody(DateOnly PaidThrough);
@@ -386,6 +504,8 @@ internal static class BillingApiEndpoints
     private sealed record PlanBody(string Code, int Version, IReadOnlyList<AddOnRequest> AddOns);
 
     private sealed record AddOnRequest(string Code, int Quantity);
+
+    private sealed record EndBody;
 
     // What a call's own move gets: the transaction that holds the subscription's row locked, and what the call read of it.
     private sealed record BillingMove<TBody>(NpgsqlTransaction Transaction, Guid SubscriptionId, string State, string? PlanCode, TBody Body, string Client);
@@ -402,6 +522,17 @@ internal static class BillingApiEndpoints
         DateOnly? PaidThrough,
         BillingPlan? Plan,
         IReadOnlyList<BillingAddOn> AddOns);
+
+    // The subscription with the usage of its cell, as reading a tenant answers. The usage is null for a deleted subscription.
+    private sealed record BillingTenant(
+        string TenantId,
+        string State,
+        DateTime? NextAt,
+        DateTime TrialEndsAt,
+        DateOnly? PaidThrough,
+        BillingPlan? Plan,
+        IReadOnlyList<BillingAddOn> AddOns,
+        CellTenantUsage? Usage);
 
     // A 401 that carries the challenge, for the routes that no settings serve. The authentication handler adds the same header on its own 401.
     private sealed class UnauthorizedBearerResult : IResult
