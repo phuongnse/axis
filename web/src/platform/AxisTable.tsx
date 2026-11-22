@@ -1,15 +1,5 @@
 import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
-import {
-  Button,
-  ConfigProvider,
-  Dropdown,
-  Flex,
-  Input,
-  Pagination,
-  Table,
-  type TableColumnType,
-  type TableProps,
-} from 'antd'
+import { ConfigProvider, Dropdown, Flex, Input, Pagination, Table, type TableColumnType, type TableProps } from 'antd'
 import {
   useContext,
   useEffect,
@@ -949,18 +939,17 @@ export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null;
             {...action.attributes}
           />
         ) : (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button
+          <AxisButton
             key={action.key}
-            type="text"
+            role="subtle"
             size="small"
-            danger={action.destructive}
+            destructive={action.destructive}
             disabled={action.disabled}
             onClick={action.onClick}
             {...action.attributes}
           >
             {t(action.labelKey)}
-          </Button>
+          </AxisButton>
         ),
       )}
     </Flex>

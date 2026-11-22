@@ -1,5 +1,5 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Flex, Layout, Typography, type ThemeConfig } from 'antd'
+import { ConfigProvider, Flex, Layout, Typography, type ThemeConfig } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
@@ -230,17 +230,16 @@ export function Shell({
                 {bell}
                 {hasAccount ? account : <AppSwitcher locale={locale} />}
                 {!hasAccount && <UserMenu />}
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button
+                <AxisButton
                   ref={toggle}
-                  type="text"
+                  role="subtle"
                   aria-expanded={open}
                   aria-controls="shell-menu"
                   onClick={() => setOpen(!open)}
                   onKeyDown={closeOnEscape}
                 >
                   {t('shell.navigation.menu')}
-                </Button>
+                </AxisButton>
               </>
             ) : (
               <Flex align="center" gap={spacing.sm}>

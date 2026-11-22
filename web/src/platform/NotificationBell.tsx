@@ -1,6 +1,7 @@
 import { BellOutlined } from '@ant-design/icons'
 import { Badge, Button, Drawer, Flex, Pagination, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
+import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Announcement } from './Announcement'
@@ -121,12 +122,11 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
 
   return (
     <>
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button type="text" aria-label={named} aria-haspopup="dialog" onClick={openPanel}>
+      <AxisButton role="subtle" aria-label={named} aria-haspopup="dialog" onClick={openPanel}>
         <Badge count={unread} size="small" offset={[2, -2]}>
           <BellOutlined aria-hidden />
         </Badge>
-      </Button>
+      </AxisButton>
       <Announcement>{named}</Announcement>
       <Drawer title={label} open={open} onClose={() => setOpen(false)} size="default">
         <PartBoundary>

@@ -19,6 +19,11 @@ import { useDesignTokens } from './themeMode'
 import { menuOf, type MenuAction } from './menuActions'
 import { focusFollowsTab } from './tabFocus'
 
+/** The destructive tone, `dangerText`, unless the button is off. One rule for every role, icon buttons included. */
+function dangerTint(colour: { dangerText: string }, destructive: boolean | undefined, disabled: boolean | undefined) {
+  return destructive && !disabled ? { color: colour.dangerText } : {}
+}
+
 type Base = Omit<ButtonProps, 'type' | 'color' | 'variant' | 'danger' | 'role' | 'icon'> & {
   ref?: Ref<HTMLButtonElement>
 }
@@ -31,7 +36,8 @@ export type AxisButtonProps =
       caret?: boolean
       /**
        * Proposed, #4902: the destructive tone, `dangerText`, for an action that removes. A tone of the main, secondary
-       * and subtle roles, never of the finish button, see docs/reference/actions-and-controls.md#buttons.
+       * and subtle roles, never of the finish button, except in a dialog that confirms a removal, whose removal is the
+       * dialog's solid `danger` button, see docs/reference/actions-and-controls.md#buttons.
        */
       destructive?: boolean
     })
@@ -92,7 +98,7 @@ function IconButton(props: IconButtonProps) {
   const pointerOver = useRef(false)
   const hushed = useRef(false)
   const name = nameValues ? fillText(t(nameKey), nameValues) : t(nameKey)
-  const tint: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
+  const tint: CSSProperties = dangerTint(colour, destructive, disabled)
   return (
     <Tooltip
       title={doneKey === undefined ? name : t(doneKey)}
@@ -287,12 +293,7 @@ export function AxisButton(props: AxisButtonProps) {
   const danger = destructive === true
   // Borderless beside a finish button, and always for a tool: the text colour, or `dangerText` for the destructive tone.
   const borderless = (
-    <Button
-      {...body}
-      type="text"
-      disabled={disabled}
-      style={{ ...(danger ? tinted(colour.dangerText) : {}), ...style }}
-    />
+    <Button {...body} type="text" disabled={disabled} style={{ ...dangerTint(colour, danger, disabled), ...style }} />
   )
   switch (role) {
     case 'finish':
