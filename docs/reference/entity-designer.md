@@ -1,8 +1,8 @@
 # Entity designer
 
 The entity designer is the Form tab of an `entity` resource in Studio, in place of the generic form.
-It shows the entity's details, its fields, validations and indexes as tables, and the JSON tab edits
-the same draft. The rest of Studio is in [Studio](studio.md).
+It shows the entity's details, its fields, validations and indexes, and the JSON tab edits the same
+draft. The rest of Studio is in [Studio](studio.md).
 
 ## Typing
 
@@ -155,7 +155,7 @@ These settings take a control of their own:
 | `expression`        | The expression editor                                                                                                                                                                     |
 | `min` and `max`     | A number input on integer, decimal and money fields, a date picker that writes `yyyy-MM-dd` on date fields, and a date-time picker that writes an RFC 3339 UTC string on date-time fields |
 | `minLength` and `maxLength` | A number input, on text fields                                                                                                                                                    |
-| `searchable`        | A checkbox with its label on the right and its help under the label, on text fields                                                                                                      |
+| `searchable`        | _(planned)_ A checkbox with its label on the right and its help under the label, on text fields                                                                                          |
 | `maxSize`, `accept` | On a `file` field, the largest size in bytes and a list of media types                                                                                                                    |
 | Currency            | On a `money` field, a choice between a fixed `currency` code and a `currencyField`, picked from the entity's `enum` and `text` fields, through `AxisChoiceField`                           |
 | `valueLabels`       | On an `enum` field, rows of a value and its label, each label typed as [label texts](studio.md#label-texts) under "Label of {value}"                                                      |
@@ -185,9 +185,9 @@ These settings take a control of their own:
   allows (`AXC0362`): for a reference, the same target too, and never the field itself or a sensitive, matched or
   computed field. Both show the required mark. They are plain boxes until the names have loaded, and From offers
   nothing while Find by names no unique field of the target.
-- **Maximum length is the type's**. `maxLength` is the size of the stored text, which a value the server sets keeps
-  too, so it is under Text settings, as precision and scale are of a number. Only the checks on an entered value are
-  Value's, and they show only for Input.
+- **Maximum length is the type's** _(planned)_. `maxLength` is the size of the stored text, which a value the server
+  sets keeps too, so it is under Text settings, as precision and scale are of a number. Only the checks on an entered
+  value are Value's, and they show only for Input.
 - **Label and help text** _(planned)_. Both are label texts, typed in words in the author's language, with the
   Translations button inside the box, as the entity's own label is. Studio shows words and never a text key, see
   [names](studio-workspace.md#names).
