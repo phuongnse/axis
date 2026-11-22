@@ -49,8 +49,16 @@ export async function openRowMenu(scope: HTMLElement): Promise<HTMLElement> {
   return shownMenu('Actions')
 }
 
-/** Opens the "…" menu in `scope` and chooses its entry `name`. The menu closes once the entry is chosen. */
+/**
+ * Chooses the row action `name` in `scope`. A row that folds has its "…" menu, which opens and then chooses the entry. A
+ * row that shows its actions has no "…" menu, so the action's own button is clicked. The menu closes once its entry is
+ * chosen.
+ */
 export async function chooseRowAction(scope: HTMLElement, name: string): Promise<void> {
+  if (within(scope).queryByRole('button', { name: 'Actions' }) === null) {
+    await userEvent.click(within(scope).getByRole('button', { name }))
+    return
+  }
   const menu = await openRowMenu(scope)
   await userEvent.click(within(menu).getByRole('menuitem', { name }))
 }

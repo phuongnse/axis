@@ -742,7 +742,7 @@ It is Ant Design's `lg`, the smallest desktop, so every desktop gets the desktop
 narrow one.
 
 - **What changes.** Below the breakpoint is narrow width: columns stack in file order, tab headers scroll, a row's
-  actions fold into one menu and the shell navigation collapses. A widget has no setting of its own for it.
+  two or more actions fold into one menu and the shell navigation collapses. A widget has no setting of its own for it.
 - **One value.** The narrow-width hook reads the token, and each card's marker in the Design System artifact sets that
   width, see [widget previews](widget-previews.md). Studio's page designer previews the narrow layout,
   see [page designer](studio-editors-by-kind.md#page-designer).

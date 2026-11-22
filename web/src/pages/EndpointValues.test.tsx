@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider } from 'antd'
 import type { ReactNode } from 'react'
@@ -7,7 +7,9 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { optionTexts, shownMenu } from '../test/antd'
+import { optionTexts, tabTo } from '../test/antd'
+import { withAntdStyles } from '../test/antdStyles'
+import { designTokensFor } from '../platform/designTokens'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { EndpointValues } from './EndpointValues'
 
@@ -76,8 +78,8 @@ describe.each(['light', 'dark'])('EndpointValues in %s mode', (mode) => {
       expect(row).toBeVisible()
       expect(within(row).getByRole('combobox', { name: 'Field' })).toBeVisible()
       expect(within(row).getByRole('textbox', { name: 'Expression' })).toBeVisible()
-      expect(within(row).getByRole('button', { name: 'Actions' })).toBeVisible()
-      expect(within(row).queryByRole('button', { name: 'Remove' })).toBeNull()
+      expect(within(row).getByRole('button', { name: 'Remove' })).toBeVisible()
+      expect(within(row).queryByRole('button', { name: 'Actions' })).toBeNull()
     }
     expect(screen.getByRole('combobox', { name: 'Add mapping' })).toBeVisible()
   })
@@ -127,6 +129,7 @@ describe('EndpointValues', () => {
       expect(screen.queryByRole('combobox', { name: 'Add mapping' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Add mapping' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
     },
   )
 
@@ -134,11 +137,31 @@ describe('EndpointValues', () => {
     const onChange = renderValues()
 
     await userEvent.click(
-      within(screen.getByTestId('studio-field-/values/department')).getByRole('button', { name: 'Actions' }),
+      within(screen.getByTestId('studio-field-/values/department')).getByRole('button', { name: 'Remove' }),
     )
-    await shownMenu('Actions')
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
     expect(onChange).toHaveBeenLastCalledWith('/values/department', undefined)
+  })
+
+  describe('with antd styles', () => {
+    withAntdStyles()
+
+    beforeEach(() => localStorage.setItem('axis.themeMode', 'dark'))
+
+    it('draws Remove as the trash icon in dangerText and names it on keyboard focus in dark mode', async () => {
+      renderValues()
+      // The first check waits for the lazy editor chunk, as the theme test does.
+      await screen.findAllByTestId('studio-expression-type', undefined, { timeout: 5000 })
+
+      const row = screen.getByTestId('studio-field-/values/department')
+      const remove = within(row).getByRole('button', { name: 'Remove' })
+      expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+      expect(remove).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
+      expect(within(row).queryByRole('button', { name: 'Actions' })).toBeNull()
+      await tabTo(remove)
+
+      // Other tooltips the tab passed may stay open, so the one of Remove is found among them.
+      await waitFor(() => expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toContain('Remove'))
+    })
   })
 
   it('renames a field in place, keeping the order of the others', async () => {

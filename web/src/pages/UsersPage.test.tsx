@@ -6,7 +6,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import type { UserList, UserRoles } from '../platform/users'
 import { TextProvider } from '../platform/TextProvider'
-import { isRequiredLabel, openDropdown, optionTexts } from '../test/antd'
+import { chooseRowAction, isRequiredLabel, openDropdown, optionTexts } from '../test/antd'
 import { expectTitleAloneInBand } from '../test/pageBand'
 import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { PlatformContext, type Platform } from './context'
@@ -127,10 +127,9 @@ function isList(input: string) {
   return /^\/api\/users(\?|$)/.test(input)
 }
 
-/** Opens the "…" menu of a row and chooses the command. A row's commands are entries of that menu, not buttons. */
+/** Chooses the command of a row, from its "…" menu or as its button when the row has one command. */
 async function chooseCommand(row: HTMLElement, name: string) {
-  await userEvent.click(within(row).getByRole('button', { name: 'Actions' }))
-  await userEvent.click(await screen.findByRole('menuitem', { name }))
+  await chooseRowAction(row, name)
 }
 
 function posts(fetchMock: ReturnType<typeof stubServer>) {
@@ -676,7 +675,10 @@ describe('UsersPage', () => {
 
     expect(await names('Ann Invited')).toEqual(['Resend invitation', 'Disable', 'Reset authenticator'])
     expect(await names('Cid Disabled')).toEqual(['Enable', 'Reset authenticator'])
-    expect(await names('Bob Active')).toEqual(['Disable'])
+    // A person who signs in through a provider has one command, so it is a button and not a menu of one.
+    const bob = within(screen.getByText('Bob Active').closest('tr')!)
+    expect(bob.getByRole('button', { name: 'Disable' })).toBeInTheDocument()
+    expect(bob.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
   })
 
   it.each([
@@ -761,7 +763,7 @@ describe('UsersPage', () => {
     )
 
     const row = (await screen.findByText('Bob Active')).closest('tr')!
-    await userEvent.click(within(row).getByRole('button', { name: 'Thao tác' }))
-    expect(await screen.findByRole('menuitem', { name: 'Khóa' })).toBeVisible()
+    expect(within(row).getByRole('button', { name: 'Khóa' })).toBeVisible()
+    expect(within(row).queryByRole('button', { name: 'Thao tác' })).toBeNull()
   })
 })

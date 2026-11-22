@@ -8,7 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chooseOption, optionTexts, tabTo } from '../test/antd'
 import { withAntdStyles } from '../test/antdStyles'
 import { dialog, filterTexts } from '../test/tableFilter'
-import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps, type AxisTableToolbar } from './AxisTable'
+import {
+  AxisTable,
+  RowActions,
+  type AxisColumn,
+  type AxisRowAction,
+  type AxisTableProps,
+  type AxisTableToolbar,
+} from './AxisTable'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
 import type { TableQuery } from './tableQuery'
@@ -103,6 +110,16 @@ const deleteAction: AxisRowAction = {
 }
 const openAction: AxisRowAction = { key: 'open', labelKey: 'row.open', onClick: vi.fn() }
 const closeAction: AxisRowAction = { key: 'close', labelKey: 'row.close', onClick: vi.fn() }
+const removeAction: AxisRowAction = { key: 'remove', labelKey: 'row.delete', meaning: 'remove', onClick: vi.fn() }
+
+/** Draws one list row's actions outside a table, as a list that is not a table does. */
+function renderRowActions(actions: AxisRowAction[], fold?: boolean) {
+  return render(
+    <TextProvider catalogs={catalogs} development={false}>
+      <RowActions actions={actions} fold={fold} />
+    </TextProvider>,
+  )
+}
 
 describe('AxisTable', () => {
   it('keeps its column headers and draws the empty state in its body, with the line in the muted text colour', () => {
@@ -513,6 +530,24 @@ describe('AxisTable', () => {
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Actions')
     })
 
+    it('draws the one action of a row as a button in a table set up for three actions', () => {
+      renderTable({ rowActions: { configured: 3, actions: (row) => (row.id === '2' ? null : [openAction]) } })
+
+      const row = screen.getByRole('row', { name: /Buy paper/ })
+      expect(within(row).getByRole('button', { name: 'Open' })).toBeInTheDocument()
+      expect(within(row).queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+    })
+
+    it('folds the two actions of a row in a table set up for three actions into one Actions menu', () => {
+      renderTable({
+        rowActions: { configured: 3, actions: (row) => (row.id === '2' ? null : [openAction, closeAction]) },
+      })
+
+      const row = screen.getByRole('row', { name: /Buy paper/ })
+      expect(within(row).getAllByRole('button')).toHaveLength(1)
+      expect(within(row).getByRole('button', { name: 'Actions' })).toBeInTheDocument()
+    })
+
     describe('at narrow width', () => {
       beforeEach(() => {
         vi.stubGlobal('matchMedia', (query: string) => ({
@@ -534,6 +569,39 @@ describe('AxisTable', () => {
         expect(within(row).getAllByRole('button')).toHaveLength(1)
         expect(within(row).getByRole('button', { name: 'Actions' })).toBeInTheDocument()
       })
+
+      it('draws the one action of a row as a button, with no Actions menu', () => {
+        renderTable({ rowActions: actionsFor(openAction) })
+
+        const row = screen.getByRole('row', { name: /Buy paper/ })
+        expect(within(row).getAllByRole('button')).toHaveLength(1)
+        expect(within(row).getByRole('button', { name: 'Open' })).toBeInTheDocument()
+        expect(within(row).queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+      })
+
+      it('draws a lone action of a list row as a button, with no Actions menu', () => {
+        renderRowActions([openAction])
+
+        expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+      })
+    })
+
+    it('draws a known Remove as the trash icon in dangerText, named by its label', () => {
+      renderRowActions([removeAction])
+
+      const remove = screen.getByRole('button', { name: 'Delete' })
+      expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+      expect(remove).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
+      expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+    })
+
+    it('draws a known Remove in a folded menu as a danger entry', async () => {
+      renderRowActions([openAction, removeAction], true)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Actions' }))
+      const entry = await screen.findByRole('menuitem', { name: 'Delete' })
+      expect(entry).toHaveClass('ant-dropdown-menu-item-danger')
     })
   })
 

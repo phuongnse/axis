@@ -234,12 +234,13 @@ read, each with its `parameters`, `record`, `opensForm` and `paths`. It lists a 
 with a `start` grant on its process. A `navigate` action may sit in either list, and `startProcess` and `delete` are
 row actions only. A row of a data source acts on its root record, and a group row has no actions.
 
-- **In the row.** Row actions are buttons in the row. With one or two actions besides the open link, they show in the
-  row: a `delete` is a trash icon in `dangerText`, named by its label, and any other action a small text button.
-- **Folded.** With three or more, or at narrow width, they fold into one "…" icon button named by the platform text
+- **In the row.** Row actions are buttons in the row, unless the row folds, see below. A `delete` is a trash icon in
+  `dangerText`, named by its label, and any other action a small text button.
+- **Folded.** With three or more configured actions, a row with two or more of them folds at any width. At narrow
+  width a row with two or more folds too. They fold into one "…" icon button named by the platform text
   `shell.table.rowActions`, which opens a menu of text entries, a delete entry in `dangerText`. The count is of the
-  actions the widget configures besides the open link, not of those a row shows, so every row has the same layout even
-  where `visibleWhen` hides an action on some rows.
+  actions the widget configures besides the open link. A row that `visibleWhen` leaves with one action shows it as a
+  button, so the rows of one table can differ.
 
 ### Navigate
 
