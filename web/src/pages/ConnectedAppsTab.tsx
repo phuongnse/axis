@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable } from '../platform/AxisTable'
@@ -271,11 +272,16 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
         open={pending !== null}
         width={size.dialog.small}
         title={t('shell.users.connectedApps.revokeConfirm')}
-        okText={t('shell.users.connectedApps.revokeOk')}
-        cancelText={t('shell.users.roles.cancel')}
-        okButtonProps={{ danger: true }}
-        confirmLoading={revoking}
-        onOk={() => void revoke()}
+        footer={
+          <DialogFooter
+            destructive
+            finishText={t('shell.users.connectedApps.revokeOk')}
+            cancelText={t('shell.users.roles.cancel')}
+            finishing={revoking}
+            onFinish={() => void revoke()}
+            onCancel={() => setPending(null)}
+          />
+        }
         onCancel={() => setPending(null)}
       >
         {pending && (

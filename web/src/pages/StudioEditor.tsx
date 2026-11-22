@@ -31,6 +31,7 @@ import {
 } from '../platform/entityMigrations'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { SectionParts } from '../platform/SectionParts'
 import { ContentInsetContext } from '../platform/contentInsetContext'
 import { SaveBar } from '../platform/SaveBar'
@@ -1359,11 +1360,16 @@ export function StudioEditor({
               open={deleteOpen}
               width={size.dialog.small}
               title={t('shell.studio.deleteConfirm')}
-              okText={t('shell.studio.delete')}
-              okButtonProps={{ danger: true }}
-              cancelText={t('shell.studio.cancel')}
-              confirmLoading={deleting}
-              onOk={remove}
+              footer={
+                <DialogFooter
+                  destructive
+                  finishText={t('shell.studio.delete')}
+                  cancelText={t('shell.studio.cancel')}
+                  finishing={deleting}
+                  onFinish={remove}
+                  onCancel={() => setDeleteOpen(false)}
+                />
+              }
               onCancel={() => setDeleteOpen(false)}
             >
               {item.usedBy > 0 && (

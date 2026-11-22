@@ -4,6 +4,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, Link, MemoryRouter, RouterProvider, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { designTokensFor } from '../platform/designTokens'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
 import { isSignInNeeded } from '../platform/signInNeeded'
@@ -1358,6 +1359,18 @@ describe('StudioPage', () => {
     )
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), slow)
     expect(screen.getByRole('tab', { name: 'Used by' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('finishes the delete dialog in a solid red Delete, with Cancel beside it', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    await openDeleteDialog()
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toHaveStyle({
+      background: designTokensFor('light').colour.danger,
+    })
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeVisible()
   })
 
   it('warns with the number of references before a delete, and deletes after confirming', async () => {

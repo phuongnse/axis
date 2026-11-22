@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, AxisButtonGroup } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { CodeBlock } from '../platform/CodeBlock'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
@@ -786,15 +787,20 @@ function Workspace({
         open={discarding !== null}
         width={size.dialog.small}
         title={fillText(t('shell.studio.packages.discardFile'), { file: discarding ?? '' })}
-        okText={t('shell.studio.discard')}
-        okButtonProps={{ danger: true }}
-        cancelText={t('shell.studio.cancel')}
-        onOk={() => {
-          if (discarding !== null) {
-            discard(discarding)
-          }
-          setDiscarding(null)
-        }}
+        footer={
+          <DialogFooter
+            destructive
+            finishText={t('shell.studio.discard')}
+            cancelText={t('shell.studio.cancel')}
+            onFinish={() => {
+              if (discarding !== null) {
+                discard(discarding)
+              }
+              setDiscarding(null)
+            }}
+            onCancel={() => setDiscarding(null)}
+          />
+        }
         onCancel={() => setDiscarding(null)}
       />
       {canDevelop && (

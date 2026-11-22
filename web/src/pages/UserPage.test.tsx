@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { designTokensFor } from '../platform/designTokens'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { UserRoles } from '../platform/users'
 import { TextProvider } from '../platform/TextProvider'
@@ -184,6 +185,23 @@ describe('UserPage', () => {
     const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
     expect(post[0]).toBe('/api/users/u1/give-role')
     expect(JSON.parse(post[1]!.body as string)).toEqual({ applicationId, role: 'approver' })
+  })
+
+  it('finishes Remove in solid red and Give in the usual solid primary', async () => {
+    stubRoles()
+    const page = await openAnn()
+    await within(page).findByText('Purchasing')
+
+    await userEvent.click(within(roleRow(page, 'buyer')).getByRole('button', { name: 'Remove' }))
+    const remove = await confirmation('Remove this role?')
+    expect(within(remove).getByRole('button', { name: 'Remove' })).toHaveStyle({
+      background: designTokensFor('light').colour.danger,
+    })
+    await userEvent.click(within(remove).getByRole('button', { name: 'Cancel' }))
+
+    await userEvent.click(within(roleRow(page, 'approver')).getByRole('button', { name: 'Give' }))
+    const give = await confirmation('Give this role?')
+    expect(within(give).getByRole('button', { name: 'Give' }).style.background).toBe('')
   })
 
   it('shows that an administrator cannot remove their own administrator role on a 409', async () => {

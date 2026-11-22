@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { designTokensFor } from '../platform/designTokens'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { TenantConnectedApp, TenantOutsideClients } from '../platform/tenantOutsideClients'
@@ -244,6 +245,18 @@ describe('ConnectedAppsTab', () => {
     expect(
       await screen.findByText('No app has consent yet. People give consent when they connect an MCP client.'),
     ).toBeVisible()
+  })
+
+  it('finishes the Revoke dialog in a solid red Revoke', async () => {
+    const user = userEvent.setup()
+    stubServer({ apps: [() => json({ items: [draftHelper] }), noApps] })
+    renderTab(none)
+
+    const dialog = await openRevoke(user, 'claude/desktop')
+
+    expect(within(dialog).getByRole('button', { name: 'Revoke' })).toHaveStyle({
+      background: designTokensFor('light').colour.danger,
+    })
   })
 
   it('names the client in the confirmation, posts the revoke to its encoded path and loads the list again', async () => {

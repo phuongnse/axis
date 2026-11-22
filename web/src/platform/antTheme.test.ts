@@ -345,6 +345,14 @@ describe('theme values', () => {
     expect(unsized).toEqual([])
   })
 
+  it('never makes an Ant Design dialog OK button red', () => {
+    // A destructive finish is drawn by DialogFooter, see docs/reference/actions-and-controls.md#buttons.
+    const red = Object.entries(sources)
+      .filter(([, text]) => /okButtonProps=\{\{[^}]*\bdanger/s.test(text))
+      .map(([file]) => file)
+    expect(red).toEqual([])
+  })
+
   it("puts every form's label above its input", () => {
     const beside = Object.entries(sources)
       .filter(([, text]) => {
