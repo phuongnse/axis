@@ -150,6 +150,10 @@ files are not checked. The plugin's rule for the end-to-end tests is on in `test
 - **`axis/no-antd-tag`** refuses a `<Tag>` imported from `antd`, also under another name. `StatusTag.tsx` is the one
   file that may use it. The table filter's removable chip is a control, not a tag, so it carries a disable comment
   with its reason, see [text](actions-and-controls.md#text).
+- **`axis/no-antd-empty`** refuses an `<Empty>` imported from `antd`, also under another name. `EmptyState.tsx` is the
+  one file that may use it, see [showing what is empty](actions-and-controls.md#showing-what-is-empty). It does not see
+  an import from a deep path such as `antd/es/empty`, an import through `import * as`, or the empty text that an Ant
+  Design widget draws itself.
 - **An older use carries its reason.** Each `Button` that predates the rules has an
   `oxlint-disable-next-line <rule> -- <reason>` comment on the line before it. With
   `--report-unused-disable-directives`, a comment that its line no longer needs fails the lint, so the
