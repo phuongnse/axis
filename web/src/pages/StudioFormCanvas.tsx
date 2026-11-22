@@ -301,11 +301,12 @@ function CanvasStep({
       data-marked={marked ? 'true' : undefined}
       style={{ outline: isOver ? `2px solid ${colour.primary}` : undefined, borderRadius: radius.base }}
     >
+      {/* Proposed, #4902: the step's circle already marks the step shown, so the entry draws no fill of its own, on hover
+          or when selected, as a tab draws none; the focus ring still shows for the keyboard. */}
       <AxisButton
         role="subtle"
-        selected={path !== undefined && path === selected}
         aria-current={path !== undefined && path === selected ? 'true' : undefined}
-        style={{ height: 'auto', paddingInline: 4 }}
+        style={{ height: 'auto', paddingInline: 4, background: 'transparent' }}
       >
         {children}
         {marked && (
