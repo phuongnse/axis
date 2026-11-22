@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from 'react'
-import { AxisActionRow } from './AxisButton'
+import { TitleRowActions } from './AxisButton'
 import { useDesignTokens } from './themeMode'
 
 /**
@@ -43,8 +43,7 @@ export function AxisFieldGroup({
           }}
         >
           <span id={titleId}>{title}</span>
-          {/* Proposed, #4902: a title row's main and secondary actions keep their borders; its tools stay subtle. */}
-          <AxisActionRow outlined>{action}</AxisActionRow>
+          <TitleRowActions>{action}</TitleRowActions>
         </legend>
       ) : (
         <legend style={legendStyle}>{title}</legend>

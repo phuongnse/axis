@@ -2,12 +2,13 @@ import { DeleteOutlined } from '@ant-design/icons'
 import { Flex, Modal } from 'antd'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useSearchParams } from 'react-router'
-import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { Link } from 'react-router'
+import { AxisButton, TitleRowActions } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn, type ColumnKind } from '../platform/AxisTable'
 import { setAt } from '../platform/jsonPatch'
 import { PartBoundary } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
+import { useAddressParameter } from '../platform/useAddressParameter'
 import { useDesignTokens } from '../platform/themeMode'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -115,24 +116,15 @@ export function ObjectListTable({
   const t = useText()
   const { colour, size } = useDesignTokens()
   const [editing, setEditing] = useState<Editing | null>(null)
-  const [searchParams, setSearchParams] = useSearchParams()
-  const addressed = searchParams.get('item')
+  const address = useAddressParameter('item')
   const prefix = `${pointer}/`
+  const addressed = address.value
   const addressedIndex =
     addressed !== null && addressed.startsWith(prefix) && /^\d+$/.test(addressed.slice(prefix.length))
       ? Number(addressed.slice(prefix.length))
       : null
-  const itemSearch = (index: number) => {
-    const next = new URLSearchParams(searchParams)
-    next.set('item', `${prefix}${index}`)
-    return `?${next.toString()}`
-  }
-  const leaveAddress = (replace: boolean) => {
-    if (searchParams.get('item') === null) return
-    const next = new URLSearchParams(searchParams)
-    next.delete('item')
-    setSearchParams(next, { replace, preventScrollReset: true })
-  }
+  const itemSearch = (index: number) => address.search(`${prefix}${index}`)
+  const leaveAddress = (replace: boolean) => address.write(null, { replace })
   // Set by Done while a required field is empty, until the first message is drawn and takes the focus to its field.
   const focusPending = useRef(false)
   const named = (text: string) => text.replace('{name}', itemName)
@@ -255,8 +247,7 @@ export function ObjectListTable({
         }}
       />
       {/* The row wraps the button where the portal is made, as context follows the React tree, not the slot's DOM. */}
-      {/* Proposed, #4902: a section's Add is a secondary button that keeps its border in the title row. */}
-      {addIn && createPortal(<AxisActionRow outlined>{addButton}</AxisActionRow>, addIn)}
+      {addIn && createPortal(<TitleRowActions>{addButton}</TitleRowActions>, addIn)}
       <Modal
         open={editing !== null}
         width={large ? size.dialog.large : size.dialog.medium}

@@ -54,7 +54,6 @@ export function SiteSignIn({
               </div>
               {componentDisabled ? null : (
                 <RowActions
-                  fold
                   actions={[
                     {
                       key: 'remove',

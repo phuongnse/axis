@@ -1,6 +1,6 @@
 import { Checkbox, Flex, Select, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisActionRow, AxisButton, TitleRowActions } from '../platform/AxisButton'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
@@ -592,15 +592,15 @@ function OwnGrants({
           </Flex>
         )
       })}
-      {/* Add grant is a light action on the grants panel's title row, see docs/reference/shell.md#layout. */}
+      {/* Proposed, #4902: Add grant is a secondary button on the grants panel's title row, which keeps its border. */}
       {actionSlot &&
         createPortal(
           // The row wraps the button where the portal is made, as context follows the React tree (see ObjectListTable).
-          <AxisActionRow>
+          <TitleRowActions>
             <AxisButton role="secondary" onClick={() => edit('/grants', [...grants, newGrant(target, grants)])}>
               {t('shell.studio.matrix.addGrant')}
             </AxisButton>
-          </AxisActionRow>,
+          </TitleRowActions>,
           actionSlot,
         )}
       <AxisActionRow>

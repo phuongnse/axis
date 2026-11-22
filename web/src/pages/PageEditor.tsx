@@ -276,7 +276,6 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
                     <PageParameter base={base} parameter={parameter} onChange={onChange} />
                   </div>
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',
@@ -482,7 +481,6 @@ function WidgetRow({
             }}
           />
           <RowActions
-            fold
             actions={[
               {
                 key: 'moveUp',
@@ -1134,7 +1132,6 @@ function ChartPanel({
                   )}
                 </Flex>
                 <RowActions
-                  fold
                   actions={[
                     {
                       key: 'remove',
@@ -1257,7 +1254,6 @@ function ColumnsPanel({
               )}
             </Flex>
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',
@@ -1332,7 +1328,6 @@ function TabsPanel({
               )}
             </Flex>
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',
@@ -1605,7 +1600,6 @@ function Actions({
   function removeMenu(actionPointer: string) {
     return (
       <RowActions
-        fold
         actions={[
           {
             key: 'remove',

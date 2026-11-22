@@ -530,7 +530,6 @@ function SchemaNode({
               />
             </div>
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',
@@ -1116,7 +1115,6 @@ function MarkedMap({
               />
             </div>
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',

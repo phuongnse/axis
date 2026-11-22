@@ -165,7 +165,6 @@ export function ConnectorInputRows({
                 </Flex>
                 {componentDisabled ? null : (
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',

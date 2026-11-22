@@ -161,7 +161,7 @@ export function FormSteps({
                     </AxisField>
                   </div>
                 </Flex>
-                {componentDisabled ? null : <RowActions fold actions={actionsOf(index)} />}
+                {componentDisabled ? null : <RowActions actions={actionsOf(index)} />}
               </Flex>
             )
           })}

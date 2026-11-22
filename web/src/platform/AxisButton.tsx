@@ -149,6 +149,15 @@ export interface AxisFoldAction {
   attributes?: object
 }
 
+/**
+ * Proposed, #4902: the actions of a title row, such as a section's Add, see docs/reference/actions-and-controls.md#buttons.
+ * Its main and secondary buttons keep their borders, as no finish button sits beside them, and its tools stay subtle.
+ * Every title row draws its actions through it, a slot filled through a portal included, as context follows the React tree.
+ */
+export function TitleRowActions({ children }: { children: ReactNode }) {
+  return <AxisActionRow outlined>{children}</AxisActionRow>
+}
+
 /** Justifies the row like `justify`, but starts the row at its start edge when the content is wider, so it can be measured. */
 function safeJustify(justify: FlexProps['justify']): CSSProperties['justifyContent'] {
   return justify === 'flex-end' || justify === 'end' || justify === 'center' ? `safe ${justify}` : undefined

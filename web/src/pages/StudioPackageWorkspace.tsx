@@ -1,7 +1,7 @@
 import { CloseOutlined } from '@ant-design/icons'
 import { Flex, Modal, Tabs } from 'antd'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { useLocation, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, AxisButtonGroup } from '../platform/AxisButton'
 import { CodeBlock } from '../platform/CodeBlock'
@@ -223,20 +223,22 @@ function Workspace({
     setJump((count) => count + 1)
   }
 
-  // Proposed, #4902: a file's place is a real link, `&file=<path>&line=<n>`, so the workspace opens the file the address
-  // names, and opens it again on each visit to that address, as a click on the same link does.
+  // Proposed, #4902: a file's place is a real link, `&file=<path>&line=<n>`, an entry point into the workspace: it opens
+  // the file at the line, then leaves the address, so the address never names a file the explorer has since changed.
   const fileAddressOf = (file: string, line?: number) =>
     studioPackageFileAddress(application, row.id, file.slice(prefix.length), line)
-  const [searchParams] = useSearchParams()
-  const { key: visit } = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const addressedFile = searchParams.get('file')
   const addressedLine = searchParams.get('line')
   useEffect(() => {
-    if (addressedFile !== null) {
-      openAt(prefix + addressedFile, addressedLine === null ? undefined : Number(addressedLine))
-    }
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Opens once per visit to the address, not when openAt changes.
-  }, [visit, addressedFile, addressedLine])
+    if (addressedFile === null) return
+    openAt(prefix + addressedFile, addressedLine === null ? undefined : Number(addressedLine))
+    const next = new URLSearchParams(searchParams)
+    next.delete('file')
+    next.delete('line')
+    setSearchParams(next, { replace: true, preventScrollReset: true })
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Follows the entry point alone, not each draw.
+  }, [addressedFile, addressedLine])
 
   // Moves the cursor of the file that openAt asked for once its editor is there. The editor builds its view in an effect
   // that runs before this one, so a file that loads later is reached through the editor's ref below, which bumps `jump`.

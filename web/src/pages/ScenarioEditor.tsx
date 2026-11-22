@@ -128,7 +128,6 @@ function StubCard({
           </Flex>
           {componentDisabled ? null : (
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',
@@ -238,7 +237,6 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
                     </Flex>
                     {componentDisabled ? null : (
                       <RowActions
-                        fold
                         actions={[
                           {
                             key: 'remove',

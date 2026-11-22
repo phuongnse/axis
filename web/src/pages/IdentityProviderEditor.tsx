@@ -297,7 +297,6 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                         </Flex>
                         {componentDisabled ? null : (
                           <RowActions
-                            fold
                             actions={[
                               {
                                 key: 'remove',
@@ -337,7 +336,6 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                   </Flex>
                   {componentDisabled ? null : (
                     <RowActions
-                      fold
                       actions={[
                         {
                           key: 'remove',

@@ -254,7 +254,6 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
                     </Flex>
                     {componentDisabled ? null : (
                       <RowActions
-                        fold
                         actions={[
                           {
                             key: 'remove',
@@ -357,7 +356,6 @@ function Step({
           componentDisabled ? undefined : (
             <span data-testid={`studio-step-actions-${index}`}>
               <RowActions
-                fold
                 actions={[
                   {
                     key: 'moveUp',
@@ -746,7 +744,6 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
                   </div>
                   {componentDisabled ? null : (
                     <RowActions
-                      fold
                       actions={[
                         {
                           key: 'remove',
@@ -1165,7 +1162,6 @@ function Decision({
                   </Flex>
                   {componentDisabled ? null : (
                     <RowActions
-                      fold
                       actions={[
                         {
                           key: 'remove',
@@ -1264,7 +1260,6 @@ function Outcomes({
                 </Flex>
                 {componentDisabled ? null : (
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',

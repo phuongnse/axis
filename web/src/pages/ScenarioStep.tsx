@@ -154,7 +154,6 @@ export function KeyValueRows({
             </Flex>
             {componentDisabled ? null : (
               <RowActions
-                fold
                 actions={[
                   {
                     key: 'remove',
@@ -565,7 +564,6 @@ export function ScenarioStep({
         extra={
           componentDisabled ? undefined : (
             <RowActions
-              fold
               actions={[
                 {
                   key: 'moveUp',

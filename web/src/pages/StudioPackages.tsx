@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { studioPackageAddress } from '../platform/studioAddress'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { recordPageSize } from '../platform/tableQuery'
@@ -15,11 +16,6 @@ const packageFields = [
 ] as const
 // The table has no parameters of its own.
 const noParameters: readonly string[] = []
-
-/** The address of a package's workspace. */
-function packageAddress(application: string, id: string): string {
-  return `/studio?${new URLSearchParams({ app: application, view: 'packages', package: id })}`
-}
 
 /**
  * The Packages view, `&view=packages`: the standard table of the application's extension packages, one row for each
@@ -50,7 +46,7 @@ export function StudioPackages({ application, folderRevision }: { application: s
       sortValue: (row) => row.label,
       filter: { kind: 'text', value: (row) => row.label },
       render: (_value, row) => (
-        <Link to={packageAddress(application, row.id)} data-testid={`studio-package-${row.id}`}>
+        <Link to={studioPackageAddress(application, row.id)} data-testid={`studio-package-${row.id}`}>
           {row.label}
         </Link>
       ),

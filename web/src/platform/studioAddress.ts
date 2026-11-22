@@ -31,18 +31,18 @@ export function studioReleaseAddress(application: string, number: number): strin
   return `/studio?${new URLSearchParams({ app: application, view: 'release', release: String(number) })}`
 }
 
+/** The address of a package's workspace, `&view=packages&package=<id>`. */
+export function studioPackageAddress(application: string, packageId: string): string {
+  return `/studio?${new URLSearchParams({ app: application, view: 'packages', package: packageId })}`
+}
+
 /**
- * Proposed, #4902: the address of a package's file at a line, `&view=packages&package=<id>&file=<path>&line=<n>`, where
- * `file` is the path inside the package. The workspace opens the file and puts the cursor on the line.
+ * Proposed, #4902: the address of a package's file at a line, its workspace's address with `&file=<path>&line=<n>`,
+ * where `file` is the path inside the package. The workspace opens the file and puts the cursor on the line.
  */
 export function studioPackageFileAddress(application: string, packageId: string, file: string, line?: number): string {
-  return `/studio?${new URLSearchParams({
-    app: application,
-    view: 'packages',
-    package: packageId,
-    file,
-    ...(line === undefined ? {} : { line: String(line) }),
-  })}`
+  const params = new URLSearchParams({ file, ...(line === undefined ? {} : { line: String(line) }) })
+  return `${studioPackageAddress(application, packageId)}&${params.toString()}`
 }
 
 /** Proposed, #4902: gives the address that opens a resource at a path, so a reference to it is a real link. */

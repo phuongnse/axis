@@ -327,7 +327,6 @@ function Operation({
         </Flex>
         {componentDisabled ? null : (
           <RowActions
-            fold
             actions={[
               {
                 key: 'remove',
@@ -477,7 +476,6 @@ function FieldRows({
                 </Flex>
                 {componentDisabled ? null : (
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',
@@ -576,7 +574,6 @@ function NestedFields({
                 </Flex>
                 {componentDisabled ? null : (
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',

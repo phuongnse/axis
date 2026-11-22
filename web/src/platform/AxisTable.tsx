@@ -1,4 +1,4 @@
-import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
 import { ConfigProvider, Dropdown, Flex, Input, Pagination, Table, type TableColumnType, type TableProps } from 'antd'
 import {
   useContext,
@@ -899,16 +899,24 @@ function MovedCells({
 }
 
 /**
- * A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. It is exported for a list
- * that is not a table, such as the resource form's rows, which passes `fold` to keep its actions in the "…" menu, see
- * docs/reference/actions-and-controls.md#tables.
+ * The icon of an action whose meaning the platform knows, by its key, so a row's Remove or Delete is the same trash icon
+ * in a table and in a list.
  */
-export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold: boolean }) {
+const knownIcons: Record<string, ReactNode> = { remove: <DeleteOutlined />, delete: <DeleteOutlined /> }
+
+/**
+ * A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. It is exported for a list
+ * that is not a table, such as the resource form's rows, see docs/reference/actions-and-controls.md#tables.
+ * Proposed, #4902: one threshold everywhere. One or two actions are buttons and three or more fold into the "…" menu,
+ * so a menu never holds one entry. A table passes `fold` for all its rows at once, by the number its author configured
+ * and at narrow width; a list's row folds by its own count. An action the platform knows, such as Remove, is its icon.
+ */
+export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold?: boolean }) {
   const t = useText()
   if (actions === null || actions.length === 0) {
     return null
   }
-  if (fold) {
+  if (fold ?? actions.length >= foldFrom) {
     return (
       <Dropdown
         trigger={['click']}
@@ -924,34 +932,36 @@ export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null;
   }
   return (
     <Flex gap="small">
-      {actions.map((action) =>
-        action.icon ? (
-          <AxisButton
-            key={action.key}
-            role="icon"
-            size="small"
-            nameKey={action.labelKey}
-            destructive={action.destructive}
-            icon={action.icon}
-            nameSuffix={action.nameSuffix}
-            disabled={action.disabled}
-            onClick={action.onClick}
-            {...action.attributes}
-          />
-        ) : (
-          <AxisButton
-            key={action.key}
-            role="subtle"
-            size="small"
-            destructive={action.destructive}
-            disabled={action.disabled}
-            onClick={action.onClick}
-            {...action.attributes}
-          >
-            {t(action.labelKey)}
-          </AxisButton>
-        ),
-      )}
+      {actions
+        .map((known) => ({ ...known, icon: known.icon ?? knownIcons[known.key] }))
+        .map((action) =>
+          action.icon ? (
+            <AxisButton
+              key={action.key}
+              role="icon"
+              size="small"
+              nameKey={action.labelKey}
+              destructive={action.destructive}
+              icon={action.icon}
+              nameSuffix={action.nameSuffix}
+              disabled={action.disabled}
+              onClick={action.onClick}
+              {...action.attributes}
+            />
+          ) : (
+            <AxisButton
+              key={action.key}
+              role="subtle"
+              size="small"
+              destructive={action.destructive}
+              disabled={action.disabled}
+              onClick={action.onClick}
+              {...action.attributes}
+            >
+              {t(action.labelKey)}
+            </AxisButton>
+          ),
+        )}
     </Flex>
   )
 }

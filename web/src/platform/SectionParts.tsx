@@ -1,6 +1,6 @@
 import { Flex, Typography } from 'antd'
 import { Children, createContext, isValidElement, useContext, useId, useState, type ReactNode } from 'react'
-import { AxisActionRow, AxisButton } from './AxisButton'
+import { AxisButton, TitleRowActions } from './AxisButton'
 import { Chevron } from './Chevron'
 import { ContentInsetContext } from './contentInsetContext'
 import { useDesignTokens } from './themeMode'
@@ -147,11 +147,7 @@ export function SectionPart({
           {typeof children === 'function' ? (
             <div ref={setSlot} />
           ) : (
-            action !== null &&
-            action !== undefined && (
-              // Proposed, #4902: a title row's main and secondary actions keep their borders; its tools stay subtle.
-              <AxisActionRow outlined>{action}</AxisActionRow>
-            )
+            action !== null && action !== undefined && <TitleRowActions>{action}</TitleRowActions>
           )}
         </Flex>
         {body}

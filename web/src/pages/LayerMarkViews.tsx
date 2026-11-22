@@ -1,5 +1,5 @@
 import { Flex, Typography } from 'antd'
-import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisButton } from '../platform/AxisButton'
 import { fillText } from '../platform/fillText'
 import { markName, markOf, type LayerElement, type LayerMark } from '../platform/layerMarks'
 import { StatusTag } from '../platform/StatusTag'
@@ -67,17 +67,16 @@ export function LayerMarkTag({
 function ResetElement({ layer, list, name }: { layer: DesignerLayer; list: string; name: string }) {
   const t = useText()
   return (
-    <AxisActionRow>
-      <AxisButton
-        role="secondary"
-        size="small"
-        aria-label={fillText(t('shell.studio.module.resetElementName'), { name })}
-        disabled={layer.disabled}
-        onClick={() => layer.onReset(list, name)}
-      >
-        {t('shell.studio.module.resetElement')}
-      </AxisButton>
-    </AxisActionRow>
+    // Proposed, #4902: a tool, so a subtle button, not a secondary one that a row makes borderless.
+    <AxisButton
+      role="subtle"
+      size="small"
+      aria-label={fillText(t('shell.studio.module.resetElementName'), { name })}
+      disabled={layer.disabled}
+      onClick={() => layer.onReset(list, name)}
+    >
+      {t('shell.studio.module.resetElement')}
+    </AxisButton>
   )
 }
 
