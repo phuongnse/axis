@@ -101,7 +101,7 @@ async function findPreviewLinks(
  * page's Activate… calls.
  * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
  * sends the same request with the names it is given. A test request shows its results under the status line, and
- * selecting a failed scenario calls `onOpenScenario`. A publish, validate or preview shows the contract scenarios it
+ * a scenario's name links to its address, built by `scenarioAddressOf`. A publish, validate or preview shows the contract scenarios it
  * stored under the status line, when it stored any.
  * Studio checks the request every second until it is `succeeded` or `failed`, with no time limit, and shows its
  * status meanwhile. When it ends, its diagnostics go to the Problems panel. A succeeded publish or activate
@@ -132,7 +132,7 @@ export function StudioPublishing({
   publishView,
   onOpenPublish,
   onDiagnostics,
-  onOpenScenario,
+  scenarioAddressOf,
   onBusyChange,
   ref,
   children,
@@ -154,7 +154,7 @@ export function StudioPublishing({
   publishView: boolean
   onOpenPublish: () => void
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
-  onOpenScenario: (resourceId: string, path: string) => void
+  scenarioAddressOf: (resourceId: string, path: string) => string
   onBusyChange?: (busy: boolean) => void
   ref?: Ref<StudioPublishingHandle>
   children?: ReactNode | ((history: StudioReleases | 'failed' | undefined) => ReactNode)
@@ -339,7 +339,7 @@ export function StudioPublishing({
         {sendError !== null && <AxisAlert data-testid="studio-request-error" kind="error" message={sendError} />}
         {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
         {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
-          <StudioTestResults request={request} onSelect={onOpenScenario} />
+          <StudioTestResults request={request} scenarioAddressOf={scenarioAddressOf} />
         )}
         {previewLinks.length > 0 && (
           <Flex vertical gap={4}>

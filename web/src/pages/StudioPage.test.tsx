@@ -625,7 +625,9 @@ describe('StudioPage', () => {
     const panel = await openProblems()
     expect(within(panel).getByText('AXC0101')).toBeInTheDocument()
     expect(within(panel).getByText('The field type is unknown.')).toBeInTheDocument()
-    expect(await within(panel).findByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
+    expect((await within(panel).findByRole('link', { name: 'PurchaseRequest' })).getAttribute('href')).toContain(
+      `resource=${entityId}`,
+    )
     expect(within(panel).getByText('application.json')).toBeInTheDocument()
     expect(within(panel).queryByText(/Path:/)).not.toBeInTheDocument()
   })
@@ -635,7 +637,7 @@ describe('StudioPage', () => {
     renderPage()
 
     const panel = await openProblems()
-    await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
+    await userEvent.click(await within(panel).findByRole('link', { name: 'PurchaseRequest' }))
 
     expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
     expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}`)
@@ -651,7 +653,7 @@ describe('StudioPage', () => {
     const item = within(panel).getByText('AXC0001').closest('li')!
     expect(within(item).queryByRole('button')).not.toBeInTheDocument()
     expect(within(item).getByText('application.json')).toBeInTheDocument()
-    expect(within(panel).getByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
+    expect(within(panel).getByRole('link', { name: 'PurchaseRequest' })).toBeInTheDocument()
   })
 
   it('opens the resource of a clicked diagnostic at its path and scrolls to that field', async () => {
@@ -662,7 +664,7 @@ describe('StudioPage', () => {
       renderPage()
 
       const panel = await openProblems()
-      await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
+      await userEvent.click(await within(panel).findByRole('link', { name: 'PurchaseRequest' }))
 
       // The editor scrolls the row of the field, then the designer scrolls the setting inside the field's drawer.
       const field = await screen.findByTestId('studio-field-/fields/0')
@@ -697,7 +699,7 @@ describe('StudioPage', () => {
       renderPage()
 
       const panel = await openProblems()
-      await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
+      await userEvent.click(await within(panel).findByRole('link', { name: 'PurchaseRequest' }))
 
       await screen.findByTestId('studio-field-/fields/0')
       expect(screen.getByTestId('location')).toHaveTextContent(/resource=[^&]+$/)
@@ -1006,7 +1008,7 @@ describe('StudioPage', () => {
       expect(items[0]).toHaveTextContent('AXC0101')
       expect(items[1]).toHaveTextContent('AXC0001')
 
-      await userEvent.click(within(panel).getByRole('button', { name: 'PurchaseRequest' }))
+      await userEvent.click(within(panel).getByRole('link', { name: 'PurchaseRequest' }))
 
       expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}`)
       expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
@@ -1322,7 +1324,7 @@ describe('StudioPage', () => {
       )
 
       const panel = await openProblems()
-      await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }, slow))
+      await userEvent.click(await within(panel).findByRole('link', { name: 'PurchaseRequest' }, slow))
 
       // The editor scrolls the row of the field, then the designer scrolls the setting inside the field's drawer.
       const field = await screen.findByTestId('studio-field-/fields/0', {}, slow)
@@ -1556,7 +1558,7 @@ describe('StudioPage leaving unsaved changes', () => {
     const maxLength = await editMaxLength()
 
     const panel = await openProblems()
-    await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
+    await userEvent.click(await within(panel).findByRole('link', { name: 'PurchaseRequest' }))
     await stay()
 
     expect(router.state.location.pathname + router.state.location.search).toBe(titleAddress)

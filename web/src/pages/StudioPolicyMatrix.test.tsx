@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioMatrixCell, StudioMatrixRole, StudioNames, StudioPolicyMatrix } from '../platform/studio'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { ThemeModeProvider } from '../platform/theme'
 import { chooseOption, emptyDescription, optionTexts, removeTag } from '../test/antd'
 import { clickInDialog, dialog, pick } from '../test/tableFilter'
@@ -146,7 +147,6 @@ function patches(fetchMock: ReturnType<typeof stubFetch>) {
 }
 
 function renderMatrix(overrides: Partial<StudioPolicyMatrix> = {}) {
-  const onOpenPolicy = vi.fn()
   const onWritten = vi.fn()
   render(
     <MemoryRouter>
@@ -156,14 +156,14 @@ function renderMatrix(overrides: Partial<StudioPolicyMatrix> = {}) {
             application={application}
             matrix={{ ...matrix, ...overrides }}
             names={names}
-            onOpenPolicy={onOpenPolicy}
+            policyAddressOf={(id) => studioResourceAddress(application, id)}
             onWritten={onWritten}
           />
         </TextProvider>
       </ThemeModeProvider>
     </MemoryRouter>,
   )
-  return Object.assign(onOpenPolicy, { onWritten })
+  return { onWritten }
 }
 
 afterEach(() => {
@@ -199,9 +199,9 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(screen.queryByTestId('studio-matrix-cell-manager-entity-PurchaseRequest')).not.toBeInTheDocument()
   })
 
-  it('marks a shared grant and opens its policy', async () => {
+  it('marks a shared grant and links its Open policy to the policy', async () => {
     stubFetch()
-    const onOpenPolicy = renderMatrix()
+    renderMatrix()
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
 
@@ -209,12 +209,15 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(grants).toHaveLength(1)
     expect(within(grants[0]).getByText('Shared')).toBeInTheDocument()
     expect(within(grants[0]).queryByRole('checkbox')).not.toBeInTheDocument()
-    await userEvent.click(within(grants[0]).getByRole('button', { name: 'Open policy' }))
-    expect(onOpenPolicy).toHaveBeenCalledWith(sharedPolicyId)
+    expect(within(grants[0]).getByRole('link', { name: 'Open policy' })).toHaveAttribute(
+      'href',
+      studioResourceAddress(application, sharedPolicyId),
+    )
+    expect(within(grants[0]).queryByRole('button', { name: 'Open policy' })).not.toBeInTheDocument()
   })
 
   it('tags a module grant with its module and offers no link to open its policy', async () => {
-    const onOpenPolicy = renderMatrix({
+    renderMatrix({
       roles: [
         {
           ...matrix.roles[1],
@@ -248,8 +251,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(within(grant).getByText('approvals/ApproverAccess')).toBeInTheDocument()
     expect(within(grant).getByText('Shared')).toBeInTheDocument()
     expect(within(grant).getByText('approvals')).toBeInTheDocument()
-    expect(within(grant).queryByRole('button', { name: 'Open policy' })).not.toBeInTheDocument()
-    expect(onOpenPolicy).not.toHaveBeenCalled()
+    expect(within(grant).queryByRole('link', { name: 'Open policy' })).not.toBeInTheDocument()
   })
 
   it('shows the filter and the fields of a grant of a read-only row, and all fields when none are listed', async () => {
@@ -689,7 +691,7 @@ describe('StudioPolicyMatrixTable reasons', () => {
               application={application}
               matrix={{ ...matrix, roles }}
               names={null}
-              onOpenPolicy={vi.fn()}
+              policyAddressOf={(id) => studioResourceAddress(application, id)}
               onWritten={vi.fn()}
             />
           </TextProvider>

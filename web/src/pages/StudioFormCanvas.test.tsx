@@ -12,12 +12,12 @@ import type {
   StudioResourceItem,
   StudioResourceReferences,
 } from '../platform/studio'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioEditor } from './StudioEditor'
-import type { OpenResource } from './StudioFormUsedOn'
 
 const folder = '/api/studio/apps/Desk'
 const formId = '1db765b0-483d-456b-9939-17e2a36de3b6'
@@ -227,7 +227,7 @@ function stub(
   return fetchMock
 }
 
-function renderEditor(onOpen: OpenResource = vi.fn()) {
+function renderEditor() {
   render(
     <MemoryRouter initialEntries={['/studio?app=Desk&resource=ticket-edit']}>
       <ThemeModeProvider>
@@ -239,7 +239,7 @@ function renderEditor(onOpen: OpenResource = vi.fn()) {
               resources={[item]}
               path={null}
               diagnosticPaths={[]}
-              onOpen={onOpen}
+              addressOf={(id, path) => studioResourceAddress('Desk', id, path)}
               onSaved={vi.fn()}
               onTextsWritten={vi.fn()}
               onDeleted={vi.fn()}
@@ -249,7 +249,6 @@ function renderEditor(onOpen: OpenResource = vi.fn()) {
       </ThemeModeProvider>
     </MemoryRouter>,
   )
-  return onOpen
 }
 
 const slow = { timeout: 5000 }
@@ -661,10 +660,10 @@ describe('the Used on list of a form', () => {
     const section = await screen.findByTestId('studio-form-used-on', {}, slow)
     const entries = await within(section).findAllByTestId('studio-form-used-on-entry')
     expect(entries).toHaveLength(2)
-    expect(within(entries[0]).getByRole('button', { name: 'Tickets' })).toBeInTheDocument()
+    expect(within(entries[0]).getByRole('link', { name: 'Tickets' })).toBeInTheDocument()
     expect(within(entries[0]).getByText('Page')).toBeInTheDocument()
     expect(within(entries[0]).getByText('Shows it in a widget')).toBeInTheDocument()
-    expect(within(entries[1]).getByRole('button', { name: 'Triage' })).toBeInTheDocument()
+    expect(within(entries[1]).getByRole('link', { name: 'Triage' })).toBeInTheDocument()
     expect(within(entries[1]).getByText('Process')).toBeInTheDocument()
     expect(within(entries[1]).getByText('Shows it in a task')).toBeInTheDocument()
   })
@@ -683,14 +682,16 @@ describe('the Used on list of a form', () => {
     expect(entries[1]).not.toHaveTextContent('/steps/1/form')
   })
 
-  it('opens the process at the path of its entry when the entry is clicked', async () => {
+  it('links an entry to the process at the path of its entry', async () => {
     stub(undefined, undefined, { uses: [], usedBy: [processUse] })
-    const onOpen = renderEditor()
+    renderEditor()
 
     await openDesign()
     const section = await screen.findByTestId('studio-form-used-on', {}, slow)
-    await userEvent.click(await within(section).findByRole('button', { name: 'Triage' }))
-    expect(onOpen).toHaveBeenCalledWith('triage-process', '/steps/1/form')
+    expect(await within(section).findByRole('link', { name: 'Triage' })).toHaveAttribute(
+      'href',
+      '/studio?app=Desk&resource=triage-process&path=%2Fsteps%2F1%2Fform',
+    )
   })
 
   it('says that no page or process uses the form when no entry is a widget or task form', async () => {
