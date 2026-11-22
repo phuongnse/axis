@@ -395,7 +395,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Problems panel with many problems',
       fixtures: studioFixtures.manyProblems,
       entry: `/studio?app=${application}`,
-      clickOnMount: '[data-testid="studio-problems"]',
+      draw: () => (
+        <ClickOnMount selector='[data-testid="studio-problems"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
     },
     {
       caption: 'Overview of a new application',
@@ -426,24 +430,9 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: `/studio?app=${application}&view=release&release=2`,
     },
   ].map(
-    ({
-      clickOnMount,
-      ...state
-    }: {
-      caption: string
-      fixtures: Record<string, FixtureRoute>
-      entry: string
-      clickOnMount?: string
-    }) => ({
+    (state: { caption: string; fixtures: Record<string, FixtureRoute>; entry: string; draw?: () => ReactNode }) => ({
+      draw: () => <ShellPreview />,
       ...state,
-      draw: () =>
-        clickOnMount === undefined ? (
-          <ShellPreview />
-        ) : (
-          <ClickOnMount selector={clickOnMount}>
-            <ShellPreview />
-          </ClickOnMount>
-        ),
       frameHeight: 640,
     }),
   ),

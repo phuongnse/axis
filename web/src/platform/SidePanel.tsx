@@ -107,10 +107,6 @@ export function SidePanel({
           style={{
             flex: 1,
             minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: spacing.sm,
-            padding: spacing.sm,
             overflowY: 'auto',
             overscrollBehavior: 'contain',
             scrollbarGutter: 'stable',
@@ -124,9 +120,8 @@ export function SidePanel({
             gap={spacing.sm}
             style={{
               position: 'sticky',
-              top: -spacing.sm,
+              top: 0,
               zIndex: 1,
-              margin: `-${spacing.sm}px -${spacing.sm}px 0`,
               padding: spacing.sm,
               background: colour.surface,
               // A rule goes under a block's title row, see docs/reference/shell.md#layout, so the body that scrolls
@@ -153,7 +148,7 @@ export function SidePanel({
               />
             )}
           </Flex>
-          <div>{children}</div>
+          <div style={{ padding: spacing.sm }}>{children}</div>
         </div>
       </aside>
     </ShellAside>
