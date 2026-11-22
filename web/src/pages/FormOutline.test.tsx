@@ -1,17 +1,19 @@
 import { DndContext } from '@dnd-kit/core'
 import { render, screen, within } from '@testing-library/react'
+import { theme } from 'antd'
 import { describe, expect, it } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { antThemeFor } from '../platform/antTheme'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { FormOutline } from './FormOutline'
 
-function renderOutline(draft: Record<string, unknown>) {
+function renderOutline(draft: Record<string, unknown>, selected: string | null = null) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <DndContext>
-          <FormOutline draft={draft} selected={null} onSelect={() => {}} />
+          <FormOutline draft={draft} selected={selected} onSelect={() => {}} />
         </DndContext>
       </TextProvider>
     </ThemeModeProvider>,
@@ -55,5 +57,24 @@ describe('FormOutline', () => {
       '/sections/0',
       '/sections/1',
     ])
+  })
+
+  it('puts the chosen row on the selected tint and no other row', () => {
+    const tint = theme.getDesignToken(antThemeFor('light')).controlItemBgActive
+    renderOutline(
+      {
+        sections: [
+          { name: 'a', fields: [{ field: 'title' }] },
+          { name: 'b', fields: [] },
+        ],
+      },
+      '/sections/0',
+    )
+
+    const rows = screen.getAllByTestId('studio-outline-section')
+    expect(rows[0]).toHaveAttribute('aria-current', 'true')
+    expect(rows[0]).toHaveStyle({ background: tint })
+    expect(rows[1]).not.toHaveAttribute('aria-current')
+    expect(rows[1]).not.toHaveStyle({ background: tint })
   })
 })

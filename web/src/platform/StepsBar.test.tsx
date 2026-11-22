@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { contrast } from '../test/contrast'
 import { designTokensFor } from './designTokens'
 import { StepsBar } from './StepsBar'
@@ -93,5 +94,58 @@ describe('StepsBar', () => {
       '0px',
       '0px',
     ])
+  })
+})
+
+describe('StepsBar with onPick', () => {
+  it('makes each step a button named by its title, and a click picks its index', async () => {
+    const onPick = vi.fn()
+    render(<StepsBar titles={['Basics', 'Extras', 'Review']} current={0} onPick={onPick} />)
+
+    const bar = screen.getByTestId('steps-bar')
+    expect(within(bar).getAllByRole('button')).toHaveLength(3)
+    expect(within(bar).getByRole('button', { name: 'Basics' })).toBeInTheDocument()
+    expect(within(bar).getByRole('button', { name: 'Review' })).toBeInTheDocument()
+    await userEvent.click(within(bar).getByRole('button', { name: 'Extras' }))
+
+    expect(onPick).toHaveBeenCalledTimes(1)
+    expect(onPick).toHaveBeenCalledWith(1)
+  })
+
+  it('keeps the one aria-current on the step shown, and adds none to a button', () => {
+    render(<StepsBar titles={['Basics', 'Extras']} current={1} onPick={() => {}} />)
+
+    const bar = screen.getByTestId('steps-bar')
+    expect(bar.querySelectorAll('[aria-current]')).toHaveLength(1)
+    expect(screen.getAllByRole('listitem')[1]).toHaveAttribute('aria-current', 'step')
+    expect(screen.getByRole('button', { name: 'Extras' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('draws the steps of seven or more as buttons with no focusable circle inside', () => {
+    render(<StepsBar titles={sevenTitles} current={2} onPick={() => {}} />)
+
+    const bar = screen.getByTestId('steps-bar')
+    expect(bar.querySelectorAll('[tabindex]')).toHaveLength(0)
+    expect(within(bar).getAllByRole('button')).toHaveLength(sevenTitles.length)
+    expect(within(bar).getByRole('button', { name: 'Five' })).toBeInTheDocument()
+  })
+
+  it('wraps each step, its button or its title, with what `entry` returns', () => {
+    render(
+      <StepsBar
+        titles={['Basics', 'Extras']}
+        current={0}
+        onPick={() => {}}
+        entry={(index, content) => <span data-testid={`entry-${index}`}>{content}</span>}
+      />,
+    )
+
+    expect(within(screen.getByTestId('entry-1')).getByRole('button', { name: 'Extras' })).toBeInTheDocument()
+  })
+
+  it('draws no button without onPick', () => {
+    render(<StepsBar titles={['Basics', 'Extras']} current={0} />)
+
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })
