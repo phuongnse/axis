@@ -112,16 +112,16 @@ type NameDialog = { kind: 'file' | 'folder'; parent: string } | { kind: 'rename'
 
 /**
  * A package's explorer, the Files pane of the workspace: a tree of the package's folders and files under the title row
- * Files, see docs/reference/studio-packages.md#a-packages-files. With `canDevelop` the title row has New, which offers New
- * file… and New folder…, and a file's or folder's menu, on a right click, Shift+F10 or the menu key, offers New file…,
- * New folder…, Rename… (also F2), Delete… and Copy path. Without it the menu offers only Copy path. New file… creates an
- * empty file with `If-None-Match: *` and opens it. New folder… adds an empty folder to the tree only, which stays until a
- * file is in it. Rename… sends one move that lists each file of the node with its version, `versionOf`, and `onRenamed`
- * hears the new path of each. Delete… asks first and then deletes each file of the node, one after another, `onDeleted`
- * hears the paths gone and a failure goes to `onFailed`. Every write reads the list again through `onRefresh` and tells
- * the folder's diagnostics to `onWritten`. Refresh reads the list again too. With `canDevelop` a file or folder can also
- * be dragged onto a folder, or onto the free space for the package's root, which sends the same one move as Rename…, and
- * a refusal goes to `onFailed`.
+ * Files, see docs/reference/studio-packages.md#a-packages-files. With `canDevelop` the title row has New, which offers
+ * New file… and New folder…, and a file's or folder's menu, on a right click, Shift+F10 or the menu key, offers New
+ * file…, New folder…, Rename… (also F2) and Copy path, then Delete… after a divider, see `menuOf`. Without `canDevelop`
+ * the menu offers only Copy path. New file… creates an empty file with `If-None-Match: *` and opens it. New folder…
+ * adds an empty folder to the tree only, which stays until a file is in it. Rename… sends one move that lists each file
+ * of the node with its version, `versionOf`, and `onRenamed` hears the new path of each. Delete… asks first and then
+ * deletes each file of the node, one after another, `onDeleted` hears the paths gone and a failure goes to `onFailed`.
+ * Every write reads the list again through `onRefresh` and tells the folder's diagnostics to `onWritten`. Refresh reads
+ * the list again too. With `canDevelop` a file or folder can also be dragged onto a folder, or onto the free space for
+ * the package's root, which sends the same one move as Rename…, and a refusal goes to `onFailed`.
  */
 export function StudioPackageExplorer({
   application,

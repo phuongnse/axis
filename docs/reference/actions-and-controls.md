@@ -127,8 +127,9 @@ choices.
   size token, and wider when an item needs the room.
 - **One threshold everywhere** _(planned)_. One or two actions show as buttons on a page's heading, a section's title
   row, a table's row or a list's item. From three on, or when the row runs out of room, they fold into one "…" menu.
-- **A menu never holds one entry** _(planned)_. A menu has at least two entries, and a destructive one comes last,
-  after a divider.
+- **A destructive entry comes last.** In a menu of actions, a destructive entry comes after the others, behind one
+  divider.
+- **A menu never holds one entry** _(planned)_. A menu has at least two entries.
 
 ## Fields
 
