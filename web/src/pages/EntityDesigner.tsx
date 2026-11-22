@@ -2260,12 +2260,18 @@ function MessageCell({ message }: { message: unknown }) {
   return text === '' ? <EmptyDash /> : text
 }
 
-/** A validation's field by its label, else by its name, or the dash when it names none. */
+/** A validation's field by its label, else by its name, or "Top of the form" in `textMuted` when it names none. */
 function FieldCell({ name, fields }: { name: unknown; fields: unknown[] }) {
   const field = fields.find((candidate) => isContent(candidate) && candidate.name === name)
   const label = useMessageText(isContent(field) ? field.label : undefined)
+  const t = useText()
+  const { colour } = useDesignTokens()
   const own = text(name)
-  return own === '' ? <EmptyDash /> : label || own
+  return own === '' ? (
+    <span style={{ color: colour.textMuted }}>{t('shell.studio.entity.validationTopOfForm')}</span>
+  ) : (
+    label || own
+  )
 }
 
 /**
@@ -2322,7 +2328,7 @@ const Validations = memo(function Validations({
         panels?.take('validations')
         setOpen(null)
         setStagedErrors({})
-        setStaged({ name: '', expression: '', message: { textKey: '' }, field })
+        setStaged({ name: '', expression: '', message: { textKey: '' }, ...(field === '' ? {} : { field }) })
       },
     }
   })
@@ -2650,13 +2656,15 @@ const ValidationPanel = memo(function ValidationPanel({
               />
             </AxisFieldGroup>
           </div>
+          {/* Proposed, #3264: a validation of the whole record names no field, and its message shows at the top of the
+              form, as Salesforce's error location may be the top of the page. */}
           <Picker
             pointer={`${pointer}/field`}
             {...fieldTexts(t, 'validations.field')}
             options={fieldOptions}
             value={content.field}
-            required
-            onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
+            required={false}
+            onPick={(next) => onChange(`${pointer}/field`, next)}
           />
         </Flex>
       </ContentInsetContext.Provider>
