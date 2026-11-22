@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Axis.ControlPlane.Audit;
 using Axis.ControlPlane.Cells;
+using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.RegionDirectory;
@@ -46,8 +47,10 @@ public sealed class BillingApiTests : IAsyncLifetime
     private readonly DateOnly _paidThrough = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private NpgsqlDataSource _dataSource = null!;
     private ILoggerFactory _loggers = null!;
+    private ControlPlaneOptions _controlPlane = null!;
     private CellClients _clients = null!;
     private JobRunner _runner = null!;
+    private SubscriptionClock _clock = null!;
     private WebApplicationFactory<Program> _factory = null!;
     private HttpClient _http = null!;
 
@@ -72,18 +75,19 @@ public sealed class BillingApiTests : IAsyncLifetime
             await Execute($"INSERT INTO directory.tenants (id, region_code, cell_id) VALUES ('{tenant}', 'vn', 'vn-1')");
         }
 
-        var controlPlane = new ControlPlaneOptions
+        _controlPlane = new ControlPlaneOptions
         {
             TenantDomain = "vn.example.com",
             PublicUrl = "https://account.vn.example.com",
             MailFrom = "no-reply@vn.example.com",
         };
-        controlPlane.Cells.Add(new CellOptions { Id = "vn-1", InternalUrl = "https://vn-1.test", TokenUrl = "https://vn-1.test/token", ClientId = "axis-controlplane" });
-        controlPlane.CellSecrets["vn-1"] = "cell-secret";
-        _clients = new CellClients(controlPlane, new StubHttpClientFactory(_cell), new CellClientOptions(), TimeProvider.System);
+        _controlPlane.Cells.Add(new CellOptions { Id = "vn-1", InternalUrl = "https://vn-1.test", TokenUrl = "https://vn-1.test/token", ClientId = "axis-controlplane" });
+        _controlPlane.CellSecrets["vn-1"] = "cell-secret";
+        _clients = new CellClients(_controlPlane, new StubHttpClientFactory(_cell), new CellClientOptions(), TimeProvider.System);
         _loggers = LoggerFactory.Create(_ => { });
         var quotas = new SubscriptionQuotas(_dataSource, _dataSource, _clients, _catalogue, TimeProvider.System, _loggers.CreateLogger<SubscriptionQuotas>());
         var resume = new SubscriptionResume(_dataSource, _dataSource, _clients, _loggers.CreateLogger<SubscriptionResume>());
+        _clock = new SubscriptionClock(_dataSource, _dataSource, _clients, EmailTemplates.LoadEmbedded(), _controlPlane, TimeProvider.System, _loggers.CreateLogger<SubscriptionClock>());
         _runner = new JobRunner(_dataSource, [quotas, resume], new JobRunnerOptions { BaseDelay = TimeSpan.Zero }, _loggers.CreateLogger<JobRunner>());
 
         // No cell is configured for the host, so only the test's runner claims the jobs.
@@ -141,8 +145,8 @@ public sealed class BillingApiTests : IAsyncLifetime
         Assert.NotEqual(before, await StepAsync(id));
         Assert.Equal($"{_paidThrough:yyyy-MM-dd}", await TextAsync($"SELECT to_char(paid_through, 'YYYY-MM-DD') FROM control_plane.subscriptions WHERE id = '{id}'"));
         Assert.Equal(
-            $"{_paidThrough.AddDays(1):yyyy-MM-dd}T00:00|",
-            await TextAsync($"SELECT to_char(next_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI') || '|' || coalesce(period_ends_at::text, '') FROM control_plane.subscriptions WHERE id = '{id}'"));
+            $"{_paidThrough.AddDays(1):yyyy-MM-dd}T00:00",
+            await TextAsync($"SELECT to_char(next_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI') FROM control_plane.subscriptions WHERE id = '{id}'"));
         var record = Assert.Single(await AuditAsync(id.ToString()));
         Assert.Equal(("billing", BillingClient, "subscription.active"), (record.ActorKind, record.Actor, record.Action));
         Assert.Equal(1L, await ScalarAsync<long>($"SELECT count(*) FROM control_plane.jobs WHERE kind = '{SubscriptionQuotas.JobKind}'"));
@@ -185,6 +189,32 @@ public sealed class BillingApiTests : IAsyncLifetime
         var put = Assert.Single(_cell.Puts);
         Assert.Equal(25, put.Set[QuotaKeys.Users]);
         Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs WHERE state <> 'succeeded'"));
+    }
+
+    [Fact]
+    public async Task A_past_due_subscription_that_the_clock_moved_returns_to_active_on_a_new_paid_through_date_and_the_cell_resumes_the_tenant()
+    {
+        var id = await SeedAsync(Tenant, "active", paidThrough: DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1));
+
+        await _clock.RunAsync(new ClaimedJob(Guid.NewGuid(), SubscriptionClock.JobKind, [], 1), TestContext.Current.CancellationToken);
+
+        Assert.Equal("pastDue", await StateAsync(id));
+        Assert.Empty(_cell.Calls);
+
+        var response = await PutAsync(Tenant, "paid-through:back", $$"""{"paidThrough":"{{_paidThrough:yyyy-MM-dd}}"}""", Token());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("active", await StateAsync(id));
+        var step = await StepAsync(id);
+        var records = await AuditAsync(id.ToString());
+        Assert.Equal(["subscription.pastDue", "subscription.active"], records.Select(record => record.Action));
+        Assert.Equal("job", records[0].ActorKind);
+        Assert.Equal(("billing", BillingClient), (records[1].ActorKind, records[1].Actor));
+
+        await DrainAsync();
+
+        var resume = Assert.Single(_cell.Resumes);
+        Assert.Equal($"resume:{step}", resume.Key);
     }
 
     [Fact]
@@ -433,8 +463,8 @@ public sealed class BillingApiTests : IAsyncLifetime
         return await AuditRecords.ReadAsync(connection, subject, TestContext.Current.CancellationToken);
     }
 
-    // A subscription of a verified sign-up that pins version 1 of the team plan, or none. A new trial pins no plan.
-    private async Task<Guid> SeedAsync(string tenant, string state, bool pinsPlan = true)
+    // A subscription of a verified sign-up that pins version 1 of the team plan, or none. A new trial pins no plan. With a paidThrough it is due the day after.
+    private async Task<Guid> SeedAsync(string tenant, string state, bool pinsPlan = true, DateOnly? paidThrough = null)
     {
         var signUp = Guid.CreateVersion7();
         var id = Guid.CreateVersion7();
@@ -442,9 +472,11 @@ public sealed class BillingApiTests : IAsyncLifetime
             INSERT INTO control_plane.sign_ups (id, full_name, email, normalised_email, business_name, subdomain, language, application, state, expires_at)
             VALUES ('{signUp}', 'An', '{tenant}@example.com', '{tenant}@example.com', 'Acme', '{tenant}', 'en', '', 'verified', now())
             """);
+        var nextAt = paidThrough is { } date ? $"'{date.AddDays(1):yyyy-MM-dd}T00:00:00Z'::timestamptz" : "now()";
         await Execute($"""
-            INSERT INTO control_plane.subscriptions (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id{(pinsPlan ? ", plan_code, plan_version" : "")})
-            VALUES ('{id}', '{tenant}', '{signUp}', '{state}', now() - interval '3 days', now(), '{Guid.CreateVersion7()}'{(pinsPlan ? ", 'team', 1" : "")})
+            INSERT INTO control_plane.subscriptions
+                (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id{(pinsPlan ? ", plan_code, plan_version" : "")}{(paidThrough is null ? "" : ", paid_through")})
+            VALUES ('{id}', '{tenant}', '{signUp}', '{state}', now() - interval '3 days', {nextAt}, '{Guid.CreateVersion7()}'{(pinsPlan ? ", 'team', 1" : "")}{(paidThrough is { } through ? $", '{through:yyyy-MM-dd}'" : "")})
             """);
         return id;
     }
