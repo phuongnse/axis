@@ -11,6 +11,10 @@ export interface FormCanvas {
   section: (index: number, content: ReactNode) => ReactNode
   /** Wraps the input of the field `name`. */
   field: (name: string, content: ReactNode) => ReactNode
+  /** Selects the step at `index`, as a click on its step of the steps bar does. */
+  pickStep: (index: number) => void
+  /** Wraps the step at `index` of the steps bar, its button and its mark. */
+  stepEntry: (index: number, content: ReactNode) => ReactNode
 }
 
 export const FormCanvasContext = createContext<FormCanvas | null>(null)

@@ -1976,6 +1976,18 @@ describe('EntityDesigner', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('keeps the button of a field with no name enabled in a read-only designer, and opens its drawer', async () => {
+    renderDesigner(entity({ fields: [{ name: '', type: 'text' }] }), vi.fn(), names, true)
+
+    const button = within(await screen.findByTestId('studio-field-/fields/0')).getByRole('button', {
+      name: 'Unnamed field',
+    })
+    expect(button).toBeEnabled()
+
+    const drawer = await openEntityField(0)
+    expect(drawer).toBe(screen.getByRole('dialog', { name: 'Unnamed field' }))
+  })
+
   it('shows a disabled label box and plain boxes for the rest until the names have loaded', async () => {
     renderDesigner(
       entity({

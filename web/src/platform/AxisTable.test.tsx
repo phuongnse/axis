@@ -890,6 +890,24 @@ describe('AxisTable', () => {
       expect(headers()).toEqual(['Name', 'Amount', 'Note'])
     })
 
+    it('draws Reset, Cancel and Apply in the footer, and Cancel closes the dialog and keeps the columns', async () => {
+      render(<Harness />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      const footer = columnsDialog().querySelector('.ant-modal-footer') as HTMLElement
+      expect(Array.from(footer.querySelectorAll('button'), (button) => button.textContent)).toEqual([
+        'Reset',
+        'Cancel',
+        'Apply',
+      ])
+      await userEvent.click(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Cancel' }))
+
+      // jsdom never ends the leave animation, so the dialog is seen leaving rather than gone.
+      expect(columnsDialog()).toHaveClass('ant-zoom-leave')
+      expect(headers()).toEqual(['Name', 'Amount', 'Note'])
+    })
+
     it('still finds a row by the text of a hidden column', async () => {
       render(<Harness initial={{ ...first, columns: ['name', 'amount'] }} />)
       expect(headers()).toEqual(['Name', 'Amount'])

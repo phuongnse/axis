@@ -345,12 +345,21 @@ describe('theme values', () => {
     expect(unsized).toEqual([])
   })
 
-  it('never makes an Ant Design dialog OK button red', () => {
-    // A destructive finish is drawn by DialogFooter, see docs/reference/actions-and-controls.md#buttons.
-    const red = Object.entries(sources)
-      .filter(([, text]) => /okButtonProps=\{\{[^}]*\bdanger/s.test(text))
+  /** The files that draw an Ant Design dialog's OK or Cancel button, which DialogFooter replaces. */
+  function antDialogButtons(files: Record<string, string>) {
+    return Object.entries(files)
+      .filter(([, text]) => /\bokText=|\bonOk=|\bokButtonProps\b|\bOkBtn\b|\bCancelBtn\b/.test(text))
       .map(([file]) => file)
-    expect(red).toEqual([])
+  }
+
+  it("draws every dialog's Cancel and finish button through DialogFooter, see docs/reference/actions-and-controls.md#buttons", () => {
+    expect(antDialogButtons(sources)).toEqual([])
+  })
+
+  it("names a file that uses Ant Design's dialog buttons", () => {
+    expect(antDialogButtons({ '../pages/Sample.tsx': '<Modal\n  okButtonProps={{\n    danger: true }}' })).toEqual([
+      '../pages/Sample.tsx',
+    ])
   })
 
   it("puts every form's label above its input", () => {

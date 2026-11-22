@@ -28,3 +28,25 @@ describe('the rename question', () => {
     expect(drop).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
   })
 })
+
+describe('the removal question', () => {
+  it('draws Drop data as a text button beside a solid Keep field, with no Cancel', () => {
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <EntityMigrationQuestions
+            questions={[{ type: 'remove', field: 'a', loadedIndex: 0 }]}
+            onDone={vi.fn()}
+            onCancel={vi.fn()}
+          />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    const [drop, keep] = ['Drop data', 'Keep field'].map((name) => screen.getByRole('button', { name }))
+    expect(keep).toHaveClass('ant-btn-variant-solid')
+    expect(drop).toHaveClass('ant-btn-variant-text')
+    expect(drop).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
+  })
+})

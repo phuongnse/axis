@@ -29,7 +29,7 @@ import { type FormUse, type ResourceAddressOf, StudioFormUsedOn } from './Studio
  * field is selected. A field row of the outline moves by pointer drag onto another field row or an empty section, or by
  * Space, the arrow keys and Space, and takes the place of the field it is dropped on. Escape cancels a move. The moved
  * field stays selected. A section row of the outline moves the same way, onto another section row, which it takes the
- * place of, or onto a step's heading or a step's entry in the step switch, which takes it at the end of the step. On a form with steps, `sections` then
+ * place of, or onto a step's heading or a step of the canvas's steps bar, which takes it at the end of the step. On a form with steps, `sections` then
  * follows the order of the steps. The section stays selected, and one undo reverses the move. For all of them, the
  * live region names the element, its section or step and its position. The canvas, the palette, the outline and the drag
  * library are one lazy chunk, which loads when the tab opens. With `layer`, the outline rows carry the layer's marks and

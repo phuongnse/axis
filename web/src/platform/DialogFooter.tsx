@@ -5,9 +5,11 @@ import { AxisActionRow, AxisButton } from './AxisButton'
  * The Cancel and the finish button of an Ant Design dialog, passed as its `footer`, see
  * docs/reference/actions-and-controls.md#buttons. Cancel is a secondary button, a light text button inside the row,
  * and the finish is a `finish` button, a solid `danger` fill when the dialog confirms a removal. The dialog keeps its
- * own `onCancel` for Escape and the close icon, and passes the same handler here, so Cancel does what they do.
+ * own `onCancel` for Escape and the close icon, and passes the same handler here, so Cancel does what they do. A
+ * dialog with no Cancel, such as a removal question, leaves `cancelText` out.
  */
 export function DialogFooter({
+  actions,
   finishText,
   cancelText,
   onFinish,
@@ -18,7 +20,8 @@ export function DialogFooter({
   finishTestId,
 }: {
   finishText: ReactNode
-  cancelText: ReactNode
+  /** The words of Cancel. Left out, the row has no Cancel button. */
+  cancelText?: ReactNode
   onFinish: () => void
   onCancel: () => void
   destructive?: boolean
@@ -26,12 +29,17 @@ export function DialogFooter({
   finishing?: boolean
   finishDisabled?: boolean
   finishTestId?: string
+  /** Other actions of the dialog, such as a Reset, drawn before Cancel in the same row. */
+  actions?: ReactNode
 }) {
   return (
     <AxisActionRow justify="end">
-      <AxisButton role="secondary" onClick={onCancel}>
-        {cancelText}
-      </AxisButton>
+      {actions}
+      {cancelText !== undefined && (
+        <AxisButton role="secondary" onClick={onCancel}>
+          {cancelText}
+        </AxisButton>
+      )}
       <AxisButton
         role="finish"
         destructive={destructive}

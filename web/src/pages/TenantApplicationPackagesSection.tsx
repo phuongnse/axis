@@ -10,6 +10,7 @@ import {
   setTenantApplicationPackages,
   type TenantApplicationPackages,
 } from '../platform/tenantApplicationPackages'
+import { DialogFooter } from '../platform/DialogFooter'
 
 /**
  * The "Application packages" section of the users page. It renders nothing unless
@@ -90,10 +91,15 @@ export function TenantApplicationPackagesSection() {
         open={confirming}
         width={size.dialog.small}
         title={t(`shell.users.applicationPackages.${next}Confirm`)}
-        okText={t(`shell.users.applicationPackages.${next}.ok`)}
-        cancelText={t('shell.users.roles.cancel')}
-        confirmLoading={busy}
-        onOk={() => void change(!packages.on)}
+        footer={
+          <DialogFooter
+            finishText={t(`shell.users.applicationPackages.${next}.ok`)}
+            cancelText={t('shell.users.roles.cancel')}
+            finishing={busy}
+            onFinish={() => void change(!packages.on)}
+            onCancel={() => setConfirming(false)}
+          />
+        }
         onCancel={() => setConfirming(false)}
       >
         <Typography.Text>{t(`shell.users.applicationPackages.${next}Effect`)}</Typography.Text>

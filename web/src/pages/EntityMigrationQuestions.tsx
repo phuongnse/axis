@@ -1,7 +1,8 @@
 import { Flex, Form, Input, Modal, Typography } from 'antd'
 import { useState } from 'react'
-import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
+import { DialogFooter } from '../platform/DialogFooter'
 import { asked, type FieldAnswer, type FieldQuestion } from '../platform/entityMigrations'
 import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
@@ -61,19 +62,17 @@ export function EntityMigrationQuestions({
       title={t(rename ? 'shell.studio.entity.migration.renameTitle' : 'shell.studio.entity.migration.removeTitle')}
       onCancel={onCancel}
       footer={
-        <AxisActionRow justify="end">
-          {rename && (
-            <AxisButton role="secondary" onClick={onCancel}>
-              {t('shell.studio.cancel')}
+        <DialogFooter
+          actions={
+            <AxisButton role="secondary" destructive onClick={() => answer('drop')}>
+              {t('shell.studio.entity.migration.dropData')}
             </AxisButton>
-          )}
-          <AxisButton role="secondary" destructive onClick={() => answer('drop')}>
-            {t('shell.studio.entity.migration.dropData')}
-          </AxisButton>
-          <AxisButton role="finish" onClick={() => answer('keep')}>
-            {t(rename ? 'shell.studio.entity.migration.keepData' : 'shell.studio.entity.migration.keepField')}
-          </AxisButton>
-        </AxisActionRow>
+          }
+          cancelText={rename ? t('shell.studio.cancel') : undefined}
+          finishText={t(rename ? 'shell.studio.entity.migration.keepData' : 'shell.studio.entity.migration.keepField')}
+          onFinish={() => answer('keep')}
+          onCancel={onCancel}
+        />
       }
     >
       <div data-testid="studio-migration-question">
@@ -126,17 +125,19 @@ function ExpressionQuestion({
       title={t(convert ? 'shell.studio.entity.migration.convertTitle' : 'shell.studio.entity.migration.fillTitle')}
       onCancel={onCancel}
       footer={
-        <AxisActionRow justify="end">
-          <AxisButton role="secondary" onClick={onCancel}>
-            {t('shell.studio.cancel')}
-          </AxisButton>
-          <AxisButton role="secondary" onClick={() => onAnswer('skip')}>
-            {t(convert ? 'shell.studio.entity.migration.skip' : 'shell.studio.entity.migration.leaveNulls')}
-          </AxisButton>
-          <AxisButton role="finish" onClick={() => form.submit()}>
-            {t(convert ? 'shell.studio.entity.migration.addConvert' : 'shell.studio.entity.migration.fillNulls')}
-          </AxisButton>
-        </AxisActionRow>
+        <DialogFooter
+          actions={
+            <AxisButton role="secondary" onClick={() => onAnswer('skip')}>
+              {t(convert ? 'shell.studio.entity.migration.skip' : 'shell.studio.entity.migration.leaveNulls')}
+            </AxisButton>
+          }
+          cancelText={t('shell.studio.cancel')}
+          finishText={t(
+            convert ? 'shell.studio.entity.migration.addConvert' : 'shell.studio.entity.migration.fillNulls',
+          )}
+          onFinish={() => form.submit()}
+          onCancel={onCancel}
+        />
       }
     >
       <div data-testid="studio-migration-question">

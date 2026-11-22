@@ -44,6 +44,7 @@ import {
   undoRelaxPatch,
   unrelaxedManifest,
 } from './relaxEntries'
+import { DialogFooter } from '../platform/DialogFooter'
 
 const StudioContractLifecycle = lazy(() => import('./StudioContractLifecycle'))
 
@@ -184,10 +185,15 @@ function Point({ value }: { value: string }) {
         open={open}
         width={size.dialog.small}
         title={t('shell.studio.contract.relaxTitle')}
-        okText={t('shell.studio.contract.relax')}
-        cancelText={t('shell.studio.cancel')}
-        confirmLoading={busy}
-        onOk={() => form.submit()}
+        footer={
+          <DialogFooter
+            finishText={t('shell.studio.contract.relax')}
+            cancelText={t('shell.studio.cancel')}
+            finishing={busy}
+            onFinish={() => form.submit()}
+            onCancel={() => setOpen(false)}
+          />
+        }
         onCancel={() => setOpen(false)}
         // Each opening starts with an empty reason.
         afterClose={() => form.resetFields()}
@@ -364,9 +370,14 @@ function AddStateDialog({
       open={open}
       width={size.dialog.medium}
       title={t('shell.studio.contract.addState')}
-      okText={t('shell.studio.addItem')}
-      cancelText={t('shell.studio.cancel')}
-      onOk={() => form.submit()}
+      footer={
+        <DialogFooter
+          finishText={t('shell.studio.addItem')}
+          cancelText={t('shell.studio.cancel')}
+          onFinish={() => form.submit()}
+          onCancel={close}
+        />
+      }
       onCancel={close}
     >
       <Form
@@ -448,9 +459,14 @@ function AddTransitionDialog({
       open={open}
       width={size.dialog.medium}
       title={t('shell.studio.contract.addTransition')}
-      okText={t('shell.studio.addItem')}
-      cancelText={t('shell.studio.cancel')}
-      onOk={() => form.submit()}
+      footer={
+        <DialogFooter
+          finishText={t('shell.studio.addItem')}
+          cancelText={t('shell.studio.cancel')}
+          onFinish={() => form.submit()}
+          onCancel={close}
+        />
+      }
       onCancel={close}
     >
       <Form

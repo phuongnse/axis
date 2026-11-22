@@ -3,6 +3,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities'
 import { Flex, Typography } from 'antd'
 import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode } from 'react'
+import { useSelectedItemTint } from '../platform/antTheme'
 import { outline } from '../platform/formLayout'
 import { markOf } from '../platform/layerMarks'
 import { useText } from '../platform/texts'
@@ -20,7 +21,7 @@ interface DragListeners {
 
 /**
  * The layout of a form, read from its draft: the steps, the sections of each step, and the fields of each section. A
- * click on a step, section or field selects it, and the selected one has `aria-current`. A section or a field is a
+ * click on a step, section or field selects it, and the selected one has `aria-current` and sits on the selected tint. A section or a field is a
  * drop target for a palette field, and shows an outline in the primary colour while one is over it. A field row lies
  * inside its section's row, so the innermost row under the pointer wins. A field row is also sortable: the pointer, or
  * Space, the arrow keys and Space, move it within its section or into another one. While a field moves, the targets
@@ -46,6 +47,7 @@ export function FormOutline({
   layer?: DesignerLayer
 }) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const { active } = useDndContext()
   const sectionMoving = typeof (active?.data.current as { section?: unknown } | undefined)?.section === 'number'
   const sections = Array.isArray(draft.sections) ? (draft.sections as unknown[]) : []
@@ -71,7 +73,10 @@ export function FormOutline({
                 selected={selected === group.step.pointer}
                 onSelect={onSelect}
               >
-                <Typography.Text strong>
+                <Typography.Text
+                  strong
+                  style={selected === group.step.pointer ? { color: colour.primaryText } : undefined}
+                >
                   {group.step.titleKey === '' ? group.step.pointer : t(group.step.titleKey)}
                 </Typography.Text>
                 <OutlineMark
@@ -213,7 +218,7 @@ function SectionRow({
       listeners={listeners as DragListeners | undefined}
       motion={{ transform: CSS.Translate.toString(transform), transition }}
     >
-      <Typography.Text>{label}</Typography.Text>
+      <Typography.Text style={selected === path ? { color: colour.primaryText } : undefined}>{label}</Typography.Text>
       <OutlineMark layer={layer} list="/sections" index={index} name={nameOf(draft.sections, index, 'name')} />
       <SortableContext
         items={fields.map((_, position) => `outline:${path}/fields/${position}`)}
@@ -286,6 +291,7 @@ function FieldRow({
   /** The `field` of the field, which keys its layer mark, or `undefined` when it has none. */
   markName: string | undefined
 }) {
+  const { colour } = useDesignTokens()
   const { active } = useDndContext()
   const sectionMoving = typeof (active?.data.current as { section?: unknown } | undefined)?.section === 'number'
   const { setNodeRef, listeners, transform, transition, isOver } = useSortable({
@@ -304,7 +310,9 @@ function FieldRow({
       listeners={listeners as DragListeners | undefined}
       motion={{ transform: CSS.Translate.toString(transform), transition }}
     >
-      <Typography.Text type="secondary">{name}</Typography.Text>
+      <Typography.Text type="secondary" style={selected ? { color: colour.primaryText } : undefined}>
+        {name}
+      </Typography.Text>
       <OutlineMark layer={layer} list={fieldsList} index={move.index} name={markName} />
     </Row>
   )
@@ -329,7 +337,8 @@ function DroppableRow({
 }
 
 /**
- * One row of the outline. It is a Tab stop that Enter or Space selects. The children go inside the row, so a nested
+ * One row of the outline. It is a Tab stop that Enter or Space selects. The selected row sits on the selected tint, as
+ * a chosen item of a menu does, and keeps `aria-current`. The children go inside the row, so a nested
  * row is under its parent's element. The caller brings the node ref and `isOver` of the library, and a sortable row
  * also its `listeners` and `motion`. Space selects the row only while no move is under way, so the Space that drops a
  * field does not select the old place.
@@ -359,6 +368,7 @@ function Row({
   children: ReactNode
 }) {
   const { colour, radius } = useDesignTokens()
+  const tint = useSelectedItemTint()
   const { active } = useDndContext()
   const props = {
     ref: nodeRef,
@@ -382,7 +392,8 @@ function Row({
     style: {
       cursor: 'pointer',
       borderRadius: radius.base,
-      outline: isOver ? `2px solid ${colour.primary}` : selected ? `1px solid ${colour.primary}` : undefined,
+      background: selected ? tint : undefined,
+      outline: isOver ? `2px solid ${colour.primary}` : undefined,
       outlineOffset: 1,
       ...motion,
     },

@@ -578,7 +578,7 @@ export function StudioPackageExplorer({
           title={dialogTexts.title}
           label={t('shell.studio.packages.name')}
           help={t('shell.studio.packages.nameHelp')}
-          okText={dialogTexts.ok}
+          finishText={dialogTexts.ok}
           cancelText={t('shell.studio.cancel')}
           requiredMessage={t('shell.studio.packages.nameRequired')}
           tooLongMessage={t('shell.studio.packages.nameInvalid')}

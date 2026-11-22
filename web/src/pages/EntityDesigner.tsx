@@ -766,7 +766,8 @@ const NameCell = memo(function NameCell({
   return (
     <Flex gap="small" align="center" wrap>
       {name === '' ? (
-        <AxisButton role="subtle" size="small" onClick={() => onOpen(index)}>
+        // `disabled={false}` keeps it on in a read-only designer, whose ConfigProvider turns off every other button.
+        <AxisButton role="subtle" size="small" disabled={false} onClick={() => onOpen(index)}>
           {t('shell.studio.entity.unnamedField')}
         </AxisButton>
       ) : (

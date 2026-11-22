@@ -1,9 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { theme } from 'antd'
 import { type ReactNode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { antThemeFor } from '../platform/antTheme'
 import { setAt } from '../platform/jsonPatch'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames } from '../platform/studio'
@@ -1284,7 +1286,7 @@ describe('PageEditor widget tree', () => {
     expect(screen.queryByTestId('studio-field-/widgets/0/columns/1/widgets/0')).not.toBeInTheDocument()
 
     await userEvent.click(nested)
-    expect(nested).toHaveAttribute('aria-current', 'true')
+    expect(nested).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('studio-field-/widgets/0/columns/1/widgets/0')).toBeVisible()
     expect(screen.getByTestId('studio-field-/widgets/0/columns/1/widgets/0/entity')).toHaveTextContent(
       'PurchaseRequest',
@@ -1348,19 +1350,20 @@ describe('PageEditor widget tree', () => {
     }
   })
 
-  it('draws the selected row in the main role with aria-current, and another row in the secondary role', async () => {
+  it('marks the selected widget as pressed on the selected tint, and no other', async () => {
+    const tint = theme.getDesignToken(antThemeFor('light')).controlItemBgActive
     renderEditor(tree())
 
-    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
-    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveClass('ant-btn-color-primary')
-    expect(screen.getByTestId('studio-widget-/widgets/1')).not.toHaveAttribute('aria-current', 'true')
-    expect(screen.getByTestId('studio-widget-/widgets/1')).not.toHaveClass('ant-btn-color-primary')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveStyle({ background: tint })
+    expect(screen.getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('studio-widget-/widgets/1')).not.toHaveStyle({ background: tint })
 
     await userEvent.click(screen.getByTestId('studio-widget-/widgets/1'))
 
-    expect(screen.getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
-    expect(screen.getByTestId('studio-widget-/widgets/1')).toHaveClass('ant-btn-color-primary')
-    expect(screen.getByTestId('studio-widget-/widgets/0')).not.toHaveClass('ant-btn-color-primary')
+    expect(screen.getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('studio-widget-/widgets/1')).toHaveStyle({ background: tint })
+    expect(screen.getByTestId('studio-widget-/widgets/0')).not.toHaveStyle({ background: tint })
   })
 
   it('moves up, moves down and deletes in the list that holds the widget, from the row menu', async () => {
@@ -2038,14 +2041,18 @@ describe('PageEditor action selection', () => {
   }
 
   it('marks the row of the selected action and keeps its widget selected in the tree', () => {
+    const tint = theme.getDesignToken(antThemeFor('light')).controlItemBgActive
     renderSelecting(withActions, '/widgets/0/rowActions/1')
 
     const rows = within(screen.getByTestId('studio-field-/widgets/0/rowActions'))
     expect(rows.getByTestId('studio-action-1')).toHaveAttribute('aria-current', 'true')
+    expect(rows.getByTestId('studio-action-1')).toHaveStyle({ background: tint })
     expect(rows.getByTestId('studio-action-0')).not.toHaveAttribute('aria-current')
+    expect(rows.getByTestId('studio-action-0')).not.toHaveStyle({ background: tint })
     const toolbar = within(screen.getByTestId('studio-field-/widgets/0/toolbarActions'))
     expect(toolbar.getByTestId('studio-action-0')).not.toHaveAttribute('aria-current')
-    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveStyle({ background: tint })
     expect(screen.getByTestId('studio-field-/widgets/0')).toBeInTheDocument()
   })
 

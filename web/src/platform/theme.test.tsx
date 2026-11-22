@@ -220,19 +220,6 @@ function SizedDialog({ name }: { name: 'small' | 'medium' | 'large' }) {
 }
 
 describe('a dialog under the theme provider', () => {
-  it('draws its Cancel as a text button beside a solid OK', () => {
-    render(
-      <ThemeModeProvider>
-        <Modal open title="Pick">
-          x
-        </Modal>
-      </ThemeModeProvider>,
-    )
-
-    expect(screen.getByRole('button', { name: /cancel/i })).toHaveClass('ant-btn-variant-text')
-    expect(screen.getByRole('button', { name: /ok/i })).toHaveClass('ant-btn-variant-solid')
-  })
-
   it.each(['small', 'medium', 'large'] as const)('takes the %s dialog width token', (name) => {
     render(
       <ThemeModeProvider>

@@ -1,6 +1,6 @@
 import { CheckOutlined } from '@ant-design/icons'
 import { Tooltip, Typography } from 'antd'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactElement, ReactNode } from 'react'
 import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
 
@@ -14,15 +14,25 @@ const circleSize = 24
  * and the other steps show their number, or a check mark when finished, with the title on hover, on focus and to
  * assistive technology. The current step is marked with `aria-current`, and a row wraps when it does not fit. The bar
  * keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
+ *
+ * With `onPick`, each step is a button with no fill that calls `onPick` with the step's index, and the focus ring shows
+ * for the keyboard. The button adds no `aria-current`, so the bar keeps the one it has. `entry` wraps each step's button,
+ * or its plain title, inside the step's item, so a caller can add a drop target or a mark around it.
  */
 export function StepsBar({
   titles,
   current,
   vertical = false,
+  onPick,
+  entry,
 }: {
   titles: string[]
   current: number
   vertical?: boolean
+  /** Makes each step a button that calls this with the step's index. */
+  onPick?: (index: number) => void
+  /** Wraps the content of the step at `index`, its button or its plain title, inside the step's item. */
+  entry?: (index: number, content: ReactNode) => ReactNode
 }) {
   const { colour, spacing } = useDesignTokens()
   const numbered = titles.length >= numbersFrom
@@ -45,64 +55,67 @@ export function StepsBar({
         background: colour.border,
       }
   return (
-    <ol
-      data-testid="steps-bar"
-      style={{
-        display: 'flex',
-        flexDirection: vertical ? 'column' : 'row',
-        flexWrap: vertical ? 'nowrap' : 'wrap',
-        alignItems: vertical ? 'flex-start' : 'center',
-        maxWidth: '100%',
-        listStyle: 'none',
-        margin: 0,
-        padding: 0,
-      }}
-    >
-      {titles.map((title, index) => {
-        const isCurrent = index === current
-        const finished = index < current
-        const outline = finished ? colour.primaryText : colour.textMuted
-        const mark = finished ? <CheckOutlined aria-hidden /> : index + 1
-        const circle: CSSProperties = {
-          position: 'relative',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 'none',
-          width: circleSize,
-          height: circleSize,
-          borderRadius: '50%',
-          border: isCurrent ? 'none' : `1px solid ${outline}`,
-          background: isCurrent ? colour.primary : 'transparent',
-          color: isCurrent ? colour.onPrimary : outline,
-          fontSize: 12,
-          lineHeight: 1,
-        }
-        return (
-          <li
-            key={index}
-            aria-current={isCurrent ? 'step' : undefined}
-            style={{
-              display: 'flex',
-              flexDirection: vertical ? 'column' : 'row',
-              alignItems: vertical ? 'flex-start' : 'center',
-              flex: 'none',
-            }}
-          >
+    <>
+      {onPick && (
+        <style>{`[data-step-pick]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: 2px; }`}</style>
+      )}
+      <ol
+        data-testid="steps-bar"
+        style={{
+          display: 'flex',
+          flexDirection: vertical ? 'column' : 'row',
+          flexWrap: vertical ? 'nowrap' : 'wrap',
+          alignItems: vertical ? 'flex-start' : 'center',
+          maxWidth: '100%',
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+        }}
+      >
+        {titles.map((title, index) => {
+          const isCurrent = index === current
+          const finished = index < current
+          const outline = finished ? colour.primaryText : colour.textMuted
+          const mark = finished ? <CheckOutlined aria-hidden /> : index + 1
+          const circle: CSSProperties = {
+            position: 'relative',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: 'none',
+            width: circleSize,
+            height: circleSize,
+            borderRadius: '50%',
+            border: isCurrent ? 'none' : `1px solid ${outline}`,
+            background: isCurrent ? colour.primary : 'transparent',
+            color: isCurrent ? colour.onPrimary : outline,
+            fontSize: 12,
+            lineHeight: 1,
+          }
+          const numberOnly = numbered && !isCurrent
+          // A step with a button is focused on the button, so its number is not a Tab stop of its own.
+          const badge = numberOnly ? (
+            <span style={circle} tabIndex={onPick ? undefined : 0}>
+              <span aria-hidden>{mark}</span>
+              <span style={visuallyHidden}>{title}</span>
+            </span>
+          ) : (
+            <span aria-hidden style={circle}>
+              {mark}
+            </span>
+          )
+          const tooltip = (node: ReactElement) =>
+            numberOnly ? (
+              <Tooltip title={title} trigger={['hover', 'focus']}>
+                {node}
+              </Tooltip>
+            ) : (
+              node
+            )
+          const label = (
             <span style={{ display: 'flex', alignItems: 'center' }}>
-              {numbered && !isCurrent ? (
-                <Tooltip title={title} trigger={['hover', 'focus']}>
-                  <span tabIndex={0} style={circle}>
-                    <span aria-hidden>{mark}</span>
-                    <span style={visuallyHidden}>{title}</span>
-                  </span>
-                </Tooltip>
-              ) : (
-                <span aria-hidden style={circle}>
-                  {mark}
-                </span>
-              )}
-              {(!numbered || isCurrent) && (
+              {onPick ? badge : tooltip(badge)}
+              {!numberOnly && (
                 <Typography.Text
                   ellipsis={{ tooltip: title }}
                   style={{
@@ -116,10 +129,45 @@ export function StepsBar({
                 </Typography.Text>
               )}
             </span>
-            {index < titles.length - 1 && <span aria-hidden style={connector} />}
-          </li>
-        )
-      })}
-    </ol>
+          )
+          const pickable = onPick
+            ? tooltip(
+                <button
+                  type="button"
+                  data-step-pick
+                  onClick={() => onPick(index)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: 0,
+                    border: 0,
+                    background: 'none',
+                    font: 'inherit',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {label}
+                </button>,
+              )
+            : label
+          return (
+            <li
+              key={index}
+              aria-current={isCurrent ? 'step' : undefined}
+              style={{
+                display: 'flex',
+                flexDirection: vertical ? 'column' : 'row',
+                alignItems: vertical ? 'flex-start' : 'center',
+                flex: 'none',
+              }}
+            >
+              {entry ? entry(index, pickable) : pickable}
+              {index < titles.length - 1 && <span aria-hidden style={connector} />}
+            </li>
+          )
+        })}
+      </ol>
+    </>
   )
 }

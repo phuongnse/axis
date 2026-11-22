@@ -1226,7 +1226,6 @@
   "shell.studio.design.width": "Preview width",
   "shell.studio.design.desktop": "Desktop",
   "shell.studio.design.phone": "Phone",
-  "shell.studio.design.step": "Step",
   "shell.studio.design.visibleWhen": "Visible when",
   "shell.studio.design.conditionMark": "{condition}: {text}",
   "shell.studio.design.requiredWhen": "Required when",

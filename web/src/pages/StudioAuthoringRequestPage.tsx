@@ -326,7 +326,7 @@ export function StudioAuthoringRequestPage({
             title={t('shell.studio.aiRequest.changePlan.title')}
             label={t('shell.studio.aiRequest.changePlan.label')}
             help=""
-            okText={t('shell.studio.aiRequest.changePlan.send')}
+            finishText={t('shell.studio.aiRequest.changePlan.send')}
             cancelText={t('shell.studio.cancel')}
             requiredMessage={t('shell.studio.aiRequest.changePlan.required')}
             tooLongMessage={t('shell.studio.aiRequest.changePlan.tooLong')}

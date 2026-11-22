@@ -17,7 +17,8 @@ const focusable = 'input:not([type=hidden]), textarea, [role=combobox], button'
  * or else to its first input, unless an error above the form holds the focus. A form without steps is one page:
  * `fields` holds every section and `last` is always true.
  *
- * Inside the Studio form canvas, the canvas picks the step. Hidden steps are not skipped and focus does not move.
+ * Inside the Studio form canvas, the canvas picks the step, and a click on a step of the bar picks it too. Hidden steps are
+ * not skipped and focus does not move.
  */
 export function useFormSteps(
   form: FormMetadata | null,
@@ -102,7 +103,12 @@ export function useFormSteps(
   }
 
   const progress: ReactNode = active && (
-    <StepsBar titles={visible.map((step) => t(steps[step].titleKey))} current={Math.max(position, 0)} />
+    <StepsBar
+      titles={visible.map((step) => t(steps[step].titleKey))}
+      current={Math.max(position, 0)}
+      onPick={canvas?.pickStep}
+      entry={canvas?.stepEntry}
+    />
   )
 
   const fields: ReactNode = active ? (
