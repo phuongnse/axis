@@ -39,6 +39,7 @@ import {
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment, setAt } from '../platform/jsonPatch'
+import { fillText } from '../platform/fillText'
 import { SidePanel } from '../platform/SidePanel'
 import { EmptyState } from '../platform/EmptyState'
 import { focusFirstError } from '../platform/focusFirstError'
@@ -2005,56 +2006,23 @@ function CurrencySource({
 }
 
 /**
- * A label picker for each value of an enum field. Each change writes the whole `valueLabels` map, in the order of
- * `values`, and the last cleared label removes the key.
+ * Proposed, #3264: an Enum field's value labels, a box for each value in which the author types what people see, in
+ * words with its Translations, as a field's label is, under "Label of {value}". A value's label is optional.
  */
 function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Content; onChange: ChangeHandler }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
   const values = Array.isArray(field.values) ? field.values.filter((item) => typeof item === 'string') : []
   const labels = isContent(field.valueLabels) ? field.valueLabels : {}
-
-  function write(value: string, key: string | undefined) {
-    const merged: Content = { ...labels }
-    if (key === undefined) {
-      delete merged[value]
-    } else {
-      setOwn(merged, value, { textKey: key })
-    }
-    const ordered: Content = {}
-    for (const name of [...values, ...Object.keys(merged)]) {
-      if (Object.hasOwn(merged, name) && !Object.hasOwn(ordered, name)) {
-        setOwn(ordered, name, merged[name])
-      }
-    }
-    onChange(pointer, Object.keys(ordered).length === 0 ? undefined : ordered)
-  }
-
   return (
     <AxisFieldGroup {...groupTexts(t, 'fields.valueLabels')}>
-      <Flex vertical gap="small">
+      <Flex vertical gap="middle">
         {values.map((value) => {
-          const name = `${t('shell.studio.entity.valueLabel')} ${value}`
-          const current = labels[value]
-          const key = isContent(current) && typeof current.textKey === 'string' ? current.textKey : undefined
+          const at = `${pointer}/${escapePointerSegment(value)}`
           return (
-            <div key={value} data-testid={`studio-field-${pointer}/${escapePointerSegment(value)}`}>
-              <AxisField label={name} help="">
-                {names === undefined ? (
-                  <Input
-                    value={text(key)}
-                    onChange={(event) => write(value, event.target.value === '' ? undefined : event.target.value)}
-                  />
-                ) : (
-                  <ReferencePicker
-                    name={name}
-                    value={key}
-                    required={false}
-                    options={referenceOptions(names, 'text', undefined, pointer)}
-                    onChange={(next) => write(value, next)}
-                  />
-                )}
-              </AxisField>
+            <div key={value} data-testid={`studio-field-${at}`}>
+              <AxisFieldGroup title={fillText(t('shell.studio.entity.valueLabel'), { value })} help="">
+                <LabelTexts pointer={at} value={labels[value]} onChange={onChange} />
+              </AxisFieldGroup>
             </div>
           )
         })}
