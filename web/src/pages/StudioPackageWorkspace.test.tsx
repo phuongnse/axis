@@ -537,13 +537,17 @@ describe('StudioPackageWorkspace', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: button }))
     }
 
-    it('offers New file…, New folder…, Rename…, Delete… and Copy path on a right click, and Rename… on F2 with the name filled in', async () => {
+    it('offers New file…, New folder…, Rename… and Copy path on a right click, then Delete… after a divider, and Rename… on F2 with the name filled in', async () => {
       stubPackage()
       renderWorkspace(true)
       await screen.findByTestId('studio-package-tree')
 
       fireEvent.contextMenu(within(tree()).getByText('src', { exact: true }))
-      expect(await menuNames()).toEqual(['New file…', 'New folder…', 'Rename…', 'Delete…', 'Copy path'])
+      await screen.findByRole('menuitem', { name: 'Delete…' })
+      const entries = screen.getByRole('menu').querySelectorAll('[role="menuitem"], [role="separator"]')
+      expect(
+        Array.from(entries, (entry) => (entry.getAttribute('role') === 'separator' ? '---' : entry.textContent)),
+      ).toEqual(['New file…', 'New folder…', 'Rename…', 'Copy path', '---', 'Delete…'])
       await userEvent.keyboard('{Escape}')
 
       await userEvent.click(within(tree()).getByText('src', { exact: true }))
