@@ -1,4 +1,4 @@
-import { Flex, Radio, Typography, type FormItemProps } from 'antd'
+import { Flex, Radio, type FormItemProps } from 'antd'
 import { useId, type ReactNode } from 'react'
 import { AxisField, type AxisFieldStatus } from './AxisField'
 import { StatusTag } from './StatusTag'
@@ -71,7 +71,7 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
   const { label, help, options } = props
   const optionId = useId()
   const groupName = useId()
-  const { spacing, type } = useDesignTokens()
+  const { colour, spacing, type } = useDesignTokens()
   const radios = (chosen?: string) => (
     <Flex vertical>
       {options.map((option, index) => {
@@ -84,9 +84,14 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
                 {option.mark && <StatusTag tone="neutral">{option.mark}</StatusTag>}
               </Flex>
               {option.help !== '' && (
-                <Typography.Text type="secondary" id={helpId} style={{ display: 'block' }}>
+                // Proposed, #3264: an option's help is a field's help, at the help's size, see
+                // docs/reference/frontend.md#platform-field-help.
+                <span
+                  id={helpId}
+                  style={{ display: 'block', fontSize: 12, lineHeight: '20px', color: colour.textMuted }}
+                >
                   {option.help}
-                </Typography.Text>
+                </span>
               )}
             </Radio>
             {option.detail !== undefined && option.value === chosen && (
