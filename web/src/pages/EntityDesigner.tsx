@@ -31,6 +31,7 @@ import {
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment, setAt } from '../platform/jsonPatch'
 import { SidePanel } from '../platform/SidePanel'
+import { EmptyState } from '../platform/EmptyState'
 import { focusFirstError } from '../platform/focusFirstError'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { ContentInsetContext } from '../platform/contentInsetContext'
@@ -1716,6 +1717,7 @@ function Settings({
                 {drawnSettings}
                 {group === 'validation' && (
                   <>
+                    {atField.length === 0 && <EmptyState text={t('shell.studio.entity.noValidationsAtField')} />}
                     {atField.map(({ validation, position }) => (
                       <ValidationRow
                         key={position}
@@ -2063,6 +2065,7 @@ const Indexes = memo(function Indexes({
     >
       <div data-testid="studio-field-/indexes">
         <Flex vertical gap="large">
+          {list.length === 0 && <EmptyState text={t('shell.studio.entity.noIndexes')} />}
           {list.map((index, position) => {
             const pointer = `/indexes/${position}`
             const content = isContent(index) ? index : {}
@@ -2193,6 +2196,9 @@ const Validations = memo(function Validations({
     >
       <div data-testid="studio-field-/validations">
         <Flex vertical gap="large">
+          {/* Proposed, #3264: a list that is a standing part of the entity says so when it is empty, through the one empty
+              state, see docs/reference/actions-and-controls.md#showing-what-is-empty. */}
+          {list.length === 0 && <EmptyState text={t('shell.studio.entity.noValidations')} />}
           {list.map((validation, index) => (
             <ValidationRow
               key={index}
