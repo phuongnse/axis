@@ -105,7 +105,10 @@ Content-Type: application/json
 ## Setting the paid-through date
 
 This call sets the date that the tenant is paid through. The tenant is paid through the end of that day
-in UTC, and the clock follows the date, as [the clock](subscriptions.md#one-clock) says.
+in UTC.
+
+- **The clock follows the date** _(planned for M34)_. Past the date, the clock moves the subscription on, as
+  [the clock](subscriptions.md#one-clock) says.
 
 ```http
 PUT /api/billing/v1/tenants/{tenantId}/subscription/paid-through
