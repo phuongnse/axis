@@ -533,6 +533,9 @@ below answers `200`.
   a new address opens at the top. A change that stays on the same page keeps the position: a table's search, filter,
   sort, page or page size, or a tab. Pages load their rows after they open, so after Back the page keeps the height it
   had until its content is that tall again, and the position still fits.
+- **Scroll kept in the page's frame** _(planned)_. The page's frame, not the window, keeps its scroll position for each
+  history entry. A new address opens at the top of the frame, and Back and Forward bring the frame back to where the
+  person left it.
 
 | Address                                | Shows                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -52,8 +52,8 @@ widget names a role, never an Ant Design button type.
   keeping its disabled state. They are buttons again when the room comes back. A row without `fold` wraps.
 - **An action bar folds into More.** An `ActionBar`, a bar of actions at the foot of a page on `surface`
   with a `borderSubtle` rule above it, folds the actions it names into one More actions menu through
-  `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width. A bar that stays at the foot of the window as the page
-  scrolls draws in the shell's [bar slot](shell.md#layout), above the footer, instead of at the foot of its page.
+  `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width. A bar that stays in view as the page
+  scrolls draws in the shell's [bar slot](shell.md#layout), instead of at the foot of its page.
 - **Actions of equal weight are one group**. A screen keeps one main action. Actions of equal weight that
   together are a region's main action, such as a task's outcomes, are one joined group in the `main` role, in the order
   the process gives them. Actions of equal weight in any other role, such as a package's Build, Run tests and Run…,
@@ -585,6 +585,8 @@ wheel with the page under two rules.
 - **One scroll area in each direction.** A scroll area never sits inside another that scrolls the same
   way, because two areas would share one wheel. So a list in a dialog grows, and the dialog's body scrolls
   it. A wide table may still scroll sideways inside a page or dialog that scrolls down.
+- **The shell's regions are scroll areas** _(planned)_. The window does not scroll. The sidebar's menu, the page's frame
+  and a side panel each scroll on their own and stop at their end, see [layout](shell.md#layout).
 - **One scroll per pane** _(planned)_. A pane scrolls as one from top to bottom, however many blocks it holds. A code
   editor in it is as tall as its text with no scroll of its own. One a person types in keeps a least height and reaches
   the pane's foot when its text is shorter. An action bar at the pane's foot stays in place.

@@ -156,9 +156,8 @@ says so.
 
 ## Save bar
 
-The save bar holds what acts on the whole draft. While there is something to save, it stays at the foot
-of the window in the shell's [bar slot](shell.md#layout), above the footer: "Unsaved changes" on the left, Undo and
-Redo as icons, then Discard and Save on the right. With nothing to save it is not drawn. At narrow width Discard
+The save bar holds what acts on the whole draft. While there is something to save, it stays in view in the shell's
+[bar slot](shell.md#layout): "Unsaved changes" on the left, Undo and Redo as icons, then Discard and Save on the right. With nothing to save it is not drawn. At narrow width Discard
 folds into the More actions menu, as an [action bar](actions-and-controls.md#buttons) does.
 
 - **While a step can be redone.** The bar stays, reading "No unsaved changes", with Redo on and no
@@ -168,10 +167,8 @@ folds into the More actions menu, as an [action bar](actions-and-controls.md#but
   space or Format, shows no bar, because nothing can be saved.
 - **Every kind.** Every resource kind has the bar. What Undo, Redo and Discard do is in
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
-- **Its place**. The bar sits in the shell's content column between the page and the footer, as wide as
-  the content and touching the sidebar. It sticks to the window's foot while the page scrolls and rests right above
-  the footer at the page's end, so it never covers the footer, in Studio and on a site's form, see
-  [saving](form-widget.md#saving).
+- **Its place**. The bar draws in the shell's bar slot, as wide as the content and touching the sidebar, in Studio and
+  on a site's form, see [layout](shell.md#layout) and [saving](form-widget.md#saving).
 - **Undo and Redo**. They show, as icons after the line, only where the editor gives them, so a site's
   form has none.
 - **Discard** _(planned)_. Discard is a `destructive` button, drawn in `dangerText`, wherever the bar shows.
@@ -199,8 +196,8 @@ The JSON view is a CodeMirror editor with JSON highlighting and line numbers.
   matching and closing, indent on input, word completion and the current line, see
   [a package's files](studio-packages.md#a-packages-files).
 - **No box of its own** _(planned for M37)_. In place of a field's border and its own scroll, the JSON view has no
-  border and is as tall as its text. It keeps a least height and reaches the footer, or the save bar while that shows,
-  when its text is shorter, and the page scrolls once, as [scroll areas](actions-and-controls.md#scroll-areas) say.
+  border and is as tall as its text. It keeps a least height and reaches the foot of the page, or the save bar while
+  that shows, when its text is shorter, and the page scrolls once, as [scroll areas](actions-and-controls.md#scroll-areas) say.
 - **Its colours are tokens.** Names are `primaryText`, strings `text`, numbers `infoText`, `true`,
   `false` and `null` `warningText`, and punctuation `textMuted`. A string stays plain because strings are
   most of what a person reads. The expression editor draws in the same colours, so no editor shows
