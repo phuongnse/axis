@@ -219,8 +219,9 @@ A table has no create button set apart from its actions. It opens a record throu
 state.
 
 - **The identifying cell is the link.** The first `navigate` row action opens a row from its identifying column, which
-  is a link, and has no button of its own. The link has a real `href` when the address is known at once, so Ctrl+click
-  opens it in a new tab. A reference path in the action, which is read on click, gives no `href`.
+  is a link, and has no button of its own. The link has a real `href`, so Ctrl+click opens it in a new tab. A reference
+  path in the action is read when the row draws, so the link has its `href` before any click. While the read runs, or
+  after a failed read, the cell is plain text and no message shows.
 - **Plain text.** An action whose `visibleWhen` hides it leaves the cell as plain text, as does a group row or an
   action the SPA cannot build an address for.
 - **An empty cell** shows the action's label as the link text, so the row can still be opened.
@@ -276,10 +277,11 @@ and the click goes to `/{site}/ticketdetail?ticket=<id>`.
   larger part of the language. A toolbar has no row, so only its literals resolve. A parameter whose value is `null`
   is left out of the query, and a button whose `record` is `null` is hidden. The target page reads its parameters from
   the URL and binds them.
-- **Reference paths.** A reference path such as `customer.parent.name` is resolved on click: the SPA reads each record
-  along it through the record API, using `paths`. A `null` reference gives `null`. A `403`, a `404`, a missing field or
-  a failed read opens no page and shows `shell.navigate.failed`. A button whose first name is not in scope or lacks a
-  `paths` entry is hidden.
+- **Reference paths.** A reference path such as `customer.parent.name` is resolved through the record API: the SPA
+  reads each record along it, using `paths`. The identifying cell resolves it when its row draws, and a row action
+  resolves it on click. A `null` reference gives `null`. A `403`, a `404`, a missing field or a failed read opens no
+  page. A row action then shows `shell.navigate.failed`, and the identifying cell stays plain text. A button whose
+  first name is not in scope or lacks a `paths` entry is hidden.
 
 ### visibleWhen
 

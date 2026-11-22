@@ -165,11 +165,14 @@ function GroupEditor({
           ),
         )}
         <Flex gap="small">
-          <AxisButton role="link" onClick={() => onChange(makeGroup(mode, [...nodes, blankCondition(columns[0])]))}>
+          <AxisButton
+            role="secondary"
+            onClick={() => onChange(makeGroup(mode, [...nodes, blankCondition(columns[0])]))}
+          >
             {t('shell.table.filterAddCondition')}
           </AxisButton>
           <AxisButton
-            role="link"
+            role="secondary"
             onClick={() => onChange(makeGroup(mode, [...nodes, makeGroup('all', [blankCondition(columns[0])])]))}
           >
             {t('shell.table.filterAddGroup')}
@@ -326,7 +329,7 @@ export function TableFilterChips({
           {text(node)}
         </Tag>
       ))}
-      <AxisButton role="link" onClick={() => onChange(undefined)}>
+      <AxisButton role="secondary" onClick={() => onChange(undefined)}>
         {t('shell.table.filterClearAll')}
       </AxisButton>
     </Flex>

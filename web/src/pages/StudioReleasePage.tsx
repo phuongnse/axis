@@ -9,6 +9,7 @@ import { sortByName } from '../platform/listOrder'
 import { PageActions, PageLayout } from '../platform/PageLayout'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
 import { ReleasePublisher } from '../platform/ReleasePublisher'
+import { studioViewAddress } from '../platform/studioAddress'
 import {
   changeRows,
   fetchStudioRelease,
@@ -135,11 +136,7 @@ export function StudioReleasePage({
     return () => controller.abort()
   }, [application, number, generation, history, lost, ready])
 
-  const all = (
-    <Link to={`/studio?${new URLSearchParams({ app: application, view: 'releases' })}`}>
-      {t('shell.studio.release.all')}
-    </Link>
-  )
+  const all = <Link to={studioViewAddress(application, 'releases')}>{t('shell.studio.release.all')}</Link>
   const line = (testId: string, key: string) => (
     <Flex vertical gap="small" data-testid={testId}>
       <Typography.Text>{t(key)}</Typography.Text>

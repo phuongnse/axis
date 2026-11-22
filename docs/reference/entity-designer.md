@@ -35,10 +35,9 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 - **Row menu** _(planned)_. Each row's "…" menu holds Move up, Move down and Delete, the way to move a row
   without a drag. Move up is off on the first row and Move down on the last, and Delete is destructive.
   Each entry replaces the `fields` array. A read-only designer has no menu.
-- **Name** _(planned)_. The Name cell is a real link to the field's side panel, at `&field=<name>`, with the
-  field's layer mark beside it. A plain click opens the panel in place. A link opens in a new tab on Ctrl+click,
-  and its address can be copied. A field with no name has no address, so its name reads "Unnamed field" as a
-  subtle button that opens the panel.
+- **Name.** The Name cell is a real link to the field's drawer, at `&field=<name>`, with the field's layer mark
+  beside it. A plain click opens the drawer in place. Ctrl+click opens a new tab, and the address can be copied.
+  A field with no name has no address, so its name reads "Unnamed field" as a subtle button that opens the drawer.
 - **Label** _(planned)_. The Label cell is the label in the author's language, else in English, read from the
   draft's texts, so a label put in by Done shows before Save writes it. The dash shows where the field has no
   label. The table has no input.

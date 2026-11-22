@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { studioFileAddress, studioPackageAddress, studioRequestAddress, studioResourceAddress } from './studioAddress'
+import {
+  studioFileAddress,
+  studioHistoryAddress,
+  studioKindAddress,
+  studioPackageAddress,
+  studioRequestAddress,
+  studioResourceAddress,
+  studioViewAddress,
+  withStudioField,
+} from './studioAddress'
 
 describe('studioResourceAddress', () => {
   it('builds the address of a resource', () => {
@@ -101,5 +110,63 @@ describe('studioFileAddress', () => {
   it('returns no address for a file outside packages', () => {
     expect(studioFileAddress('Shop', 'entities/a.json', 3)).toBeUndefined()
     expect(studioFileAddress('Shop', 'packages/tools', 3)).toBeUndefined()
+  })
+})
+
+describe('studioViewAddress', () => {
+  it('builds the address of a view of an application', () => {
+    expect(studioViewAddress('Shop', 'releases')).toBe('/studio?app=Shop&view=releases')
+    expect(studioViewAddress('Shop', 'publish')).toBe('/studio?app=Shop&view=publish')
+  })
+})
+
+describe('studioKindAddress', () => {
+  it("builds the address of a kind's list", () => {
+    expect(studioKindAddress('Shop', 'entity')).toBe('/studio?app=Shop&kind=entity')
+  })
+})
+
+describe('studioHistoryAddress', () => {
+  it('builds the address of the History view', () => {
+    expect(studioHistoryAddress('Shop')).toBe('/studio?app=Shop&view=history')
+  })
+
+  it("builds the address of one revision's page", () => {
+    expect(studioHistoryAddress('Shop', 'r1')).toBe('/studio?app=Shop&view=history&revision=r1')
+  })
+})
+
+describe('withStudioField', () => {
+  it('adds the field to the address', () => {
+    expect(withStudioField(new URLSearchParams({ app: 'Shop' }), 'code').toString()).toBe('app=Shop&field=code')
+  })
+
+  it('keeps the other parameters, such as the path and the search of the fields', () => {
+    const params = new URLSearchParams({
+      app: 'Shop',
+      resource: 'abc',
+      path: '/fields/0/name',
+      'fields.search': 'co',
+      'fields.filter': 'entity',
+    })
+    expect(withStudioField(params, 'code').toString()).toBe(
+      'app=Shop&resource=abc&path=%2Ffields%2F0%2Fname&fields.search=co&fields.filter=entity&field=code',
+    )
+  })
+
+  it('replaces the field the address holds', () => {
+    expect(withStudioField(new URLSearchParams({ app: 'Shop', field: 'old' }), 'code').toString()).toBe(
+      'app=Shop&field=code',
+    )
+  })
+
+  it('removes the field for no name, and leaves the other parameters', () => {
+    expect(withStudioField(new URLSearchParams({ app: 'Shop', field: 'code' }), null).toString()).toBe('app=Shop')
+  })
+
+  it('does not change the parameters it is given', () => {
+    const params = new URLSearchParams({ app: 'Shop' })
+    withStudioField(params, 'code')
+    expect(params.toString()).toBe('app=Shop')
   })
 })

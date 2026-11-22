@@ -807,8 +807,9 @@ describe('the Design tab of a page', () => {
       const before = screen.getByTestId('location').textContent
       const link = design.querySelector<HTMLElement>('[data-action="rowActions/0"]')!
 
-      expect(link).toHaveAttribute('role', 'link')
-      expect(link).not.toHaveAttribute('href')
+      // The link has the record's address, and a click on the canvas still selects the action without navigating.
+      expect(link.tagName).toBe('A')
+      expect(link).toHaveAttribute('href', '/Shop/tickets/00000000-0000-4000-8000-000000000001')
       await userEvent.click(link)
 
       const list = within(design).getByTestId('studio-field-/widgets/0/rowActions')

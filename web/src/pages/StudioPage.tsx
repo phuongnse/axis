@@ -33,7 +33,12 @@ import {
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { kindName, kindSingular } from '../platform/studioKinds'
-import { studioFileAddress, studioResourceAddress } from '../platform/studioAddress'
+import {
+  studioApplicationAddress,
+  studioFileAddress,
+  studioResourceAddress,
+  studioViewAddress,
+} from '../platform/studioAddress'
 import { starterKinds } from '../platform/studioStarters'
 import { StudioApplicationContext, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
@@ -82,7 +87,7 @@ function StudioApplicationTiles({ apps }: { apps: StudioApplication[] }) {
         return (
           <Tile
             key={app.name}
-            to={`/studio?app=${encodeURIComponent(app.name)}`}
+            to={studioApplicationAddress(app.name)}
             testId={`studio-app-${app.name}`}
             align={description === null ? 'center' : 'flex-start'}
           >
@@ -430,14 +435,14 @@ function StudioWorkspace() {
   const activity = activityState?.application === application ? activityState.items : undefined
 
   function openPublish() {
-    navigate(`/studio?${new URLSearchParams({ app: application!, view: 'publish' })}`, {
+    navigate(studioViewAddress(application!, 'publish'), {
       state: { publishFrom: location.pathname + location.search },
     })
   }
 
   /** Goes back to the page Publish… was opened from, or to the Overview, and replaces the publish page's entry. */
   function leavePublish() {
-    navigate(publishOrigin(location.state) ?? `/studio?${new URLSearchParams({ app: application! })}`, {
+    navigate(publishOrigin(location.state) ?? studioApplicationAddress(application!), {
       replace: true,
     })
   }
@@ -750,7 +755,7 @@ function StudioWorkspace() {
                                     diagnostics,
                                   })
                                   setFolderRevision((value) => value + 1)
-                                  navigate(`/studio?${new URLSearchParams({ app: application! })}`, {
+                                  navigate(studioApplicationAddress(application!), {
                                     state: leaveWithoutAsking,
                                   })
                                 }}

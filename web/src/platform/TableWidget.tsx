@@ -14,7 +14,7 @@ import { FilterBar } from './FilterBar'
 import { enumLabel, formatValue, isNumeric } from './formatValue'
 import { ImportDialog } from './ImportDialog'
 import { importsPath } from './imports'
-import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
+import { navigatePath, navigateTarget, type NavigateOpen, type NavigateScope } from './navigateAction'
 import { newIdempotencyKey, startProcess } from './processes'
 import {
   deleteRecord,
@@ -31,10 +31,12 @@ import type {
   DataSourceParameter,
   DeleteAction,
   FieldMetadata,
+  NavigateAction,
   StartProcessAction,
   WidgetMetadata,
 } from './site'
 import { useSiteTableKey } from './tableChoices'
+import { siteAddress } from './siteLinks'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -114,6 +116,62 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
 }
 
 /**
+ * The link of an identifying cell whose address needs a reference path. The path is read once when its row draws, so
+ * the link has its `href` before any click. While the read runs, or when it fails, the cell is plain text, and no
+ * message shows, see docs/reference/table-widget.md#opening-a-row.
+ */
+function ResolvedOpenLink({
+  sitePath,
+  action,
+  scope,
+  label,
+  from,
+}: {
+  sitePath: string
+  action: NavigateAction
+  scope: NavigateScope
+  label: ReactNode
+  from: string
+}) {
+  const { id, values } = scope
+  // The address that the read gave for these inputs. A row whose inputs change shows plain text until its own read answers.
+  const [answer, setAnswer] = useState<{
+    sitePath: string
+    action: NavigateAction
+    id: string | null
+    values: NavigateScope['values']
+    href: string
+  } | null>(null)
+  useEffect(() => {
+    let live = true
+    const open = navigateTarget(sitePath, action, { id, values })
+    void open?.().then((address) => {
+      if (live && address !== null) {
+        setAnswer({ sitePath, action, id, values, href: address })
+      }
+    })
+    return () => {
+      live = false
+    }
+  }, [sitePath, action, id, values])
+  const href =
+    answer !== null &&
+    answer.sitePath === sitePath &&
+    answer.action === action &&
+    answer.id === id &&
+    answer.values === values
+      ? answer.href
+      : null
+  return href === null ? (
+    label
+  ) : (
+    <Link to={href} state={{ from }}>
+      {label}
+    </Link>
+  )
+}
+
+/**
  * Shows the records of the widget's entity, or the rows of its data source. A row of a data source
  * carries the id of its root record, so a row action can open a form for it. A row of a grouped
  * data source is a group with no id, so it has no row action buttons. Each `navigate` row action is
@@ -135,8 +193,9 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
  * a button whose expressions the SPA cannot work out is hidden. The identifying column, which is the entity's
  * display field when the table shows it and otherwise the first column, comes first. The first `navigate` row
- * action is the link of its cell, with a real address when the SPA can build it, so Ctrl+click opens a new tab. It
- * is plain text when `visibleWhen` hides the action, and shows the action's label when the cell is empty. A file
+ * action is the link of its cell, with a real address, so Ctrl+click opens a new tab. An address that needs a
+ * reference path is read when the row draws, so the link has its `href` before any click. The cell is plain text
+ * when `visibleWhen` hides the action, and shows the action's label when the cell is empty. A file
  * column keeps its download link, so then no action is the link. The other row actions show in the row, a delete
  * as a trash icon. Three or more configured ones fold a row into one "Actions" menu, and below 992 px a row with two or
  * more does, so a row with one action shows it as a button. The toolbar always shows. Its right side has a Refresh
@@ -443,19 +502,18 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
         return shown
       }
       const label = text === '' ? t(action.labelKey) : shown
+      const scope = { id: record.id, values: record.values }
       if (canvas.active) {
+        // The canvas has no page to open, so a reference path stands in for the target page's own address.
         return (
-          <a
-            role="link"
-            tabIndex={0}
-            onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.click()}
+          <Link
+            to={navigatePath(sitePath, action, scope) ?? siteAddress(sitePath, action.page.toLowerCase())}
             {...canvas.props(`rowActions/${openIndex}`)}
           >
             {label}
-          </a>
+          </Link>
         )
       }
-      const scope = { id: record.id, values: record.values }
       if (!isVisible(action.visibleWhen, scope)) {
         return shown
       }
@@ -467,21 +525,11 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
           </Link>
         )
       }
-      // A reference path is read on click, so the link has no address.
-      const open = navigateTarget(sitePath, action, scope)
-      if (open === null) {
+      // A reference path is read when the row draws, see ResolvedOpenLink.
+      if (navigateTarget(sitePath, action, scope) === null) {
         return shown
       }
-      return (
-        <a
-          role="link"
-          tabIndex={0}
-          onClick={() => void runNavigate(open)}
-          onKeyDown={(event) => event.key === 'Enter' && void runNavigate(open)}
-        >
-          {label}
-        </a>
-      )
+      return <ResolvedOpenLink sitePath={sitePath} action={action} scope={scope} label={label} from={from} />
     }
     return fields.map((field, column): AxisColumn<TableRow> => ({
       key: field.name,
@@ -508,7 +556,7 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
         return column === 0 ? openLink(text, text, record) : text
       },
     }))
-  }, [fields, locale, rowActions, openIndex, runNavigate, sitePath, from, t, canvas, widget.priorities])
+  }, [fields, locale, rowActions, openIndex, sitePath, from, t, canvas, widget.priorities])
 
   // The row's actions other than the one its identifying cell opens. A start action runs for the row, a delete asks
   // first, a navigate action opens its page or is dropped when its path is unknown, and an action whose visibleWhen

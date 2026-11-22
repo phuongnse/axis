@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { EditorView } from '@codemirror/view'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
@@ -563,7 +563,7 @@ describe('EntityDesigner', () => {
     expect(fieldCells(4)[2]).toBe('Text')
   })
 
-  it('links the target of a reference to its entity, and leaves the name of the field a button', () => {
+  it('links the target of a reference to its entity, and links the name of the field to its drawer', () => {
     renderDesigner(entity({ fields: [{ name: 'unit', type: 'reference', target: 'OrgUnit' }] }), vi.fn(), withTargets)
 
     const row = screen.getByTestId('studio-field-/fields/0')
@@ -571,8 +571,7 @@ describe('EntityDesigner', () => {
       'href',
       studioResourceAddress('Shop', 'e3'),
     )
-    expect(within(row).getByRole('button', { name: 'unit' })).toBeInTheDocument()
-    expect(within(row).queryByRole('link', { name: 'unit' })).toBeNull()
+    expect(within(row).getByRole('link', { name: 'unit' })).toHaveAttribute('href', '/?field=unit')
   })
 
   it('links a target with no label by its name, and a module entity by its own id at its module view', () => {
@@ -613,14 +612,15 @@ describe('EntityDesigner', () => {
 
     expect(fieldCells(0)[2]).toBe('Reference to Missing')
     expect(fieldCells(1)[2]).toBe('Reference to —')
-    expect(screen.queryByRole('link')).toBeNull()
+    // Only the names of the fields are links, and no target is.
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['ghost', 'empty'])
   })
 
   it('shows a target as text, with no link, until the names have loaded', () => {
     renderDesigner(entity({ fields: [{ name: 'vendor', type: 'reference', target: 'Supplier' }] }), vi.fn(), null)
 
     expect(fieldCells(0)[2]).toBe('Reference to Supplier')
-    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['vendor'])
   })
 
   describe('the search of the Fields table', () => {
@@ -909,6 +909,35 @@ describe('EntityDesigner', () => {
       expect(router.state.location.search).toBe('?app=Shop')
     })
 
+    it('links the name of a field to &field=<name>, and a plain click opens the drawer in place', async () => {
+      const { router } = renderAddressed(entity(), ['/studio?app=Shop'])
+
+      const link = await screen.findByRole('link', { name: 'code' })
+      expect(link).toHaveAttribute('href', '/studio?app=Shop&field=code')
+      await userEvent.click(link)
+
+      expect(await screen.findByTestId('studio-field-drawer')).toBeVisible()
+      expect(router.state.location.search).toBe('?app=Shop&field=code')
+      expect(router.state.historyAction).toBe('PUSH')
+    })
+
+    it('leaves a Ctrl+click on a field name to the browser, which opens a new tab, and opens no drawer', async () => {
+      const { router } = renderAddressed(entity(), ['/studio?app=Shop'])
+
+      fireEvent.click(await screen.findByRole('link', { name: 'code' }), { ctrlKey: true })
+
+      expect(screen.queryByTestId('studio-field-drawer')).toBeNull()
+      expect(router.state.location.search).toBe('?app=Shop')
+    })
+
+    it('shows a field with no name as a button named Unnamed field, with no link', async () => {
+      renderDesigner(entity({ fields: [{ name: '', type: 'text' }] }))
+
+      const cell = within(await screen.findByTestId('studio-field-/fields/0')).getAllByRole('cell')[0]
+      expect(within(cell).getByRole('button', { name: 'Unnamed field' })).toBeInTheDocument()
+      expect(within(cell).queryByRole('link')).not.toBeInTheDocument()
+    })
+
     it('opens the drawer of the field at an address that names it, and of no other', async () => {
       renderAddressed(entity(), ['/studio?app=Shop&field=code'])
 
@@ -931,7 +960,7 @@ describe('EntityDesigner', () => {
 
       await waitFor(() => expect(screen.queryByTestId('studio-field-drawer')).toBeNull())
       expect(router.state.location.search).toBe('?app=Shop')
-      expect(within(screen.getByTestId('studio-field-/fields/1')).getAllByRole('button')[0]).toHaveFocus()
+      expect(within(screen.getByTestId('studio-field-/fields/1')).getAllByRole('link')[0]).toHaveFocus()
     })
 
     it('follows a rename of the open field in the address, and keeps the drawer open', async () => {
@@ -1937,7 +1966,7 @@ describe('EntityDesigner', () => {
           expect(within(drawer).getByRole('combobox', { name: label })).toBeDisabled()
         }
       }
-      expect(within(screen.getAllByTestId(`studio-field-/fields/${index}`)[0]).getAllByRole('button')[0]).toBeEnabled()
+      expect(screen.getAllByTestId(`studio-field-/fields/${index}`)[0].querySelector('a, button')).toBeEnabled()
     }
 
     await userEvent.type(
@@ -1945,6 +1974,18 @@ describe('EntityDesigner', () => {
       'x',
     )
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('keeps the button of a field with no name enabled in a read-only designer, and opens its drawer', async () => {
+    renderDesigner(entity({ fields: [{ name: '', type: 'text' }] }), vi.fn(), names, true)
+
+    const button = within(await screen.findByTestId('studio-field-/fields/0')).getByRole('button', {
+      name: 'Unnamed field',
+    })
+    expect(button).toBeEnabled()
+
+    const drawer = await openEntityField(0)
+    expect(drawer).toBe(screen.getByRole('dialog', { name: 'Unnamed field' }))
   })
 
   it('shows a disabled label box and plain boxes for the rest until the names have loaded', async () => {

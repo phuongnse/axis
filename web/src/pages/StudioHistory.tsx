@@ -7,6 +7,7 @@ import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EventTime } from '../platform/EventTime'
 import { PageLayout } from '../platform/PageLayout'
 import { PersonName } from '../platform/PersonName'
+import { studioHistoryAddress } from '../platform/studioAddress'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioRevision,
@@ -41,11 +42,6 @@ function RevisionAuthor({ revision }: { revision: StudioRevision }) {
   ) : (
     <PersonName id={revision.userId} name={revision.author} />
   )
-}
-
-/** The address of the History view, or of one revision's page. */
-function historyAddress(application: string, revision?: string): string {
-  return `/studio?${new URLSearchParams({ app: application, view: 'history', ...(revision ? { revision } : {}) })}`
 }
 
 /** The columns the view's search, filter and sort can name, see docs/reference/authoring-revisions.md#list. */
@@ -152,7 +148,7 @@ export function StudioHistory({
       title: t('shell.studio.history.summary'),
       filter: { kind: 'text' },
       render: (_, row) => (
-        <Link data-testid="studio-revision-link" to={historyAddress(application, row.id)}>
+        <Link data-testid="studio-revision-link" to={studioHistoryAddress(application, row.id)}>
           {row.summary}
         </Link>
       ),
@@ -293,7 +289,7 @@ export function StudioRevisionPage({
     return () => controller.abort()
   }, [application, revisionId, generation, lost])
 
-  const back = <Link to={historyAddress(application)}>{t('shell.studio.history.back')}</Link>
+  const back = <Link to={studioHistoryAddress(application)}>{t('shell.studio.history.back')}</Link>
   const loaded = diff?.revisionId === revisionId ? diff.value : undefined
   if (diff?.revisionId !== revisionId) {
     return <Spin />

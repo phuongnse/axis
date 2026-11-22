@@ -537,7 +537,7 @@ describe('TableWidget', () => {
       const categoryAnswer = (url: string, answer: Response) =>
         url.startsWith(categoryPath) ? answer : new Response(notePage)
 
-      it('reads the record along the path on click and puts the value in the query', async () => {
+      it('reads the record along the path when its row draws, and links to its address before a click', async () => {
         const requested = stubFetch((url) =>
           categoryAnswer(
             url,
@@ -547,25 +547,39 @@ describe('TableWidget', () => {
         renderWidget('', { ...noteWidget, rowActions: [named] })
         const row = await screen.findByRole('row', { name: /Buy paper/ })
 
-        // A reference path is read on click, so the link has no address.
-        const link = within(row).getByRole('link', { name: 'Buy paper' })
-        expect(link).not.toHaveAttribute('href')
+        const link = await within(row).findByRole('link', { name: 'Buy paper' })
+        expect(link).toHaveAttribute('href', '/e2e/ticketdetail?category=Office')
+        expect(requested()).toContain(`${categoryPath}/${categoryId}`)
+
         await userEvent.click(link)
 
         await waitFor(() => expect(search()).toBe('?category=Office'))
         expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail')
-        expect(requested()).toContain(`${categoryPath}/${categoryId}`)
       })
 
-      it('shows one message and opens no page when the record is missing', async () => {
-        stubFetch((url) => categoryAnswer(url, new Response('{}', { status: 404 })))
+      it('shows the identifying cell as plain text, with no message, when the record is missing', async () => {
+        const requested = stubFetch((url) => categoryAnswer(url, new Response('{}', { status: 404 })))
         renderWidget('', { ...noteWidget, rowActions: [named] })
         const row = await screen.findByRole('row', { name: /Buy paper/ })
 
-        await userEvent.click(within(row).getByRole('link', { name: 'Buy paper' }))
+        await waitFor(() => expect(requested()).toContain(`${categoryPath}/${categoryId}`))
+        await waitFor(() => expect(within(row).getByText('Buy paper')).toBeInTheDocument())
+        expect(within(row).queryByRole('link')).not.toBeInTheDocument()
+        expect(screen.queryByTestId('table-action-error')).not.toBeInTheDocument()
+      })
 
-        expect(await screen.findByTestId('table-action-error')).toHaveTextContent('The page could not be opened.')
-        expect(screen.getByTestId('path')).toHaveTextContent('/e2e/notes')
+      it('shows the identifying cell as plain text while the record along the path is read', async () => {
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(async (input: string) =>
+            input.startsWith(categoryPath) ? new Promise<Response>(() => {}) : new Response(notePage),
+          ),
+        )
+        renderWidget('', { ...noteWidget, rowActions: [named] })
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+        expect(within(row).getByText('Buy paper')).toBeInTheDocument()
+        expect(within(row).queryByRole('link')).not.toBeInTheDocument()
       })
 
       it('shows plain text when paths has no entry for a hop', async () => {

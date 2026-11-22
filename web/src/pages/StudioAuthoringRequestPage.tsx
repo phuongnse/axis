@@ -168,7 +168,7 @@ export function StudioAuthoringRequestPage({
       <Flex vertical gap="small" data-testid="studio-ai-request-not-found">
         <Typography.Text>{t('shell.studio.aiRequest.notFound')}</Typography.Text>
         {onAskAi !== undefined && (
-          <AxisButton role="link" onClick={onAskAi}>
+          <AxisButton role="secondary" onClick={onAskAi}>
             {t('shell.studio.aiRequest.askAi')}
           </AxisButton>
         )}

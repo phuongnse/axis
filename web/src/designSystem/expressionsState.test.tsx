@@ -24,7 +24,7 @@ describe('the design-system Entity with expressions state', () => {
     render(<Preview states={[state]} />)
 
     // The computed field's expression is in its field drawer, which starts closed: open it from the field's name.
-    await userEvent.click(await screen.findByRole('button', { name: 'amountWithTax' }, { timeout: 15000 }))
+    await userEvent.click(await screen.findByRole('link', { name: 'amountWithTax' }, { timeout: 15000 }))
     // Each expression box checks on its own, so the second reading can arrive after the first. Wait for both.
     await waitFor(() => expect(screen.getAllByTestId('studio-expression-reading')).toHaveLength(2), { timeout: 15000 })
     const readings = screen.getAllByTestId('studio-expression-reading')

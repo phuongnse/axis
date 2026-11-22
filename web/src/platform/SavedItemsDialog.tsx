@@ -119,7 +119,7 @@ function ItemLine<T>({
     <Flex vertical gap="small">
       {mode === 'show' && (
         <Flex align="center" justify="space-between" gap="small">
-          <AxisButton role="link" onClick={onOpen}>
+          <AxisButton role="subtle" onClick={onOpen}>
             {itemName}
           </AxisButton>
           <AxisSplitButton

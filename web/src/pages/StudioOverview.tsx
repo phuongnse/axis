@@ -2,6 +2,7 @@ import { Flex, Typography } from 'antd'
 import { useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { EmptyState } from '../platform/EmptyState'
+import { studioKindAddress, studioViewAddress } from '../platform/studioAddress'
 import { PageLayout } from '../platform/PageLayout'
 import { fetchSites, type SiteListItem } from '../platform/site'
 import { changeRows, type StudioReleases, type StudioResourceItem } from '../platform/studio'
@@ -51,7 +52,6 @@ export function StudioOverview({
     (entry) =>
       entry.group !== 'other' && !present.has(entry.kind) && !(getStarted && getStartedKinds.includes(entry.kind)),
   )
-  const address = (extra: Record<string, string>) => `/studio?${new URLSearchParams({ app: application, ...extra })}`
 
   return (
     <PageLayout title={title} line={description}>
@@ -61,16 +61,16 @@ export function StudioOverview({
           <SectionPart testName="get-started" heading={{ title: t('shell.studio.overview.getStarted') }}>
             <ol style={{ margin: 0, paddingInlineStart: spacing.lg }}>
               <li>
-                <Link to={address({ kind: 'entity' })}>{t('shell.studio.overview.start.entity')}</Link>
+                <Link to={studioKindAddress(application, 'entity')}>{t('shell.studio.overview.start.entity')}</Link>
               </li>
               <li>
-                <Link to={address({ kind: 'page' })}>{t('shell.studio.overview.start.page')}</Link>
+                <Link to={studioKindAddress(application, 'page')}>{t('shell.studio.overview.start.page')}</Link>
               </li>
               <li>
-                <Link to={address({ kind: 'site' })}>{t('shell.studio.overview.start.site')}</Link>
+                <Link to={studioKindAddress(application, 'site')}>{t('shell.studio.overview.start.site')}</Link>
               </li>
               <li>
-                <Link to={address({ view: 'releases' })}>{t('shell.studio.overview.start.publish')}</Link>
+                <Link to={studioViewAddress(application, 'releases')}>{t('shell.studio.overview.start.publish')}</Link>
               </li>
             </ol>
           </SectionPart>
@@ -100,7 +100,7 @@ export function StudioOverview({
                   application={application}
                 />
               )}
-              <Link to={address({ view: 'releases' })}>{t('shell.studio.overview.changes.releases')}</Link>
+              <Link to={studioViewAddress(application, 'releases')}>{t('shell.studio.overview.changes.releases')}</Link>
             </Flex>
           )}
         </SectionPart>
@@ -109,7 +109,7 @@ export function StudioOverview({
             <Flex vertical gap={spacing.sm}>
               {missing.map((entry) => (
                 <Flex key={entry.kind} vertical>
-                  <Link to={address({ kind: entry.kind })}>{kindName(entry.kind, t)}</Link>
+                  <Link to={studioKindAddress(application, entry.kind)}>{kindName(entry.kind, t)}</Link>
                   <Typography.Text>{t(`shell.studio.overview.more.${entry.kind}.purpose`)}</Typography.Text>
                   <Typography.Text style={{ color: colour.textMuted }}>
                     {t(`shell.studio.overview.more.${entry.kind}.when`)}

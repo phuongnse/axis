@@ -18,14 +18,13 @@ widget names a role, never an Ant Design button type.
 | Main      | Outlined in `primaryText`                                                       | The main action of a region: a table's first toolbar action that is shown, such as New request, Add row of a child collection, and a `startProcess` action on a form or a detail |
 | Secondary | The default grey outline                                                        | Other actions, such as Cancel and Import                                                                                                                                         |
 | Subtle    | Borderless in the text colour, with a light fill on hover and focus             | Tools such as Refresh, Format and Undo, header controls such as the account button, and icon-only buttons. Choose and Clear of a `reference` field are bordered and joined       |
-| Link      | Text in `primaryText` with no border                                            | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects)                                   |
 
 - **Four roles, by weight.** Finish is a solid fill, the one action that finishes a task, one a screen.
   Main is outlined in `primaryText`, the main action of a region, one a region. Secondary is the default grey outline,
   for most actions. Subtle is borderless in the text colour, with a light fill on hover and focus, for tools such as
   Refresh, Format and Undo. An icon-only button is a subtle button with only its icon.
-- **The `link` role ends** _(planned)_. Each use of the `link` role becomes a link with an address or a button with a
-  visible shape, see [opening things](#opening-things).
+- **An action with no address is a button, never a link.** A name that opens its item in place is a subtle button.
+  An action such as Add condition is a secondary button, so it has a visible shape. See [opening things](#opening-things).
 - **A tone apart from the role**. The role says how much an action weighs. The destructive tone says it removes or
   throws something away, such as Delete, Discard, Revoke or Drop, and any role takes it. A main, secondary or subtle
   button takes it in `dangerText`, and a menu entry too. A finish button takes it as a fill in `danger` with white text.
@@ -37,7 +36,7 @@ widget names a role, never an Ant Design button type.
 - **A chosen subtle button is marked through `selected`.** `AxisButton`'s `selected` draws a subtle button on the
   selected tint in `primaryText` and sets the one `aria-pressed` itself, or `aria-current` for a page or a step, in place
   of any the caller passes.
-- **No button looks like a link** _(planned)_. A borderless button is in the text colour, or in `dangerText` in the
+- **No button looks like a link**. A borderless button is in the text colour, or in `dangerText` in the
   tone, even beside a finish button. Borderless text in `primaryText` is a link's look alone.
 - **A region's main action keeps its border.** It keeps its border wherever it sits, a title row included.
   A section's Add, such as Add field, Add validation or Add index, is a secondary button in the title row, and a
@@ -543,14 +542,16 @@ A thing opens at one of three levels, chosen by what the person does, never by t
 - **A reference opens what it names**. A record's label, shown read-only, is a real link to its record page,
   with an `href` so Ctrl+click opens a new tab. The link passes the page it leaves as `from`, see
   [shell layout](shell.md#layout). It never opens a dialog. A record the person cannot open is plain text.
-- **A link goes to an address** _(planned)_. A link is a real `<a href>` or the router's link, so it opens in a new
-  tab and its address can be copied. It is in `primaryText`, underlined in running text and on hover when it stands
-  alone. An action with no address is a button, never a link.
+- **A link goes to an address.** A link is a real `<a href>` or the router's link, so it opens in a new tab and its
+  address can be copied. It is in `primaryText`. An action with no address is a button, never a link.
+- **A link is underlined** _(planned)_. In running text, and on hover when a link stands alone, it is underlined.
 - **What opens a view gets an address.** A resource named in Problems, test results or a form's Used on is a
   real link to the resource at its path, and a shared grant's Open policy links to the policy. Ctrl+click opens
   either in a new tab. See [Studio's route and address](studio.md#route-and-address).
-- **A field's name and a list's first cell get an address** _(planned)_. A field's name links to `&field=<name>`.
-  A list of objects' first cell links to `&item=<pointer>`, which opens the item.
+- **A field's name gets an address.** A field's name links to `&field=<name>`, and a plain click opens the field in
+  place, as [entity designer](entity-designer.md#fields) says.
+- **A list's first cell gets an address** _(planned)_. A list of objects' first cell links to `&item=<pointer>`, which
+  opens the item.
 - **A package file's place is a link.** A package file's place, such as `lib/x.py, line 3`, links to
   `&view=packages&package=<id>&file=<path>&line=<n>`, which opens the file at that line. See
   [Studio's route and address](studio.md#route-and-address).
