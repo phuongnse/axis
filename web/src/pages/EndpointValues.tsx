@@ -19,8 +19,9 @@ function escapeSegment(segment: string): string {
  * row's field is picked from `fields`, or typed while they are unknown. The rows edit the draft through `onChange`: a
  * rename keeps the row's place in the file, and a value that is not an object is left to the JSON view. The rows sit in
  * a part headed with the values' title and help, and an endpoint with no values says so. Its Add mapping sits on the right
- * of the part's heading, see docs/reference/studio-resource-form.md#sections, and each row's Remove is in its "…" menu. A
- * read-only editor, Ant Design's `componentDisabled`, shows neither, see docs/reference/studio-form-editors.md#endpoint-rows.
+ * of the part's heading, see docs/reference/studio-resource-form.md#sections, and each row's Remove is the trash icon. A
+ * read-only editor, Ant Design's `componentDisabled`, shows neither, see
+ * docs/reference/studio-form-editors.md#endpoint-rows.
  */
 export function EndpointValues({
   fields,

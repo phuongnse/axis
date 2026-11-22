@@ -1,11 +1,13 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider } from 'antd'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
-import { emptyDescription } from '../test/antd'
+import { emptyDescription, tabTo } from '../test/antd'
+import { withAntdStyles } from '../test/antdStyles'
+import { designTokensFor } from '../platform/designTokens'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { MappingRows } from './MappingRows'
 import type { ChangeHandler } from './SchemaForm'
@@ -63,7 +65,7 @@ afterEach(() => {
 })
 
 describe('MappingRows', () => {
-  it('puts Add row on the title row as a secondary button and Remove in each row’s menu', async () => {
+  it('puts Add row on the title row as a secondary button and each row’s Remove beside it', async () => {
     const onChange = renderRows()
 
     const group = within(screen.getByRole('group', { name: title }))
@@ -71,21 +73,40 @@ describe('MappingRows', () => {
     expect(add.closest('legend')).not.toBeNull()
     expect(add).toHaveClass('ant-btn-variant-outlined')
     expect(group.getAllByRole('button', { name: 'Add row' })).toHaveLength(1)
-    expect(group.queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(within(add.closest('legend') as HTMLElement).queryByRole('button', { name: 'Remove' })).toBeNull()
 
     for (const key of Object.keys(value)) {
-      expect(
-        within(screen.getByTestId(`studio-field-/steps/1/output/${key}`)).getByRole('button', { name: 'Actions' }),
-      ).toBeVisible()
+      const row = within(screen.getByTestId(`studio-field-/steps/1/output/${key}`))
+      expect(row.getByRole('button', { name: 'Remove' })).toBeVisible()
+      expect(row.queryByRole('button', { name: 'Actions' })).toBeNull()
     }
     await userEvent.click(
-      within(screen.getByTestId('studio-field-/steps/1/output/total')).getByRole('button', { name: 'Actions' }),
+      within(screen.getByTestId('studio-field-/steps/1/output/total')).getByRole('button', { name: 'Remove' }),
     )
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/output/total', undefined)
 
     await userEvent.click(add)
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/output/', '')
+  })
+
+  describe('with antd styles', () => {
+    withAntdStyles()
+
+    beforeEach(() => localStorage.setItem('axis.themeMode', 'dark'))
+
+    it('draws Remove as the trash icon in dangerText and names it on keyboard focus in dark mode', async () => {
+      renderRows()
+
+      const row = screen.getByTestId('studio-field-/steps/1/output/total')
+      const remove = within(row).getByRole('button', { name: 'Remove' })
+      expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+      expect(remove).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
+      expect(within(row).queryByRole('button', { name: 'Actions' })).toBeNull()
+      await tabTo(remove)
+
+      // Other tooltips the tab passed may stay open, so the one of Remove is found among them.
+      await waitFor(() => expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toContain('Remove'))
+    })
   })
 
   it('puts the add choice of the unmapped keys on the title row while the keys are known', async () => {

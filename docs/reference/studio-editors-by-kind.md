@@ -293,8 +293,9 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 - **The process.** The Form tab has the General, Subject and Steps [sections](studio-resource-form.md#sections),
   and each field has a [field text](studio-resource-form.md#fields).
 - **Lists.** The lists of a process's parameters, a decision's branches, a task's outcomes and escalations, and an
-  operation's rows have Add on their title row as a secondary button. Each row's actions, and each step card's, are
-  entries of its "…" menu, the table's [row actions](actions-and-controls.md#tables). A task's deadline and a wait
+  operation's rows have Add on their title row as a secondary button. Each row's Remove is the trash icon, named by its
+  tooltip. Each step card's Move up, Move down and Delete are entries of its "…" menu, with Delete last after a divider, the
+  table's [row actions](actions-and-controls.md#tables). A task's deadline and a wait
   for event's timeout have Add or Remove on their group's title row, also as a secondary button, and Remove in the
   destructive tone, so it is outlined in `dangerText`. A read-only tab,
   such as while the JSON has an error, shows no Add, no Remove and no menu.
@@ -326,7 +327,7 @@ sub-process and wait for event steps and of a task's deadline and escalations.
   what is still missing, and every other key, unknown keys included, stays.
   - **Rows.** Each list of rows, `set`, `input` and its nested `fields`, `output`, an event's `fields`, a
     notification's `values` and a page's parameters, has Add row on its title row, or the add choice of the
-    unmapped keys where the keys are known. Its rows' menus and a read-only tab follow the
+    unmapped keys where the keys are known. Its rows' Remove and a read-only tab follow the
     [Lists](#process-editor) bullet.
   - `updateRecord` shows `set` as rows of a field of the process's entity and an expression.
   - `callConnector` shows the connector and its operation as pickers, its
@@ -366,9 +367,9 @@ Operations heading, and the JSON view stays as the second view of the same draft
   the connector's other operations. Its input and output fields are rows of name, type and required,
   one field to a line, and the schema's required keys carry the shared required mark. Add operation sits
   on the Operations heading. Each input, output and nested field list has its Add on its title row, as a
-  secondary button. Each operation's Delete operation is in its "…" menu at its top right, and each row's
-  Delete is in its "…" menu, which also removes the fields nested in the row. A read-only tab, such as while the JSON has
-  an error, shows no Add and no menu, as the Lists bullet of the [process editor](#process-editor) says.
+  secondary button. Each operation's Delete operation is the trash icon at its top right, and each row's
+  Delete is the trash icon, which also removes the fields nested in the row. A read-only tab, such as while the JSON has
+  an error, shows no Add and no Delete, as the Lists bullet of the [process editor](#process-editor) says.
   A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
 - **Placement and nesting.** A scalar input has a Sent in choice of `body`, `path`, `query` or
   `header`, which shows `body` when the file has no `in` key and removes the key when `body` is chosen.

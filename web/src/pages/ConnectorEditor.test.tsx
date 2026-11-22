@@ -20,7 +20,6 @@ import {
   optionTexts,
   selectRoot,
   shownDropdown,
-  shownMenu,
 } from '../test/antd'
 import { ConnectorEditor } from './ConnectorEditor'
 
@@ -235,11 +234,9 @@ describe('ConnectorEditor', () => {
       { name: '', method: 'POST', path: '/' },
     ])
 
-    // The operation's own "…" menu is the last one in its card, after the fields it holds.
     const operation = within(screen.getByTestId('studio-operation-1'))
-    await userEvent.click(operation.getAllByRole('button', { name: 'Actions' }).at(-1)!)
-    await shownMenu('Actions')
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete operation' }))
+    expect(operation.queryByRole('button', { name: 'Actions' })).toBeNull()
+    await userEvent.click(operation.getByRole('button', { name: 'Delete operation' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/1', undefined)
   })
 
@@ -259,13 +256,11 @@ describe('ConnectorEditor', () => {
     ])
 
     const row = within(screen.getByTestId('studio-field-/operations/0/input/1'))
-    await userEvent.click(row.getByRole('button', { name: 'Actions' }))
-    await shownMenu('Actions')
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    await userEvent.click(row.getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/1', undefined)
   })
 
-  it('puts Add input on its title row and each input row in a menu with Delete', () => {
+  it('puts Add input on its title row and each input row with its Delete as the trash icon', () => {
     renderEditor()
     const input = within(screen.getByTestId('studio-field-/operations/0/input'))
     const add = input.getByRole('button', { name: 'Add input' })
@@ -273,8 +268,10 @@ describe('ConnectorEditor', () => {
     expect(add.closest('legend')).not.toBeNull()
     expect(add).toHaveClass('ant-btn-variant-outlined')
     const row = within(screen.getByTestId('studio-field-/operations/0/input/0'))
-    expect(row.getByRole('button', { name: 'Actions' })).toBeVisible()
-    expect(row.queryByRole('button', { name: 'Delete' })).toBeNull()
+    const remove = row.getByRole('button', { name: 'Delete' })
+    expect(remove).toBeVisible()
+    expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+    expect(row.queryByRole('button', { name: 'Actions' })).toBeNull()
   })
 
   it('shows no Add, no operation menu and no row menu while the editor is read-only', () => {
@@ -284,6 +281,8 @@ describe('ConnectorEditor', () => {
     expect(screen.queryByRole('button', { name: 'Add input' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add output' })).toBeNull()
     expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
+    expect(screen.queryAllByRole('button', { name: 'Delete operation' })).toHaveLength(0)
+    expect(screen.queryAllByRole('button', { name: 'Delete' })).toHaveLength(0)
   })
 
   it('edits a field row by name, type and required', async () => {
@@ -616,9 +615,7 @@ describe('ConnectorEditor', () => {
     const nested = within(screen.getByTestId('studio-field-/operations/0/input/0/fields/0'))
     await userEvent.click(field('operations.input.fields.required', 'checkbox', nested))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/0/fields/0/required', true)
-    await userEvent.click(nested.getByRole('button', { name: 'Actions' }))
-    await shownMenu('Actions')
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    await userEvent.click(nested.getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/0/fields/0', undefined)
   })
 

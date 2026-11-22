@@ -45,7 +45,7 @@ names, and is typed while those are unknown. Add mapping lists the fields that h
 row's field keeps its place in the file, and a value that is not an object is left to the JSON view.
 
 - **Where the actions sit.** Add mapping is a secondary button on the part's title row. Each value row's Remove is the
-  trash icon, named by its tooltip. The `event`'s fields use MappingRows, which keeps Remove in each row's "…" menu.
+  trash icon, named by its tooltip. The `event`'s fields use MappingRows, whose Remove is the trash icon too.
 - **Read-only.** While the tab is read-only, such as while the JSON has an error, the part shows neither Add mapping nor
   any row's action.
 

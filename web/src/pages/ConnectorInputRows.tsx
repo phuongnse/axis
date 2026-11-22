@@ -48,9 +48,9 @@ function kindOf(entry: unknown): Kind | undefined {
  * A value is an expression, an object is nested rows over the same record, and a list picks a child collection of
  * `entity` with `from` and has nested rows over a row of it. Nested rows use the same fields and nest further. The step
  * keeps the shape the author switched to, and the compiler reports what is missing. A value that is not a plain object
- * is left to the JSON view. Add sits on each list's title row as a secondary button and each row's Remove is in the row's
- * "…" menu, which removes what is nested in the row too. A read-only editor, Ant Design's `componentDisabled`, shows
- * neither, see docs/reference/studio-editors-by-kind.md#process-editor.
+ * is left to the JSON view. Add sits on each list's title row as a secondary button and each row's Remove is the trash
+ * icon, which removes what is nested in the row too. A read-only editor, Ant Design's `componentDisabled`, shows neither,
+ * see docs/reference/studio-editors-by-kind.md#process-editor.
  */
 export function ConnectorInputRows({
   pointer,
@@ -165,12 +165,11 @@ export function ConnectorInputRows({
                 </Flex>
                 {componentDisabled ? null : (
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',
                         labelKey: 'shell.studio.process.removeMapping',
-                        destructive: true,
+                        meaning: 'remove',
                         onClick: () => onChange(rowPointer, undefined),
                       },
                     ]}
