@@ -354,6 +354,17 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: '/sample/requests',
       frameHeight: shellFrameHeight,
     },
+    {
+      // Proposed, #4934: the account menu holds the legal links, as the shell has no footer.
+      caption: 'Account menu',
+      draw: () => (
+        <ClickOnMount selector='[data-testid="account-menu"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
+      entry: '/sample/requests',
+      frameHeight: shellFrameHeight,
+    },
     { caption: 'Account page', draw: () => <ShellPreview />, entry: '/account', frameHeight: shellFrameHeight },
     {
       caption: 'Account notifications',

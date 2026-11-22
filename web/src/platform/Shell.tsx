@@ -10,7 +10,6 @@ import { NotificationBell } from './NotificationBell'
 import { ReadOnlyBanner } from './ReadOnlyBanner'
 import { PreferencesMenu } from './PreferencesMenu'
 import { sizeTokens } from './designTokens'
-import { ShellFooter } from './ShellFooter'
 import { ShellNavigation } from './ShellNavigation'
 import { ContentInsetContext } from './contentInsetContext'
 import { ShellAsideContext } from './shellAsideContext'
@@ -230,7 +229,7 @@ export function Shell({
               <>
                 {bell}
                 {hasAccount ? account : <AppSwitcher locale={locale} />}
-                {!hasAccount && <UserMenu />}
+                {!hasAccount && <UserMenu legal={legal} />}
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
                   ref={toggle}
@@ -248,7 +247,7 @@ export function Shell({
                 {bell}
                 {!hasAccount && <AppSwitcher locale={locale} />}
                 {preferences}
-                {hasAccount ? account : <UserMenu />}
+                {hasAccount ? account : <UserMenu legal={legal} />}
               </Flex>
             )}
           </Layout.Header>
@@ -329,11 +328,6 @@ export function Shell({
               </Layout>
             </Layout>
           </Layout>
-          {/* Proposed, #4934: the footer runs across the window at its foot, under the sidebar, the page and the side
-              panel, as the header runs across its top, see docs/reference/shell.md#layout. */}
-          <div style={{ flex: 'none' }}>
-            <ShellFooter legal={legal} />
-          </div>
         </Layout>
       </ConfigProvider>
     </div>

@@ -810,6 +810,8 @@ export const applicationSite: ApplicationSite = {
   notificationsPath,
   // Request has a form page. Category has none, so it opens on the default record page.
   recordPages: { Request: `/${sitePath}/request`, Category: `/${sitePath}/records/category` },
+  // The tenant's links, so the account menu shows Privacy and Terms beside Licences.
+  legal: { privacyUrl: '#privacy', termsUrl: '#terms' },
 }
 
 const requestsPage: PageMetadata = {
