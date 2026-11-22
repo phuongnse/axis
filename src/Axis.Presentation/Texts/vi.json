@@ -2967,6 +2967,8 @@
   "shell.studio.entity.type.date-time.help": "Lúc một việc xảy ra, tới từng phút.",
   "shell.studio.entity.type.enum": "Lựa chọn",
   "shell.studio.entity.type.enum.help": "Một giá trị trong danh sách ngắn do bạn đặt.",
+  "shell.studio.entity.type.person": "Người dùng",
+  "shell.studio.entity.type.person.help": "Một người dùng của ứng dụng, chọn theo tên.",
   "shell.studio.entity.type.reference": "Tham chiếu",
   "shell.studio.entity.type.reference.help": "Liên kết tới một bản ghi của đối tượng khác.",
   "shell.studio.entity.type.references": "Nhiều tham chiếu",

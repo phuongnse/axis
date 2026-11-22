@@ -66,7 +66,7 @@ const drawerGroups: {
   { name: 'type', settings: ['target', 'values', 'valueLabels', 'currency', ['precision', 'scale'], 'maxLength'] },
   // Proposed, #3264: Required and Unique sit in Value, right under the way the value comes from, as they hold for an
   // entered value, so they show near the top as other platforms show them.
-  { name: 'value', settings: ['required', 'unique', 'default', 'userId', 'expression', 'sequence', 'match'] },
+  { name: 'value', settings: ['required', 'unique', 'default', 'expression', 'sequence', 'match'] },
   { name: 'validation', settings: ['minLength', ['min', 'max'], 'maxSize', 'accept'] },
   { name: 'searchPrivacy', settings: ['searchable', 'sensitive', 'exactLookup'] },
 ]
@@ -701,7 +701,7 @@ const Fields = memo(function Fields({
       title: t('shell.studio.entity.fieldType'),
       filter: {
         kind: 'enum',
-        value: ({ field }) => text(isContent(field) ? field.type : undefined) || null,
+        value: ({ field }) => (isContent(field) ? designerType(field) : '') || null,
         options: fieldTypeChoices(t).map(({ value, label }) => ({ value, label })),
       },
       render: (_, { field }) => <TypeCell application={application} field={field} />,
@@ -829,7 +829,7 @@ const Fields = memo(function Fields({
  * The field types in the order Add field offers them: text and numbers, then yes or no and dates, then a choice, the
  * types that point to another entity, and a file. Proposed, see #3264.
  */
-const fieldTypeChoiceOrder: readonly FieldType[] = [
+const fieldTypeChoiceOrder: readonly DesignerType[] = [
   'text',
   'integer',
   'decimal',
@@ -838,11 +838,42 @@ const fieldTypeChoiceOrder: readonly FieldType[] = [
   'date',
   'date-time',
   'enum',
+  'person',
   'reference',
   'references',
   'child-collection',
   'file',
 ]
+
+/**
+ * Proposed, #3264: a field's type as the designer offers it. Person is a text field that holds a user's id, `userId`, as
+ * the file keeps it, offered as a type of its own, as other platforms offer a person or user field.
+ */
+type DesignerType = FieldType | 'person'
+
+/** The designer's type of a field: Person for a text field that holds a user, its own type otherwise. */
+function designerType(field: Content): string {
+  const type = text(field.type)
+  return type === 'text' && field.userId === true ? 'person' : type
+}
+
+/**
+ * The field with the designer's type `next`: Person is a text field with `userId`, entered by people, as a user id is
+ * neither computed, a sequence nor the creator, and with no length or search of its own; leaving Person drops `userId`.
+ */
+function changeDesignerType(field: Content, next: string): Content {
+  if (next === 'person') {
+    const text = withValueSource(changeFieldType(field, 'text'), 'entered')
+    // A person shows none of a text's own settings, so it keeps none of them either.
+    for (const setting of ['maxLength', 'minLength', 'searchable']) {
+      delete text[setting]
+    }
+    return { ...text, userId: true }
+  }
+  const changed = changeFieldType(field, next)
+  delete changed.userId
+  return changed
+}
 
 /** The field types as choices, each its name in words and a line that says what it holds. Proposed, see #3264. */
 function fieldTypeChoices(t: (key: string) => string) {
@@ -1022,7 +1053,7 @@ const TypeCell = memo(function TypeCell({ field, application }: { field: unknown
     return type
   }
   if (!targetTypes.includes(type)) {
-    return t(`shell.studio.entity.type.${type}`)
+    return t(`shell.studio.entity.type.${isContent(field) ? designerType(field) : type}`)
   }
   const target = text(isContent(field) ? field.target : undefined)
   if (target === '') {
@@ -1313,12 +1344,12 @@ const FieldDrawer = memo(function FieldDrawer({
                             showSearch
                             optionFilterProp="label"
                             virtual={false}
-                            value={type === '' ? undefined : type}
+                            value={type === '' ? undefined : designerType(content)}
                             // Proposed, #3264: the types by name in words, each with a line that says what it holds, as
                             // the choice of a new field's type is made here.
                             options={fieldTypeChoices(t)}
                             optionRender={({ data }) => <TypeOption label={data.label} help={data.help} />}
-                            onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
+                            onChange={(next: string) => onChange(pointer, changeDesignerType(content, next))}
                           />
                         </AxisField>
                       </div>
@@ -1377,9 +1408,13 @@ function Settings({
 }) {
   const t = useText()
   const pointer = `/fields/${index}`
-  const taken = editableSettings(field)
+  const person = designerType(field) === 'person'
+  // A person's id is no text a person sizes or searches, and Person is its own type, so it shows none of those.
+  const taken = editableSettings(field).filter(
+    (setting) => setting !== 'userId' && !(person && ['maxLength', 'minLength', 'searchable'].includes(setting)),
+  )
   const type = text(field.type)
-  const sources = valueSourcesOf(type)
+  const sources = person ? ['entered' as const] : valueSourcesOf(type)
   const name = text(field.name)
   // A validation's `field` must name a field, so a field with no name has none and adds none.
   const list: unknown[] | undefined =

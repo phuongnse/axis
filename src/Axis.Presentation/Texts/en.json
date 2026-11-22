@@ -2967,6 +2967,8 @@
   "shell.studio.entity.type.date-time.help": "When something happened, to the minute.",
   "shell.studio.entity.type.enum": "Enum",
   "shell.studio.entity.type.enum.help": "One value from a short list you set.",
+  "shell.studio.entity.type.person": "Person",
+  "shell.studio.entity.type.person.help": "Someone who uses the application, picked by name.",
   "shell.studio.entity.type.reference": "Reference",
   "shell.studio.entity.type.reference.help": "Links to one record of another entity.",
   "shell.studio.entity.type.references": "References",
