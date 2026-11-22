@@ -1,6 +1,6 @@
 # D169. The billing client signs in with OAuth client credentials from the operator's identity provider
 
-Status: **Proposed**
+Status: **Agreed**
 
 ## Context
 

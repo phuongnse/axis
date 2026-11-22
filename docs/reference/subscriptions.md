@@ -20,9 +20,10 @@ commerce.
   delays a step and never skips one. Every change of state writes an audit record.
 - **The `control_plane.subscriptions` table.** `id`, `tenant_id`, `sign_up_id`, `state` (`trialing`,
   `active`, `pastDue`, `readOnly`, `cancelled`, `deleting` or `deleted`), `trial_ends_at`, `next_at`, `step_id`, `plan_code`,
-  `plan_version`, `period` (`month` or `year`), `period_ends_at` and `created_at`. The
+  `plan_version`, `period` (`month` or `year`), `period_ends_at`, `paid_through` and `created_at`. The
   plan and period are empty until a plan is set, see
-  [the catalogue](plans.md#the-catalogue). `period_ends_at` is the end of the current paid period,
+  [the catalogue](plans.md#the-catalogue). `paid_through` is the date the tenant is paid through, set by the
+  [billing API](billing-api.md#setting-the-paid-through-date), and it is empty until then. `period_ends_at` is the end of the current paid period,
   which is the start of the next one, and it is empty until the first paid period starts. A
   subscription with a `period_ends_at` is a paid tenant. A [confirmed sign-up](sign-up.md#the-verify-page) starts the subscription as `trialing`, with the
   trial ending 30 days later, and writes the first audit record with the sign-up as actor. A tenant
@@ -66,10 +67,10 @@ A subscription is in one of these states, and each state says how the tenant wor
 
 | State | The tenant | Next |
 | --- | --- | --- |
-| `trialing` | Works, with the trial's quotas | `readOnly` at the trial's end |
+| `trialing` | Works, with the trial's quotas | `active` on a paid-through date, `readOnly` at the trial's end |
 | `active` | Works, with the plan's quotas | Its period moving forward at each end |
-| `pastDue` | Works, with the plan's quotas | `readOnly` after 14 days of grace |
-| `readOnly` | Read-only, see [the read-only tenant](#the-read-only-tenant) | `deleting` after its wait |
+| `pastDue` | Works, with the plan's quotas | `active` on a paid-through date, `readOnly` after 14 days of grace |
+| `readOnly` | Read-only, see [the read-only tenant](#the-read-only-tenant) | `active` on a paid-through date, `deleting` after its wait |
 | `cancelled` | Works until the paid period ends | `readOnly` at the period's end |
 | `deleting` | Suspended, in the cell's grace window | `deleted` after the window, `readOnly` if the operator cancels the deletion |
 | `deleted` | Gone | — |
@@ -79,8 +80,19 @@ A subscription is in one of these states, and each state says how the tenant wor
   `cancelled` ends in `readOnly` at the period's end. The end of each `active` period moves
   `period_ends_at` forward one period.
 - **A past-due banner** _(planned for M34)_. A `pastDue` tenant's administrators see a banner that links the operator's billing page.
-- **Becoming active** _(planned for M34)_. The operator's billing system makes a subscription `active`
-  through the billing API, see [D168](../decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md).
+- **A paid-through date makes the tenant active.** A date set through the
+  [billing API](billing-api.md#setting-the-paid-through-date) makes a `trialing`, `pastDue`, `readOnly` or
+  `cancelled` subscription `active` at once, in the call's own transaction, see
+  [D168](../decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md).
+  The move writes the audit record `subscription.active`, with the billing client as its actor, and queues
+  `writeQuotas`, so the tenant gets the plan's quotas. From `pastDue` or `readOnly` it also queues
+  `resumeTenant`, which calls the cell's resume with the key `resume:<step id>`. The job queue retries a failed
+  call with the same key. The job does nothing once a later move has changed the step id. The move sets
+  `paid_through` and sets `next_at` to the start of the day after that date in UTC. It clears `period_ends_at`, so
+  the period roll-forward leaves the subscription alone. An `active` subscription keeps its state and step id
+  and takes the new date, with the audit record `subscription.paidThroughSet`.
+- **The clock follows the paid-through date** _(planned for M34)_. Once the date has passed, the clock moves an
+  `active` subscription to `pastDue`, then to `readOnly` after the grace and to `deleting` as for an ended trial.
 - **Cancelling** _(planned for M34)_. The operator's billing system ends the subscription at its
   paid-through date through the [billing API](billing-api.md#ending-a-subscription). The tenant keeps
   working to that date, then follows the same path as an unpaid one.

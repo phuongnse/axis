@@ -1,3 +1,4 @@
+using Axis.ControlPlane.BillingApi;
 using Axis.ControlPlane.SignUp;
 using Axis.ControlPlane.Subscriptions;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> schema of the control plane database. It holds the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>sign_up_emails</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c> and the append-only <c>terms_acceptances</c>.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>sign_up_emails</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the <c>billing_requests</c> and the append-only <c>terms_acceptances</c>.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -35,6 +36,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<SubscriptionEmailRow> SubscriptionEmails => Set<SubscriptionEmailRow>();
 
     public DbSet<SubscriptionAddOnRow> SubscriptionAddOns => Set<SubscriptionAddOnRow>();
+
+    public DbSet<BillingRequestRow> BillingRequests => Set<BillingRequestRow>();
 
     public DbSet<QuotaOverrideRow> QuotaOverrides => Set<QuotaOverrideRow>();
 
@@ -65,7 +68,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
 
         modelBuilder.Entity<AuditRecordRow>(record =>
         {
-            record.ToTable("audit_records", table => table.HasCheckConstraint("ck_audit_records_actor_kind", "actor_kind IN ('account', 'webhook', 'job', 'operator')"));
+            record.ToTable("audit_records", table => table.HasCheckConstraint("ck_audit_records_actor_kind", "actor_kind IN ('account', 'webhook', 'job', 'operator', 'billing')"));
             record.HasKey(r => r.Id).HasName("pk_audit_records");
             record.Property(r => r.Id).HasColumnName("id").ValueGeneratedNever();
             record.Property(r => r.OccurredAt).HasColumnName("occurred_at").HasDefaultValueSql("now()");
@@ -156,6 +159,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             subscription.Property(s => s.PlanVersion).HasColumnName("plan_version");
             subscription.Property(s => s.Period).HasColumnName("period");
             subscription.Property(s => s.PeriodEndsAt).HasColumnName("period_ends_at");
+            subscription.Property(s => s.PaidThrough).HasColumnName("paid_through").HasColumnType("date");
             subscription.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             subscription.HasOne<SignUpRow>().WithMany().HasForeignKey(s => s.SignUpId).HasConstraintName("fk_subscriptions_sign_up_id").OnDelete(DeleteBehavior.Restrict);
             subscription.HasIndex(s => s.SignUpId, "ix_subscriptions_sign_up_id");
@@ -182,6 +186,18 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             addOn.Property(a => a.Quantity).HasColumnName("quantity");
             addOn.Property(a => a.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             addOn.HasOne<SubscriptionRow>().WithMany().HasForeignKey(a => a.SubscriptionId).HasConstraintName("fk_subscription_add_ons_subscription_id").OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<BillingRequestRow>(request =>
+        {
+            request.ToTable("billing_requests");
+            request.HasKey(r => r.Id).HasName("pk_billing_requests");
+            request.Property(r => r.Id).HasColumnName("id").ValueGeneratedNever();
+            request.Property(r => r.IdempotencyKey).HasColumnName("idempotency_key");
+            request.Property(r => r.RequestHash).HasColumnName("request_hash");
+            request.Property(r => r.Answer).HasColumnName("answer");
+            request.Property(r => r.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            request.HasIndex(r => new { r.IdempotencyKey, r.CreatedAt }, "ix_billing_requests_idempotency_key_created_at");
         });
 
         modelBuilder.Entity<QuotaOverrideRow>(quotaOverride =>

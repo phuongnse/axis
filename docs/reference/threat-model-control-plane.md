@@ -9,8 +9,8 @@ apart from the cells. How its rows are found, rated and checked is in
 
 ## The control plane
 
-The control plane has three trust boundaries. Each has its own diagram and table below: the sign-up
-page and API, the calls to the cells, and the directory's DNS writes.
+The control plane has four trust boundaries. Each has its own diagram and table below: the sign-up
+page and API, the calls to the cells, the directory's DNS writes, and the billing API.
 
 ```mermaid
 flowchart LR
@@ -20,6 +20,7 @@ flowchart LR
     subgraph control [Regional control plane]
         SignUp[Sign-up page and API]
         Directory[Region directory, DNS jobs and cell client]
+        Billing[Billing API]
     end
     subgraph dns [DNS provider]
         Records[(Tenant subdomain CNAME records)]
@@ -27,10 +28,14 @@ flowchart LR
     subgraph cell [Cell]
         Internal[Internal listener with mutual TLS]
     end
+    subgraph operator [Operator]
+        BillingSystem[Billing system]
+    end
     Visitor -->|HTTPS| SignUp
     SignUp -->|creates tenants through| Directory
     Directory -->|signed DNS updates| Records
     Directory -->|calls over mutual TLS| Internal
+    BillingSystem -->|bearer token to| Billing
 ```
 
 ### Sign-up page and API
@@ -132,3 +137,46 @@ flowchart LR
 
 Information disclosure and elevation of privilege do not apply to a `CNAME` record, which holds only a
 name and a target.
+
+### Billing API
+
+The operator's billing system drives a tenant's commercial life through the billing API. The control plane
+checks the billing client's token and scope on each call and keeps the answer of each call under its
+idempotency key, see [signing in](billing-api.md#signing-in) and [idempotency](billing-api.md#idempotency).
+
+```mermaid
+flowchart LR
+    subgraph operator [Operator]
+        BillingSystem[Billing system with the billing client]
+        Provider[Identity provider]
+    end
+    subgraph attacker [Attacker]
+        Other[Holder of another client's token or a token without the billing scope]
+        Replayer[Retrying or replaying caller]
+    end
+    subgraph cp [Regional control plane]
+        Route[PUT /api/billing/v1/tenants/id/subscription/paid-through]
+        Check[Token and scope check]
+        Keys[(control_plane.billing_requests)]
+        Subs[(Subscriptions)]
+        Audit[(Audit records)]
+        Queue[(Job queue)]
+    end
+    BillingSystem -->|gets a token from| Provider
+    BillingSystem -->|bearer token and Idempotency-Key| Route
+    Other -->|calls| Route
+    Replayer -->|repeats a call| Route
+    Route -->|checked by| Check
+    Route -->|keeps the answer in| Keys
+    Route -->|changes| Subs
+    Route -->|appends to| Audit
+    Route -->|queues writeQuotas and resumeTenant in| Queue
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| C21 | A token of another client, or without the billing scope, changes a subscription. | Billing API | Spoofing | Critical | **Mitigated** | `BillingApiTests` shows that a call with no token, another client's token, a wrong audience or a key of another signer answers `401`, a billing client's token without `axis-billing` answers `403`, and each leaves the subscription, the audit records and the jobs unchanged. `ControlPlaneOptionsTests` shows that without the billing settings every route answers `401`. |
+| C22 | A retried call makes a change twice. | Billing API | Tampering | High | **Mitigated** | `BillingApiTests` shows that the same `Idempotency-Key` with the same body answers the first answer again and leaves one audit record and one `writeQuotas` job, five parallel retries act once, and the same key with another body answers `422`. |
+
+Repudiation does not need a row: each change writes an audit record with the billing client as actor, see
+[audit records](billing-api.md#audit-records).

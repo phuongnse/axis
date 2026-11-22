@@ -1,4 +1,5 @@
 using Axis.ControlPlane;
+using Axis.ControlPlane.BillingApi;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Emails;
@@ -104,8 +105,9 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cel
     builder.Services.AddSingleton<IJobHandler, SubscriptionClock>();
     builder.Services.AddSingleton(new RecurringJob(SubscriptionClock.JobKind, TimeSpan.FromHours(1)));
 
-    // The write of a subscription's quotas to its cell and the quotas sync over every subscription, queued every 24 hours. Each finds the tenant's cell in the directory and calls it.
+    // The write of a subscription's quotas to its cell, the resume of a tenant that the billing API made active, and the quotas sync over every subscription, queued every 24 hours. Each finds the tenant's cell in the directory and calls it.
     builder.Services.AddSingleton<IJobHandler, SubscriptionQuotas>();
+    builder.Services.AddSingleton<IJobHandler, SubscriptionResume>();
     builder.Services.AddSingleton<IJobHandler, QuotaSync>();
     builder.Services.AddSingleton(new RecurringJob(QuotaSync.JobKind, TimeSpan.FromDays(1)));
 }
@@ -122,6 +124,9 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
 {
     healthChecks.Add(new HealthCheckRegistration("directory", sp => new DatabaseHealthCheck(sp.GetRequiredKeyedService<NpgsqlDataSource>("directory"), "The region directory database is unreachable."), failureStatus: null, tags: [HealthEndpoints.ReadyTag]));
 }
+
+// The billing client's sign-in and the policy of the billing routes, see docs/reference/billing-api.md#signing-in.
+builder.Services.AddBillingApiClient(options.Billing);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddControlPlaneTelemetry(builder.Configuration, builder.Environment);
@@ -141,10 +146,15 @@ if (!forwardedHeaders.IsEmpty)
     app.UseWhen(context => context.Connection.RemoteIpAddress is not null, branch => branch.UseForwardedHeaders());
 }
 
+// After the forwarded headers and before the routes, so a billing route sees the caller's token. Only the billing routes ask for authorization.
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseStaticFiles();
 
 app.MapHealthEndpoints();
 app.MapSignUpEndpoints();
+app.MapBillingApiEndpoints(options.Billing);
 
 // The sign-up page, its verify page and its progress page, built by web/vite.sign-up.config.ts into the web root. The bundle picks the page by its path.
 app.MapFallbackToFile("/sign-up", "sign-up.html");

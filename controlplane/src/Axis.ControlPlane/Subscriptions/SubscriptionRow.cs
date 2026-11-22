@@ -39,5 +39,8 @@ public sealed class SubscriptionRow
     /// <summary>The end of the current paid period, or null until the first paid period starts.</summary>
     public DateTimeOffset? PeriodEndsAt { get; set; }
 
+    /// <summary>The date the tenant is paid through, set by the billing API, or null until then, see <c>docs/reference/billing-api.md#setting-the-paid-through-date</c>.</summary>
+    public DateOnly? PaidThrough { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 }
