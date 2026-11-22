@@ -1,5 +1,6 @@
 import { type BoundFunctions, type ByRoleMatcher, type queries, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import { type ReactNode, useEffect, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -11,7 +12,16 @@ import { StudioBindingsContext } from '../platform/studioCatalog'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, clearSelect, openDropdown, optionTexts, selectRoot, shownDropdown } from '../test/antd'
+import {
+  chooseOption,
+  clearSelect,
+  emptyDescription,
+  openDropdown,
+  optionTexts,
+  selectRoot,
+  shownDropdown,
+  shownMenu,
+} from '../test/antd'
 import { ConnectorEditor } from './ConnectorEditor'
 
 const connector = {
@@ -50,13 +60,20 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderEditor(value: Record<string, unknown> = connector, onChange = vi.fn(), bindings?: StudioBindings) {
+function renderEditor(
+  value: Record<string, unknown> = connector,
+  onChange = vi.fn(),
+  bindings?: StudioBindings,
+  readOnly = false,
+) {
   render(
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioBindingsContext.Provider value={bindings}>
-            <ConnectorEditor value={value} onChange={onChange} />
+            <ConfigProvider componentDisabled={readOnly}>
+              <ConnectorEditor value={value} onChange={onChange} />
+            </ConfigProvider>
           </StudioBindingsContext.Provider>
         </TextProvider>
       </ThemeRoot>
@@ -218,9 +235,11 @@ describe('ConnectorEditor', () => {
       { name: '', method: 'POST', path: '/' },
     ])
 
-    await userEvent.click(
-      within(screen.getByTestId('studio-operation-1')).getByRole('button', { name: 'Delete operation' }),
-    )
+    // The operation's own "…" menu is the last one in its card, after the fields it holds.
+    const operation = within(screen.getByTestId('studio-operation-1'))
+    await userEvent.click(operation.getAllByRole('button', { name: 'Actions' }).at(-1)!)
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete operation' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/1', undefined)
   })
 
@@ -240,8 +259,31 @@ describe('ConnectorEditor', () => {
     ])
 
     const row = within(screen.getByTestId('studio-field-/operations/0/input/1'))
-    await userEvent.click(row.getByRole('button', { name: 'Delete' }))
+    await userEvent.click(row.getByRole('button', { name: 'Actions' }))
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/1', undefined)
+  })
+
+  it('puts Add input on its title row and each input row in a menu with Delete', () => {
+    renderEditor()
+    const input = within(screen.getByTestId('studio-field-/operations/0/input'))
+    const add = input.getByRole('button', { name: 'Add input' })
+
+    expect(add.closest('legend')).not.toBeNull()
+    expect(add).toHaveClass('ant-btn-variant-text')
+    const row = within(screen.getByTestId('studio-field-/operations/0/input/0'))
+    expect(row.getByRole('button', { name: 'Actions' })).toBeVisible()
+    expect(row.queryByRole('button', { name: 'Delete' })).toBeNull()
+  })
+
+  it('shows no Add, no operation menu and no row menu while the editor is read-only', () => {
+    renderEditor(connector, vi.fn(), undefined, true)
+
+    expect(screen.queryByRole('button', { name: 'Add operation' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add input' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add output' })).toBeNull()
+    expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
   })
 
   it('edits a field row by name, type and required', async () => {
@@ -574,7 +616,9 @@ describe('ConnectorEditor', () => {
     const nested = within(screen.getByTestId('studio-field-/operations/0/input/0/fields/0'))
     await userEvent.click(field('operations.input.fields.required', 'checkbox', nested))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/0/fields/0/required', true)
-    await userEvent.click(nested.getByRole('button', { name: 'Delete' }))
+    await userEvent.click(nested.getByRole('button', { name: 'Actions' }))
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/0/fields/0', undefined)
   })
 
@@ -630,6 +674,30 @@ describe('ConnectorEditor', () => {
     expect(screen.queryByRole('combobox', { name: texts('operations.input.in').label })).toBeNull()
     await userEvent.clear(field('operations.output.source'))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/output/0/source', undefined)
+  })
+
+  it('says in one line that there are no operations yet', () => {
+    renderEditor({ ...connector, operations: [] })
+
+    expect(emptyDescription('No operations yet.', screen.getByTestId('studio-field-/operations'))).toBeVisible()
+  })
+
+  it('says in one line that an operation has no input or output yet', () => {
+    renderEditor({ ...connector, operations: [{ name: 'a', method: 'POST', path: '/' }] })
+
+    expect(emptyDescription('No input yet.', screen.getByTestId('studio-field-/operations/0/input'))).toBeVisible()
+    expect(emptyDescription('No output yet.', screen.getByTestId('studio-field-/operations/0/output'))).toBeVisible()
+  })
+
+  it('says in one line that a nested field list has no fields yet', () => {
+    renderEditor({
+      ...connector,
+      operations: [{ name: 'a', method: 'POST', path: '/', input: [{ name: 'x', type: 'object', fields: [] }] }],
+    })
+
+    expect(
+      emptyDescription('No nested fields yet.', screen.getByTestId('studio-field-/operations/0/input/0/fields')),
+    ).toBeVisible()
   })
 
   describe('draws every field through AxisField with its label and help', () => {

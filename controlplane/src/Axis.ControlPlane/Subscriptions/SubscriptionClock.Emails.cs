@@ -61,7 +61,7 @@ internal sealed partial class SubscriptionClock
         var candidates = new List<EmailCandidate>();
         await using (var select = controlPlane.CreateCommand(
             """
-            SELECT s.id, s.tenant_id, s.state, s.period_ends_at IS NOT NULL, s.trial_ends_at, s.next_at, u.email, u.full_name, u.language,
+            SELECT s.id, s.tenant_id, s.state, s.paid_through IS NOT NULL, s.trial_ends_at, s.next_at, u.email, u.full_name, u.language,
                    ARRAY(SELECT e.kind FROM control_plane.subscription_emails e WHERE e.subscription_id = s.id)
             FROM control_plane.subscriptions s
             JOIN control_plane.sign_ups u ON u.id = s.sign_up_id

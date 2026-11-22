@@ -1,5 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
-import { Button, Flex, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
+import { AxisButton } from '../platform/AxisButton'
 import { useText } from '../platform/texts'
 import { entryLabel, type PaletteEntry, paletteEntries } from './processPalette'
 
@@ -29,9 +30,14 @@ function PaletteType({ entry, onInsert }: { entry: PaletteEntry; onInsert: () =>
   const t = useText()
   const { setNodeRef, listeners } = useDraggable({ id: `process-palette:${entry.key}`, data: { entry } })
   return (
-    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-    <Button ref={setNodeRef} {...listeners} data-testid={`studio-process-palette-${entry.key}`} onClick={onInsert}>
+    <AxisButton
+      role="secondary"
+      ref={setNodeRef}
+      {...listeners}
+      data-testid={`studio-process-palette-${entry.key}`}
+      onClick={onInsert}
+    >
       {entryLabel(entry, t('shell.studio.process.packageOperation'))}
-    </Button>
+    </AxisButton>
   )
 }

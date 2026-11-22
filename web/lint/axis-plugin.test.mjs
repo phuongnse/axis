@@ -106,37 +106,38 @@ describe('axis/no-prototype-write', () => {
   })
 })
 
-describe('axis/no-preset-tag-colour', () => {
-  const rules = { 'axis/no-preset-tag-colour': 'error' }
+describe('axis/no-antd-tag', () => {
+  const rules = { 'axis/no-antd-tag': 'error' }
 
-  it('reports a preset colour as a string, in an expression and in a condition', () => {
+  it('reports each Tag imported from antd, also under another name', () => {
     const source = [
-      'const a = <Tag color="blue">a</Tag>',
-      "const b = <Tag color={'success'}>b</Tag>",
-      "const c = <Tag color={on ? 'red-inverse' : colour.text}>c</Tag>",
+      "import { Tag, Tag as Chip } from 'antd'",
+      'const a = <Tag>a</Tag>',
+      'const b = (',
+      '  <Chip',
+      '    color="blue"',
+      '  />',
+      ')',
       '',
     ].join('\n')
-    expect(lint(source, { rules })).toEqual([
-      'axis(no-preset-tag-colour):1',
-      'axis(no-preset-tag-colour):2',
-      'axis(no-preset-tag-colour):3',
-    ])
+    expect(lint(source, { rules })).toEqual(['axis(no-antd-tag):2', 'axis(no-antd-tag):4'])
   })
 
-  it('allows a token, a lookup and a hex colour', () => {
+  it('allows StatusTag, TagList and a Tag from elsewhere', () => {
     const source = [
-      'const a = <Tag color={colour.dangerText}>a</Tag>',
-      'const b = <Tag color={map[value]}>b</Tag>',
-      'const c = <Tag color="#ff0000">c</Tag>',
-      'const d = <Tag>d</Tag>',
-      'const e = <Badge color="blue" />',
+      "import { Tag } from './elsewhere'",
+      "import { Space } from 'antd'",
+      'const a = <Tag>a</Tag>',
+      'const b = <StatusTag tone="neutral">b</StatusTag>',
+      'const c = <TagList />',
       '',
     ].join('\n')
     expect(lint(source, { rules })).toEqual([])
   })
 
-  it('does not report a comment that names a preset tag', () => {
-    expect(lint('// <Tag color="blue">\nconst a = \'<Tag color="blue">\'\n', { rules })).toEqual([])
+  it('does not report a comment that names a Tag', () => {
+    const source = "import { Tag } from 'antd'\n// <Tag>a</Tag>\nconst a = '<Tag>'\n"
+    expect(lint(source, { rules })).toEqual([])
   })
 })
 
@@ -206,6 +207,41 @@ describe('axis/no-antd-alert', () => {
 
   it('does not report a comment that names an Alert', () => {
     const source = "import { Alert } from 'antd'\n// <Alert title=\"a\" />\nconst a = '<Alert>'\n"
+    expect(lint(source, { rules })).toEqual([])
+  })
+})
+
+describe('axis/no-antd-empty', () => {
+  const rules = { 'axis/no-antd-empty': 'error' }
+
+  it('reports each Empty imported from antd, also under another name', () => {
+    const source = [
+      "import { Empty, Empty as Nothing } from 'antd'",
+      'const a = <Empty />',
+      'const b = (',
+      '  <Nothing',
+      '    image={Empty.PRESENTED_IMAGE_SIMPLE}',
+      '  />',
+      ')',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual(['axis(no-antd-empty):2', 'axis(no-antd-empty):4'])
+  })
+
+  it('allows EmptyState, the member of an Empty, and an Empty from elsewhere', () => {
+    const source = [
+      "import { Empty } from './elsewhere'",
+      "import { Space } from 'antd'",
+      'const a = <Empty />',
+      'const b = <EmptyState text="a" />',
+      'const c = <Space />',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual([])
+  })
+
+  it('does not report a comment that names an Empty', () => {
+    const source = "import { Empty } from 'antd'\n// <Empty />\nconst a = '<Empty>'\n"
     expect(lint(source, { rules })).toEqual([])
   })
 })
@@ -475,6 +511,23 @@ describe('the rules of web/.oxlintrc.json', () => {
       ).diagnostics.map((diagnostic) => diagnostic.code)
     expect(run('src/platform/AxisAlert.tsx')).toEqual([])
     expect(run('src/pages/Other.tsx')).toEqual(['axis(no-antd-alert)'])
+  })
+
+  it('refuses an Empty outside EmptyState.tsx and allows it inside', () => {
+    const copy = path.join(folder, 'real-config-empty')
+    mkdirSync(path.join(copy, 'src/platform'), { recursive: true })
+    mkdirSync(path.join(copy, 'src/pages'), { recursive: true })
+    const configFile = path.join(copy, '.oxlintrc.json')
+    const source = "import { Empty } from 'antd'\nexport function Page() {\n  return <Empty />\n}\n"
+    writeFileSync(configFile, JSON.stringify(realConfig))
+    writeFileSync(path.join(copy, 'src/platform/EmptyState.tsx'), source)
+    writeFileSync(path.join(copy, 'src/pages/Other.tsx'), source)
+    const run = (file) =>
+      JSON.parse(
+        spawnSync(oxlint, ['-c', configFile, '--format', 'json', file], { cwd: copy, encoding: 'utf8' }).stdout,
+      ).diagnostics.map((diagnostic) => diagnostic.code)
+    expect(run('src/platform/EmptyState.tsx')).toEqual([])
+    expect(run('src/pages/Other.tsx')).toEqual(['axis(no-antd-empty)'])
   })
 
   it('refuses a hand-drawn field label outside the sign-in pages and allows it inside', () => {

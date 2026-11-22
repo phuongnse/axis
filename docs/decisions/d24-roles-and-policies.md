@@ -16,7 +16,8 @@ filters that fail open when combined, checks trusted on the client, and field ru
   an undeclared role is a compile error, and a role a user holds that the application does not
   declare is ignored.
 - **Filters and field lists.** An entity grant may have a record `filter`, which may call
-  `currentUser()`, and a `fields` list. `currentUser()` is allowed only in policy filters.
+  `currentUser()`, and a `fields` list. `currentUser()` is allowed only in a policy filter and in a
+  data source's own `filter`, as [current user](../reference/expressions.md#current-user) says.
 - **Default-deny.** No session is `401`, no matching grant is `403`, and a record outside every read
   filter is `404`, because it does not exist for the user.
 - **OR, and a mistake never widens access.** Grants combine with OR, and a filter that is false,

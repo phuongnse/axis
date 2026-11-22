@@ -270,6 +270,8 @@ module ([kind lists](studio.md#kind-lists-and-module-resources)), and each opens
 - **Marks.** An element that the layer added shows **Added**, one it changed **Changed**, and one it
   removed stays listed as **Removed**, in a muted row. When the resource has a layer, its header shows
   a Customized tag and **Reset all**.
+- **A mark names itself**. A layer's mark is `LayerMarkLabel`, a `StatusTag` in `neutral` with `role="note"`
+  and an accessible name such as "supplier, added by this application", see [which widget](shared-widgets.md#which-widget).
 - **Names.** In the schema form editors `name` shows as text, because the save route refuses a renamed
   module resource.
 - **Module policies.** The module editor edits a grant's actions and deletes grants, and shows a
@@ -277,13 +279,14 @@ module ([kind lists](studio.md#kind-lists-and-module-resources)), and each opens
   ceiling (`AXC0334`) shows in the Problems panel after the save.
 - **Module pages.** A module page opens in the page designer with every input on and a Save
   button, and with no Form tab, JSON tab, Undo or Delete. A widget, action, row action, toolbar action,
-  column or tab that the layer added or changed is marked on its tree row, its card or its row in the
-  container's panel, and a change inside a nested widget also marks every container that holds it as
+  column or tab that the layer added or changed is marked on its tree row or its row in the container's
+  panel, and a change inside a nested widget also marks every container that holds it as
   **Changed**. A label is a plain text key, with no box for each locale, so a save writes no text. The
   canvas draws the saved page from the [module page route](draft-page-metadata.md), so it changes after
   **Save** or a reset and not while the author types.
 - **Reset.** Each added, changed or removed element has **Reset to module**, which takes it out of the
-  layer with the reset route and keeps the rest of the layer. **Reset all** deletes the layer file with
+  layer with the reset route and keeps the rest of the layer. It is a light text action beside the element's
+  tag, off while the draft has unsaved edits. **Reset all** deletes the layer file with
   the [delete of the layer resource](authoring.md#routes).
 - **Saving writes the difference.** Studio sends the edited resource whole. The authoring API compares
   it with the pinned module version, by the list keys, and writes the layer that holds only the

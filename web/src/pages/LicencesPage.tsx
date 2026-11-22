@@ -16,7 +16,6 @@ import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
-import { usePlatform } from './context'
 
 const noParameters: string[] = []
 
@@ -28,7 +27,6 @@ const noParameters: string[] = []
  */
 export function LicencesPage() {
   const t = useText()
-  const platform = usePlatform()
   const [licences, setLicences] = useState<Licences>()
   const [version, setVersion] = useState<string | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -60,10 +58,7 @@ export function LicencesPage() {
     query === '' || entry.name.toLowerCase().includes(query) || entry.licence.toLowerCase().includes(query)
 
   return (
-    <PageLayout
-      title={t('shell.licences.title')}
-      breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.licences.title') }]}
-    >
+    <PageLayout title={t('shell.licences.title')} band>
       <Typography.Paragraph>{t('shell.licences.axis')}</Typography.Paragraph>
       <Flex gap="middle" wrap>
         <a href={axisLicenceUrl} target="_blank" rel="noreferrer">

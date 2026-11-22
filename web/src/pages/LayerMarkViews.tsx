@@ -1,6 +1,8 @@
-import { Button, Flex, Tag, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
+import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { fillText } from '../platform/fillText'
 import { markName, markOf, type LayerElement, type LayerMark } from '../platform/layerMarks'
+import { StatusTag } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
 
 /** What the designer needs to show a customization layer: its marked elements, and Reset to module for each. */
@@ -11,7 +13,7 @@ export interface DesignerLayer {
 }
 
 /**
- * What the layer did to one element, as a tag with its accessible name, such as "supplier, added by this application".
+ * What the layer did to one element, as a neutral tag with its accessible name, such as "supplier, added by this application".
  * `data-testid` passes to the tag. It is the one tag that the designers and a request's diff draw for a mark.
  */
 export function LayerMarkLabel({
@@ -25,9 +27,9 @@ export function LayerMarkLabel({
 }) {
   const t = useText()
   return (
-    <Tag role="note" aria-label={markName(t, mark, name)} data-testid={testId}>
+    <StatusTag tone="neutral" role="note" aria-label={markName(t, mark, name)} data-testid={testId}>
       {t(`shell.studio.module.${mark}`)}
-    </Tag>
+    </StatusTag>
   )
 }
 
@@ -58,19 +60,24 @@ export function LayerMarkTag({
   )
 }
 
-/** The Reset to module button of one element, named after the element. */
+/**
+ * The Reset to module button of one element, named after the element. It is a light action, a text button drawn through
+ * `AxisActionRow`, see docs/reference/shell.md#layout ('A title row's actions are light').
+ */
 function ResetElement({ layer, list, name }: { layer: DesignerLayer; list: string; name: string }) {
   const t = useText()
   return (
-    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-    <Button
-      size="small"
-      aria-label={fillText(t('shell.studio.module.resetElementName'), { name })}
-      disabled={layer.disabled}
-      onClick={() => layer.onReset(list, name)}
-    >
-      {t('shell.studio.module.resetElement')}
-    </Button>
+    <AxisActionRow>
+      <AxisButton
+        role="secondary"
+        size="small"
+        aria-label={fillText(t('shell.studio.module.resetElementName'), { name })}
+        disabled={layer.disabled}
+        onClick={() => layer.onReset(list, name)}
+      >
+        {t('shell.studio.module.resetElement')}
+      </AxisButton>
+    </AxisActionRow>
   )
 }
 

@@ -360,7 +360,10 @@ describe('SchemaForm sections', () => {
     renderForm((await loadKindSchema('application'))!, applicationValue)
 
     const section = screen.getByTestId('studio-section-modules')
-    expect(within(section).getAllByRole('button', { name: 'Add module…' })).toHaveLength(1)
+    const add = within(section).getAllByRole('button', { name: 'Add module…' })
+    expect(add).toHaveLength(1)
+    expect(add[0]).toHaveClass('ant-btn-variant-text')
+    expect(add[0]).not.toHaveClass('ant-btn-variant-outlined')
     expect(
       within(screen.getByTestId('studio-field-/modules')).queryByRole('button', { name: 'Add module…' }),
     ).toBeNull()
@@ -581,13 +584,42 @@ describe('SchemaForm lists of objects', () => {
     expect(within(rowOf(1)).queryByText('Nghỉ phép')).toBeNull()
   })
 
-  it('keeps a list of plain values as inline rows of inputs', () => {
+  it('keeps a list of plain values as inline rows of inputs, with Add as a text button on its title row', () => {
     renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] })
 
     const plain = screen.getByTestId('studio-field-/plain')
     expect(within(plain).getAllByRole('textbox')).toHaveLength(2)
     expect(within(plain).queryByRole('table')).toBeNull()
-    expect(within(plain).getByRole('button', { name: 'Add' })).toBeVisible()
+    const add = within(screen.getByRole('group', { name: 'plain' })).getByRole('button', { name: 'Add' })
+    expect(add.closest('legend')).not.toBeNull()
+    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(within(plain).queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(within(plain).getAllByRole('button', { name: 'Actions' })).toHaveLength(2)
+  })
+
+  it("removes a row of a list of plain values from the row's Actions menu, and Add appends an item", async () => {
+    const onChange = vi.fn()
+    renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] }, onChange)
+
+    const plain = screen.getByTestId('studio-field-/plain')
+    await userEvent.click(within(plain).getAllByRole('button', { name: 'Actions' })[0])
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
+    expect(onChange).toHaveBeenLastCalledWith('/plain/0', undefined)
+
+    await userEvent.click(within(screen.getByRole('group', { name: 'plain' })).getByRole('button', { name: 'Add' }))
+    expect(onChange).toHaveBeenLastCalledWith('/plain', ['x', 'y', ''])
+  })
+
+  it('shows a list of plain values named read-only as text, with no Add, Remove or Actions button', () => {
+    renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] }, vi.fn(), {
+      readOnlyNames: new Set(['plain']),
+    })
+
+    const plain = screen.getByTestId('studio-field-/plain')
+    expect(within(plain).queryByRole('textbox')).toBeNull()
+    expect(within(plain).queryByRole('button', { name: 'Add' })).toBeNull()
+    expect(within(plain).queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(within(plain).queryByRole('button', { name: 'Actions' })).toBeNull()
   })
 
   it('shows the layer tag in the first cell and the removed rows below the table', async () => {
@@ -942,7 +974,7 @@ describe('SchemaForm controls that know what they hold', () => {
     expect(within(screen.getByTestId('studio-field-/packages')).getByRole('button', { name: 'Finance' })).toBeVisible()
   })
 
-  it('shows each role slot of the installed module as a line, and "Not mapped" in warning colour for one no role plays', async () => {
+  it('shows each role slot of the installed module as a line, and "Not mapped" as an attention tag for one no role plays', async () => {
     renderForm(
       (await loadKindSchema('application'))!,
       { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0' }] },
@@ -953,7 +985,7 @@ describe('SchemaForm controls that know what they hold', () => {
     const modules = screen.getByTestId('studio-field-/modules')
     const line = within(modules).getByText(/^Budget approver:/)
     expect(line).toHaveTextContent('Budget approver: Not mapped')
-    expect(within(line).getByText('Not mapped')).toHaveStyle({ color: designTokensFor('light').colour.warningText })
+    expect(within(line).getByText('Not mapped')).toHaveAttribute('data-tone', 'attention')
   })
 
   it('shows the role that plays a slot by its name, without the warning', async () => {
@@ -1099,5 +1131,27 @@ describe('SchemaForm controls that know what they hold', () => {
     expect(modules.getByText('1.2.0 only')).toBeVisible()
     expect(modules.getByText('1.2.3 and later 1.2.x')).toBeVisible()
     expect(within(screen.getByTestId('studio-field-/packages')).getByText('3.1.0 and later 3.x')).toBeVisible()
+  })
+})
+
+describe('SchemaForm field widths', () => {
+  beforeEach(() => localStorage.setItem('axis.themeMode', 'light'))
+
+  it('makes a select and a text box of one section as wide as each other', () => {
+    renderForm(
+      {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['open', 'closed'] },
+          title: { type: 'string' },
+        },
+      },
+      {},
+    )
+
+    const status = within(screen.getByTestId('studio-field-/status')).getByRole('combobox')
+    const title = within(screen.getByTestId('studio-field-/title')).getByRole('textbox')
+    expect(status.closest('.ant-select')).toHaveStyle({ width: '100%' })
+    expect(title).toHaveStyle({ width: '100%' })
   })
 })

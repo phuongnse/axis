@@ -286,7 +286,6 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
                 "storage": {{16 + version}},
                 "workerWeight": {{17 + version}}
               },
-              "prices": [],
               "addOns": []
             }
             """));

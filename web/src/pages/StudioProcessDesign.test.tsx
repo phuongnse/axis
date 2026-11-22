@@ -12,6 +12,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { chooseRowAction } from '../test/antd'
 import { stubResizeObserver } from '../test/resizeObserver'
 import { ShellAsideHost } from '../test/shellAsideHost'
 import type { DesignerLayer } from './LayerMarkViews'
@@ -233,7 +234,7 @@ describe('moving a step', () => {
 
   it('moves a step to the start with one change, keeps it selected and says so', async () => {
     const calls = renderDesign(1)
-    await userEvent.click(screen.getByRole('button', { name: 'Move up' }))
+    await chooseRowAction(screen.getByTestId('studio-step-actions-1'), 'Move up')
 
     expect(calls.changes).toEqual([['/steps', [resolve, submit, check, done]]])
     expect(calls.selected.at(-1)).toBe(0)
@@ -242,7 +243,7 @@ describe('moving a step', () => {
 
   it('moves a step down and names the step that is now before it', async () => {
     const calls = renderDesign(1)
-    await userEvent.click(screen.getByRole('button', { name: 'Move down' }))
+    await chooseRowAction(screen.getByTestId('studio-step-actions-1'), 'Move down')
 
     expect(calls.changes).toEqual([['/steps', [submit, check, resolve, done]]])
     expect(calls.selected.at(-1)).toBe(2)
@@ -251,11 +252,27 @@ describe('moving a step', () => {
 
   it('moves a step up past another and names the step that is now before it', async () => {
     const calls = renderDesign(2)
-    await userEvent.click(screen.getByRole('button', { name: 'Move up' }))
+    await chooseRowAction(screen.getByTestId('studio-step-actions-2'), 'Move up')
 
     expect(calls.changes).toEqual([['/steps', [submit, check, resolve, done]]])
     expect(calls.selected.at(-1)).toBe(1)
     expect(announcement()).toHaveTextContent(/^Moved step check after submit\.$/)
+  })
+})
+
+describe('removing a line', () => {
+  it('draws Remove line as a destructive button, and clicking it clears that line and says so', async () => {
+    const calls = renderDesign(0)
+    await userEvent.click(await screen.findByTestId('rf__edge-/steps/2/otherwise'))
+    const remove = within(screen.getByTestId('studio-process-transition')).getByRole('button', { name: 'Remove line' })
+
+    expect(remove).toHaveClass('ant-btn-variant-outlined')
+    expect(remove).toHaveStyle({ color: colourTokens.dangerText.light, borderColor: colourTokens.dangerText.light })
+    await userEvent.click(remove)
+
+    expect(calls.changes.at(-1)).toEqual(['/steps/2/otherwise', ''])
+    expect(screen.queryByTestId('rf__edge-/steps/2/otherwise')).not.toBeInTheDocument()
+    expect(announcement()).toHaveTextContent(/^Removed the line check to done, otherwise\.$/)
   })
 })
 

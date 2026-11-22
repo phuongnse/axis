@@ -1,15 +1,24 @@
 import { Flex, Typography } from 'antd'
 import { Children, createContext, isValidElement, useContext, useId, useState, type ReactNode } from 'react'
-import { AxisButton } from './AxisButton'
+import { AxisActionRow, AxisButton } from './AxisButton'
 import { Chevron } from './Chevron'
+import { ContentInsetContext } from './contentInsetContext'
 import { useDesignTokens } from './themeMode'
 
 /** Whether the part that reads it draws a `borderSubtle` rule above itself. */
 const RuleAbove = createContext(false)
 
-/** A boundary a part does not draw its rule across, such as a tile: a part inside it draws no rule above itself. */
+/**
+ * A boundary that a part draws no rule across, such as a tile or a drawer's or a dialog's body: a part inside it draws no
+ * rule above itself. It gives no page inset either, so what is inside reads 0 from `ContentInsetContext`, see
+ * docs/reference/shell.md#layout.
+ */
 export function PartBoundary({ children }: { children: ReactNode }) {
-  return <RuleAbove.Provider value={false}>{children}</RuleAbove.Provider>
+  return (
+    <RuleAbove.Provider value={false}>
+      <ContentInsetContext.Provider value={0}>{children}</ContentInsetContext.Provider>
+    </RuleAbove.Provider>
+  )
 }
 
 /**
@@ -44,6 +53,9 @@ type SectionPartName = { testName: string; testId?: undefined } | { testId: stri
  * A part of a page or a Studio section, see docs/reference/shell.md#layout and docs/reference/studio-resource-form.md#sections:
  * an optional heading, its optional line and a slot for an action on the right of the heading, with no panel. A part with no
  * heading is its fields alone. It draws the `borderSubtle` rule above itself when `SectionParts` says a part comes before it.
+ * Its action is drawn through `AxisActionRow`, so a `main`, `secondary` or `destructive` button is a text button, see
+ * docs/reference/shell.md#layout ('A title row's actions are light'). Its rule reaches past the shell's content inset to the
+ * page area's edges, and stays inside where the inset is 0, see docs/reference/shell.md#layout ('Parts a rule apart').
  */
 export function SectionPart({
   testName,
@@ -61,7 +73,10 @@ export function SectionPart({
    * before the heading, named by `title`, and a body that is drawn only while `open`. Needs a `heading`.
    */
   fold?: { open: boolean; onToggle: () => void; title: string }
-  /** On the right of the heading, such as a list's Add. A function child draws the slot in its place. */
+  /**
+   * On the right of the heading, such as a list's Add, drawn through `AxisActionRow`. A function child draws the slot in
+   * its place, and draws its own action through `AxisActionRow`.
+   */
   action?: ReactNode
   /** Sets `aria-busy` on the part while its body loads. */
   busy?: boolean
@@ -70,6 +85,7 @@ export function SectionPart({
 }) {
   const { colour, spacing } = useDesignTokens()
   const ruled = useContext(RuleAbove)
+  const inset = useContext(ContentInsetContext)
   const headingId = useId()
   const bodyId = useId()
   const [slot, setSlot] = useState<HTMLElement | null>(null)
@@ -88,7 +104,14 @@ export function SectionPart({
       {heading?.line !== undefined && <Typography.Text type="secondary">{heading.line}</Typography.Text>}
     </div>
   )
-  const rule = ruled && <div role="separator" style={{ borderTop: `1px solid ${colour.borderSubtle}` }} />
+  // Negative side margins reach the edges of the content area, see docs/reference/shell.md#layout. Inside a boundary the
+  // inset is 0, so no margin is set.
+  const rule = ruled && (
+    <div
+      role="separator"
+      style={{ borderTop: `1px solid ${colour.borderSubtle}`, margin: inset ? `0 -${inset}px` : undefined }}
+    />
+  )
   if (heading === undefined) {
     return (
       <>
@@ -121,7 +144,11 @@ export function SectionPart({
           ) : (
             headingBlock
           )}
-          {typeof children === 'function' ? <div ref={setSlot} /> : action}
+          {typeof children === 'function' ? (
+            <div ref={setSlot} />
+          ) : (
+            action !== null && action !== undefined && <AxisActionRow>{action}</AxisActionRow>
+          )}
         </Flex>
         {body}
       </section>

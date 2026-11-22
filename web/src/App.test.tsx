@@ -36,7 +36,6 @@ const texts: Record<string, Record<string, string>> = {
   en: {
     'shell.title': 'Axis',
     'shell.nav.home': 'Home',
-    'shell.breadcrumb.label': 'Breadcrumb',
     'shell.appSwitcher.label': 'Switch to',
     'shell.appSwitcher.studio': 'Studio',
     'shell.appSwitcher.console': 'Operator console',
@@ -1326,7 +1325,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Note' })).toBeInTheDocument()
   })
 
-  it('shows the title of a form page as its level-one heading, with no breadcrumb and the table that opened it marked', async () => {
+  it('shows the title of a form page as its level-one heading, and the table that opened it marked', async () => {
     stubServer()
     renderApp('/e2e/notes?pageSize=100')
     expect(await screen.findByText('No records yet.')).toBeInTheDocument()
@@ -1334,31 +1333,29 @@ describe('App', () => {
     await userEvent.click(screen.getByRole('button', { name: 'New' }))
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Note' })).toBeInTheDocument()
-    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
     const navigation = within(screen.getByRole('navigation', { name: 'shell.navigation.menu' }))
     expect(navigation.getByRole('link', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('shows the title of a form page as its level-one heading, with no breadcrumb, when the page was not opened from a table', async () => {
+  it('shows the title of a form page as its level-one heading when the page was not opened from a table', async () => {
     stubServer()
 
     renderApp('/e2e/noteform/new')
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Note' })).toBeInTheDocument()
-    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
     const navigation = within(screen.getByRole('navigation', { name: 'shell.navigation.menu' }))
     for (const link of navigation.getAllByRole('link')) {
       expect(link).not.toHaveAttribute('aria-current')
     }
   })
 
-  it('shows no breadcrumb on the platform home page', async () => {
+  it('shows no band on the platform home page', async () => {
     stubServer()
 
     renderApp()
 
     await screen.findByRole('heading', { name: 'Applications' })
-    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('page-band')).not.toBeInTheDocument()
   })
 
   it('shows the missing-record line under the heading for a form page whose well-formed id the API answers 404 for', async () => {

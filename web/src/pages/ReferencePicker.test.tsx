@@ -391,13 +391,17 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
     expect(onChange).toHaveBeenLastCalledWith('/parameters', { limit: 0 })
   })
 
-  it('adds a row with the first unused name and removes a row', async () => {
+  it('adds a row with the first unused name from the title row, and removes a row from its Actions menu', async () => {
     const onChange = renderForm({ dataSource: 'Orders', parameters: { status: 'open' } }, true, widgetSchema)
+    const group = screen.getByRole('group', { name: 'parameters' })
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(within(group).getByRole('button', { name: 'Add' }))
     expect(onChange).toHaveBeenLastCalledWith('/parameters', { status: 'open', limit: 0 })
+    expect(within(group).getByRole('button', { name: 'Add' }).closest('legend')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(group).getByRole('button', { name: 'Actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
     expect(onChange).toHaveBeenLastCalledWith('/parameters/status', undefined)
   })
 
@@ -437,5 +441,16 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     expect(onChange).toHaveBeenLastCalledWith('/groupBy', ['status', { field: 'placedOn', bucket: 'month' }, ''])
+  })
+})
+
+describe('ReferencePicker in a field', () => {
+  it('fills the field with a chosen resource, its select and its Open link joined together', () => {
+    renderForm({ entity: 'Order', grants: [] }, true, schema, 'Shop')
+
+    const group = screen.getByRole('link', { name: 'Open entity' }).closest<HTMLElement>('.ant-space-compact')
+    expect(group?.closest('.axis-field')).not.toBeNull()
+    expect(group).toHaveStyle({ width: '100%' })
+    expect(group?.querySelector('.ant-select')).toHaveStyle({ flexGrow: '1' })
   })
 })

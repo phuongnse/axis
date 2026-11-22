@@ -1,7 +1,8 @@
 import { useDraggable } from '@dnd-kit/core'
-import { Button, Flex, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { useContext, type PointerEventHandler } from 'react'
 import { Announcement } from '../platform/Announcement'
+import { AxisButton } from '../platform/AxisButton'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { addSection, addStep, insertionPlace, paletteFields } from '../platform/formLayout'
@@ -80,14 +81,16 @@ export function FormPalette({
           </Flex>
         )}
         <Flex gap="small" wrap>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button data-testid="studio-form-add-section" onClick={() => apply(addSection(draft, selected, keys))}>
+          <AxisButton
+            role="secondary"
+            data-testid="studio-form-add-section"
+            onClick={() => apply(addSection(draft, selected, keys))}
+          >
             {t('shell.studio.design.addSection')}
-          </Button>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button data-testid="studio-form-add-step" onClick={() => apply(addStep(draft, keys))}>
+          </AxisButton>
+          <AxisButton role="secondary" data-testid="studio-form-add-step" onClick={() => apply(addStep(draft, keys))}>
             {t('shell.studio.design.addStep')}
-          </Button>
+          </AxisButton>
         </Flex>
         <Announcement testId="studio-form-palette-announcement">{announcement}</Announcement>
       </Flex>
@@ -115,8 +118,8 @@ function PaletteField({
     disabled,
   })
   return (
-    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-    <Button
+    <AxisButton
+      role="secondary"
       ref={setNodeRef}
       onPointerDown={listeners?.onPointerDown as PointerEventHandler<HTMLElement> | undefined}
       disabled={disabled}
@@ -127,6 +130,6 @@ function PaletteField({
       <Typography.Text type="secondary" style={{ fontSize: 'inherit' }}>
         {field.type}
       </Typography.Text>
-    </Button>
+    </AxisButton>
   )
 }

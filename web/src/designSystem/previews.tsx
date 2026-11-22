@@ -16,6 +16,7 @@ import { FieldPreview } from './FieldPreview'
 import type { FixtureRoute } from './fixtureFetch'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SignUpPreview } from './SignUpPreview'
+import { StatusTagPreview } from './StatusTagPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview, TypedOnMount } from './ShellPreview'
 import {
@@ -54,6 +55,7 @@ import {
   missingTaskId,
   loadingRoutes,
   loadingTableWidget,
+  instanceId,
   noRowsPath,
   type PreviewFieldType,
   locale,
@@ -61,6 +63,7 @@ import {
   requestId,
   sectionWidgets,
   shellRequestId,
+  shellUserId,
   signUpApplications,
   signUpDocuments,
   signUpRegion,
@@ -104,7 +107,10 @@ export interface PreviewState {
   fixtures?: Record<string, FixtureRoute>
   /** The address the state starts at. */
   entry?: InitialEntry
-  /** The height of the screen the state draws in. A taller page scrolls inside it. */
+  /**
+   * The least height of the screen the state draws in. The screen fills the window down to the canvas's padding, and
+   * a taller page scrolls inside it.
+   */
   frameHeight?: number
 }
 
@@ -187,7 +193,7 @@ function studioDesignerStates(resourceId: string): readonly PreviewState[] {
   ]
 }
 
-/** The height of every `shell` state's frame, so more of each page shows. */
+/** The least height of every `shell` state's frame, so more of each page shows in a short window. */
 const shellFrameHeight = 800
 
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
@@ -250,6 +256,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Loading', draw: () => requestTable(loadingTableWidget), routes: loadingRoutes },
     { caption: 'Load error', draw: () => requestTable(failingTableWidget), routes: failingRoutes },
   ],
+  statusTag: typical(() => <StatusTagPreview />),
   ...Object.fromEntries(
     fieldTypes.map((type) => [
       `field-${type}`,
@@ -320,6 +327,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: shellFrameHeight,
     },
     { caption: 'Dashboard', draw: () => <ShellPreview />, entry: '/sample/dashboard', frameHeight: shellFrameHeight },
+    {
+      caption: 'Process instance',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/instances/${instanceId}`, state: { from: '/sample/instances' } },
+      frameHeight: shellFrameHeight,
+    },
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: shellFrameHeight },
     {
       caption: 'App switcher',
@@ -350,6 +363,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       entry: '/account',
+      frameHeight: shellFrameHeight,
+    },
+    { caption: 'Users page', draw: () => <ShellPreview />, entry: '/users', frameHeight: shellFrameHeight },
+    {
+      caption: 'User page',
+      draw: () => <ShellPreview />,
+      entry: `/users/${shellUserId}`,
       frameHeight: shellFrameHeight,
     },
   ],

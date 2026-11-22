@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import { type ReactNode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -19,7 +20,7 @@ import {
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { flexOf } from '../test/antd'
+import { emptyDescription, flexOf, shownMenu } from '../test/antd'
 import { ScenarioEditor } from './ScenarioEditor'
 
 const english: Record<string, string> = platformEnglish
@@ -531,19 +532,50 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/by', 'PT1H0')
   })
 
-  it('titles the second step "Step 2" and deletes that step with its Delete button', async () => {
+  it('titles the second step "Step 2" and deletes that step from its menu', async () => {
     const { onChange } = renderHarness(scenario([fixtures.advanceTime, fixtures.expectRecord]))
 
     const cards = screen.getAllByTestId('studio-scenario-step')
     expect(cards).toHaveLength(2)
     expect(cards[1]).toHaveTextContent('Step 2')
-    await userEvent.click(within(cards[1]).getByRole('button', { name: 'Delete' }))
+    await userEvent.click(within(cards[1]).getByRole('button', { name: 'Actions' }))
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/steps/1', undefined)
     const remaining = screen.getAllByTestId('studio-scenario-step')
     expect(remaining).toHaveLength(1)
     expect(remaining[0]).toHaveTextContent('Step 1')
     expect(screen.getByRole('textbox', { name: 'Moves time by' })).toHaveValue('PT1H')
+  })
+
+  it('keeps Move up, Move down and Delete in a step menu, with Move down off on the last step', async () => {
+    renderHarness(scenario([fixtures.advanceTime, fixtures.expectRecord]))
+
+    const cards = screen.getAllByTestId('studio-scenario-step')
+    for (const name of ['Move up', 'Move down', 'Delete']) {
+      expect(within(cards[1]).queryByRole('button', { name })).toBeNull()
+    }
+    await userEvent.click(within(cards[1]).getByRole('button', { name: 'Actions' }))
+    const menu = within(await shownMenu('Actions'))
+    expect(menu.getByRole('menuitem', { name: 'Move up' })).not.toHaveAttribute('aria-disabled', 'true')
+    expect(menu.getByRole('menuitem', { name: 'Move down' })).toHaveAttribute('aria-disabled', 'true')
+    expect(menu.getByRole('menuitem', { name: 'Delete' })).toBeVisible()
+  })
+
+  it('shows no Add and no "…" menu on a step, user or stub while the editor is read-only', () => {
+    render(
+      providers(
+        <ConfigProvider componentDisabled>
+          <ScenarioEditor value={scenario([fixtures.advanceTime, fixtures.expectRecord])} onChange={vi.fn()} />
+        </ConfigProvider>,
+      ),
+    )
+
+    expect(screen.queryByRole('button', { name: 'Add step' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add user' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add stub' })).toBeNull()
+    expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
   })
 
   it('adds an advanceTime step at the end', async () => {
@@ -577,8 +609,8 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(input).toHaveValue('author')
   })
 
-  it('stacks a user ID and its roles, with Delete under them', () => {
-    renderEditor(scenario([fixtures.advanceTime]))
+  it('stacks a user ID and its roles, with a Delete menu beside them', async () => {
+    const { onChange } = renderEditor(scenario([fixtures.advanceTime]))
 
     const row = screen.getByTestId('studio-field-/users/author')
     const id = within(row).getByRole('textbox', { name: labelOf('users.id') })
@@ -586,7 +618,11 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(stack).toHaveClass('ant-flex-vertical')
     expect(stack.children[0]).toContainElement(id)
     expect(stack.children[1]).toContainElement(within(row).getByRole('combobox', { name: 'Roles' }))
-    expect(stack.lastElementChild).toContainElement(within(row).getByRole('button', { name: 'Delete' }))
+    expect(stack.parentElement).toContainElement(within(row).getByRole('button', { name: 'Actions' }))
+    await userEvent.click(within(row).getByRole('button', { name: 'Actions' }))
+    await shownMenu('Actions')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(onChange).toHaveBeenLastCalledWith('/users/author', undefined)
   })
 
   it('stacks the connector name and the operation of a stub', () => {
@@ -882,5 +918,71 @@ describe('ScenarioEditor sections', () => {
     expect(within(sections[1]).getByRole('button', { name: 'Add user' })).toBeVisible()
     expect(within(sections[2]).getByRole('button', { name: 'Add stub' })).toBeVisible()
     expect(within(sections[3]).getByRole('button', { name: 'Add step' })).toBeVisible()
+  })
+})
+
+describe('ScenarioEditor empty lists', () => {
+  it('says in each section what its emptiness means', () => {
+    renderEditor({ ...scenario([]), users: {}, stubs: [] })
+
+    const sections = screen.getAllByTestId(/^studio-section-/)
+    expect(emptyDescription(english['shell.studio.scenario.noUsers'], sections[1])).toBeVisible()
+    expect(emptyDescription(english['shell.studio.scenario.noStubs'], sections[2])).toBeVisible()
+    expect(emptyDescription(english['shell.studio.scenario.noSteps'], sections[3])).toBeVisible()
+  })
+
+  it('shows no empty line in a section that has an item', () => {
+    renderEditor({ ...scenario([fixtures.advanceTime]), stubs: [{ operation: 'billing/Refund', output: {} }] })
+
+    expect(screen.queryByText(english['shell.studio.scenario.noUsers'])).toBeNull()
+    expect(screen.queryByText(english['shell.studio.scenario.noSteps'])).toBeNull()
+    expect(screen.queryByText(english['shell.studio.scenario.noStubs'])).toBeNull()
+  })
+
+  it('says in a read-only editor what each empty section means', () => {
+    render(
+      providers(
+        <ConfigProvider componentDisabled>
+          <ScenarioEditor value={{ ...scenario([]), users: {}, stubs: [] }} onChange={vi.fn()} />
+        </ConfigProvider>,
+      ),
+    )
+
+    const sections = screen.getAllByTestId(/^studio-section-/)
+    expect(emptyDescription(english['shell.studio.scenario.noUsers'], sections[1])).toBeVisible()
+    expect(emptyDescription(english['shell.studio.scenario.noStubs'], sections[2])).toBeVisible()
+    expect(emptyDescription(english['shell.studio.scenario.noSteps'], sections[3])).toBeVisible()
+  })
+
+  it('says that an expectNotification step with no values has no value yet', () => {
+    renderEditor(onlyStep({ ...fixtures.expectNotification, values: {} }))
+
+    const card = screen.getByTestId('studio-field-/steps/0')
+    expect(emptyDescription(english['shell.studio.scenario.noValues'], card)).toBeVisible()
+  })
+
+  it('says that a createRecord step of a known entity with no values has no value yet', () => {
+    renderEditor(onlyStep({ ...fixtures.createRecord, values: {} }))
+
+    const card = screen.getByTestId('studio-field-/steps/0')
+    expect(emptyDescription(english['shell.studio.scenario.noValues'], card)).toBeVisible()
+  })
+
+  it('says that a stub with an empty output answers with an empty output', () => {
+    renderEditor(withStub({ connector: { name: 'Payments', operation: 'charge' }, output: {} }))
+
+    const stub = screen.getByTestId('studio-field-/stubs/0')
+    expect(emptyDescription(english['shell.studio.scenario.noOutput'], stub)).toBeVisible()
+  })
+
+  it.each([
+    'shell.studio.scenario.noUsers',
+    'shell.studio.scenario.noStubs',
+    'shell.studio.scenario.noSteps',
+    'shell.studio.scenario.noValues',
+    'shell.studio.scenario.noOutput',
+  ])('has %s in English and Vietnamese', (key) => {
+    expect(english[key]).toBeTruthy()
+    expect(vietnamese[key]).toBeTruthy()
   })
 })

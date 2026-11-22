@@ -38,13 +38,6 @@ controlPlane:
     useTls: true
     # ControlPlane:Mail:UserName. Optional. When set, secrets.mailPassword is required.
     userName: ""
-  # ControlPlane:PayOs, the PayOS adapter that creates the payment links of the VND invoices. Optional.
-  payOs:
-    # ControlPlane:PayOs:Provider. Empty registers no PayOS adapter and no payment link job. "PayOs" calls the real PayOS,
-    # and then secrets.payOs is required. The chart runs in Production, so it does not offer "Fake".
-    provider: ""
-    # ControlPlane:PayOs:BaseUrl, the https address of the PayOS API. Used only with the provider "PayOs".
-    baseUrl: https://api-merchant.payos.vn
   # ControlPlane:Cells, the cells of the region that the control plane calls over mutual TLS. Optional: an empty list sets no
   # cell, and then the chart renders no cell setting, no cell secret, no client certificate and no authority. An entry is
   #   - id: vn-1                                 # ControlPlane:Cells:<n>:Id, lowercase letters and digits joined by single hyphens
@@ -79,11 +72,6 @@ secrets:
   challengeKey:
     name: ""
     key: ControlPlane__SignUp__ChallengeKey
-  # The PayOS keys, a Kubernetes Secret with the keys ControlPlane__PayOs__ClientId, ControlPlane__PayOs__ApiKey and
-  # ControlPlane__PayOs__ChecksumKey. The chart mounts each as the file of the same name in /run/secrets. The keys are fixed,
-  # so the reference holds only the name. Required when controlPlane.payOs.provider is "PayOs", and left out otherwise.
-  payOs:
-    name: ""
   # ControlPlane:CellClientCertificate, the certificate and key that the control plane presents to every cell: a Kubernetes TLS
   # Secret with tls.crt and tls.key, issued by the region's internal certificate authority. The chart mounts it at
   # /cell-client-tls. Required when controlPlane.cells lists a cell, and left out otherwise. The keys are fixed, so the

@@ -7,8 +7,8 @@ using Npgsql;
 namespace Axis.ControlPlane.Subscriptions;
 
 /// <summary>
-/// Runs the <c>resumeTenant</c> job: resumes the tenant of a subscription that a payment made <c>active</c> after <c>pastDue</c> or <c>readOnly</c>, see
-/// <c>docs/reference/subscriptions.md#states</c>. The payload is <c>{ subscriptionId, stepId }</c>, where the step id is the one that the payment's move
+/// Runs the <c>resumeTenant</c> job: resumes the tenant of a subscription that the billing API made <c>active</c> after <c>pastDue</c> or <c>readOnly</c>, see
+/// <c>docs/reference/subscriptions.md#states</c>. The payload is <c>{ subscriptionId, stepId }</c>, where the step id is the one that the move
 /// gave the subscription. The job calls the cell's resume with the key <c>resume:&lt;step id&gt;</c> and follows the cell's job, so a retry gets the cell's
 /// first job. It does nothing when the subscription is gone or its step id has changed, as a later move then owns the tenant and a stale resume must
 /// never undo it. A tenant with no directory row, a cell that is not one of the region's and a failed cell call fail the job, so the job queue retries it.
@@ -25,7 +25,7 @@ internal sealed partial class SubscriptionResume(
     public string Kind => JobKind;
 
     /// <summary>
-    /// Queues a <c>resumeTenant</c> job for a subscription and its new <paramref name="stepId"/> and returns its id. The payment that makes the subscription
+    /// Queues a <c>resumeTenant</c> job for a subscription and its new <paramref name="stepId"/> and returns its id. The move that makes the subscription
     /// <c>active</c> queues it in its own <paramref name="transaction"/>, so both commit or neither does.
     /// </summary>
     public static Task<Guid> EnqueueAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, Guid subscriptionId, Guid stepId, CancellationToken cancellationToken) =>

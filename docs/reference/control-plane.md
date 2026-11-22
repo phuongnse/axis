@@ -1,11 +1,10 @@
 # Control plane
 
-The control plane is the service that runs the operator's business around the [cells](cells.md):
-sign-up, trials, plans, payments and invoices. This page covers what the service is, how it reaches
-the cells, the work it runs, its operators and settings, its image and chart, and its health. The
-business it runs is on the pages of [sign-up](sign-up.md), [subscriptions](subscriptions.md),
-[plans](plans.md), [payments](payments.md), [e-invoices](e-invoices.md) and the
-[billing portal](billing-portal.md).
+The control plane is the service that runs the operator's side of Axis SaaS around the [cells](cells.md):
+sign-up, trials, subscriptions and plans. This page covers what the service is, how it reaches the
+cells, the work it runs, its operators and settings, its image and chart, and its health. The work it
+runs is on the pages of [sign-up](sign-up.md), [subscriptions](subscriptions.md) and
+[plans](plans.md).
 
 ## What it is
 
@@ -17,12 +16,19 @@ through a cell's API.
   real PostgreSQL through Testcontainers for its storage, and Playwright for its pages.
 - **Apart from the cells.** It runs on a small Kubernetes cluster of its own, with its own managed
   PostgreSQL, in the region it serves. It is never deployed in a cell, and a cell never calls it. So
-  a failing cell never stops sign-up or billing, and billing code never runs beside a customer's data.
+  a failing cell never stops sign-up or the subscription's clock, and its code never runs beside a customer's data.
 - **No engine.** It holds no application, process or record of a customer. It reaches a tenant only
   through the cell's [provisioning API](tenant-lifecycle.md#provisioning-api).
 - **Its own Helm chart and image.** `deploy/helm/axis-controlplane` and the image
   `axis-controlplane`, built, scanned and versioned with the platform's images, see
   [image and chart](#image-and-chart).
+- **The operator's billing system** _(planned for M34)_. The operator's own billing system holds the
+  prices, invoices and payments, and calls the control plane's billing API.
+- **A billing API.** The operator's billing system sets a tenant's
+  [paid-through date](billing-api.md#setting-the-paid-through-date) and its
+  [plan and add-ons](billing-api.md#setting-the-plan-and-add-ons), [ends a subscription](billing-api.md#ending-a-subscription)
+  and [reads a tenant's state and usage](billing-api.md#reading-a-tenant) through the [billing API](billing-api.md), with a
+  client and a scope of its own.
 
 ## Two parts
 
@@ -34,10 +40,10 @@ personal data stays in its region.
 | Part | Where it runs | What it holds |
 | --- | --- | --- |
 | The [region directory](region-directory.md) | One instance for all regions | Which cell holds each tenant and host. No personal data. |
-| The regional control plane | One instance in each region, with its data in that region | Sign-up, [billing portal](billing-portal.md) accounts, [subscriptions](subscriptions.md), [plans](plans.md), [payments](payments.md), [e-invoices](e-invoices.md), terms acceptances, and the emails it sends |
+| The regional control plane | One instance in each region, with its data in that region | Sign-up, [subscriptions](subscriptions.md), [plans](plans.md), terms acceptances, and the emails it sends |
 
-- **Data stays in its region.** A person who signs up in `vn` gives their name, email and billing
-  details to the `vn` control plane, and nothing of it leaves the region. The directory holds tenant
+- **Data stays in its region.** A person who signs up in `vn` gives their name and email
+  to the `vn` control plane, and nothing of it leaves the region. The directory holds tenant
   ids, hosts and cell ids only.
 - **Where the directory runs.** Beside the first region's control plane, in its own database. It
   holds no personal data, so its place does not change where customer data is kept.
@@ -92,8 +98,8 @@ over a private network with mutual TLS.
 The control plane runs its work as durable jobs in its own database, sends its own emails, and audits
 every business change.
 
-- **Durable jobs.** Provisioning a tenant, the subscription clock, emails, invoice issuing and the
-  daily reconciliation run as jobs in the control plane's database, on the queue below, which follows
+- **Durable jobs.** Provisioning a tenant, the subscription clock and emails
+  run as jobs in the control plane's database, on the queue below, which follows
   the [publisher](publisher.md#publisher) in claiming with a lease.
   - **The `control_plane.jobs` table.** `id`, `kind`, `payload` (JSON), `state` (`queued`,
     `running`, `succeeded` or `failed`), `attempts`, `next_attempt_at`, `lease_owner`,
@@ -118,8 +124,8 @@ every business change.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
     (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry and the counts of sign-up emails older than 24 hours), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
-    (`advanceSubscriptions`) and the [period invoices](payments.md#invoices) (`createPeriodInvoices`) each every hour. When the directory and a cell are set, it also queues the
-    [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When `ControlPlane:PayOs:Provider` is set, it also queues the [payment links](payments.md#paying-in-vietnam) (`createPaymentLinks`) every 5 minutes and the [payment webhook events](payments.md#webhooks) (`applyPaymentWebhooks`) every minute. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
+    (`advanceSubscriptions`) every hour. When the directory and a cell are set, it also queues the
+    [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
     [disposable mailbox domains](sign-up.md#bots-and-abuse) (`refreshDisposableDomains`) every 7 days. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
@@ -132,7 +138,7 @@ every business change.
     message, never the payload.
 - **Emails.** The control plane sends its own emails, from a mail domain of its own,
   `ControlPlane:MailFrom`, with SPF, DKIM and DMARC. It never uses a cell's mail domain, so one
-  tenant's sending never touches a sign-up or a payment reminder. Every email is in `en` and `vi`, in
+  tenant's sending never touches a sign-up or a subscription email. Every email is in `en` and `vi`, in
   the language the person chose at sign-up, or, for a tenant administrator, in the realm. SPF, DKIM
   and DMARC are DNS and relay setup, outside the repository.
   - **The `sendEmail` job.** Every email is one durable job of the kind `sendEmail`, so a restart
@@ -164,11 +170,11 @@ every business change.
   - **At-least-once, made visible.** The email's `Message-ID` is the job id and the domain of
     `ControlPlane:MailFrom`. A job that runs twice after a crash sends the same message twice, and the
     receiver can drop the copy.
-- **Audit.** Every change to a subscription, a payment, an invoice or an account writes an
-  append-only audit record with its actor: a person of the [billing portal](billing-portal.md), a
-  provider's webhook, a job, or an operator.
+- **Audit.** Every change to a subscription, a sign-up or an account writes an
+  append-only audit record with its actor: a person who signs up, a
+  job, an operator, or the billing client.
   - **The `control_plane.audit_records` table.** `id`, `occurred_at`, `actor_kind` (`account`,
-    `webhook`, `job` or `operator`), `actor`, `action` and `subject`. The database rejects every
+    `webhook`, `job`, `operator` or `billing`), `actor`, `action` and `subject`. The database rejects every
     update, delete and truncate with `restrict_violation`, raw SQL included, and the control plane's
     code has only an append and a read.
   - **Who writes it.** The handler or the command that makes the change appends the record in the
@@ -176,6 +182,8 @@ every business change.
     actor. An operator command's record has the actor kind `operator` and the `--operator` name as
     the actor. The job runner writes none itself, because claiming and retrying are bookkeeping and not a
     business change.
+  - **The billing client.** A call of the billing API writes its record with the actor
+    kind `billing` and the client id as actor, see [audit records](billing-api.md#audit-records).
 
 ## Operators
 
@@ -214,9 +222,6 @@ The platform operator, who runs the cells, runs the control plane too, from the 
 - **`--operator` is required.** A change command names the operator who runs it, and a missing or
   blank name is a usage error. The audit record of the change has the actor kind `operator` and
   that name as its actor. Every change command commits the change and its audit record in one transaction.
-- **Billing commands** _(planned for M34)_. `Axis.ControlPlane.Admin` also records a bank transfer
-  that arrived without a payment link, issues a refund and adjusts an e-invoice. Each writes an audit
-  record.
 - **No web page.** The operator works through these commands, and the control plane has no operator
   web page.
 
@@ -232,8 +237,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
   their settings is set, all of them are required. The sign-up challenge key is optional. The disposable domain list is optional, and once one of its
-  settings is set, both are required. The public URL is optional. The PayOS provider is optional, and with `PayOs` the base URL and the client id, API
-  key and checksum key are required.
+  settings is set, both are required. The public URL is optional. The billing client's settings are optional, and once one of them is set, all of them are required.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, or the quota key, and never its value.
 - **Forwarded headers.** The control plane reads `ForwardedHeaders:KnownProxies` and
@@ -241,16 +245,11 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   [sign-up limits](sign-up.md#bots-and-abuse) see the client address. Without them it sees the proxy's address
   for every client.
 - **Secrets as files.** The connection strings, the mail password, the cells' secrets, the DNS key,
-  the sign-up challenge key and the PayOS keys may also come from the key-per-file secrets
+  and the sign-up challenge key may also come from the key-per-file secrets
   `/run/secrets/ControlPlane__ConnectionString`, `/run/secrets/ControlPlane__DirectoryConnectionString`,
   `/run/secrets/ControlPlane__Mail__Password`, `/run/secrets/ControlPlane__CellSecrets__<cell id>`,
-  `/run/secrets/ControlPlane__Dns__Key`, `/run/secrets/ControlPlane__SignUp__ChallengeKey`,
-  `/run/secrets/ControlPlane__PayOs__ClientId`, `/run/secrets/ControlPlane__PayOs__ApiKey` and
-  `/run/secrets/ControlPlane__PayOs__ChecksumKey`. The PayOS keys come only from these files, and no log
-  line or error message holds one.
+  `/run/secrets/ControlPlane__Dns__Key` and `/run/secrets/ControlPlane__SignUp__ChallengeKey`.
 - **Plans.** `ControlPlane:` settings also hold the [plans](plans.md#the-catalogue).
-- **Providers** _(planned for M34)_. `ControlPlane:` settings also hold the Paddle and e-invoice
-  providers' non-secret values.
 
 | Setting | Meaning | Start check |
 | --- | --- | --- |
@@ -278,11 +277,9 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Dns:Zone` | The zone that holds the tenant subdomains, such as `vn.example.com` | A valid domain name, with `Rfc2136` |
 | `ControlPlane:Dns:KeyName` | The name of the TSIG key that the server knows | Not empty, with `Rfc2136` |
 | `ControlPlane:Dns:Key` | The TSIG HMAC-SHA256 key as base64, from the secret `ControlPlane__Dns__Key` | Valid base64, with `Rfc2136`. Never a value in a setting file or a message |
-| `ControlPlane:PayOs:Provider` | The PayOS adapter: `Fake` or `PayOs`. Optional. With none the service registers no adapter, no payment link job and no webhook route or job | `Fake` is refused outside Development and Testing. Any other value is refused |
-| `ControlPlane:PayOs:BaseUrl` | The address of the PayOS API, such as `https://api-merchant.payos.vn` | An absolute `https` URL, with `PayOs` |
-| `ControlPlane:PayOs:ClientId` | The PayOS client id, from the secret `ControlPlane__PayOs__ClientId` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
-| `ControlPlane:PayOs:ApiKey` | The PayOS API key, from the secret `ControlPlane__PayOs__ApiKey` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
-| `ControlPlane:PayOs:ChecksumKey` | The PayOS checksum key that signs the requests and the answers and checks the webhooks, from the secret `ControlPlane__PayOs__ChecksumKey` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
+| `ControlPlane:Billing:Authority` | The issuer URL of the operator's identity provider, which signs the billing client's tokens, see [signing in](billing-api.md#signing-in). Optional. Without the three `ControlPlane:Billing` settings every billing route answers `401` | An absolute `https` URL, when any `ControlPlane:Billing` setting is set |
+| `ControlPlane:Billing:Audience` | The audience that the billing client's token carries | Not empty, when any `ControlPlane:Billing` setting is set |
+| `ControlPlane:Billing:ClientId` | The id of the billing client, as the token's `client_id` or `azp` claim names it. It is the actor of the billing audit records | Not empty, when any `ControlPlane:Billing` setting is set |
 | `ControlPlane:SignUp:Applications:<n>:Id` | The id of a built-in application that the [sign-up page](sign-up.md#the-page) offers, such as `approvals`. Optional | Not empty and unique |
 | `ControlPlane:SignUp:Applications:<n>:Titles:en` | The English title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |
@@ -302,26 +299,21 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Privacy:Urls:vi` | The Vietnamese address of the privacy policy | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:ChallengeKey` | The HMAC-SHA256 key, as base64, that signs the [sign-up page's proof-of-work challenges](sign-up.md#bots-and-abuse). A key derived from it also seals the [resend token](sign-up.md#check-your-inbox). Optional. Without it `GET /api/sign-up/challenge`, `POST /api/sign-up` and `POST /api/sign-up/resend` answer `503`, so nobody can sign up. Comes from the secret `ControlPlane__SignUp__ChallengeKey`, never from a setting file | Base64 of at least 32 bytes, when set. The message never holds the value |
 | `ControlPlane:SignUp:LicencesUrl` | The address of the licences page that the legal line links. Optional | An absolute `https` URL, when a document is set |
-| `ControlPlane:Plans:<n>:Code` | The plan code, such as `team`. The whole `ControlPlane:Plans` list is optional | Lowercase letters and digits, joined by single hyphens |
+| `ControlPlane:Plans:<n>:Code` | The plan code, such as `team`. The whole `ControlPlane:Plans` list is optional | Lowercase letters and digits, joined by single hyphens. A plan and an add-on hold no setting other than the rows below |
 | `ControlPlane:Plans:<n>:Version` | The version of the plan. The code and version are unique, and a subscription's pinned version must stay | Plain digits, at least 1, and the code and version not repeated |
 | `ControlPlane:Plans:<n>:Name:en` | The English name of the plan | Not empty |
 | `ControlPlane:Plans:<n>:Name:vi` | The Vietnamese name of the plan | Not empty |
-| `ControlPlane:Plans:<n>:IncludedUsers` | The users that the plan's price includes | Plain digits, at least 1 |
-| `ControlPlane:Plans:<n>:Trial` | Whether the plan is the trial plan, which sets a new trial's quotas, see [the catalogue](plans.md#the-catalogue). Default off | A trial plan has no price and no add-on and at most 10 included users, and every trial plan has the same code |
+| `ControlPlane:Plans:<n>:IncludedUsers` | The users that the plan includes | Plain digits, at least 1 |
+| `ControlPlane:Plans:<n>:Trial` | Whether the plan is the trial plan, which sets a new trial's quotas, see [the catalogue](plans.md#the-catalogue). Default off | A trial plan has no add-on and at most 10 included users, and every trial plan has the same code |
 | `ControlPlane:Plans:<n>:Quotas:<quota>` | A quota of the plan, by the key of [tenant quotas](tenant-quotas.md#quotas), such as `storage` | Every quota key except `users` is set, no other key, and each is plain digits from 0 |
-| `ControlPlane:Plans:<n>:Prices:<n>:Currency` | The currency of a monthly price | `VND` or `USD`, each once, and both set unless the plan is a trial plan |
-| `ControlPlane:Plans:<n>:Prices:<n>:Month` | The monthly price in the currency's smallest unit. A year costs 10 times it, computed | Plain digits, at least 1 and at most a tenth of the largest 64-bit integer |
 | `ControlPlane:Plans:<n>:AddOns:<n>:Code` | The code of a user pack, such as `users-10` | Lowercase letters and digits, joined by single hyphens, and unique in the plan version |
 | `ControlPlane:Plans:<n>:AddOns:<n>:Users` | The users that the pack adds | Plain digits, at least 1 |
-| `ControlPlane:Plans:<n>:AddOns:<n>:Prices:<n>:Currency` | The currency of a monthly price of the pack | `VND` or `USD`, each once, and both set |
-| `ControlPlane:Plans:<n>:AddOns:<n>:Prices:<n>:Month` | The monthly price of the pack in the currency's smallest unit | Plain digits, at least 1 and at most a tenth of the largest 64-bit integer |
 | `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
-At start the service applies its migrations to the `control_plane` and `billing` schemas, with the
+At start the service applies its migrations to the `control_plane` schema, with the
 history table `control_plane.__control_plane_migrations`. A failed migration stops the start. One
 database role runs the migrations and the queries, and the migrations leave it only `INSERT` and
-`SELECT` on `billing.ledger_entries`, see [the ledger](payments.md#the-ledger), and on
-`control_plane.terms_acceptances`, see [terms acceptance](sign-up.md#terms-acceptance). When
+`SELECT` on `control_plane.terms_acceptances`, see [terms acceptance](sign-up.md#terms-acceptance). When
 `ControlPlane:DirectoryConnectionString` is set, the start then applies the region directory's
 migrations to the `directory` schema of that database, with the history table
 `directory.__directory_migrations`, and a failure there also stops the start. Right after the
@@ -352,11 +344,6 @@ The control plane ships as its own image and Helm chart, beside the platform's.
   password, as `/run/secrets/ControlPlane__Mail__Password`, and is left out when the relay needs no
   sign-in. `secrets.challengeKey` does the same for the sign-up challenge key, as
   `/run/secrets/ControlPlane__SignUp__ChallengeKey`, and is left out when no Secret is named.
-  `controlPlane.payOs.provider` and `controlPlane.payOs.baseUrl` set `ControlPlane:PayOs:Provider`,
-  which is empty or `PayOs`, and `ControlPlane:PayOs:BaseUrl`, which defaults to
-  `https://api-merchant.payos.vn`. `secrets.payOs` names one Kubernetes Secret with the keys
-  `ControlPlane__PayOs__ClientId`, `ControlPlane__PayOs__ApiKey` and `ControlPlane__PayOs__ChecksumKey`,
-  which the chart mounts as the files of the same names, and is left out when the provider is empty.
   `controlPlane.cells` lists the region's cells. Each entry holds `id`, `internalUrl`, `tokenUrl` and
   `clientId`, which set `ControlPlane:Cells:<n>:Id`, `:InternalUrl`, `:TokenUrl` and `:ClientId`, and
   `clientSecret`, the name and optionally the key of the Kubernetes Secret that holds the cell's client
@@ -373,7 +360,6 @@ The control plane ships as its own image and Helm chart, beside the platform's.
 - **Render failures.** Rendering fails and names the value when `controlPlane.region`,
   `controlPlane.tenantDomain`, `controlPlane.mailFrom`, `controlPlane.mail.host`,
   `secrets.connectionString.name` or `secrets.certificate.name` is not set. It also fails and names
-  `secrets.payOs.name` when `controlPlane.payOs.provider` is `PayOs` and no Secret is named,
   `controlPlane.cells[<n>].clientSecret.name` when a listed cell names no Secret, and
   `secrets.cellClientCertificate.name` when a cell is listed and no Secret is named.
 - **Checks.** `scripts/lint.sh` lints the chart and checks its rendered manifests against the
@@ -396,12 +382,11 @@ The control plane reports its health and telemetry as the platform's hosts do.
   region directory.
 - **Telemetry.** Logs, metrics and traces as the platform's hosts write them, under the service name
   `axis-controlplane`, and the platform's security headers on every response. A log never holds a
-  payment card, a bank account, a tax code or a webhook body.
-- **Metrics.** Next to the standard metrics, the service counts the jobs that ended `failed`, the requests that a
-  rate limit refused and the payment events that were out of place.
+  payment card, a bank account or a tax code.
+- **Metrics.** Next to the standard metrics, the service counts the jobs that ended `failed` and the requests that a
+  rate limit refused.
 
   | Metric | Instrument | Unit | Attributes |
   | --- | --- | --- | --- |
   | `axis.controlplane.jobs.failed` | counter | `{job}` | `axis.job.kind`. Never the job id |
-  | `axis.controlplane.payments.out_of_place` | counter | `{event}` | `axis.payment.provider`, `axis.payment.reason`. Never an id or an amount |
   | `axis.rate_limits.refused` | counter | `{request}` | `axis.partition`, always `sign_up`. Never an address or a domain |

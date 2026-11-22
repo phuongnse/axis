@@ -109,6 +109,12 @@ flowchart LR
   runs the publish requests that Studio stores. It has no HTTP endpoint, and the server holds no
   tenant schema connection. The production installs, `scripts/dev.sh`, Docker Compose and the E2E
   script each start one. See [publisher](reference/publisher.md#publisher).
+- **Axis.ControlPlane** is the service, apart from the cells, that runs sign-up, trials, the
+  subscription's clock and the plans of Axis SaaS. It reaches a cell only through the provisioning API,
+  see [control plane](reference/control-plane.md#what-it-is).
+- **The operator's billing system** _(planned for M34)_. The operator's own system calls the control
+  plane's billing API and receives its signed events. It holds the prices, the invoices and the
+  payments, which Axis does not.
 - **The platform database** holds installation-level data: the
   [tenant directory](#tenant-directory) in its `platform` schema, and platform settings.
 - **A tenant database** holds everything else of one tenant: releases, system tables, process

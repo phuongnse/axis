@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { expectTitleAloneInBand } from '../test/pageBand'
 import { ShellAsideHost } from '../test/shellAsideHost'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
@@ -119,7 +120,18 @@ afterEach(() => {
 })
 
 describe('ConsoleInstancePage', () => {
-  it('draws the steps by name with the failed step current, and the history error and the hidden call input under History', async () => {
+  it('holds the process title alone in the band', async () => {
+    stubServer(
+      () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1, name: 'PurchaseRequestApproval' })
+
+    expectTitleAloneInBand('PurchaseRequestApproval')
+  })
+
+  it('draws the steps by name with the failed step current, and the stored error in the banner and not in History', async () => {
     const fetchMock = stubServer(
       () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
     )
@@ -135,10 +147,12 @@ describe('ConsoleInstancePage', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: 'History' }))
 
-    expect(screen.getByText('System.InvalidOperationException')).toBeVisible()
-    expect(within(screen.getByTestId('inspector-call-c-1')).getByText('Input: Hidden')).toBeVisible()
+    const history = within(screen.getByTestId('inspector-history'))
+    expect(history.getByText('createOrder (Purchasing) has an unknown outcome.')).toBeVisible()
+    expect(history.queryByText('System.InvalidOperationException')).toBeNull()
+    expect(history.queryByText('Input: Hidden')).toBeNull()
+    expect(within(screen.getByTestId('inspector-failure')).getByText(/System.InvalidOperationException/)).toBeVisible()
     expect(screen.queryByTestId('inspector-command-retry')).toBeNull()
-    expect(screen.getByRole('link', { name: 'Operator console' })).toHaveAttribute('href', '/console')
   })
 
   it("opens a step's run in the side panel by the step's name, with the stored error and a sub-process that is not a link", async () => {
@@ -188,22 +202,13 @@ describe('ConsoleInstancePage', () => {
     renderPage('?tab=history')
 
     const page = await screen.findByTestId('inspector-instance')
-    const sections = within(page).getAllByRole('region')
-    expect(sections.map((part) => within(part).getByRole('heading', { level: 2 }).textContent)).toEqual([
-      'History',
-      'Tasks',
-      'Calls',
-      'Sub-processes',
-    ])
     expect(within(page).getByTestId('studio-section-inspector-facts')).toBeVisible()
     expect(within(page).getByTestId('studio-section-inspector-tabs').previousElementSibling).toHaveAttribute(
       'role',
       'separator',
     )
-    expect(within(page).getAllByRole('separator')).toHaveLength(4)
-    for (const part of sections.slice(1)) {
-      expect(part.previousElementSibling).toHaveAttribute('role', 'separator')
-    }
+    expect(within(page).getAllByRole('separator')).toHaveLength(1)
+    expect(within(page).getByTestId('inspector-history')).toBeVisible()
   })
 
   it('posts the reason of a retry to the console route and shows the instance read again', async () => {

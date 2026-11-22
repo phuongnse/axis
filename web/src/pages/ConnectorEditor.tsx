@@ -1,9 +1,11 @@
-import { Button, Card, Flex, Input, Select } from 'antd'
+import { Card, ConfigProvider, Flex, Input, Select } from 'antd'
 import { useContext, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { StudioBindingsContext } from '../platform/studioCatalog'
 import { useText } from '../platform/texts'
 import { WarningLine } from '../platform/WarningLine'
@@ -73,6 +75,7 @@ function bindingName(value: unknown): string {
 export function ConnectorEditor({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
   const t = useText()
   const bindings = useContext(StudioBindingsContext)
+  const { componentDisabled } = ConfigProvider.useConfig()
   const auth = isContent(value.auth) ? value.auth : undefined
   const authType = typeof auth?.type === 'string' ? auth.type : undefined
   const operations = Array.isArray(value.operations) ? value.operations : []
@@ -226,14 +229,17 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
                   onChange={onChange}
                 />
               ))}
+              {operations.length === 0 && <EmptyState text={t('shell.studio.connector.noOperations')} />}
             </Flex>
           </div>,
-          <AxisButton
-            role="secondary"
-            onClick={() => onChange('/operations', [...operations, { name: '', method: 'POST', path: '/' }])}
-          >
-            {t('shell.studio.connector.addOperation')}
-          </AxisButton>,
+          componentDisabled ? undefined : (
+            <AxisButton
+              role="secondary"
+              onClick={() => onChange('/operations', [...operations, { name: '', method: 'POST', path: '/' }])}
+            >
+              {t('shell.studio.connector.addOperation')}
+            </AxisButton>
+          ),
         )}
       </SectionParts>
     </div>
@@ -257,65 +263,81 @@ function Operation({
   const hasBodyInput =
     Array.isArray(operation.input) &&
     operation.input.some((row) => !isContent(row) || row.in === undefined || row.in === 'body')
+  const { componentDisabled } = ConfigProvider.useConfig()
 
   return (
     <Card size="small" data-testid={`studio-operation-${index}`}>
-      <Flex vertical gap="small">
-        <div data-testid={`studio-field-${pointer}/name`}>
-          <AxisField {...fieldTexts(t, 'operations.name')} required>
-            <Input value={text(operation.name)} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
-          </AxisField>
-        </div>
-        <div data-testid={`studio-field-${pointer}/method`}>
-          <AxisField {...fieldTexts(t, 'operations.method')} required>
-            <Select
-              virtual={false}
-              style={{ minWidth: 240 }}
-              value={typeof operation.method === 'string' ? operation.method : undefined}
-              options={methods.map((method) => ({ value: method, label: method }))}
-              onChange={(next: string) => onChange(`${pointer}/method`, next)}
-            />
-          </AxisField>
-        </div>
-        <div data-testid={`studio-field-${pointer}/path`}>
-          <AxisField {...fieldTexts(t, 'operations.path')} required>
-            <Input value={text(operation.path)} onChange={(event) => onChange(`${pointer}/path`, event.target.value)} />
-          </AxisField>
-        </div>
-        <div data-testid={`studio-field-${pointer}/lookup`}>
-          <AxisField {...fieldTexts(t, 'operations.lookup')}>
-            <ReferencePicker
-              name={t('shell.studio.field.connector.operations.lookup')}
-              value={lookup}
-              required={false}
-              options={siblings}
-              onChange={(next) => onChange(`${pointer}/lookup`, next)}
-            />
-          </AxisField>
-        </div>
-        <FieldRows
-          kind="input"
-          pointer={`${pointer}/input`}
-          addText={t('shell.studio.connector.addInput')}
-          rows={operation.input}
-          onChange={onChange}
-        />
-        {operation.method === 'GET' && hasBodyInput && (
-          <WarningLine testId="studio-connector-get-no-input">{t('shell.studio.connector.getNoInput')}</WarningLine>
+      <Flex gap="small" align="flex-start">
+        <Flex vertical gap="small" style={{ flex: 1 }}>
+          <div data-testid={`studio-field-${pointer}/name`}>
+            <AxisField {...fieldTexts(t, 'operations.name')} required>
+              <Input
+                value={text(operation.name)}
+                onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
+              />
+            </AxisField>
+          </div>
+          <div data-testid={`studio-field-${pointer}/method`}>
+            <AxisField {...fieldTexts(t, 'operations.method')} required>
+              <Select
+                virtual={false}
+                style={{ minWidth: 240 }}
+                value={typeof operation.method === 'string' ? operation.method : undefined}
+                options={methods.map((method) => ({ value: method, label: method }))}
+                onChange={(next: string) => onChange(`${pointer}/method`, next)}
+              />
+            </AxisField>
+          </div>
+          <div data-testid={`studio-field-${pointer}/path`}>
+            <AxisField {...fieldTexts(t, 'operations.path')} required>
+              <Input
+                value={text(operation.path)}
+                onChange={(event) => onChange(`${pointer}/path`, event.target.value)}
+              />
+            </AxisField>
+          </div>
+          <div data-testid={`studio-field-${pointer}/lookup`}>
+            <AxisField {...fieldTexts(t, 'operations.lookup')}>
+              <ReferencePicker
+                name={t('shell.studio.field.connector.operations.lookup')}
+                value={lookup}
+                required={false}
+                options={siblings}
+                onChange={(next) => onChange(`${pointer}/lookup`, next)}
+              />
+            </AxisField>
+          </div>
+          <FieldRows
+            kind="input"
+            pointer={`${pointer}/input`}
+            addText={t('shell.studio.connector.addInput')}
+            rows={operation.input}
+            onChange={onChange}
+          />
+          {operation.method === 'GET' && hasBodyInput && (
+            <WarningLine testId="studio-connector-get-no-input">{t('shell.studio.connector.getNoInput')}</WarningLine>
+          )}
+          <FieldRows
+            kind="output"
+            pointer={`${pointer}/output`}
+            addText={t('shell.studio.connector.addOutput')}
+            rows={operation.output}
+            onChange={onChange}
+          />
+        </Flex>
+        {componentDisabled ? null : (
+          <RowActions
+            fold
+            actions={[
+              {
+                key: 'remove',
+                labelKey: 'shell.studio.connector.removeOperation',
+                destructive: true,
+                onClick: () => onChange(pointer, undefined),
+              },
+            ]}
+          />
         )}
-        <FieldRows
-          kind="output"
-          pointer={`${pointer}/output`}
-          addText={t('shell.studio.connector.addOutput')}
-          rows={operation.output}
-          onChange={onChange}
-        />
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button danger onClick={() => onChange(pointer, undefined)}>
-            {t('shell.studio.connector.removeOperation')}
-          </Button>
-        </div>
       </Flex>
     </Card>
   )
@@ -346,7 +368,11 @@ function changeFieldType(
   }
 }
 
-/** The input or output fields of an operation as rows of name, type and required, with a placement or a source. */
+/**
+ * The input or output fields of an operation as rows of name, type and required, with a placement or a source. Add sits on
+ * the group's title row, and each row's Delete is in its "…" menu, which removes the fields nested in the row too. A
+ * read-only editor, Ant Design's `componentDisabled`, shows neither, see docs/reference/studio-editors-by-kind.md#connector-editor.
+ */
 function FieldRows({
   kind,
   pointer,
@@ -361,20 +387,35 @@ function FieldRows({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   const list = Array.isArray(rows) ? rows : []
   const path = `operations.${kind}`
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisFieldGroup {...groupTexts(t, path)}>
+      <AxisFieldGroup
+        {...groupTexts(t, path)}
+        action={
+          componentDisabled ? undefined : (
+            <AxisButton role="secondary" onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>
+              {addText}
+            </AxisButton>
+          )
+        }
+      >
         <Flex vertical gap="small">
+          {list.length === 0 && (
+            <EmptyState
+              text={t(kind === 'input' ? 'shell.studio.connector.noInput' : 'shell.studio.connector.noOutput')}
+            />
+          )}
           {list.map((row, index) => {
             const field = isContent(row) ? row : {}
             const rowPointer = `${pointer}/${index}`
             const structured = kind === 'input' && isStructured(field.type)
             return (
-              <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
-                <Flex vertical gap="small">
+              <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-${rowPointer}`}>
+                <Flex vertical gap="small" style={{ flex: 1 }}>
                   <div data-testid={`studio-field-${rowPointer}/name`}>
                     <AxisField {...fieldTexts(t, `${path}.name`)} required>
                       <Input
@@ -430,23 +471,26 @@ function FieldRows({
                       </AxisField>
                     </div>
                   )}
-                  <div>
-                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                    <Button onClick={() => onChange(rowPointer, undefined)}>
-                      {t('shell.studio.connector.removeField')}
-                    </Button>
-                  </div>
+                  {structured && (
+                    <NestedFields pointer={`${rowPointer}/fields`} rows={field.fields} level={2} onChange={onChange} />
+                  )}
                 </Flex>
-                {structured && (
-                  <NestedFields pointer={`${rowPointer}/fields`} rows={field.fields} level={2} onChange={onChange} />
+                {componentDisabled ? null : (
+                  <RowActions
+                    fold
+                    actions={[
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.studio.connector.removeField',
+                        destructive: true,
+                        onClick: () => onChange(rowPointer, undefined),
+                      },
+                    ]}
+                  />
                 )}
               </Flex>
             )
           })}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>{addText}</Button>
-          </div>
         </Flex>
       </AxisFieldGroup>
     </div>
@@ -455,7 +499,8 @@ function FieldRows({
 
 /**
  * The fields nested in an `object` or `list` input. `level` is the level of these rows, counting the input as 1. The
- * schema's nested field is one recursive definition, so every level draws the same field texts.
+ * schema's nested field is one recursive definition, so every level draws the same field texts. Its Add and each row's
+ * Delete follow the rules of `FieldRows`.
  */
 function NestedFields({
   pointer,
@@ -469,20 +514,31 @@ function NestedFields({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { componentDisabled } = ConfigProvider.useConfig()
   const list = Array.isArray(rows) ? rows : []
   const types = level <= nestingLimit ? inputTypes : fieldTypes
   const path = 'operations.input.fields'
 
   return (
     <div style={{ marginInlineStart: 24 }} data-testid={`studio-field-${pointer}`}>
-      <AxisFieldGroup {...groupTexts(t, path)}>
+      <AxisFieldGroup
+        {...groupTexts(t, path)}
+        action={
+          componentDisabled ? undefined : (
+            <AxisButton role="secondary" onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>
+              {t('shell.studio.connector.addNestedField')}
+            </AxisButton>
+          )
+        }
+      >
         <Flex vertical gap="small">
+          {list.length === 0 && <EmptyState text={t('shell.studio.connector.noNestedFields')} />}
           {list.map((row, index) => {
             const field = isContent(row) ? row : {}
             const rowPointer = `${pointer}/${index}`
             return (
-              <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
-                <Flex vertical gap="small">
+              <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-${rowPointer}`}>
+                <Flex vertical gap="small" style={{ flex: 1 }}>
                   <div data-testid={`studio-field-${rowPointer}/name`}>
                     <AxisField {...fieldTexts(t, `${path}.name`)} required>
                       <Input
@@ -509,30 +565,31 @@ function NestedFields({
                       onChange={(checked) => onChange(`${rowPointer}/required`, checked)}
                     />
                   </div>
-                  <div>
-                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                    <Button onClick={() => onChange(rowPointer, undefined)}>
-                      {t('shell.studio.connector.removeField')}
-                    </Button>
-                  </div>
+                  {isStructured(field.type) && (
+                    <NestedFields
+                      pointer={`${rowPointer}/fields`}
+                      rows={field.fields}
+                      level={level + 1}
+                      onChange={onChange}
+                    />
+                  )}
                 </Flex>
-                {isStructured(field.type) && (
-                  <NestedFields
-                    pointer={`${rowPointer}/fields`}
-                    rows={field.fields}
-                    level={level + 1}
-                    onChange={onChange}
+                {componentDisabled ? null : (
+                  <RowActions
+                    fold
+                    actions={[
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.studio.connector.removeField',
+                        destructive: true,
+                        onClick: () => onChange(rowPointer, undefined),
+                      },
+                    ]}
                   />
                 )}
               </Flex>
             )
           })}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>
-              {t('shell.studio.connector.addNestedField')}
-            </Button>
-          </div>
         </Flex>
       </AxisFieldGroup>
     </div>

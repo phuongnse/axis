@@ -1,37 +1,12 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Axis.Tenancy;
+using Microsoft.Extensions.Configuration;
 
 namespace Axis.ControlPlane.Plans;
 
-/// <summary>The currencies of a price, see <c>docs/reference/plans.md#the-catalogue</c>.</summary>
-public static class PlanCurrencies
-{
-    public const string Vnd = "VND";
-
-    public const string Usd = "USD";
-
-    internal static readonly string[] All = [Vnd, Usd];
-}
-
-/// <summary>The periods of a subscription, see <c>docs/reference/plans.md#the-catalogue</c>.</summary>
-public static class PlanPeriods
-{
-    public const string Month = "month";
-
-    public const string Year = "year";
-
-    /// <summary>A year costs this many months, see <c>docs/reference/plans.md#the-catalogue</c>.</summary>
-    internal const long MonthsPerYear = 10;
-}
-
-/// <summary>A user pack of a plan version, with its monthly prices.</summary>
-public sealed record PlanAddOn(string Code, long Users, IReadOnlyDictionary<string, long> MonthlyPrices)
-{
-    /// <summary>The price of the pack for a period in a currency, in the currency's smallest unit.</summary>
-    /// <exception cref="ArgumentException">The currency or the period is unknown.</exception>
-    public long Price(string currency, string period) => PlanPrices.Of(MonthlyPrices, currency, period);
-}
+/// <summary>A user pack of a plan version.</summary>
+public sealed record PlanAddOn(string Code, long Users);
 
 /// <summary>One version of a plan, see <c>docs/reference/plans.md#the-catalogue</c>.</summary>
 public sealed record PlanVersion(
@@ -42,32 +17,7 @@ public sealed record PlanVersion(
     bool Trial,
     long IncludedUsers,
     IReadOnlyDictionary<string, long> Quotas,
-    IReadOnlyDictionary<string, long> MonthlyPrices,
-    IReadOnlyList<PlanAddOn> AddOns)
-{
-    /// <summary>The price of the plan for a period in a currency, in the currency's smallest unit.</summary>
-    /// <exception cref="ArgumentException">The currency or the period is unknown.</exception>
-    public long Price(string currency, string period) => PlanPrices.Of(MonthlyPrices, currency, period);
-}
-
-internal static class PlanPrices
-{
-    // Computed, never stored: a year costs 10 months, see docs/reference/plans.md#the-catalogue.
-    public static long Of(IReadOnlyDictionary<string, long> monthly, string currency, string period)
-    {
-        if (!monthly.TryGetValue(currency, out var month))
-        {
-            throw new ArgumentException("The currency has no price.", nameof(currency));
-        }
-
-        return period switch
-        {
-            PlanPeriods.Month => month,
-            PlanPeriods.Year => checked(month * PlanPeriods.MonthsPerYear),
-            _ => throw new ArgumentException("The period is not month or year.", nameof(period)),
-        };
-    }
-}
+    IReadOnlyList<PlanAddOn> AddOns);
 
 /// <summary>
 /// The plan versions of <c>ControlPlane:Plans</c>, checked at start, see <c>docs/reference/plans.md#the-catalogue</c>. A subscription pins
@@ -77,9 +27,6 @@ internal static class PlanPrices
 public sealed partial class PlanCatalogue
 {
     private const string Section = $"{ControlPlaneOptions.SectionName}:{nameof(ControlPlaneOptions.Plans)}";
-
-    // A yearly price is 10 times the monthly one, so the monthly one must leave room for it.
-    private const long MaxMonthlyPrice = long.MaxValue / PlanPeriods.MonthsPerYear;
 
     // A trial has at most this many users, see docs/reference/plans.md#the-catalogue.
     private const long MaxTrialUsers = 10;
@@ -124,8 +71,7 @@ public sealed partial class PlanCatalogue
             plan.Trial,
             Parse(plan.IncludedUsers!),
             required.ToDictionary(key => key, key => Parse(plan.Quotas[key]), StringComparer.Ordinal),
-            Prices(plan.Prices),
-            plan.AddOns.Select(addOn => new PlanAddOn(addOn.Code!, Parse(addOn.Users!), Prices(addOn.Prices))).ToList())).ToList());
+            plan.AddOns.Select(addOn => new PlanAddOn(addOn.Code!, Parse(addOn.Users!))).ToList())).ToList());
     }
 
     /// <summary>Stops the start when a subscription pins a plan version that the settings no longer list.</summary>
@@ -195,11 +141,6 @@ public sealed partial class PlanCatalogue
 
             if (plan.Trial)
             {
-                if (plan.Prices.Count > 0)
-                {
-                    problems.Add($"The setting {prefix}:{nameof(PlanOptions.Prices)}{of} must be empty, because the plan is a trial plan.");
-                }
-
                 if (plan.AddOns.Count > 0)
                 {
                     problems.Add($"The setting {prefix}:{nameof(PlanOptions.AddOns)}{of} must be empty, because the plan is a trial plan.");
@@ -231,11 +172,50 @@ public sealed partial class PlanCatalogue
                 continue;
             }
 
-            PriceProblems(problems, $"{prefix}:{nameof(PlanOptions.Prices)}", of, plan.Prices);
             AddOnProblems(problems, prefix, of, plan.AddOns);
         }
 
         return problems;
+    }
+
+    /// <summary>
+    /// Every setting of a plan or an add-on that the catalogue does not know, such as a leftover <c>Prices</c>, see <c>docs/reference/plans.md#the-catalogue</c>.
+    /// The binder drops such a setting without a word, so the start reads the settings themselves. A message names the setting and never holds its value.
+    /// </summary>
+    internal static List<string> SettingProblems(IConfigurationSection plans)
+    {
+        var problems = new List<string>();
+        foreach (var plan in plans.GetChildren())
+        {
+            AddUnknownSettings(problems, plan, "a plan", _planSettings);
+            foreach (var addOn in plan.GetSection(nameof(PlanOptions.AddOns)).GetChildren())
+            {
+                AddUnknownSettings(problems, addOn, "an add-on", _addOnSettings);
+            }
+        }
+
+        return problems;
+    }
+
+    private static readonly string[] _planSettings =
+    [
+        nameof(PlanOptions.Code),
+        nameof(PlanOptions.Version),
+        nameof(PlanOptions.Name),
+        nameof(PlanOptions.IncludedUsers),
+        nameof(PlanOptions.Trial),
+        nameof(PlanOptions.Quotas),
+        nameof(PlanOptions.AddOns),
+    ];
+
+    private static readonly string[] _addOnSettings = [nameof(PlanAddOnOptions.Code), nameof(PlanAddOnOptions.Users)];
+
+    private static void AddUnknownSettings(List<string> problems, IConfigurationSection entry, string of, string[] known)
+    {
+        foreach (var setting in entry.GetChildren().Where(child => !known.Contains(child.Key, StringComparer.OrdinalIgnoreCase)))
+        {
+            problems.Add($"The setting {setting.Path} is not a setting of {of}.");
+        }
     }
 
     // Every quota key of the platform except the users, which the plan's included users and add-ons set.
@@ -284,37 +264,6 @@ public sealed partial class PlanCatalogue
             }
 
             AddWholeNumberProblem(problems, $"{path}:{nameof(PlanAddOnOptions.Users)}", of, addOn.Users, 1, long.MaxValue);
-            PriceProblems(problems, $"{path}:{nameof(PlanAddOnOptions.Prices)}", of, addOn.Prices);
-        }
-    }
-
-    // A paid plan and an add-on carry exactly one price in each currency.
-    private static void PriceProblems(List<string> problems, string path, string of, List<PlanPriceOptions> prices)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        for (var index = 0; index < prices.Count; index++)
-        {
-            var price = prices[index];
-            var pricePath = $"{path}:{index.ToString(CultureInfo.InvariantCulture)}";
-            if (string.IsNullOrWhiteSpace(price.Currency))
-            {
-                problems.Add($"The setting {pricePath}:{nameof(PlanPriceOptions.Currency)}{of} is required.");
-            }
-            else if (!PlanCurrencies.All.Contains(price.Currency, StringComparer.Ordinal))
-            {
-                problems.Add($"The setting {pricePath}:{nameof(PlanPriceOptions.Currency)}{of} must be {PlanCurrencies.Vnd} or {PlanCurrencies.Usd}.");
-            }
-            else if (!seen.Add(price.Currency))
-            {
-                problems.Add($"The setting {pricePath}:{nameof(PlanPriceOptions.Currency)}{of} repeats the currency of an earlier price.");
-            }
-
-            AddWholeNumberProblem(problems, $"{pricePath}:{nameof(PlanPriceOptions.Month)}", of, price.Month, 1, MaxMonthlyPrice);
-        }
-
-        foreach (var currency in PlanCurrencies.All.Where(currency => !seen.Contains(currency)))
-        {
-            problems.Add($"The setting {path}{of} has no {currency} price.");
         }
     }
 
@@ -348,9 +297,6 @@ public sealed partial class PlanCatalogue
     }
 
     private static long Parse(string value) => long.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture);
-
-    private static Dictionary<string, long> Prices(List<PlanPriceOptions> prices) =>
-        prices.ToDictionary(price => price.Currency!, price => Parse(price.Month!), StringComparer.Ordinal);
 
     [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]
     private static partial Regex Code();

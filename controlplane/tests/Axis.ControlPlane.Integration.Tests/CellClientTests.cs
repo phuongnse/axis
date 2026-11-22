@@ -283,6 +283,31 @@ public sealed class CellClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_tenant_read_returns_the_usage_when_the_body_holds_it_and_none_when_it_does_not()
+    {
+        var cell = Build().Get("vn-1");
+        var token = TestContext.Current.CancellationToken;
+        _server.TenantStatus = "active";
+
+        Assert.Null((await cell.GetTenantAsync("acme", token))!.Usage);
+
+        _server.TenantUsage = new
+        {
+            storage = new { limit = 100L, used = 7L },
+            users = new { limit = 25L, used = (long?)null },
+            applications = new { limit = 5L, used = 2L },
+            emailsPerDay = new { limit = (long?)null, used = 40L },
+        };
+        var read = await cell.GetTenantAsync("acme", token);
+
+        Assert.Equal("active", read!.Status);
+        Assert.Equal(new CellQuotaUse(100, 7), read.Usage!.Storage);
+        Assert.Equal(new CellQuotaUse(25, null), read.Usage.Users);
+        Assert.Equal(new CellQuotaUse(5, 2), read.Usage.Applications);
+        Assert.Equal(new CellQuotaUse(null, 40), read.Usage.EmailsPerDay);
+    }
+
+    [Fact]
     public async Task A_tenant_read_answered_with_an_error_throws_with_the_status_and_no_body()
     {
         _server.TenantReadStatus = 500;

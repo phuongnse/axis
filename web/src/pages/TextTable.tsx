@@ -1,8 +1,10 @@
-import { Button, Flex, Input, Tag, Typography } from 'antd'
+import { Flex, Input, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { useMemo, useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { escapePointerSegment } from '../platform/jsonPatch'
+import { StatusTag } from '../platform/StatusTag'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
@@ -137,7 +139,7 @@ export function TextTable({
               const missing = !Object.hasOwn(column.texts, row.key)
               if (!column.editable) {
                 return missing ? (
-                  <Tag>{t('shell.studio.texts.missing')}</Tag>
+                  <StatusTag tone="attention">{t('shell.studio.texts.missing')}</StatusTag>
                 ) : (
                   <Typography.Text>{textOf(column, row.key)}</Typography.Text>
                 )
@@ -149,7 +151,7 @@ export function TextTable({
                     value={textOf(column, row.key)}
                     onChange={(event) => onChange(`/texts/${escapePointerSegment(row.key)}`, event.target.value)}
                   />
-                  {missing && <Tag>{t('shell.studio.texts.missing')}</Tag>}
+                  {missing && <StatusTag tone="attention">{t('shell.studio.texts.missing')}</StatusTag>}
                 </Flex>
               )
             },
@@ -174,10 +176,9 @@ export function TextTable({
             onChange={(event) => setNewTexts((current) => ({ ...current, [column.locale]: event.target.value }))}
           />
         ))}
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button loading={adding} disabled={adding} onClick={add}>
+        <AxisButton role="secondary" loading={adding} disabled={adding} onClick={add}>
           {t('shell.studio.texts.addKey')}
-        </Button>
+        </AxisButton>
         {problem && (
           <Typography.Text type="danger" data-testid="studio-text-add-problem">
             {problem}

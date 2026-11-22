@@ -1,5 +1,6 @@
 import { theme, type ConfigProviderProps, type ThemeConfig } from 'antd'
 import { colourTokens, designTokensFor, type ColourName, type DesignTokens, type PageTokenValues } from './designTokens'
+import type { StatusTone } from './statusTones'
 import type { ThemeMode } from './themeMode'
 
 // The only file that names Ant Design tokens. It maps the Axis tokens to Ant Design's theme.
@@ -201,15 +202,37 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
   }
 }
 
+/** The class `AxisField` puts on its wrapper, which `fieldRules` sizes the input the field holds by. */
+export const fieldClass = 'axis-field'
+
+/** The inputs that fill their field. A checkbox, a switch and an upload keep their own width. */
+const fieldInputs = [
+  '.ant-select',
+  '.ant-input-number',
+  '.ant-input-number-affix-wrapper',
+  '.ant-picker',
+  '.ant-input',
+  '.ant-input-affix-wrapper',
+  '.ant-input-group-wrapper',
+  '.ant-space-compact',
+]
+
+/** Where such an input sits: directly in the field a screen holds, or in the content of a form item. */
+const fieldParents = [`.${fieldClass}`, `.${fieldClass} .ant-form-item-control-input-content`]
+
 /**
  * The CSS every Axis form and message shares, rendered once beside each provider's ConfigProvider. Ant Design has no
  * token for the gap under a message, for an unticked box's error border or for a message's icon, which it draws in the
  * seed colour, so these rules carry them. The border and the icon take the mode's text colour: a page with two modes
- * would give them one colour.
+ * would give them one colour. An input of an `AxisField` fills the field's width, and a select joined with its action
+ * fills it together with the action, see docs/reference/shell.md#layout.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
   const { colour, type } = designTokensFor(mode, page)
+  const fieldWidth = fieldParents.flatMap((parent) => fieldInputs.map((input) => `${parent} > ${input}`)).join(', ')
   return [
+    // An input fills its field, and a select joined with its action fills it too, see docs/reference/shell.md#layout.
+    `${fieldWidth} { width: 100%; }`,
     // A message sits 4px under its control. The gap under the message is the form's.
     `.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: ${type.fontSize}px; line-height: 20px; }`,
     '.ant-form-item-margin-offset { display: none; }',
@@ -229,6 +252,29 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
  */
 export function useSelectedItemTint(): string {
   return theme.useToken().token.controlItemBgActive
+}
+
+/** A status tag's text, fill and border colours. */
+export interface StatusTint {
+  text: string
+  fill: string
+  border: string
+}
+
+/**
+ * Each tone's tint in the theme in use, which follows the page's seed colours: Ant Design's tint of the tone's seed for a
+ * fill and its border, the secondary fill edged with the strongest fill for a neutral tag, and no fill for a muted one.
+ * See docs/reference/shared-widgets.md#which-widget.
+ */
+export function useStatusTints(): Record<StatusTone, StatusTint> {
+  const { token } = theme.useToken()
+  return {
+    neutral: { text: token.colorText, fill: token.colorFillSecondary, border: token.colorFill },
+    attention: { text: token.colorWarningText, fill: token.colorWarningBg, border: token.colorWarningBorder },
+    success: { text: token.colorSuccessText, fill: token.colorSuccessBg, border: token.colorSuccessBorder },
+    danger: { text: token.colorErrorText, fill: token.colorErrorBg, border: token.colorErrorBorder },
+    muted: { text: token.colorTextSecondary, fill: 'transparent', border: token.colorFill },
+  }
 }
 
 /**

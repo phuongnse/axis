@@ -1,4 +1,3 @@
-using Axis.ControlPlane.Billing;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.RegionDirectory;
@@ -327,15 +326,6 @@ public sealed class ControlPlaneOptionsTests
         ["ControlPlane:Dns:Key"] = DnsKey,
     };
 
-    private static Dictionary<string, string?> PayOsSettings() => new()
-    {
-        ["ControlPlane:PayOs:Provider"] = "PayOs",
-        ["ControlPlane:PayOs:BaseUrl"] = "https://api-merchant.payos.test",
-        ["ControlPlane:PayOs:ClientId"] = "client-id-48151623420",
-        ["ControlPlane:PayOs:ApiKey"] = "api-key-91827364550",
-        ["ControlPlane:PayOs:ChecksumKey"] = "checksum-key-27182818280",
-    };
-
     [Theory]
     [InlineData("ControlPlane:Dns:Server")]
     [InlineData("ControlPlane:Dns:Zone")]
@@ -427,109 +417,6 @@ public sealed class ControlPlaneOptionsTests
 
         Assert.IsType<InMemoryDnsRecords>(factory.Services.GetRequiredService<IDnsRecords>());
         Assert.Same(factory.Services.GetRequiredService<InMemoryDnsRecords>(), factory.Services.GetRequiredService<IDnsRecords>());
-    }
-
-    [Fact]
-    public void Outside_Development_and_Testing_the_fake_PayOS_provider_stops_the_start()
-    {
-        var settings = new Dictionary<string, string?>
-        {
-            ["ControlPlane:PayOs:Provider"] = "Fake",
-            ["ControlPlane:ConnectionString"] = ControlPlaneFactory.UnreachableConnectionString + ";SSL Mode=VerifyFull",
-            ["ControlPlane:Mail:UseTls"] = "true",
-        };
-        using var factory = ControlPlaneFactory.Create(environment: "Production", settings: settings);
-
-        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
-
-        Assert.Contains("ControlPlane:PayOs:Provider", exception.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("ControlPlane:ConnectionString", exception.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void An_unknown_PayOS_provider_stops_the_start()
-    {
-        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:PayOs:Provider"] = "Other" });
-
-        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
-
-        Assert.Contains("ControlPlane:PayOs:Provider", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("Fake or PayOs", exception.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("Other", exception.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void In_Testing_the_fake_PayOS_provider_loads_and_registers_the_adapter_and_the_payment_link_job()
-    {
-        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:PayOs:Provider"] = "Fake" });
-
-        using var client = factory.CreateClient();
-
-        Assert.IsType<FakePayOs>(factory.Services.GetRequiredService<IPayOs>());
-        Assert.Same(factory.Services.GetRequiredService<FakePayOs>(), factory.Services.GetRequiredService<IPayOs>());
-        Assert.Contains(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks" && job.Interval == TimeSpan.FromMinutes(5));
-        Assert.Contains(factory.Services.GetServices<IJobHandler>(), handler => handler.Kind == "createPaymentLinks");
-    }
-
-    [Theory]
-    [InlineData("BaseUrl")]
-    [InlineData("ClientId")]
-    [InlineData("ApiKey")]
-    [InlineData("ChecksumKey")]
-    public void The_PayOS_provider_without_one_of_its_settings_stops_the_start_and_the_message_names_only_that_setting(string name)
-    {
-        var settings = PayOsSettings();
-        settings[$"ControlPlane:PayOs:{name}"] = string.Empty;
-        using var factory = ControlPlaneFactory.Create(settings: settings);
-
-        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
-
-        Assert.Contains($"ControlPlane:PayOs:{name}", exception.Message, StringComparison.Ordinal);
-        foreach (var (setting, value) in PayOsSettings().Where(pair => pair.Key != "ControlPlane:PayOs:Provider"))
-        {
-            Assert.DoesNotContain(value!, exception.Message, StringComparison.Ordinal);
-            if (!setting.EndsWith($":{name}", StringComparison.Ordinal))
-            {
-                Assert.DoesNotContain(setting, exception.Message, StringComparison.Ordinal);
-            }
-        }
-    }
-
-    [Fact]
-    public void A_PayOS_base_URL_that_is_not_https_stops_the_start()
-    {
-        var settings = PayOsSettings();
-        settings["ControlPlane:PayOs:BaseUrl"] = "http://api-merchant.payos.test";
-        using var factory = ControlPlaneFactory.Create(settings: settings);
-
-        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
-
-        Assert.Contains("ControlPlane:PayOs:BaseUrl", exception.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("api-merchant.payos.test", exception.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void The_PayOS_provider_with_all_its_settings_registers_the_real_adapter_and_the_payment_link_job()
-    {
-        using var factory = ControlPlaneFactory.Create(settings: PayOsSettings());
-
-        using var client = factory.CreateClient();
-
-        Assert.IsType<PayOsClient>(factory.Services.GetRequiredService<IPayOs>());
-        Assert.Null(factory.Services.GetService<FakePayOs>());
-        Assert.Contains(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks" && job.Interval == TimeSpan.FromMinutes(5));
-        Assert.Contains(factory.Services.GetServices<IJobHandler>(), handler => handler.Kind == "createPaymentLinks");
-    }
-
-    [Fact]
-    public void Without_a_PayOS_provider_no_adapter_and_no_payment_link_job_are_registered()
-    {
-        using var factory = ControlPlaneFactory.Create();
-
-        using var client = factory.CreateClient();
-
-        Assert.Null(factory.Services.GetService<IPayOs>());
-        Assert.DoesNotContain(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks");
     }
 
     [Fact]
@@ -642,6 +529,50 @@ public sealed class ControlPlaneOptionsTests
 
         Assert.Contains("ControlPlane:Plans:0:IncludedUsers", exception.Message, StringComparison.Ordinal);
         Assert.Contains("version 1", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("12345678901", exception.Message, StringComparison.Ordinal);
+    }
+
+    // A plan has no price, see docs/reference/plans.md#the-catalogue. Any setting that a plan does not have stops the start, and Prices is the example.
+    [Fact]
+    public void A_catalogue_with_no_prices_starts_and_a_plan_that_sets_prices_stops_the_start_and_the_message_names_the_setting_and_not_the_value()
+    {
+        using (var valid = ControlPlaneFactory.Create(settings: ControlPlaneFactory.TrialPlanSettings()))
+        {
+            using var client = valid.CreateClient();
+
+            Assert.Single(valid.Services.GetRequiredService<ControlPlaneOptions>().Plans);
+        }
+
+        var settings = ControlPlaneFactory.TrialPlanSettings();
+        settings["ControlPlane:Plans:0:Prices:VND:month"] = "12345678901";
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Plans:0:Prices", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("12345678901", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_add_on_that_sets_prices_stops_the_start_and_the_message_names_the_setting_and_not_the_value()
+    {
+        var settings = ControlPlaneFactory.TrialPlanSettings();
+        settings["ControlPlane:Plans:0:Trial"] = "false";
+        settings["ControlPlane:Plans:0:AddOns:0:Code"] = "users-10";
+        settings["ControlPlane:Plans:0:AddOns:0:Users"] = "10";
+        using (var valid = ControlPlaneFactory.Create(settings: settings))
+        {
+            using var client = valid.CreateClient();
+
+            Assert.Single(valid.Services.GetRequiredService<ControlPlaneOptions>().Plans[0].AddOns);
+        }
+
+        settings["ControlPlane:Plans:0:AddOns:0:Prices:VND"] = "12345678901";
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Plans:0:AddOns:0:Prices", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("12345678901", exception.Message, StringComparison.Ordinal);
     }
 
@@ -772,6 +703,73 @@ public sealed class ControlPlaneOptionsTests
         using var client = factory.CreateClient();
 
         Assert.DoesNotContain(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "refreshDisposableDomains");
+    }
+
+    [Theory]
+    [InlineData("https://idp-4f9c.example/realms/billing", null, null, "Audience")]
+    [InlineData("https://idp-4f9c.example/realms/billing", "axis-control-plane", null, "ClientId")]
+    [InlineData(null, "axis-control-plane", "billing-client-4f9c", "Authority")]
+    [InlineData("http://idp-4f9c.example/realms/billing", "axis-control-plane", "billing-client-4f9c", "Authority")]
+    [InlineData("not a url 4f9c", "axis-control-plane", "billing-client-4f9c", "Authority")]
+    public void A_billing_client_that_is_half_set_or_has_an_authority_that_is_not_https_stops_the_start_and_the_message_holds_no_value(
+        string? authority,
+        string? audience,
+        string? clientId,
+        string refused)
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:Billing:Authority"] = authority,
+            ["ControlPlane:Billing:Audience"] = audience,
+            ["ControlPlane:Billing:ClientId"] = clientId,
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains($"ControlPlane:Billing:{refused}", exception.Message, StringComparison.Ordinal);
+        foreach (var value in new[] { authority, audience, clientId }.OfType<string>())
+        {
+            Assert.DoesNotContain(value, exception.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void A_billing_client_with_an_https_authority_an_audience_and_a_client_id_loads()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:Billing:Authority"] = "https://idp.example/realms/billing",
+            ["ControlPlane:Billing:Audience"] = "axis-control-plane",
+            ["ControlPlane:Billing:ClientId"] = "billing-client",
+        });
+
+        using var client = factory.CreateClient();
+
+        Assert.True(factory.Services.GetRequiredService<ControlPlaneOptions>().Billing.IsComplete);
+    }
+
+    [Fact]
+    public async Task Without_the_billing_settings_every_billing_route_answers_401_with_a_bearer_challenge()
+    {
+        using var factory = ControlPlaneFactory.Create();
+        using var client = factory.CreateClient();
+
+        var response = await client.PutAsync(
+            "/api/billing/v1/tenants/acme/subscription/paid-through",
+            new StringContent("""{"paidThrough":"2027-01-31"}""", System.Text.Encoding.UTF8, "application/json"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("Bearer", Assert.Single(response.Headers.WwwAuthenticate).Scheme);
+
+        var end = await client.PostAsync("/api/billing/v1/tenants/acme/subscription/end", null, TestContext.Current.CancellationToken);
+        var read = await client.GetAsync("/api/billing/v1/tenants/acme/subscription", TestContext.Current.CancellationToken);
+
+        foreach (var refused in new[] { end, read })
+        {
+            Assert.Equal(System.Net.HttpStatusCode.Unauthorized, refused.StatusCode);
+            Assert.Equal("Bearer", Assert.Single(refused.Headers.WwwAuthenticate).Scheme);
+        }
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
+import { ContentInsetContext } from './contentInsetContext'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
 
@@ -45,14 +46,15 @@ interface ColumnGridCellProps extends HTMLAttributes<HTMLDivElement> {
 /**
  * A cell of a {@link ColumnGrid}. It spans all twelve columns at narrow width, below 992 px, see
  * docs/reference/frontend.md#narrow-width. The hook decides, not Ant Design's breakpoints, so the page designer can
- * force the stack.
+ * force the stack. A cell is a column inside the page, so what it holds reads an inset of 0, see
+ * docs/reference/shell.md#layout.
  */
 export function ColumnGridCell({ width, style, children, ...rest }: ColumnGridCellProps) {
   const narrow = useNarrowWidth()
   const span = narrow || width === undefined || width < 1 || width > 12 ? 12 : width
   return (
     <div {...rest} style={{ gridColumn: `span ${span}`, minWidth: 0, ...style }}>
-      {children}
+      <ContentInsetContext.Provider value={0}>{children}</ContentInsetContext.Provider>
     </div>
   )
 }

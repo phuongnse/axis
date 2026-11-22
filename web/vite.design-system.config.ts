@@ -1,6 +1,7 @@
 import { defineConfig, mergeConfig, normalizePath, type Plugin } from 'vite'
 import { fileURLToPath } from 'node:url'
 import config from './vite.config.ts'
+import { leaveOutSchemaValidators } from './schemaValidators.ts'
 
 const textsFolder = normalizePath(fileURLToPath(new URL('../src/Axis.Presentation/Texts', import.meta.url)))
 
@@ -61,9 +62,11 @@ function escapeScriptEndings(): Plugin {
 }
 
 // Under `vite`, the harness loads the previews from source so that React Fast Refresh swaps an edit in
-// place: the module below replaces the script tag of the built bundle. Only the harness is checked, since
-// Vite runs this transform on every HTML page it serves. A harness without that tag fails the page load, so
-// the dev server never serves a stale bundle unnoticed.
+// place: the module below replaces the script tag of the built bundle. The harness also loads the app's fonts,
+// web/src/fonts.css, so a preview shows its text as the app does. The built bundle carries no fonts, see
+// docs/development.md#widget-previews. Only the harness is checked, since Vite runs this transform on every HTML
+// page it serves. A harness without that tag fails the page load, so the dev server never serves a stale bundle
+// unnoticed.
 function serveBundleFromSource(): Plugin {
   const bundleTag = '<script src="../artifacts/design-system/axis-design-system.js"></script>'
   // Proposed, #3264: the harness also loads the app's fonts, as the bundle carries none, so a preview shows the text
@@ -124,6 +127,8 @@ export default defineConfig(({ command }) =>
     // development mode.
     define: command === 'build' ? { 'process.env.NODE_ENV': JSON.stringify('production') } : {},
     plugins: [
+      // No preview state needs the JSON view's schema problems, see docs/reference/widget-previews.md#the-bundle.
+      leaveOutSchemaValidators(),
       dropRouteModuleImport(),
       inlineStyleSheets(),
       escapeScriptEndings(),

@@ -39,8 +39,11 @@ keeps every part of them that still holds.
 - **Navigate actions.** A `navigate` action names a target page and gives each of its parameters an
   expression over the row or the record, which may follow a short reference path. It sits in a
   table's row and toolbar actions ([D59](d59-table-row-and-toolbar-actions.md)) and in a form's
-  actions. To a form page it may set `record` to open that record, or give a new record the first
-  values of its fields, such as the customer of the page it came from.
+  actions. To a form page it may set `record` to open that record.
+- **A new record starts with its parent's values.** _(planned for M42)_ A `navigate` action to a form
+  page without `record` may give a new record the first values of its fields, such as the customer of
+  the page it came from, as [resource files](../reference/resource-files.md#first-values-of-a-new-record)
+  set out.
 - **One format.** A table opens and creates records only through navigate actions.
 - **Checked when compiled.** The compiler checks each target page, parameter, field and value type,
   and indexes each target as a `navigate page` relation

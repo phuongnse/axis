@@ -3,12 +3,8 @@ using Npgsql;
 
 namespace Axis.ControlPlane.Subscriptions;
 
-/// <summary>The plan version that a subscription pinned, with the currency and period it bought. The currency and period are null when none is chosen.</summary>
-public sealed record PinnedPlan(PlanVersion Plan, string? Currency, string? Period)
-{
-    /// <summary>The price of the pinned period in the pinned currency, or null without a currency.</summary>
-    public long? Price => Currency is null || Period is null ? null : Plan.Price(Currency, Period);
-}
+/// <summary>The plan version that a subscription pinned.</summary>
+public sealed record PinnedPlan(PlanVersion Plan);
 
 /// <summary>
 /// Reads the plan that subscriptions pin. A subscription keeps the version it bought, whatever versions the settings list later, see
@@ -41,7 +37,7 @@ internal static class SubscriptionPlans
     public static async Task<PinnedPlan?> ReadAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, Guid subscriptionId, PlanCatalogue catalogue, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            "SELECT plan_code, plan_version, currency, period FROM control_plane.subscriptions WHERE id = $1",
+            "SELECT plan_code, plan_version FROM control_plane.subscriptions WHERE id = $1",
             connection,
             transaction);
         command.Parameters.AddWithValue(subscriptionId);
@@ -55,7 +51,7 @@ internal static class SubscriptionPlans
         var version = reader.GetInt32(1);
         var plan = catalogue.Find(code, version)
             ?? throw new InvalidOperationException($"The setting ControlPlane:Plans has no plan {code} version {version}, which the subscription pins.");
-        return new PinnedPlan(plan, reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3));
+        return new PinnedPlan(plan);
     }
 
     /// <summary>

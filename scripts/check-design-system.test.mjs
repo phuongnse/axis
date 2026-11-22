@@ -6,7 +6,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { cardGroups, cardName } from '../web/src/designSystem/cardOrder.ts'
-import { checkDesignSystemBundle } from './check-design-system.mjs'
+import { checkDesignSystemBundle, warnBytes } from './check-design-system.mjs'
 
 const script = fileURLToPath(new URL('./check-design-system.mjs', import.meta.url))
 const components = cardGroups.flatMap((group) => group.previews).map((preview) => ({ name: cardName(preview) }))
@@ -15,6 +15,13 @@ const header = headerLine({ format: 4, namespace: 'Axis', components })
 const valid = header + 'var Axis = (function () { return { table: function () {} } })()\n'
 
 let root
+
+/** A valid bundle of exactly `bytes` bytes. */
+function nearCap(bytes) {
+  const start = `${header}var Axis = '`
+  const end = "'\n"
+  return start + 'a'.repeat(bytes - Buffer.byteLength(start) - Buffer.byteLength(end)) + end
+}
 
 function write(file, content) {
   writeFileSync(path.join(root, file), content)
@@ -177,13 +184,59 @@ describe('checkDesignSystemBundle', () => {
     assert.deepEqual(problems, ['axis-design-system.js has a literal <!--.'])
   })
 
-  test('fails a script over 6 MB', () => {
-    write('axis-design-system.js', header + `var Axis = '${'a'.repeat(6 * 1024 * 1024)}'\n`)
+  test('fails a @font-face rule', () => {
+    write('axis-design-system.js', valid + "var css = '@font-face{font-family:x}'\n")
 
     const { problems } = checkDesignSystemBundle(root)
 
     assert.equal(problems.length, 1)
+    assert.match(problems[0], /holds a font/)
+  })
+
+  test('fails a data:font/ URL', () => {
+    write('axis-design-system.js', valid + "var url = 'data:font/woff2;base64,AA'\n")
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /holds a font/)
+  })
+
+  test('passes library code that names @font-face without a rule', () => {
+    write('axis-design-system.js', valid + 'var fontRules = rules.filter((rule) => rule.cssText.startsWith(`@font-face`))\n')
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.deepEqual(problems, [])
+  })
+
+  test('fails a script over 6 MB', () => {
+    write('axis-design-system.js', header + `var Axis = '${'a'.repeat(6 * 1024 * 1024)}'\n`)
+
+    const { problems, warnings } = checkDesignSystemBundle(root)
+
+    assert.equal(problems.length, 1)
     assert.match(problems[0], /over the 6\.00 MB cap/)
+    assert.deepEqual(warnings, [])
+  })
+
+  test('warns about a script within 256 KB of the cap', () => {
+    write('axis-design-system.js', nearCap(warnBytes + 1))
+
+    const { problems, warnings } = checkDesignSystemBundle(root)
+
+    assert.deepEqual(problems, [])
+    assert.equal(warnings.length, 1)
+    assert.match(warnings[0], /within 256 KB of the 6\.00 MB cap/)
+  })
+
+  test('does not warn about a script below the margin', () => {
+    write('axis-design-system.js', nearCap(warnBytes - 1))
+
+    const { problems, warnings } = checkDesignSystemBundle(root)
+
+    assert.deepEqual(problems, [])
+    assert.deepEqual(warnings, [])
   })
 })
 
@@ -206,5 +259,14 @@ describe('check-design-system.mjs', () => {
 
     assert.equal(result.status, 1)
     assert.match(result.stderr, /literal <!--/)
+  })
+
+  test('prints the warning and exits 0 for a script within 256 KB of the cap', () => {
+    write('axis-design-system.js', nearCap(warnBytes + 1))
+
+    const result = run(root)
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stderr, /^Warning: .*within 256 KB/m)
   })
 })

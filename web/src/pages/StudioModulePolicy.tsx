@@ -1,8 +1,9 @@
-import { Checkbox, Descriptions, Flex, Tag, Typography } from 'antd'
+import { Checkbox, Descriptions, Flex, Typography } from 'antd'
 import { useContext } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { fillText } from '../platform/fillText'
+import { StatusTag } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
 import { PlatformContext } from './context'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
@@ -104,10 +105,9 @@ export function StudioModulePolicy({
                     }
                   />
                   {unaccepted.map((action) => (
-                    // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-                    <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
+                    <StatusTag key={action} tone="attention">
                       {fillText(t('shell.studio.matrix.unacceptedAction'), { action })}
-                    </Tag>
+                    </StatusTag>
                   ))}
                 </Flex>
               </AxisFieldGroup>
@@ -120,7 +120,11 @@ export function StudioModulePolicy({
                 {fields.length === 0 ? (
                   <Typography.Text type="secondary">{t('shell.studio.matrix.allFields')}</Typography.Text>
                 ) : (
-                  fields.map((field) => <Tag key={field}>{field}</Tag>)
+                  fields.map((field) => (
+                    <StatusTag key={field} tone="neutral">
+                      {field}
+                    </StatusTag>
+                  ))
                 )}
               </Flex>
             </Flex>

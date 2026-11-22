@@ -420,8 +420,8 @@ public sealed class SubscriptionQuotaTests : IAsyncLifetime
             VALUES ('{signUp}', 'An', '{tenant}@example.com', '{tenant}@example.com', 'Acme', '{tenant}', 'en', '', 'verified', now())
             """);
         await Execute($"""
-            INSERT INTO control_plane.subscriptions (id, tenant_id, sign_up_id, state, trial_ends_at, step_id{(pinned ? ", plan_code, plan_version, currency, period" : "")})
-            VALUES ('{id}', '{tenant}', '{signUp}', '{state}', now(), '{Guid.CreateVersion7()}'{(pinned ? ", 'team', 1, 'VND', 'month'" : "")})
+            INSERT INTO control_plane.subscriptions (id, tenant_id, sign_up_id, state, trial_ends_at, step_id{(pinned ? ", plan_code, plan_version" : "")})
+            VALUES ('{id}', '{tenant}', '{signUp}', '{state}', now(), '{Guid.CreateVersion7()}'{(pinned ? ", 'team', 1" : "")})
             """);
         return id;
     }
@@ -443,8 +443,7 @@ public sealed class SubscriptionQuotaTests : IAsyncLifetime
           "name": { "en": "Team", "vi": "Nhóm" },
           "includedUsers": {{includedUsers}},
           {{Quotas.Replace("{{storage}}", storage.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal).Replace("{{applications}}", applications.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)}},
-          "prices": [{ "currency": "VND", "month": 4900000 }, { "currency": "USD", "month": 1900 }],
-          "addOns": [{ "code": "users-10", "users": 10, "prices": [{ "currency": "VND", "month": 500000 }, { "currency": "USD", "month": 20 }] }]
+          "addOns": [{ "code": "users-10", "users": 10 }]
         }
         """;
 

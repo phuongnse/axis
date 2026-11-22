@@ -1,5 +1,6 @@
 import { type BoundFunctions, type ByRoleMatcher, type queries, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -9,7 +10,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { optionTexts } from '../test/antd'
+import { emptyDescription, optionTexts, shownMenu } from '../test/antd'
 import { IdentityProviderEditor } from './IdentityProviderEditor'
 
 const names = {
@@ -48,19 +49,29 @@ function renderEditor(
   value: Record<string, unknown> = oidc,
   onChange = vi.fn(),
   loaded: StudioNames | undefined = names,
+  readOnly = false,
 ) {
   render(
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={loaded}>
-            <IdentityProviderEditor value={value} onChange={onChange} />
+            <ConfigProvider componentDisabled={readOnly}>
+              <IdentityProviderEditor value={value} onChange={onChange} />
+            </ConfigProvider>
           </StudioNamesContext.Provider>
         </TextProvider>
       </ThemeRoot>
     </ThemeModeProvider>,
   )
   return onChange
+}
+
+/** Deletes a row or an item through the "…" menu of its scope. */
+async function deleteFrom(scope: HTMLElement) {
+  await userEvent.click(within(scope).getByRole('button', { name: 'Actions' }))
+  await shownMenu('Actions')
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
 }
 
 /** The label and the help of an identity provider field's text, in English. */
@@ -282,21 +293,21 @@ describe('IdentityProviderEditor', () => {
       value3: '',
     })
 
-    await userEvent.click(within(screen.getByTestId('studio-role-row-0')).getByRole('button', { name: 'Delete' }))
+    await deleteFrom(screen.getByTestId('studio-role-row-0'))
     expect(onChange).toHaveBeenLastCalledWith('/roles/values', { finance: 'finance-reviewer' })
   })
 
   it('removes values, and roles when nothing else is left, with the last role row', async () => {
     const onChange = renderEditor({ ...oidc, roles: { claim: 'groups', values: { managers: 'department-manager' } } })
 
-    await userEvent.click(within(screen.getByTestId('studio-role-row-0')).getByRole('button', { name: 'Delete' }))
+    await deleteFrom(screen.getByTestId('studio-role-row-0'))
     expect(onChange).toHaveBeenLastCalledWith('/roles/values', undefined)
   })
 
   it('removes roles with the last role row when it holds nothing else', async () => {
     const onChange = renderEditor({ ...oidc, roles: { values: { managers: 'department-manager' } }, acr: undefined })
 
-    await userEvent.click(within(screen.getByTestId('studio-role-row-0')).getByRole('button', { name: 'Delete' }))
+    await deleteFrom(screen.getByTestId('studio-role-row-0'))
 
     expect(onChange).toHaveBeenLastCalledWith('/roles', undefined)
   })
@@ -304,7 +315,15 @@ describe('IdentityProviderEditor', () => {
   it('says that a claim value gives the role of the same name when there are no rows', () => {
     renderEditor({ ...oidc, roles: undefined })
 
-    expect(screen.getByTestId('studio-identity-provider-same-name')).toBeVisible()
+    expect(emptyDescription(platformEnglish['shell.studio.identityProvider.sameNameHint'])).toBeVisible()
+  })
+
+  it('says in one line that sign-ins are not checked for an assurance level when there are none', () => {
+    renderEditor({ ...oidc, acr: undefined })
+
+    expect(
+      emptyDescription(platformEnglish['shell.studio.identityProvider.noAcr'], screen.getByTestId('studio-field-/acr')),
+    ).toBeVisible()
   })
 
   it('removes a claim key when its box is cleared, and claims with the last key', async () => {
@@ -329,8 +348,22 @@ describe('IdentityProviderEditor', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add assurance level' }))
     expect(onChange).toHaveBeenLastCalledWith('/acr', ['urn:level2', ''])
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/acr/0')).getByRole('button', { name: 'Delete' }))
+    await deleteFrom(screen.getByTestId('studio-field-/acr/0'))
     expect(onChange).toHaveBeenLastCalledWith('/acr', undefined)
+  })
+
+  it('shows no Add and no "…" menu on a claim value or an assurance level while read-only', () => {
+    renderEditor(
+      { ...oidc, roles: { claim: 'groups', values: { managers: 'department-manager' } } },
+      vi.fn(),
+      names,
+      true,
+    )
+
+    expect(screen.getByTestId('studio-role-row-0')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Add claim value' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add assurance level' })).toBeNull()
+    expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
   })
 
   it('writes only the pointer it edits, so a key it does not show is passed through', async () => {

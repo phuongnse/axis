@@ -1,23 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { Route, Routes } from 'react-router'
-import { AccountPage } from './pages/AccountPage'
-import { CellConsoleRoute } from './pages/CellConsoleRoute'
-import { CellJobsPage } from './pages/CellJobsPage'
-import { CellPage } from './pages/CellPage'
-import { CellTenantPage } from './pages/CellTenantPage'
-import { CellTenantsPage } from './pages/CellTenantsPage'
-import { ConsoleInstancePage } from './pages/ConsoleInstancePage'
-import { ConsolePage } from './pages/ConsolePage'
-import { HomePage } from './pages/HomePage'
-import { LicencesPage } from './pages/LicencesPage'
+import { useEffect, useMemo, useState } from 'react'
 import { ShellError } from './pages/LocaleLoadFailed'
-import { NotFoundPage } from './pages/NotFoundPage'
-import { PageRoute, RecordPageRoute } from './pages/PageRoute'
-import { PlatformContext, usePlatform, type Platform, type PlatformTexts } from './pages/context'
-import { PlatformShellRoute } from './pages/PlatformShellRoute'
-import { SiteIndex, SiteRoute } from './pages/SiteRoute'
-import { UserPage } from './pages/UserPage'
-import { UsersPage } from './pages/UsersPage'
+import { PlatformContext, type Platform, type PlatformTexts } from './pages/context'
+import { PlatformRoutes } from './pages/PlatformRoutes'
 import { readStoredLocale } from './platform/locale'
 import { SignInPrompt } from './platform/SignInPrompt'
 import { TextProvider } from './platform/TextProvider'
@@ -25,12 +9,6 @@ import { fetchSite, type SiteMetadata } from './platform/site'
 import { setHostSite } from './platform/siteLinks'
 import { fetchTexts, type TextMap } from './platform/texts'
 import { LeaveWithoutSaving, UnsavedChangesGuard } from './platform/UnsavedChangesGuard'
-
-/**
- * Studio is for authors only, so it loads in a chunk of its own, and the main bundle stays within the budget of
- * docs/development.md#bundle-budget.
- */
-const LazyStudioPage = lazy(() => import('./pages/StudioPage').then((module) => ({ default: module.StudioPage })))
 
 interface LoadedPlatform {
   site: SiteMetadata
@@ -95,140 +73,5 @@ export function PlatformRoot({ development }: { development: boolean }) {
         </TextProvider>
       </UnsavedChangesGuard>
     </PlatformContext.Provider>
-  )
-}
-
-/**
- * The routes of the platform. On the host of a site the SPA serves that site at `/` and its pages at `/{page}`, and
- * nothing else, as the server serves nothing else there. Elsewhere it serves the platform's own routes and every site
- * under `/{site}`. On the cell console's host it serves the console's pages: Cell at `/`, Jobs at `/jobs`, Tenants at
- * `/tenants` and one tenant at `/tenants/{id}`.
- */
-function PlatformRoutes() {
-  const { hostSite, cellConsole } = usePlatform().site
-  if (cellConsole) {
-    return (
-      <Routes>
-        <Route element={<CellConsoleRoute />}>
-          <Route index element={<CellPage />} />
-          <Route path="jobs" element={<CellJobsPage />} />
-          <Route path="tenants" element={<CellTenantsPage />} />
-          <Route path="tenants/:id" element={<CellTenantPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
-    )
-  }
-  if (hostSite) {
-    return (
-      <Routes>
-        <Route element={<SiteRoute path={hostSite} />}>
-          <Route index element={<SiteIndex />} />
-          <Route path="records/:entity/:id" element={<RecordPageRoute />} />
-          <Route path="records/:module/:entity/:id" element={<RecordPageRoute />} />
-          <Route path=":page" element={<PageRoute />} />
-          <Route path=":page/new" element={<PageRoute form="new" />} />
-          <Route path=":page/:id" element={<PageRoute form="edit" />} />
-          <Route path=":module/:page/new" element={<PageRoute form="new" />} />
-          <Route path=":module/:page/:id" element={<PageRoute form="edit" />} />
-        </Route>
-        <Route
-          path="*"
-          element={
-            <PlatformShellRoute>
-              <NotFoundPage />
-            </PlatformShellRoute>
-          }
-        />
-      </Routes>
-    )
-  }
-  return (
-    <Routes>
-      <Route
-        index
-        element={
-          <PlatformShellRoute>
-            <HomePage />
-          </PlatformShellRoute>
-        }
-      />
-      <Route
-        path="studio"
-        element={
-          <PlatformShellRoute>
-            <Suspense fallback={null}>
-              <LazyStudioPage />
-            </Suspense>
-          </PlatformShellRoute>
-        }
-      />
-      <Route
-        path="account"
-        element={
-          <PlatformShellRoute>
-            <AccountPage />
-          </PlatformShellRoute>
-        }
-      />
-      <Route
-        path="users"
-        element={
-          <PlatformShellRoute>
-            <UsersPage />
-          </PlatformShellRoute>
-        }
-      />
-      <Route
-        path="users/:id"
-        element={
-          <PlatformShellRoute>
-            <UserPage />
-          </PlatformShellRoute>
-        }
-      />
-      <Route
-        path="licences"
-        element={
-          <PlatformShellRoute>
-            <LicencesPage />
-          </PlatformShellRoute>
-        }
-      />
-      <Route
-        path="console"
-        element={
-          <PlatformShellRoute>
-            <ConsolePage />
-          </PlatformShellRoute>
-        }
-      />
-      <Route
-        path="console/instances/:id"
-        element={
-          <PlatformShellRoute>
-            <ConsoleInstancePage />
-          </PlatformShellRoute>
-        }
-      />
-      <Route path=":site" element={<SiteRoute />}>
-        <Route index element={<SiteIndex />} />
-        <Route path="records/:entity/:id" element={<RecordPageRoute />} />
-        <Route path="records/:module/:entity/:id" element={<RecordPageRoute />} />
-        <Route path=":page" element={<PageRoute />} />
-        <Route path=":page/new" element={<PageRoute form="new" />} />
-        <Route path=":page/:id" element={<PageRoute form="edit" />} />
-        <Route path=":module/:page/new" element={<PageRoute form="new" />} />
-        <Route path=":module/:page/:id" element={<PageRoute form="edit" />} />
-      </Route>
-      <Route
-        path="*"
-        element={
-          <PlatformShellRoute>
-            <NotFoundPage />
-          </PlatformShellRoute>
-        }
-      />
-    </Routes>
   )
 }

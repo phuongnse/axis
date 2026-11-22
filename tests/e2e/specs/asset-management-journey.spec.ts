@@ -28,6 +28,8 @@ import {
   openKind,
   openListItem,
   openTab,
+  processStepAction,
+  widgetRowAction,
   writeLabel,
 } from '../studio-resources'
 
@@ -309,7 +311,11 @@ test.describe('the author builds the asset management application with Studio on
       if (list.aggregate.groupBy.length === 0) {
         // The form has no empty array to start from, so the author adds an entry and removes it to write `[]`.
         await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
-        await groupBy.getByRole('button', { name: 'Remove', exact: true }).click()
+        await groupBy.getByRole('button', { name: 'Actions', exact: true }).click()
+        await page
+          .getByRole('menu', { name: 'Actions', exact: true })
+          .getByRole('menuitem', { name: 'Remove', exact: true })
+          .click()
       }
       for (const [index, measure] of list.aggregate.measures.entries()) {
         const at = `studio-field-/aggregate/measures/${index}`
@@ -843,10 +849,7 @@ test.describe('the author builds the asset management application with Studio on
     await dragTo(page, 'studio-page-design', panel.getByTestId('studio-data-entity-Asset'), starter, 0.75)
     await chooseBinding(page, 'detail')
     await expect(frame(page, '/widgets/1')).toBeVisible()
-    await panel
-      .getByTestId('studio-widget-row-/widgets/0')
-      .getByRole('button', { name: 'Delete', exact: true })
-      .click()
+    await widgetRowAction(panel, '/widgets/0', 'Delete')
     await expect(panel.getByTestId('studio-widget-/widgets/1')).toHaveCount(0)
     await save(page)
   })
@@ -875,10 +878,7 @@ test.describe('the author builds the asset management application with Studio on
     await expect(frame(page, '/widgets/1')).toBeVisible()
     await dragOnto('studio-palette-columns', frame(page, '/widgets/0'), 0.25)
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toBeVisible()
-    await panel
-      .getByTestId('studio-widget-row-/widgets/1')
-      .getByRole('button', { name: 'Delete', exact: true })
-      .click()
+    await widgetRowAction(panel, '/widgets/1', 'Delete')
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toHaveCount(0)
     await panel.getByTestId('studio-widget-/widgets/0').click()
     await panel.getByTestId('studio-field-/widgets/0/columns/0/width').getByRole('spinbutton').fill('4')
@@ -1101,7 +1101,7 @@ test.describe('the author builds the asset management application with Studio on
     // The subject of a new process is an entity, so only the entity is picked.
     await pick(page, 'studio-field-/entity', 'Asset')
     await writeLabel(page, 'studio-field-/title', text('processes.warrantyReminder.title'))
-    await stepCard(0).getByRole('button', { name: 'Delete', exact: true }).click()
+    await processStepAction(page, 0, 'Delete')
     for (const [index, [stepName, type]] of [
       ['remind', 'operation'],
       ['done', 'end'],

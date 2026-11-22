@@ -71,9 +71,11 @@ edits the same draft on a canvas.
 
 A `kpi` panel has a data source picker, a measure picker and a [label](studio-resource-form.md#labels).
 Add comparison adds a comparison with its own measure picker and label, and Add navigate action adds a
-[navigate action](#navigate-actions), each with Remove. A `chart` panel has a data source picker, a
-kind picker over `bar`, `line` and `pie`, a category picker, a title, and a list of measures, each with
-a picker and a label, with Add measure and Remove measure, which is off when one measure is left.
+[navigate action](#navigate-actions). Each of the two adds is a grey button, and each Remove comparison and
+Remove navigate action is a red button. A `chart` panel has a data source picker, a kind picker over `bar`,
+`line` and `pie`, a category picker, a title, and a list of measures, each with a picker and a label. Add
+measure is a light text button on the Measures title row, and each measure's Remove measure is in its "…"
+menu, which is off when one measure is left.
 Every field and group of both panels shows its label and help. A chart's title and a section's title
 share one text, Title, with one help.
 
@@ -100,9 +102,12 @@ expression and parameter expressions. The page picker, label, record and paramet
 label and help. The page picker lists every page, the current one included, because a page may open
 itself with other parameters.
 
-- **Adding one.** A table offers only Add navigate action, and a form also Add action for
-  `startProcess`. A new action is named `<action type><n>`, such as `navigate1`, with the first free
-  `n` in its list. A KPI's `navigate` has no name, because the schema refuses one.
+- **Adding one.** The Adds of an action list are one group of light text buttons on the list's title
+  row. A table's row actions offer Add navigate action and Add delete action, its toolbar actions offer
+  only Add navigate action, and a form or a detail also offers Add action for `startProcess`. Each
+  action is a row with no box, and its Remove action is in the row's "…" menu. A new action is named
+  `<action type><n>`, such as `navigate1`, with the first free `n` in its list. A KPI's `navigate` has no
+  name, because the schema refuses one.
 - **Record.** An empty Record box removes the `record` key.
 - **Parameters.** When the names list the target page, the action shows an expression box for each
   parameter the page declares, with the parameter's type and whether it is required. An empty box
@@ -114,14 +119,17 @@ itself with other parameters.
 
 ### Page parameters
 
-The Parameters section sits between General and Widgets. Its Add parameter button sits on the right of the
-heading, and a page with no parameters says so in one line. Each parameter has a name, a type picker over
-`text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `reference`, a Required switch
-and Remove. The name, type and Required switch sit one to a row. Add parameter appends a `text` parameter
+The Parameters section sits between General and Widgets. Its Add parameter is a light text button on the
+right of the heading, and a page with no parameters says so in one line. Each parameter is a row with no
+box. It has a name, a type picker over `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum`
+and `reference`, and a Required switch. The name, type and Required switch sit one to a row, each as wide as
+the field it fills. Remove parameter is an entry of the row's "…" menu at its top right, the same menu as a
+table's [row actions](actions-and-controls.md#tables). Add parameter appends a `text` parameter
 with an empty name. A `reference` parameter also has a target entity picker, and an `enum` parameter its
 values. A type change removes the `target` or the `values` that the new type does not take, and switching Required off removes the `required` key.
 The names answer lists each page's parameters, which is how a navigate action knows them. A
-`parameters` that is not a list points to the JSON view.
+`parameters` that is not a list points to the JSON view, and a parameter that is not an object shows that
+line with no menu.
 
 ### Widget tree
 
@@ -133,8 +141,11 @@ body as nested lists, and a row opens its widget's panel at its own pointer, suc
   `<type><n>`, such as `table1`, with the first `n` free on the page at any depth, ignoring letter case.
   A new `columns` starts with the columns `column1` and `column2` of width 6, a new `tabs` with `tab1`,
   and a new `section` empty.
-- **Moving.** Every row has Move up, Move down and Remove, which replace only the list that holds the
-  widget, and a Move to picker. Move to lists every other widget list as a path, such as
+- **Moving.** Every row has a Move to picker and a "…" menu at its end, with Move up, Move down and
+  Delete. The menu's actions replace only the list that holds the widget, Move up is off on the list's first
+  row and Move down on its last, and Delete is destructive. The row's button that selects the widget is
+  outlined in the primary colour while the widget is selected, with `aria-current`, and grey otherwise.
+  Move to lists every other widget list as a path, such as
   `Page › columns 1 › Column 2`, leaves out the widget's own list and the lists inside it, and replaces
   the page's `widgets` in one change. A type change or a move keeps the widget's name.
 - **Fixed containers.** A container's type is fixed. The compiler reports the depth limit and an empty
@@ -148,11 +159,12 @@ tab or a section, stays in the saved file. A container whose parts are malformed
 that is not a list, points to the JSON view.
 
 - **Columns.** A `columns` panel shows a width box from 1 to 12 for each column, and the compiler
-  reports widths that do not add up to 12 after the save. Add column adds a column that takes what is
-  left of 12, or 1 when nothing is left, and keeps the other widths. Remove column drops a column with
-  its widgets.
-- **Tabs.** A `tabs` panel shows each tab's [label](studio-resource-form.md#labels), with Add tab
-  and Remove tab.
+  reports widths that do not add up to 12 after the save. Each column is a row with no box. Add column
+  is a light text button on the Columns title row, and it adds a column that takes what is left of 12,
+  or 1 when nothing is left, and keeps the other widths. Remove column is in the column's "…" menu and
+  drops a column with its widgets.
+- **Tabs.** A `tabs` panel shows each tab's [label](studio-resource-form.md#labels) as a row with no
+  box. Add tab is a light text button on the Tabs title row, and Remove tab is in the tab's "…" menu.
 - **Names.** An added column or tab is named with the first free `column<n>` or `tab<n>` among its
   siblings, ignoring letter case.
 - **Section.** A `section` panel shows the title as a tab's label shows, and a Collapsed switch.
@@ -201,8 +213,8 @@ panel, its undo and its drag and drop.
   placeholder data or a form action on an unsaved record. A click, Enter or Space on the button selects
   the action, by its JSON Pointer, such as `/widgets/0/rowActions/1`, or `/widgets/0/navigate` for a
   KPI, and not its widget. The button has `aria-current` and an outline in the primary colour, the
-  widget tree keeps its widget selected, and the panel shows the widget's panel with the action's card
-  marked by `aria-current` and scrolled into view. Adding a navigate, `startProcess` or `delete` action
+  widget tree keeps its widget selected, and the panel shows the widget's panel with the action's row
+  marked by `aria-current`, outlined in the primary colour and scrolled into view. Adding a navigate, `startProcess` or `delete` action
   in the panel selects the new action, and removing an action selects its widget. The button runs
   nothing: it does not navigate, start a process, open a delete confirmation or call `/api/apps/`.
 - **Actions that fold.** A KPI's navigate action is a link-style button on the label line, and the
@@ -279,17 +291,23 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 
 - **The process.** The Form tab has the General, Subject and Steps [sections](studio-resource-form.md#sections),
   and each field has a [field text](studio-resource-form.md#fields).
+- **Lists.** The lists of a process's parameters, a decision's branches, a task's outcomes and escalations, and an
+  operation's rows have Add on their title row as a light text button. Each row's actions, and each step card's, are
+  entries of its "…" menu, the table's [row actions](actions-and-controls.md#tables). A task's deadline and a wait
+  for event's timeout have Add or Remove on their group's title row, also as a light text button. A read-only tab,
+  such as while the JSON has an error, shows no Add, no Remove and no menu.
 - **Subject.** A choice between Entity, which shows the entity picker, and Parameters, which shows rows
-  of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, with Add
-  and Remove. Switching replaces the draft in one change, so one undo brings it back: the other key is
-  removed, and the new key, empty, takes its place in the file. See
+  of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, as the
+  [Lists](#process-editor) bullet says. Switching replaces the draft in one change, so one undo brings it back: the
+  other key is removed, and the new key, empty, takes its place in the file. See
   [processes without a subject](process-flow.md#processes-without-a-subject).
-- **Steps.** The steps show as cards in file order, each with the step's name and type, Move up, Move
-  down and Remove. Add step appends a step of the chosen type, with an empty name. A type change works
-  as the [step panel](process-designer.md#step-panel) says.
+- **Steps.** The steps show as cards in file order, each with the step's name and type. Each card has a "…"
+  menu with Move up, off on the first step, Move down, off on the last, and Delete, as the
+  [Lists](#process-editor) bullet says. Add step appends a step of the chosen type, with an empty name. A type change
+  works as the [step panel](process-designer.md#step-panel) says.
 - **Decision and end.** A decision shows its branches, each with a `when` expression and a target, and
-  its `otherwise`. A branch can be added and removed, and a new one is named `branch1`, `branch2` and so
-  on. An end step shows only its name and type.
+  its `otherwise`. A branch is added and removed as the [Lists](#process-editor) bullet says, and a new one is
+  named `branch1`, `branch2` and so on. An end step shows only its name and type.
 - **Transitions.** The start step, `next`, a branch's `next`, `otherwise` and an outcome's `next` pick
   their target from the step names of the unsaved draft. A target that is not a step stays visible and
   is tagged unknown. Removing a step does not rewrite the transitions that name it, so the compiler
@@ -297,13 +315,17 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 - **Task.** A task shows its label and its form as pickers over the application's text keys and forms.
   The assignee has a User and Role switch: User shows the expression editor and Role a role picker, and
   a switch removes the other key, so the step never holds both. `dueIn` is a text box, and clearing it
-  removes the key. The outcomes are rows of name, label and target step, with add and remove. A key the
-  card does not show stays as it is. A diagnostic path inside a task's label, assignee, form, `dueIn` or
-  outcomes opens the Form tab at that field.
+  removes the key. The outcomes are rows of name, label and target step, added and removed as the
+  [Lists](#process-editor) bullet says. A key the card does not show stays as it is. A diagnostic path inside a
+  task's label, assignee, form, `dueIn` or outcomes opens the Form tab at that field.
 - **Operation.** An `operation` step shows an operation choice, `updateRecord`, `callConnector`,
   `raiseEvent`, `createRecord`, `notify` or Package operation, above its transition. Changing the
   operation removes only the keys the new one forbids and adds no empty key, so the compiler reports
   what is still missing, and every other key, unknown keys included, stays.
+  - **Rows.** Each list of rows, `set`, `input` and its nested `fields`, `output`, an event's `fields`, a
+    notification's `values` and a page's parameters, has Add row on its title row, or the add choice of the
+    unmapped keys where the keys are known. Its rows' menus and a read-only tab follow the
+    [Lists](#process-editor) bullet.
   - `updateRecord` shows `set` as rows of a field of the process's entity and an expression.
   - `callConnector` shows the connector and its operation as pickers, its
     [`input`](process-designer.md#connector-input), `output` as rows of a typed connector output name
@@ -340,8 +362,12 @@ Operations heading, and the JSON view stays as the second view of the same draft
   Audience boxes that remove their key when empty, see [OAuth2 auth](integration-resources.md#oauth2-auth).
 - **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from
   the connector's other operations. Its input and output fields are rows of name, type and required,
-  one field to a line, and the schema's required keys carry the shared required mark. Operations and rows
-  can be added and deleted. A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
+  one field to a line, and the schema's required keys carry the shared required mark. Add operation sits
+  on the Operations heading. Each input, output and nested field list has its Add on its title row, as a
+  light text button. Each operation's Delete operation is in its "…" menu at its top right, and each row's
+  Delete is in its "…" menu, which also removes the fields nested in the row. A read-only tab, such as while the JSON has
+  an error, shows no Add and no menu, as the Lists bullet of the [process editor](#process-editor) says.
+  A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
 - **Placement and nesting.** A scalar input has a Sent in choice of `body`, `path`, `query` or
   `header`, which shows `body` when the file has no `in` key and removes the key when `body` is chosen.
   `object` and `list` inputs show nested field rows instead, down to four levels with the input as
@@ -372,28 +398,36 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim
-  value and a role picked from the application's roles, one field to a line, with Add claim value and Delete. With no rows, a claim
-  value gives the role of the same name, and the editor says so.
-- **Assurance.** `acr` is a list of text rows, each with Delete below, and with none the key is removed.
+  value and a role picked from the application's roles, one field to a line. Add claim value sits on the
+  title row, and each row's Delete is in its "…" menu. With no rows, a claim value gives the role of the
+  same name, and the editor says so.
+- **Assurance.** `acr` is a list of text rows. Add assurance level sits on the Assurance heading, and each
+  row's Delete is in its "…" menu. With none the key is removed. A read-only tab, such as while the JSON
+  has an error, shows no Add and no menu, as the Lists bullet of the [process editor](#process-editor) says.
 - **Unknown keys.** A key the editor does not show is saved unchanged.
 
 ### A site's sign-in
 
 On a `site`, `signIn` is a list of the application's identity providers, picked by name, with add and
-remove. An empty list removes `signIn`, so the site allows every provider, and the form says so.
+remove. Add provider sits on the heading, and each row's Remove is in its "…" menu. A read-only tab shows
+neither. An empty list removes `signIn`, so the site allows every provider, and the form says so.
 
 ## Scenario editor
 
 The scenario editor's Form tab has four sections: General, with the scenario's name, its [description](studio.md#editor)
 and `now`; Users, with their roles; Stubs; and Steps, a list with a panel for each step type. Add user,
-Add stub and Add step sit on their section's heading. The JSON view stays as the second view of the same
-draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
+Add stub and Add step sit on their section's heading, and a read-only tab shows none of them. The JSON view
+stays as the second view of the same draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
 
 - **Field names.** Every field, stub and step property shows a label and help text in the app's
   languages, so a person sees "Moves time by" and not the property name `by`.
 - **Steps.** Each step has a type. Changing the type keeps the properties the new type takes and drops
-  the others, and keys the editor does not show stay in the file. A step can be removed or moved up or
-  down.
+  the others, and keys the editor does not show stay in the file. A step's Move up, Move down and Delete
+  are in its "…" menu on the card's title row. Move up is off on the first step and Move down on the last.
+  A read-only tab shows no menu.
+- **Rows.** A key and value list, such as an expected notification's values or a stub's output, has Add on
+  its title row, and each row's Delete is in its "…" menu. Users and stubs keep their Delete in a menu too.
+  A read-only tab shows neither, as the Lists bullet of the [process editor](#process-editor) says.
 - **Pickers.** Entities, processes, roles and connectors are picked by name. A `record` is picked from
   the aliases that earlier `createRecord` steps save, and a `step` and its `outcome` come from the
   processes that the record started.

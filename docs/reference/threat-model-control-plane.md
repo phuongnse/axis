@@ -3,28 +3,24 @@
 _(planned for M33)_
 
 This page holds the threats to the control plane, the **C** scope of the
-[threat model](threat-model.md). The control plane runs sign-up, trials and billing for Axis SaaS,
+[threat model](threat-model.md). The control plane runs sign-up, trials, subscriptions and plans for Axis SaaS,
 apart from the cells. How its rows are found, rated and checked is in
 [threat model method](threat-model-method.md).
 
 ## The control plane
 
-The control plane has seven trust boundaries. Each has its own diagram and table below: the sign-up
-page and API, the calls to the cells, the directory's DNS writes, the payment webhooks, the e-invoice
-provider, and the billing portal's sign-in and its pages.
+The control plane has four trust boundaries. Each has its own diagram and table below: the sign-up
+page and API, the calls to the cells, the directory's DNS writes, and the billing API.
 
 ```mermaid
 flowchart LR
     subgraph people [People]
         Visitor[Visitor who signs up]
-        Payer[Owner or billing contact]
     end
     subgraph control [Regional control plane]
         SignUp[Sign-up page and API]
         Directory[Region directory, DNS jobs and cell client]
-        Webhooks[Payment webhook routes, inbox and ledger jobs]
-        Issuer[E-invoice issuing job and adapter]
-        Billing[Billing portal]
+        Billing[Billing API]
     end
     subgraph dns [DNS provider]
         Records[(Tenant subdomain CNAME records)]
@@ -32,24 +28,14 @@ flowchart LR
     subgraph cell [Cell]
         Internal[Internal listener with mutual TLS]
     end
-    subgraph idp [Control plane identity provider]
-        Realm[axis-billing realm]
-    end
-    subgraph providers [External payment and e-invoice providers]
-        PayOS[PayOS]
-        Paddle[Paddle]
-        EInvoice[E-invoice provider]
+    subgraph operator [Operator]
+        BillingSystem[Billing system]
     end
     Visitor -->|HTTPS| SignUp
     SignUp -->|creates tenants through| Directory
     Directory -->|signed DNS updates| Records
     Directory -->|calls over mutual TLS| Internal
-    Payer -->|HTTPS| Billing
-    Billing -->|signs in through| Realm
-    Payer -->|pay page loads Paddle's checkout| Paddle
-    PayOS -->|signed webhooks to| Webhooks
-    Paddle -->|signed webhooks to| Webhooks
-    Issuer -->|issues e-invoices over HTTPS to| EInvoice
+    BillingSystem -->|bearer token to| Billing
 ```
 
 ### Sign-up page and API
@@ -152,154 +138,50 @@ flowchart LR
 Information disclosure and elevation of privilege do not apply to a `CNAME` record, which holds only a
 name and a target.
 
-### Payment webhooks
+### Billing API
 
-_(planned for M34)_
-
-PayOS and Paddle tell the control plane about each payment with a signed webhook. The control plane
-checks each one, keeps it once and applies it in order, see [webhooks](payments.md#webhooks).
+The operator's billing system drives a tenant's commercial life through the billing API. The control plane
+checks the billing client's token and scope on each call and keeps the answer of each call under its
+idempotency key, see [signing in](billing-api.md#signing-in) and [idempotency](billing-api.md#idempotency).
 
 ```mermaid
 flowchart LR
-    subgraph providers [Payment providers]
-        PayOS[PayOS]
-        Paddle[Paddle]
+    subgraph operator [Operator]
+        BillingSystem[Billing system with the billing client]
+        Provider[Identity provider]
     end
     subgraph attacker [Attacker]
-        Forger[Forger or replayer of a captured webhook]
+        Other[Holder of another client's token or a token without the billing scope]
+        Replayer[Retrying or replaying caller]
     end
     subgraph cp [Regional control plane]
-        Route[POST /api/payments/payos/webhook and POST /api/payments/paddle/webhook]
-        Check[Signature check over the raw body]
-        Inbox[(billing.webhook_inbox)]
-        Apply[Ordered apply job]
-        Ledger[(billing.ledger_entries)]
-        Recon[Nightly reconciliation]
+        Route[Billing routes: PUT paid-through and plan, POST end, GET subscription, under /api/billing/v1/tenants/id]
+        Check[Token and scope check]
+        Keys[(control_plane.billing_requests)]
+        Subs[(Subscriptions)]
+        Audit[(Audit records)]
+        Queue[(Job queue)]
     end
-    PayOS -->|signed webhook| Route
-    Paddle -->|signed webhook| Route
-    Forger -->|forged or replayed webhook| Route
+    subgraph cellRead [Cell]
+        Cell[Tenant read]
+    end
+    BillingSystem -->|gets a token from| Provider
+    BillingSystem -->|bearer token and Idempotency-Key| Route
+    Other -->|calls| Route
+    Replayer -->|repeats a call| Route
     Route -->|checked by| Check
-    Check -->|stores the event in| Inbox
-    Inbox -->|read in order by| Apply
-    Apply -->|writes payment entries to| Ledger
-    Recon -->|reads the day's transactions from| PayOS
-    Recon -->|reads the day's transactions from| Paddle
-    Recon -->|records missed payments in| Ledger
+    Route -->|keeps the answer in| Keys
+    Route -->|changes| Subs
+    Route -->|appends to| Audit
+    Route -->|queues writeQuotas and resumeTenant in| Queue
+    Route -->|reads usage from| Cell
 ```
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| C12 | A forged webhook marks an invoice as paid. | Payment webhooks | Spoofing | Critical | **Gap** | `PaymentWebhookTests` shows that a PayOS webhook with a wrong checksum answers `401`, stores nothing and logs no part of its body. [#2487](https://github.com/phuongnse/axis/issues/2487) checks Paddle's signature the same way. |
-| C13 | A replayed webhook applies a payment or a state change twice. | Payment webhooks | Tampering | High | **Gap** | `PaymentWebhookTests` shows that a PayOS event posted three times leaves one inbox row and one payment, and [#2487](https://github.com/phuongnse/axis/issues/2487) refuses a Paddle timestamp older than 5 minutes. `LedgerTests` shows that a second entry with the same idempotency key adds nothing. |
-| C14 | A lost webhook leaves a paid invoice due and makes the tenant read-only. | Payment webhooks | Denial of service | Medium | **Gap** | [#2488](https://github.com/phuongnse/axis/issues/2488) reads each provider's transactions every night and records a missed payment as if its webhook had come. |
-| C15 | A leaked PayOS checksum key or Paddle secret lets someone forge webhooks or act on Axis's provider account. | Payment webhooks | Spoofing | High | **Gap** | [#2480](https://github.com/phuongnse/axis/issues/2480) keeps PayOS's keys in Kubernetes Secrets and out of logs: the control plane chart mounts them from one Secret as files, and `PayOsClientTests` shows that no key reaches a log or an error message. [#2487](https://github.com/phuongnse/axis/issues/2487) adds the Paddle adapter but does not say where Paddle's secret is kept. |
+| C21 | A token of another client, or without the billing scope, changes a subscription. | Billing API | Spoofing | Critical | **Mitigated** | `BillingApiTests` shows that a call with no token, another client's token, a wrong audience or a key of another signer answers `401`, a billing client's token without `axis-billing` answers `403`, and each leaves the subscription, the audit records and the jobs unchanged. `BillingApiTests` shows the same for the end call and the read. `ControlPlaneOptionsTests` shows that without the billing settings every route answers `401`. |
+| C22 | A retried call makes a change twice. | Billing API | Tampering | High | **Mitigated** | `BillingApiTests` shows that the same `Idempotency-Key` with the same body answers the first answer again and leaves one audit record and one `writeQuotas` job, five parallel retries act once, and the same key with another body answers `422`. It also shows that the same key sent twice to the end call answers the same text and leaves one audit record, and that a key first used on the paid-through call answers `422` on the end call. |
+| C23 | A read shows which tenants exist in another region. | Billing API | Information disclosure | Medium | **Mitigated** | `BillingApiTests` shows that a read, and an end call, for a tenant that another region holds or that no region holds answer `404` alike, and that the cell is not called. |
 
-There is no repudiation row for the webhooks: each event is kept in the inbox, and an event that does not
-fit the state alerts the operator, see [webhooks](payments.md#webhooks).
-
-### E-invoice provider
-
-_(planned for M34)_
-
-The control plane issues each Vietnamese e-invoice through a provider adapter, and the provider keeps it as
-the law asks, see [through an adapter](e-invoices.md#through-an-adapter).
-
-```mermaid
-flowchart LR
-    subgraph cp [Regional control plane]
-        Issue[E-invoice issuing job]
-        Adapter[E-invoice adapter]
-        Ledger[(Amounts from the ledger)]
-        Details[(Buyer from the billing details)]
-        Operator[Operator correction with Axis.ControlPlane.Admin]
-    end
-    subgraph secrets [Kubernetes Secrets]
-        Creds[Provider credentials]
-    end
-    subgraph provider [E-invoice provider]
-        Api[Provider API over HTTPS]
-    end
-    subgraph thief [Someone with leaked credentials]
-        Holder[Holder of the credentials]
-    end
-    Ledger -->|amounts| Issue
-    Details -->|buyer| Issue
-    Issue -->|sends the invoice to| Adapter
-    Creds -->|read by| Adapter
-    Adapter -->|HTTPS with credentials| Api
-    Operator -->|adjusts or replaces through| Adapter
-    Holder -->|issues, adjusts or replaces invoices| Api
-```
-
-| Id | Threat | Boundary | Category | Rating | Status | Evidence |
-| --- | --- | --- | --- | --- | --- | --- |
-| C16 | A tampered e-invoice goes out under the operator's tax code with a wrong buyer, lines or amount. | E-invoice provider | Tampering | High | **Gap** | [#2486](https://github.com/phuongnse/axis/issues/2486) takes the amounts from the ledger and the buyer from the billing details. [#2495](https://github.com/phuongnse/axis/issues/2495) allows a correction only through the operator's command, with a reason. |
-| C17 | Leaked e-invoice credentials let someone issue, adjust or replace invoices in the operator's name. | E-invoice provider | Spoofing | High | **Gap** | [#2486](https://github.com/phuongnse/axis/issues/2486) keeps the provider's credentials in Kubernetes Secrets. |
-
-Repudiation does not need a row for the e-invoices: each correction writes an audit record, see
-[after it is issued](e-invoices.md#after-it-is-issued).
-
-### Billing portal sign-in
-
-The billing portal signs people in through the `axis-billing` realm of the control plane's identity
-provider. Its accounts are apart from the operator and tenant realms, see [billing portal](billing-portal.md#accounts).
-
-```mermaid
-flowchart LR
-    subgraph people [People]
-        Owner[Tenant owner or billing contact]
-        Attacker[Someone with a stolen password]
-    end
-    subgraph portal [Billing portal]
-        Site[Billing portal site]
-    end
-    subgraph idp [Control plane identity provider]
-        Realm[axis-billing realm with verified email and a second factor]
-    end
-    Owner -->|signs in| Site
-    Attacker -->|signs in| Site
-    Site -->|sends to| Realm
-    Realm -->|session| Site
-```
-
-| Id | Threat | Boundary | Category | Rating | Status | Evidence |
-| --- | --- | --- | --- | --- | --- | --- |
-| C11 | Someone takes over a billing account and acts as a tenant's owner. | Billing portal sign-in | Spoofing | High | **Gap** | [#2463](https://github.com/phuongnse/axis/issues/2463) makes the account's email verified and offers a second factor at the first sign-in. |
-
-### Billing portal pages
-
-_(planned for M34)_
-
-The portal's pages show the subscription and take payments. Every route checks its caller on the server, see
-[rules](billing-portal.md#rules). The portal's account takeover is C11, above.
-
-```mermaid
-flowchart LR
-    subgraph people [People]
-        Owner[Owner or billing contact with a session]
-        Other[Account of another tenant]
-    end
-    subgraph portal [Billing portal pages]
-        Routes[Portal routes]
-        Grant[Server-side grant check per tenant]
-        Data[(Billing data of the tenant)]
-        PayPage[Pay page]
-        Script[Any other script on the pay page]
-    end
-    subgraph paddle [Paddle]
-        Checkout[Checkout script and frame]
-    end
-    Owner -->|calls| Routes
-    Other -->|calls another tenant's route| Routes
-    Routes -->|checks the role with| Grant
-    Grant -->|allows only the tenant's own data| Data
-    Grant -->|answers 404 to| Other
-    PayPage -->|loads only| Checkout
-    Script -->|tries to read the session or change the payment| PayPage
-```
-
-| Id | Threat | Boundary | Category | Rating | Status | Evidence |
-| --- | --- | --- | --- | --- | --- | --- |
-| C18 | A billing contact or owner of one tenant reads or changes another tenant's billing. | Billing portal pages | Elevation of privilege | High | **Gap** | [#2463](https://github.com/phuongnse/axis/issues/2463) answers `404` to any other tenant's page, and [#2468](https://github.com/phuongnse/axis/issues/2468) checks the account's role on every route. |
-| C19 | Paddle's checkout script, or another script on the pay page, reads the session or changes the payment. | Billing portal pages | Tampering | Medium | **Gap** | [#2487](https://github.com/phuongnse/axis/issues/2487) allows Paddle's checkout script and frame on the pay page only, through that page's Content-Security-Policy. |
+Repudiation does not need a row: each change writes an audit record with the billing client as actor, see
+[audit records](billing-api.md#audit-records).

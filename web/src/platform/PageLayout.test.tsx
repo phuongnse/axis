@@ -1,8 +1,8 @@
 import { render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
+import { ContentInsetContext } from './contentInsetContext'
+import { spacingTokens } from './designTokens'
 import { PageActions, PageLayout } from './PageLayout'
-import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 
 describe('PageLayout', () => {
@@ -33,35 +33,43 @@ describe('PageLayout', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Purchase requests' })).toBeInTheDocument()
   })
 
-  it('puts the breadcrumb above the title, with links but the last step, which is the current page', () => {
-    render(
-      <ThemeModeProvider>
-        <TextProvider
-          catalogs={[{ texts: { 'shell.breadcrumb.label': 'Breadcrumb' }, fallbackTexts: {} }]}
-          development={false}
-        >
-          <MemoryRouter>
-            <PageLayout
-              title="New note"
-              breadcrumb={[
-                { label: 'E2E notes', to: '/e2e' },
-                { label: 'Notes', to: '/e2e/notes?page=2' },
-                { label: 'New note' },
-              ]}
-            >
+  it.each([24, 16])(
+    'draws the heading alone in a band with spacing-md above and below it and its sides and top reach the content inset of %dpx',
+    (inset) => {
+      render(
+        <ThemeModeProvider>
+          <ContentInsetContext.Provider value={inset}>
+            <PageLayout title="Users" band>
               <p>Page content</p>
             </PageLayout>
-          </MemoryRouter>
-        </TextProvider>
+          </ContentInsetContext.Provider>
+        </ThemeModeProvider>,
+      )
+
+      const band = screen.getByTestId('page-band')
+      expect(within(band).getByRole('heading', { level: 1, name: 'Users' })).toBeInTheDocument()
+      expect(within(band).queryByText('Page content')).not.toBeInTheDocument()
+      expect(band).toHaveStyle({
+        marginTop: `-${inset}px`,
+        marginLeft: `-${inset}px`,
+        marginRight: `-${inset}px`,
+        paddingTop: `${spacingTokens.md}px`,
+        paddingBottom: `${spacingTokens.md}px`,
+        paddingLeft: `${inset}px`,
+        paddingRight: `${inset}px`,
+      })
+    },
+  )
+
+  it('draws no band without band', () => {
+    render(
+      <ThemeModeProvider>
+        <PageLayout title="Users" />
       </ThemeModeProvider>,
     )
 
-    const breadcrumb = screen.getByRole('navigation', { name: 'Breadcrumb' })
-    expect(within(breadcrumb).getByRole('link', { name: 'E2E notes' })).toHaveAttribute('href', '/e2e')
-    expect(within(breadcrumb).getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/e2e/notes?page=2')
-    expect(within(breadcrumb).queryByRole('link', { name: 'New note' })).not.toBeInTheDocument()
-    expect(within(breadcrumb).getByText('New note')).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('heading', { name: 'New note' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Users' })).toBeInTheDocument()
+    expect(screen.queryByTestId('page-band')).not.toBeInTheDocument()
   })
 
   it('draws the tags beside the title and the line under it, and no line when it is empty', () => {

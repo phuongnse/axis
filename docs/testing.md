@@ -214,6 +214,15 @@ directory. The server listens on https at `AXIS_E2E_TENANT_HTTPS_PORT`, with a c
 on the tenant host with no port in the address. No redirect address is added by hand: only
 `tenant create` writes them.
 
+**The new package spec** creates the tenant `packages-made` and serves it from a directory server on the port offset
+11, with a temporary `Studio:ApplicationsPath`. The developer creates a TypeScript package and a Python package,
+`checks`, and adds a test file to it. The build and the test run of the Python package need a package host and a
+publisher that the shared stack does not start, so the spec starts its own. The package host is `Axis.PackageHost host`
+on a spare loopback port, started by `tests/e2e/package-host.ts`. Its `PackageBuild:Trivy` is a stub that reports no
+findings, as the integration tests' `StubTrivy` does. The publisher comes from `startSpecPublisher`, with application
+packages on and `Extensions:Runners:Application` set to that host. It runs alone under the publishers' lock. The spec
+stops the publisher and the package host when the build and the test run end.
+
 **The Ask AI agent spec** plans a request for real. It runs `tenant create` for `ask-ai-agent`, on the host
 `ask-ai-agent.eval.localhost`, and gives an author of that realm the author role and the agent client's roles mapper. Its
 server starts on offset 9, from the directory, with Ask AI on through the scripted binding. The spec makes its own
@@ -279,6 +288,15 @@ and `run_scenarios`. `validate_draft` reports no error. The scenario run goes th
 because no ready authoring request owns an outside client's draft, and the newest revision stays the same. The spec stops
 each agent host once its request reads Ready or Failed, because the scripted answers are used up by then. Both AI authoring specs hold one exclusive lock, `holdAiSpecLock`, for their
 whole run, because an agent host serves every directory tenant, so the two specs run one after the other in a shard.
+
+**The package run spec** runs on the tenant `packages-run`, on the host `packages-run.localhost`, with its server on the
+port offset 12. The shared publisher of the E2E stack has application packages off and reads no directory tenant, so the
+spec starts its own Node.js package host, `Axis.PackageHost host`, with a stub Trivy that reports no findings. It also
+starts its own publisher with `Extensions:ApplicationPackages` on and `Extensions:Runners:Application` set to that host. The publisher takes the
+publishers' lock alone, so no cell spec runs with it. A developer with the author and developer roles makes a TypeScript
+package from the starter. The first test saves the input `{ "text": "hello" }` as `greeting` through Manage saved inputs…,
+reloads and finds it in Saved input. The second test runs the starter's `echo` and expects Succeeded, the output JSON with
+`"text": "hello"`, and the host's line in the Log that says it installed the dependencies of the lock.
 
 **The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
 `Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the

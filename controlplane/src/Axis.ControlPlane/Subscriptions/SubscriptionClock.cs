@@ -21,12 +21,10 @@ namespace Axis.ControlPlane.Subscriptions;
 /// A failed cell call, a job that does not end in time or a tenant with no directory row leaves the subscription as it is and logs a
 /// warning that names the subscription and the cell, never the tenant. The run goes on with the other subscriptions and throws at
 /// the end, so the job queue retries it. After its moves the run queues the timeline emails, see <c>SubscriptionClock.Emails.cs</c>.
-/// A subscription whose <see cref="SubscriptionRow.PeriodEndsAt"/> is set is a paid tenant, and its moves are these. An <c>active</c> one is
-/// due when its period has ended or an open invoice is <see cref="PastDueAfter"/> past its due date, and it is never due by its next
-/// date. An overdue invoice makes it <c>pastDue</c> with no cell call. Otherwise the end of the period moves the period forward once,
-/// with no audit record and no cell call, see <see cref="AdvancePeriodAsync"/>. A <c>pastDue</c> one becomes <c>readOnly</c> after
-/// <see cref="PastDueGrace"/> and a <c>cancelled</c> one at its next date, which is the end of its period, each with one read-only cell
-/// call. A paid tenant stays <c>readOnly</c> for <see cref="PaidReadOnlyWait"/> before it is <c>deleting</c>.
+/// A subscription whose <see cref="SubscriptionRow.PaidThrough"/> is set is a paid tenant, and its moves are these. An <c>active</c> one is due
+/// at its next date, the day after its paid-through date, and becomes <c>pastDue</c> with no cell call, so the tenant keeps working. A
+/// <c>pastDue</c> one becomes <c>readOnly</c> after <see cref="PastDueGrace"/> and a <c>cancelled</c> one at its next date, each with one
+/// read-only cell call. A paid tenant stays <c>readOnly</c> for <see cref="PaidReadOnlyWait"/> before it is <c>deleting</c>.
 /// </summary>
 internal sealed partial class SubscriptionClock(
     NpgsqlDataSource controlPlane,
@@ -44,9 +42,6 @@ internal sealed partial class SubscriptionClock(
 
     /// <summary>How long a tenant stays read-only before its deletion is scheduled.</summary>
     public static readonly TimeSpan ReadOnlyWait = TimeSpan.FromDays(30);
-
-    /// <summary>How long after its due date an open invoice makes an <c>active</c> subscription <c>pastDue</c>.</summary>
-    public static readonly TimeSpan PastDueAfter = TimeSpan.FromDays(1);
 
     /// <summary>How long a subscription stays <c>pastDue</c> before it becomes <c>readOnly</c>.</summary>
     public static readonly TimeSpan PastDueGrace = TimeSpan.FromDays(14);
@@ -72,17 +67,13 @@ internal sealed partial class SubscriptionClock(
         var due = new List<DueSubscription>();
         await using (var select = controlPlane.CreateCommand(
             """
-            SELECT s.id, s.tenant_id, s.state, s.step_id, s.period, s.period_ends_at,
-                   EXISTS (SELECT 1 FROM billing.invoices i WHERE i.subscription_id = s.id AND i.status = 'open' AND i.due_at <= @overdue)
+            SELECT s.id, s.tenant_id, s.state, s.step_id
             FROM control_plane.subscriptions s
-            WHERE (s.state IN ('trialing', 'pastDue', 'cancelled', 'readOnly', 'deleting') AND s.next_at <= @now)
-               OR (s.state = 'active' AND (s.period_ends_at <= @now
-                   OR EXISTS (SELECT 1 FROM billing.invoices i WHERE i.subscription_id = s.id AND i.status = 'open' AND i.due_at <= @overdue)))
+            WHERE s.state IN ('trialing', 'active', 'pastDue', 'cancelled', 'readOnly', 'deleting') AND s.next_at <= @now
             ORDER BY s.next_at, s.id
             """))
         {
             select.Parameters.AddWithValue("now", now);
-            select.Parameters.AddWithValue("overdue", now - PastDueAfter);
             await using var reader = await select.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
@@ -90,28 +81,17 @@ internal sealed partial class SubscriptionClock(
                     reader.GetGuid(0),
                     reader.GetString(1),
                     reader.GetString(2),
-                    reader.GetGuid(3),
-                    reader.IsDBNull(4) ? null : reader.GetString(4),
-                    reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5),
-                    reader.GetBoolean(6)));
+                    reader.GetGuid(3)));
             }
         }
 
         var failed = 0;
-        foreach (var (id, tenantId, state, stepId, period, periodEndsAt, overdue) in due)
+        foreach (var (id, tenantId, state, stepId) in due)
         {
             if (state == Active)
             {
-                // An active subscription makes no cell call, so it needs no cell. A move to pastDue wins over the period's move.
-                if (overdue)
-                {
-                    await CommitAsync(job, id, Active, stepId, PastDue, now + PastDueGrace, cancellationToken);
-                }
-                else if (periodEndsAt is { } end)
-                {
-                    await AdvancePeriodAsync(id, end, period, cancellationToken);
-                }
-
+                // An active subscription makes no cell call, so it needs no cell.
+                await CommitAsync(job, id, Active, stepId, PastDue, now + PastDueGrace, now, cancellationToken);
                 continue;
             }
 
@@ -174,26 +154,6 @@ internal sealed partial class SubscriptionClock(
         }
     }
 
-    // The end of a paid period moves the period forward. It is not a move, so it writes no audit record and keeps the step id. It runs
-    // once, as the new end is later than now and the old end in the condition no longer matches.
-    private async Task AdvancePeriodAsync(Guid id, DateTimeOffset periodEndsAt, string? period, CancellationToken cancellationToken)
-    {
-        var next = PeriodEnd(periodEndsAt, period);
-        await using var advance = controlPlane.CreateCommand(
-            "UPDATE control_plane.subscriptions SET period_ends_at = @next, next_at = @next WHERE id = @id AND state = 'active' AND period_ends_at = @old");
-        advance.Parameters.AddWithValue("next", next);
-        advance.Parameters.AddWithValue("id", id);
-        advance.Parameters.AddWithValue("old", periodEndsAt);
-        await advance.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    /// <summary>The end of the paid period that starts at <paramref name="start"/>: one year for the period <c>year</c> and one month otherwise, on the UTC date.</summary>
-    internal static DateTimeOffset PeriodEnd(DateTimeOffset start, string? period)
-    {
-        var date = start.UtcDateTime;
-        return new DateTimeOffset(period == "year" ? date.AddYears(1) : date.AddMonths(1), TimeSpan.Zero);
-    }
-
     private async Task CheckDeletionAsync(
         ClaimedJob job, CellClient cell, Guid id, string tenantId, string path, Guid stepId, DateTimeOffset now, CancellationToken cancellationToken)
     {
@@ -239,14 +199,20 @@ internal sealed partial class SubscriptionClock(
         }
     }
 
-    // One transaction: a run that lost the race, or a retry after the commit, changes no row and so writes no audit record.
+    // One transaction: a run that lost the race, or a retry after the commit, changes no row and so writes no audit record. With dueBy, the
+    // row must still be due. The billing API locks the row and keeps the step id of an active subscription when it sets a new paid-through
+    // date, and PostgreSQL checks the condition again on the new row version, so a date set at the same time wins.
     private async Task CommitAsync(
         ClaimedJob job, Guid id, string from, Guid stepId, string to, DateTimeOffset? nextAt, CancellationToken cancellationToken)
+        => await CommitAsync(job, id, from, stepId, to, nextAt, null, cancellationToken);
+
+    private async Task CommitAsync(
+        ClaimedJob job, Guid id, string from, Guid stepId, string to, DateTimeOffset? nextAt, DateTimeOffset? dueBy, CancellationToken cancellationToken)
     {
         await using var connection = await controlPlane.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await using (var update = new NpgsqlCommand(
-            "UPDATE control_plane.subscriptions SET state = @to, next_at = @next, step_id = @newStep WHERE id = @id AND state = @from AND step_id = @step",
+            "UPDATE control_plane.subscriptions SET state = @to, next_at = @next, step_id = @newStep WHERE id = @id AND state = @from AND step_id = @step AND (@dueBy::timestamptz IS NULL OR next_at <= @dueBy)",
             connection,
             transaction))
         {
@@ -256,6 +222,7 @@ internal sealed partial class SubscriptionClock(
             update.Parameters.AddWithValue("id", id);
             update.Parameters.AddWithValue("from", from);
             update.Parameters.AddWithValue("step", stepId);
+            update.Parameters.AddWithValue("dueBy", (object?)dueBy ?? DBNull.Value);
             if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
             {
                 return;
@@ -266,7 +233,7 @@ internal sealed partial class SubscriptionClock(
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private sealed record DueSubscription(Guid Id, string TenantId, string State, Guid StepId, string? Period, DateTimeOffset? PeriodEndsAt, bool Overdue);
+    private sealed record DueSubscription(Guid Id, string TenantId, string State, Guid StepId);
 
     [LoggerMessage(LogLevel.Warning, "The subscription {SubscriptionId} could not be moved: its tenant has no row in the region directory, or its cell is not one of the region's. It stays as it is.")]
     private partial void LogNoCell(Guid subscriptionId);

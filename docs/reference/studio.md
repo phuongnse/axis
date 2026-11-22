@@ -99,7 +99,7 @@ resource opens it alone, under its [name](studio-workspace.md#names), with its e
 - **The server builds the rows**. The [kind list route](studio-resource-form.md#kind-list) answers one page with
   its names in the UI locale. A failed load shows one error above the table.
 - **A module's resources**. The resources of the modules that the application uses are in the same list. Each is
-  named by its label, else without the `<module>/` prefix, and has a neutral tag of its module's label, else the
+  named by its label, else without the `<module>/` prefix, and has a tag of its module's label, else the
   module's id. There is no Module column. A kind with no label, such as a policy, keeps its name. A text resource
   shows its language, such as Vietnamese. A module's resource has a status, as a new module version or a layer changes it.
 - **Status**. New, Changed or Published, as the [resource activity](studio-resource-form.md#resource-activity) reads
@@ -322,7 +322,8 @@ picks what exists.
   and again after a save, a text write, a delete and a reconnect.
 - **Maps with marked keys.** A map whose keys carry a mark, such as a trigger's `parameters`, shows one
   row for each entry, in the order of the file: a key select that offers the names no other row uses, a
-  value box and Remove. Add appends the first name that is not used and is off when none is left. A
+  value box and a "…" menu with Remove. Add on the map's title row appends the first name that is not used,
+  and is off when none is left. A
   parameter's value box follows its type: a number box for `integer` and `decimal`, a checkbox for
   `boolean` and a text box for the rest. Picking another key keeps the value when it fits the new type.
   A `null` value is edited in the JSON view.
@@ -453,8 +454,10 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   as text over the cell's actions, so "contains update" finds the roles that may update there. The filter is kept in
   the address as `matrix.filter`, and every role shows on one page with no pager.
 - **A cell's grants.** Selecting a cell opens its grants under the table, each with its actions, its filter in the
-  [expression editor](#expression-editor) and its fields in a field picker. The panel says the cell has no grant only
-  when it shows none. An editable row whose cell has only shared grants lists them and offers Add grant.
+  [expression editor](#expression-editor) and its fields in a field picker. The selected cell is marked with the
+  selected tint in `primaryText`, as a menu marks its chosen item. The panel's title row names the role and the target.
+  The panel says the cell has no grant only when it shows none. An editable row whose cell has only shared grants lists
+  them and offers Add grant, a light text action on the panel's title row.
 - **Where an edit goes.** An edit writes to `<Role>Access`, the PascalCase role name plus `Access`, so
   `department-manager` writes `DepartmentManagerAccess`. When the role has none, Save creates
   `policies/<role>-access.json` with `roles` set to that role only.

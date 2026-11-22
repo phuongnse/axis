@@ -515,12 +515,17 @@ transitions through a layer, and relaxes and restores points.
   prefix: `states.filter`, `transitions.filter`, `validations.filter`, `effects.filter` or `ceiling.filter`. A state or
   transition that the saved contract does not have stays shown under any filter, so an author sees what they just
   added. A change to a filter does not ask to leave without saving.
-- **Added states and transitions.** **Add state** and **Add transition** open a dialog. A state takes a
+- **Added states and transitions.** **Add state** and **Add transition** are light text actions on the title rows of
+  the States and Transitions tables, and each opens a dialog. A contract with a lifecycle shows each table with its
+  empty message when it has no rows, so its Add button stays reachable. A state takes a
   name, **Initial** and **Deletable**, which are yes-or-no fields with help, and a transition a name,
   its from-states, its to-state and an optional guard. The names, the from-states and the to-state are required fields with help. **Add**
   stays on, and a click [checks the fields](actions-and-controls.md#fields), including a name the
   contract already uses and a to-state that is also a from-state. The diagnostics of the contract's layer, such as `AXC0370` for a transition into a protected state,
   show in a list in the editor after a save and when the contract is opened again.
+- **A problem's severity in words.** Each diagnostic in the editor's list leads with its severity as a
+  status tag, Error in `danger` or Warning in `attention`, then its code and message, as in the
+  [Problems panel](studio-workspace.md#problems-panel).
 - **Added rows.** A state or transition that the application added shows an **Added** tag and a
   **Delete** button, and has no named point, because a relax entry cannot name it. The module's own states and
   transitions show neither and stay read-only. **Delete** takes the row out of the unsaved draft, and **Save** writes

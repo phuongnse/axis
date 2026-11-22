@@ -459,3 +459,37 @@ describe('AxisField outside a form', () => {
     ).toBeDefined()
   })
 })
+
+describe('AxisField input width', () => {
+  // Each input, the role that finds it and the root that fills the field.
+  const inputs = [
+    {
+      kind: 'a select',
+      input: <Select options={[{ value: 'open', label: 'Open' }]} onChange={() => {}} />,
+      role: 'combobox',
+      root: '.ant-select',
+    },
+    { kind: 'a number box', input: <InputNumber onChange={() => {}} />, role: 'spinbutton', root: '.ant-input-number' },
+    { kind: 'a text box', input: <Input onChange={() => {}} />, role: 'textbox', root: 'input' },
+  ]
+
+  it.each(inputs)('makes $kind as wide as the field inside a form', ({ input, role, root }) => {
+    renderForm(
+      <AxisField label="Status" help="Pick one." name="status">
+        {input}
+      </AxisField>,
+    )
+
+    expect(screen.getByRole(role, { name: 'Status' }).closest(root)).toHaveStyle({ width: '100%' })
+  })
+
+  it.each(inputs)('makes $kind as wide as the field outside a form', ({ input, role, root }) => {
+    renderOutside(
+      <AxisField label="Status" help="Pick one.">
+        {input}
+      </AxisField>,
+    )
+
+    expect(screen.getByRole(role, { name: 'Status' }).closest(root)).toHaveStyle({ width: '100%' })
+  })
+})

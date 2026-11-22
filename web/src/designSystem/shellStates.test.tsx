@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { expectTitleAloneInBand } from '../test/pageBand'
 import { installFixtureFetch } from './fixtureFetch'
 import { categoryId, fixtureScopes, requestId, routes } from './fixtures'
 import { Preview } from './Preview'
@@ -59,7 +60,6 @@ describe('the design-system shell states', () => {
 
     expect(await screen.findByDisplayValue('Office furniture', {}, { timeout: 15000 })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Requests' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   }, 30000)
 
   it("opens a saved request's Category on the default record page, not the not-found page", async () => {
@@ -82,6 +82,25 @@ describe('the design-system shell states', () => {
   }, 30000)
 
   const state = (caption: string) => previews.shell.find((candidate) => candidate.caption === caption)!
+
+  it.each([
+    ['Account page', 'Your account', 'button', 'End all other sessions'],
+    ['Users page', 'Users', 'link', 'Priya Raman'],
+    ['User page', 'Priya Raman', 'heading', 'Priya Raman'],
+  ] as const)(
+    'draws the %s with its title alone in the band over fixtures',
+    async (caption, title, role, loaded) => {
+      const error = vi.spyOn(console, 'error')
+
+      render(<Preview states={[state(caption)]} />)
+
+      // The page's own data is on screen, so every request it makes has been answered.
+      expect(await screen.findByRole(role, { name: loaded }, { timeout: 15000 })).toBeVisible()
+      expectTitleAloneInBand(title)
+      expect(error.mock.calls.filter(([message]) => String(message).startsWith('No design-system fixture'))).toEqual([])
+    },
+    30000,
+  )
 
   it('shows a saved record with Submit for approval on the page heading and its history', async () => {
     render(<Preview states={[state('Saved record')]} />)
@@ -129,5 +148,26 @@ describe('the design-system shell states', () => {
       'This task does not exist, or you cannot open it.',
     )
     expect(screen.getByRole('link', { name: 'Go to Tasks' })).toBeVisible()
+  }, 30000)
+
+  it('shows the waiting instance under its process title, with its Waiting tag and the Approvals entry marked', async () => {
+    render(<Preview states={[state('Process instance')]} />)
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Purchase approval' }, { timeout: 15000 }),
+    ).toBeVisible()
+    expect(within(screen.getByTestId('page-heading')).getByText('Waiting')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Approvals' })).toHaveAttribute('aria-current', 'page')
+  }, 30000)
+
+  it('shows the instance History with its call on attempt 3 and its sub-process', async () => {
+    render(<Preview states={[state('Process instance')]} />)
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'History' }, { timeout: 15000 }))
+
+    expect(
+      await screen.findByText('createPurchaseOrder (ERP) succeeded on attempt 3.', {}, { timeout: 15000 }),
+    ).toBeVisible()
+    expect(screen.getByText('Started Delivery.')).toBeVisible()
   }, 30000)
 })

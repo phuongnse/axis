@@ -1,21 +1,24 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { DatePicker, Table, theme } from 'antd'
+import { DatePicker, Drawer, Table, theme } from 'antd'
 import viVN from 'antd/locale/vi_VN'
 import dayjs from 'dayjs'
-import { useEffect, type ReactNode } from 'react'
+import { useContext, useEffect, type ReactNode } from 'react'
 import { MemoryRouter, type InitialEntry } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
-import { designTokensFor, sizeTokens } from './designTokens'
+import { ContentInsetContext } from './contentInsetContext'
+import { designTokensFor, sizeTokens, spacingTokens } from './designTokens'
 import { PreferencesMenu } from './PreferencesMenu'
 import { SaveBar } from './SaveBar'
+import { PartBoundary, SectionPart, SectionParts } from './SectionParts'
 import { Shell } from './Shell'
 import { ShellNavigation } from './ShellNavigation'
 import { ShellAside } from './shellAside'
 import { ShellSidebar } from './shellSidebar'
 import { useShellSidebar } from './shellSidebarContext'
+import { SidePanel } from './SidePanel'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 import { narrowWidthQuery } from './useNarrowWidth'
@@ -42,6 +45,30 @@ const navigationTexts = [
     fallbackTexts: {},
   },
 ]
+
+/** Shows the content inset that the shell gives the content area, which a band reaches past. */
+function InsetReader() {
+  const inset = useContext(ContentInsetContext)
+  return <span data-testid="inset">{inset}</span>
+}
+
+/** Two parts of one section column, so the rule above the second part can be read. */
+function twoParts(prefix: string) {
+  return (
+    <SectionParts>
+      {['one', 'two'].map((name) => (
+        <SectionPart key={name} testName={`${prefix}-${name}`} heading={{ title: name }}>
+          <span>Fields</span>
+        </SectionPart>
+      ))}
+    </SectionParts>
+  )
+}
+
+/** The rule above a part, which is the part's previous sibling, see SectionParts. */
+function ruleAbove(testName: string) {
+  return screen.getByTestId(`studio-section-${testName}`).previousElementSibling as HTMLElement
+}
 
 /** Shows the container background token the theme gives components inside the shell. */
 function Background() {
@@ -562,6 +589,100 @@ describe('Shell sidebar claimed by a page', () => {
     await screen.findByRole('link', { name: 'Entities' })
 
     expect(mounts).toBe(1)
+  })
+
+  it('gives the content area its inset of spacing-lg, which a page reads, while no page claims the sidebar', () => {
+    renderShell('en', ['/'], notesNavigation.slice(0, 1), <InsetReader />)
+
+    expect(screen.getByTestId('inset').textContent).toBe(String(spacingTokens.lg))
+  })
+
+  it('gives the content area its inset of spacing-md once a page claims the sidebar', async () => {
+    renderShell(
+      'en',
+      ['/'],
+      notesNavigation.slice(0, 1),
+      <>
+        {claim()}
+        <InsetReader />
+      </>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('inset').textContent).toBe(String(spacingTokens.md)))
+  })
+
+  it("reaches the content inset of spacing-lg with the page's rules, while no page claims the sidebar", () => {
+    renderShell('en', ['/'], notesNavigation.slice(0, 1), twoParts('page'))
+
+    expect(ruleAbove('page-two')).toHaveStyle({
+      marginLeft: `-${spacingTokens.lg}px`,
+      marginRight: `-${spacingTokens.lg}px`,
+    })
+  })
+
+  it("reaches the content inset of spacing-md with the page's rules once a page claims the sidebar", async () => {
+    renderShell(
+      'en',
+      ['/'],
+      notesNavigation.slice(0, 1),
+      <>
+        {claim()}
+        {twoParts('page')}
+      </>,
+    )
+
+    await waitFor(() =>
+      expect(ruleAbove('page-two')).toHaveStyle({
+        marginLeft: `-${spacingTokens.md}px`,
+        marginRight: `-${spacingTokens.md}px`,
+      }),
+    )
+  })
+})
+
+describe("A section's rule inside a side panel or a drawer", () => {
+  it('gives no margin to a rule in a side panel, and the page rule its inset in the same render', async () => {
+    renderShell(
+      'en',
+      ['/'],
+      notesNavigation.slice(0, 1),
+      <>
+        {twoParts('page')}
+        <SidePanel id="panel" title="Panel" testId="panel">
+          {twoParts('panel')}
+        </SidePanel>
+      </>,
+    )
+
+    await screen.findByTestId('studio-section-panel-two')
+    expect(ruleAbove('panel-two').style.marginLeft).toBe('')
+    expect(ruleAbove('panel-two').style.marginRight).toBe('')
+    expect(ruleAbove('page-two')).toHaveStyle({
+      marginLeft: `-${spacingTokens.lg}px`,
+      marginRight: `-${spacingTokens.lg}px`,
+    })
+  })
+
+  it('gives no margin to a rule in an open drawer whose body is a part boundary, and the page rule its inset', async () => {
+    renderShell(
+      'en',
+      ['/'],
+      notesNavigation.slice(0, 1),
+      <>
+        {twoParts('page')}
+        <Drawer open title="Drawer">
+          <PartBoundary>{twoParts('drawer')}</PartBoundary>
+        </Drawer>
+      </>,
+    )
+
+    await screen.findByTestId('studio-section-drawer-two')
+    expect(ruleAbove('drawer-two').style.marginLeft).toBe('')
+    expect(ruleAbove('drawer-two').style.marginRight).toBe('')
+    expect(ruleAbove('page-two')).toHaveStyle({
+      marginLeft: `-${spacingTokens.lg}px`,
+      marginRight: `-${spacingTokens.lg}px`,
+    })
   })
 })
 

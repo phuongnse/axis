@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { describe, expect, it } from 'vitest'
+import { AxisButton } from './AxisButton'
 import { designTokensFor } from './designTokens'
 import { SectionPart, SectionParts } from './SectionParts'
 import { TextProvider } from './TextProvider'
@@ -91,6 +92,44 @@ describe('SectionPart', () => {
     expect(within(screen.getByRole('region', { name: 'Items' })).getByRole('button', { name: 'Add' })).toBeVisible()
   })
 
+  it('draws a title-row action as a borderless text button, the main and destructive ones in their colour', () => {
+    renderSections(
+      <SectionPart
+        testName="rows"
+        heading={{ title: 'Rows' }}
+        action={
+          <>
+            <AxisButton role="secondary">Add row</AxisButton>
+            <AxisButton role="main">Import</AxisButton>
+            <AxisButton role="secondary" destructive>
+              Clear
+            </AxisButton>
+          </>
+        }
+      >
+        <span>Fields</span>
+      </SectionPart>,
+    )
+
+    const section = screen.getByRole('region', { name: 'Rows' })
+    for (const name of ['Add row', 'Import', 'Clear']) {
+      const button = within(section).getByRole('button', { name })
+      expect(button).toHaveClass('ant-btn-variant-text')
+      expect(button).not.toHaveClass('ant-btn-variant-outlined')
+    }
+  })
+
+  it('draws nothing in the heading when it has no action', () => {
+    renderSections(
+      <SectionPart testName="plain" heading={{ title: 'Plain' }} action={null}>
+        <span>Fields</span>
+      </SectionPart>,
+    )
+
+    const heading = screen.getByRole('heading', { name: 'Plain' })
+    expect(heading.parentElement!.parentElement!.children).toHaveLength(1)
+  })
+
   it('folds when given a fold: a button before the heading opens a body that is drawn only while open', async () => {
     function Folding() {
       const [open, setOpen] = useState(false)
@@ -161,6 +200,20 @@ describe('SectionPart', () => {
     expect(screen.getByTestId('studio-section-three').previousElementSibling).toBe(rules[1])
     expect(rules[0]).toHaveStyle(rule)
     expect(rules[1]).toHaveStyle(rule)
+  })
+
+  it('gives the rule no side margin with no ContentInsetContext, so it stays inside its boundary', () => {
+    renderSections(
+      ['one', 'two'].map((name) => (
+        <SectionPart key={name} testName={name} heading={{ title: name }}>
+          <span>Fields</span>
+        </SectionPart>
+      )),
+    )
+
+    const rule = screen.getByRole('separator')
+    expect(rule.style.marginLeft).toBe('')
+    expect(rule.style.marginRight).toBe('')
   })
 
   it('draws no extra rule for a component child that renders nothing, in the middle or at the end', () => {

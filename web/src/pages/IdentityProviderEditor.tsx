@@ -1,9 +1,11 @@
-import { Button, Flex, Input, Select, Typography } from 'antd'
+import { ConfigProvider, Flex, Input, Select } from 'antd'
 import { useContext, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useFieldTexts } from './fieldTexts'
@@ -56,6 +58,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
   const t = useText()
   const { field, group } = useFieldTexts('identityProvider')
   const names = useContext(StudioNamesContext)
+  const { componentDisabled } = ConfigProvider.useConfig()
   const type = typeof value.type === 'string' ? value.type : undefined
   const claims = isContent(value.claims) ? value.claims : {}
   const roles = isContent(value.roles) ? value.roles : {}
@@ -262,49 +265,58 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
             <Flex vertical gap="small">
               {textField('/roles/claim', 'roles.claim', roles.claim, 'roles', changeRolesClaim)}
               <div data-testid="studio-field-/roles/values">
-                <AxisFieldGroup {...group('roles.values')}>
+                <AxisFieldGroup
+                  {...group('roles.values')}
+                  action={
+                    componentDisabled ? undefined : (
+                      <AxisButton role="secondary" onClick={addRoleRow}>
+                        {t('shell.studio.identityProvider.addRole')}
+                      </AxisButton>
+                    )
+                  }
+                >
                   <Flex vertical gap="small">
                     {Object.entries(roleValues).map(([claim, role], position) => (
-                      <Flex key={position} vertical gap="small" data-testid={`studio-role-row-${position}`}>
-                        <AxisField {...field('roles.values.claimValue')}>
-                          <Input
-                            value={claim}
-                            onChange={(event) => changeRoleRow(position, event.target.value, text(role))}
+                      <Flex key={position} gap="small" align="flex-start" data-testid={`studio-role-row-${position}`}>
+                        <Flex vertical gap="small" style={{ flex: 1 }}>
+                          <AxisField {...field('roles.values.claimValue')}>
+                            <Input
+                              value={claim}
+                              onChange={(event) => changeRoleRow(position, event.target.value, text(role))}
+                            />
+                          </AxisField>
+                          <AxisField {...field('roles.values.role')}>
+                            <ReferencePicker
+                              name={field('roles.values.role').label}
+                              value={text(role)}
+                              required
+                              options={names?.roles ?? []}
+                              onChange={(next) => changeRoleRow(position, claim, next ?? '')}
+                            />
+                          </AxisField>
+                        </Flex>
+                        {componentDisabled ? null : (
+                          <RowActions
+                            fold
+                            actions={[
+                              {
+                                key: 'remove',
+                                labelKey: 'shell.studio.identityProvider.remove',
+                                destructive: true,
+                                onClick: () =>
+                                  writeRoleValues(
+                                    Object.entries(roleValues)
+                                      .map(([key, current]): [string, string] => [key, text(current)])
+                                      .filter((_, index) => index !== position),
+                                  ),
+                              },
+                            ]}
                           />
-                        </AxisField>
-                        <AxisField {...field('roles.values.role')}>
-                          <ReferencePicker
-                            name={field('roles.values.role').label}
-                            value={text(role)}
-                            required
-                            options={names?.roles ?? []}
-                            onChange={(next) => changeRoleRow(position, claim, next ?? '')}
-                          />
-                        </AxisField>
-                        <div>
-                          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                          <Button
-                            onClick={() =>
-                              writeRoleValues(
-                                Object.entries(roleValues)
-                                  .map(([key, current]): [string, string] => [key, text(current)])
-                                  .filter((_, index) => index !== position),
-                              )
-                            }
-                          >
-                            {t('shell.studio.identityProvider.remove')}
-                          </Button>
-                        </div>
+                        )}
                       </Flex>
                     ))}
-                    <div>
-                      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                      <Button onClick={addRoleRow}>{t('shell.studio.identityProvider.addRole')}</Button>
-                    </div>
                     {Object.keys(roleValues).length === 0 && (
-                      <Typography.Text type="secondary" data-testid="studio-identity-provider-same-name">
-                        {t('shell.studio.identityProvider.sameNameHint')}
-                      </Typography.Text>
+                      <EmptyState text={t('shell.studio.identityProvider.sameNameHint')} />
                     )}
                   </Flex>
                 </AxisFieldGroup>
@@ -317,27 +329,39 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
           <div data-testid="studio-field-/acr">
             <Flex vertical gap="small">
               {acr.map((level, index) => (
-                <Flex key={index} vertical gap="small" data-testid={`studio-field-/acr/${index}`}>
-                  <AxisField {...field('acr')}>
-                    <Input value={text(level)} onChange={(event) => onChange(`/acr/${index}`, event.target.value)} />
-                  </AxisField>
-                  <div>
-                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                    <Button
-                      onClick={() =>
-                        onChange('/acr', acr.length > 1 ? acr.filter((_, position) => position !== index) : undefined)
-                      }
-                    >
-                      {t('shell.studio.identityProvider.remove')}
-                    </Button>
-                  </div>
+                <Flex key={index} gap="small" align="flex-start" data-testid={`studio-field-/acr/${index}`}>
+                  <Flex vertical gap="small" style={{ flex: 1 }}>
+                    <AxisField {...field('acr')}>
+                      <Input value={text(level)} onChange={(event) => onChange(`/acr/${index}`, event.target.value)} />
+                    </AxisField>
+                  </Flex>
+                  {componentDisabled ? null : (
+                    <RowActions
+                      fold
+                      actions={[
+                        {
+                          key: 'remove',
+                          labelKey: 'shell.studio.identityProvider.remove',
+                          destructive: true,
+                          onClick: () =>
+                            onChange(
+                              '/acr',
+                              acr.length > 1 ? acr.filter((_, position) => position !== index) : undefined,
+                            ),
+                        },
+                      ]}
+                    />
+                  )}
                 </Flex>
               ))}
+              {acr.length === 0 && <EmptyState text={t('shell.studio.identityProvider.noAcr')} />}
             </Flex>
           </div>,
-          <AxisButton role="secondary" onClick={() => onChange('/acr', [...acr, ''])}>
-            {t('shell.studio.identityProvider.addAcr')}
-          </AxisButton>,
+          componentDisabled ? undefined : (
+            <AxisButton role="secondary" onClick={() => onChange('/acr', [...acr, ''])}>
+              {t('shell.studio.identityProvider.addAcr')}
+            </AxisButton>
+          ),
         )}
       </SectionParts>
     </div>

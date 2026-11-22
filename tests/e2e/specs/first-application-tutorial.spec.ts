@@ -18,6 +18,7 @@ import {
   openFormTab,
   openKind,
   openListItem,
+  processStepAction,
   writeLabel,
 } from '../studio-resources'
 
@@ -267,7 +268,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Expense')
     await writeLabel(page, 'studio-field-/title', { en: en['processes.expenseApproval.title'] })
-    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Delete', exact: true }).click()
+    await processStepAction(page, 0, 'Delete')
 
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
     const steps: [name: string, type: string][] = [

@@ -1,7 +1,9 @@
 import { Flex, Typography } from 'antd'
-import type { ReactNode } from 'react'
+import { useContext, type ReactNode } from 'react'
+import { useStatusTints } from '../platform/antTheme'
 import { AxisButton } from '../platform/AxisButton'
-import { folderDiffers, type StudioDiagnostic, type StudioReleases } from '../platform/studio'
+import { ContentInsetContext } from '../platform/contentInsetContext'
+import { folderDiffers, severityTone, type StudioDiagnostic, type StudioReleases } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 
@@ -15,7 +17,8 @@ export const problemsPanelId = 'studio-problems-panel'
  * `textMuted`: "Changes not live" when the folder differs from the live release, "Not published yet" when there is no
  * live release, and "Release 7 is live" otherwise, or "Release 7 is live, off-standard" when the live release is
  * off-standard. "Releases did not load" is in `warningText` when `history` is `'failed'`, and nothing shows while
- * `history` is `undefined`. No state has an icon or a link. `children` are the actions on the right.
+ * `history` is `undefined`. No state has an icon or a link. `children` are the actions on the right. It reaches the page
+ * area's edges by the shell's content inset, see docs/reference/shell.md#layout.
  */
 export function StudioBand({
   diagnostics,
@@ -31,7 +34,9 @@ export function StudioBand({
   children?: ReactNode
 }) {
   const t = useText()
-  const { colour, size, spacing } = useDesignTokens()
+  const { colour, size } = useDesignTokens()
+  const inset = useContext(ContentInsetContext)
+  const tints = useStatusTints()
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length
   const warnings = diagnostics.length - errors
   const counts = (count: number, one: string, many: string) =>
@@ -48,8 +53,8 @@ export function StudioBand({
         top: size.bar,
         zIndex: 5,
         height: size.bar,
-        margin: `-${spacing.md}px -${spacing.md}px 0`,
-        paddingInline: spacing.md,
+        margin: `-${inset}px -${inset}px 0`,
+        padding: `0 ${inset}px`,
         background: colour.surface,
         borderBottom: `1px solid ${colour.borderSubtle}`,
       }}
@@ -64,13 +69,13 @@ export function StudioBand({
             onClick={onToggleProblems}
           >
             {errors > 0 && (
-              <span style={{ color: colour.dangerText }}>
+              <span style={{ color: tints[severityTone('error')].text }}>
                 {counts(errors, 'shell.studio.problems.error', 'shell.studio.problems.errors')}
               </span>
             )}
             {errors > 0 && warnings > 0 && ', '}
             {warnings > 0 && (
-              <span style={{ color: colour.warningText }}>
+              <span style={{ color: tints[severityTone('warning')].text }}>
                 {counts(warnings, 'shell.studio.problems.warning', 'shell.studio.problems.warnings')}
               </span>
             )}

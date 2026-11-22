@@ -23,8 +23,8 @@ their own controls where they expect them.
 - **Read-only banner.** While the tenant is [read-only](subscriptions.md#the-read-only-tenant), a
   warning banner with the alert role sits at the top of the content, under the header and beside the
   sidebar, on every page of every site. It says that the workspace is read-only and why. An
-  administrator in a cell also gets a link to the billing portal, the `billingUrl` of
-  `GET /api/me`. The cell console's host has no tenant, so it shows no banner.
+  administrator in a cell also gets a link to the billing page, the `billingUrl` of
+  `GET /api/me`, see [the current user](security.md#roles-and-the-current-user). The cell console's host has no tenant, so it shows no banner.
 - **Mark and title.** The mark is the first letter of the site's title on a `primary` tile with
   `radius-base` corners, and the mark and the title are one link to the site's first navigation page.
   The platform site's title and mark name Axis, because the tenant has no name yet, as the
@@ -93,7 +93,10 @@ their own controls where they expect them.
   A small block that stands for one thing, such as a home page tile or a dashboard's KPI or chart, keeps its own
   `borderSubtle` border and `radius-base` corners.
 - **Parts a rule apart.** A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
-  drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
+  drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule. On a page the
+  rule reaches past the page's padding to the page area's edges. In a drawer, a dialog, the side panel, the sidebar, a
+  tile or a column of a grid it stays inside. A runtime page's widget list, a record's detail and a record form also
+  keep it inside.
 - **Rules, not boxes** _(planned)_. One `borderSubtle` rule parts a block from the one beside it, and no border, box
   or rounded corner goes round a region. It follows dividers over containers, as Material's containment has it, and a
   code editor's split panes, and keeps clear of boxes inside boxes.
@@ -101,7 +104,7 @@ their own controls where they expect them.
   where one block ends and the next begins, such as between a run's Output and its Log. Inside a block's content no
   rule is drawn at will: the parts of one task sit together under one title, set apart by spacing. Where a rule is
   needed is judged on the whole page, not by applying a rule everywhere.
-- **A rule runs the whole way** _(planned)_. It runs the length of what it parts, from one rule to the next or to the
+- **A rule runs the whole way**. It runs the length of what it parts, from one rule to the next or to the
   edge, as the rules under the header and beside the sidebar do.
 - **What fills a region fills it to its rules** _(planned)_. A log, a code editor or a table reaches the region's
   rules, with no box of its own.
@@ -112,12 +115,12 @@ their own controls where they expect them.
 - **Fields as wide as each other** _(planned)_. Every field of a region is as wide as the others, and no button stands
   loose beside an input. An action of the whole region, such as Reset or Import, sits in its title row, and an action
   of one control goes with the control.
-- **A title row's actions are light** _(planned)_. They are borderless text buttons or icon buttons with their names as
+- **A title row's actions are light**. They are borderless text buttons or icon buttons with their names as
   tooltips, at the usual button size, such as the explorer's New and Refresh.
 - **A view switch sits above what it switches** _(planned)_. A switch between two views of one content, such as Form
   and JSON, is a row of line tabs right above that content, in the one look every tab row of the workspace has, see
   [tab bars](actions-and-controls.md#tab-bars).
-- **The layout follows the work** _(planned)_. A region puts what to act on first, then the input, the action and the
+- **The layout follows the work**. A region puts what to act on first, then the input, the action and the
   result. An action sits after what it acts on, at the foot of its region when the input can be long, and the result
   comes after it.
 - **A handle on a rule** _(planned)_. Every size handle, the side panel's included, is one handle: a grip of two bars
@@ -164,18 +167,13 @@ application never depends on the UI library.
 ## Page header
 
 A page with a band starts with a header band on `surface` across the page area, with a `borderSubtle` rule
-below it. It says where the person is and what the page is.
+below it. It says what the page is.
 
-- **Regular band.** The band of a platform page that keeps one, the account and Users pages, holds the breadcrumb,
-  then the page title in `heading4`. It has `spacing-lg` padding above and at its sides, `spacing-md` below the title,
-  and `spacing-xs` between the breadcrumb and the title.
-- **Title alone in the band** _(planned)_. The band of a platform page that keeps one holds only the page title in
-  `heading4`, as the page's level-one heading: the account, users, user, licences, console and console instance pages.
-  It has `spacing-md` padding above and below the title, so the title sits evenly, and `spacing-lg` at its sides, where
-  the title lines up with the content below.
-- **Breadcrumb.** The breadcrumb starts at the site and ends at the page: "Axis › Users". Every step but the
-  last is a link, and the last is marked `aria-current`.
-- **No breadcrumb** _(planned)_. No page of any site draws a breadcrumb. The header's mark leads to the site's first
+- **Title alone in the band.** The band of a platform page that keeps one holds only the page title in
+  `heading4`, as the page's level-one heading, such as "Users" or "Your account": the account, users, user, licences,
+  console and console instance pages. It has `spacing-md` padding above and below the title, so the title sits evenly,
+  and `spacing-lg` at its sides, where the title lines up with the content below. `PageLayout`'s `band` switches it on.
+- **No breadcrumb.** No page of any site draws a breadcrumb. The header's mark leads to the site's first
   page, and the browser goes back, as **No link back** in [layout](#layout) says. The user page and the console instance
   page have no step back to their list, because the browser leads back to it. `PageLayout` takes no breadcrumb, and no
   text names one.
@@ -203,10 +201,7 @@ below it. It says where the person is and what the page is.
   elsewhere, is the page's first part. It is a list of facts through `TermList`, see
   [fields](actions-and-controls.md#fields), above a `borderSubtle` rule. It never sits on the heading's line.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
-  see the [platform home page](#platform-home-page). The users page has the band "Axis › Users".
-- **The account page's band.** The account page has the band "Axis › Your account".
-- **Bands by title alone** _(planned)_. Each platform page's band names the page by its title alone, such as "Users" or
-  "Your account", with no "Axis ›" before it.
+  see the [platform home page](#platform-home-page).
 
 ## App switcher and preferences
 
@@ -217,8 +212,8 @@ theme.
   under the heading "Sites", then the tools of their roles under the heading "Tools": Studio for an
   author, the operator console for an operator and Users for an administrator, which links to the
   users page at `/users`, see [the administrator role](user-administration.md#the-administrator-role).
-  An administrator in a cell also sees Billing after Users, a link to `billingUrl` that opens the
-  [billing portal](billing-portal.md#where) in the same tab. Outside a cell there is no such entry.
+  An administrator in a cell also sees Billing after Users, a link to `billingUrl`, the billing page, that opens in the same tab, see
+  [the current user](security.md#roles-and-the-current-user). Outside a cell there is no such entry.
   The entry of the current page, a site or a tool, is drawn selected, as the language and theme menu
   draws its current choices, and marked `aria-current="page"`. With nobody signed in the app switcher
   is not shown. On a site's own host it lists only that site and no tools.
@@ -433,21 +428,30 @@ to the frame shows in every state. How previews work is in
 
   | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Saved record, Saved record with a change, Record not found, Task, Task not found, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                 |
+  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Saved record, Saved record with a change, Record not found, Task, Task not found, Dashboard, Process instance, Platform site, App switcher, Language and theme, Account page, Account notifications, Users page, and User page                                                                                        |
   | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
   | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 
 - **The identity provider's pages are the theme's own.** `identitySignIn` is built from fixtures
   through the shared sign-in components in `web/src/identitySignIn/`. Its states from Two-step
   verification to Error are the same components that the theme draws.
-- **A frame is a screen.** A shell preview draws the shell in a frame exactly as tall as its height, and
-  the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
+- **A frame is a screen.** A shell preview draws the shell in a frame that fills the window down to the canvas's
+  padding and is never shorter than the state's height. The page scrolls inside it as in a window, so a dialog
+  opens in the middle of what shows.
 - **The State control.** `shell`, `signIn` and `identitySignIn` show one state at a time under a State
   control, as `studio` does, and `&state=<slug>` opens one.
 - **Account states.** The `shell` preview gains Account page, the platform's `/account` on its
   Security tab, and Account notifications, the same page on its Notifications tab. Both use fixtures of
   `GET /api/me/authenticators`, `GET /api/me/sessions` and `GET /api/me/notification-preferences`, and `PUT`
   answers `204`.
+- **Users states.** The `shell` preview gains Users page, the platform's `/users`, and User page, `/users/{id}` of the
+  first person listed. Both use fixtures of `GET /api/users`, `GET /api/users/{id}/roles` and
+  `GET /api/me/tables/users`. The five tenant sections of the users page, `GET /api/tenant/outside-clients`, `usage`,
+  `hosts`, `model-key` and `application-packages`, answer `404`, so the page shows only its people.
+- **The preview draws the platform's own routes.** `ShellPreview` renders `PlatformRoutes`, the route table that the app
+  draws, so the preview's platform pages cannot drift from the real ones.
+- **Process instance.** The `shell` preview gains Process instance, which opens a waiting instance from the fixture
+  site's Approvals page, on its Diagram. It uses fixtures of the instance detail and of the instance's release texts.
 - **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
   through the shell over fixtures of the purchase request sample, in sixteen states: Typical, Empty,
   Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live,

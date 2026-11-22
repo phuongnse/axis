@@ -9,6 +9,7 @@ import type { OwnNotificationPreferences } from '../platform/ownNotificationPref
 import type { OwnSessions } from '../platform/ownSessions'
 import { assignLocation } from '../platform/navigation'
 import { chooseOption } from '../test/antd'
+import { expectTitleAloneInBand } from '../test/pageBand'
 import { TextProvider } from '../platform/TextProvider'
 import { AccountPage } from './AccountPage'
 import { PlatformContext, type Platform } from './context'
@@ -129,6 +130,15 @@ beforeEach(() => {
 })
 
 describe('AccountPage', () => {
+  it('holds the title alone in the band', async () => {
+    stubServer(() => json(sessions(true)))
+    renderPage()
+
+    await screen.findAllByRole('button', { name: 'End' })
+
+    expectTitleAloneInBand('Your account')
+  })
+
   it('disables every end button and offers Sign in again when the session may not end sessions', async () => {
     const fetchMock = stubServer(() => json(sessions(false)))
     renderPage()

@@ -26,6 +26,8 @@ import {
   openFormTab,
   openKind,
   openListItem,
+  processStepAction,
+  widgetRowAction,
   writeLabel,
 } from '../studio-resources'
 
@@ -421,7 +423,11 @@ test.describe('the author builds the service desk with Studio only', () => {
         if (list.aggregate.groupBy.length === 0) {
           // The form has no empty array to start from, so the author adds an entry and removes it to write `[]`.
           await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
-          await groupBy.getByRole('button', { name: 'Remove', exact: true }).click()
+          await groupBy.getByRole('button', { name: 'Actions', exact: true }).click()
+          await page
+            .getByRole('menu', { name: 'Actions', exact: true })
+            .getByRole('menuitem', { name: 'Remove', exact: true })
+            .click()
         }
         for (const [index, measure] of list.aggregate.measures.entries()) {
           const at = `studio-field-/aggregate/measures/${index}`
@@ -574,7 +580,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
     await writeLabel(page, 'studio-field-/title', text('processes.ticketHandling.title'))
-    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Delete', exact: true }).click()
+    await processStepAction(page, 0, 'Delete')
 
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
     const steps: [name: string, type: string][] = [
@@ -933,10 +939,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await dragTo(page, 'studio-page-design', panel.getByTestId('studio-data-entity-Ticket'), starter, 0.75)
     await chooseBinding(page, 'detail')
     await expect(frame(page, '/widgets/1')).toBeVisible()
-    await panel
-      .getByTestId('studio-widget-row-/widgets/0')
-      .getByRole('button', { name: 'Delete', exact: true })
-      .click()
+    await widgetRowAction(panel, '/widgets/0', 'Delete')
     await expect(panel.getByTestId('studio-widget-/widgets/1')).toHaveCount(0)
     await save(page)
   })
@@ -992,10 +995,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(frame(page, '/widgets/1')).toBeVisible()
     await dragOnto('studio-palette-columns', frame(page, '/widgets/0'), 0.25)
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toBeVisible()
-    await panel
-      .getByTestId('studio-widget-row-/widgets/1')
-      .getByRole('button', { name: 'Delete', exact: true })
-      .click()
+    await widgetRowAction(panel, '/widgets/1', 'Delete')
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toHaveCount(0)
     await panel.getByTestId('studio-widget-/widgets/0').click()
     await panel.getByTestId('studio-field-/widgets/0/columns/0/width').getByRole('spinbutton').fill('4')
@@ -1095,7 +1095,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await page.getByTestId(`studio-field-/parameters/${index}/name`).getByRole('textbox').fill(parameter)
         await pick(page, `studio-field-/parameters/${index}/type`, type)
       }
-      await stepCard(0).getByRole('button', { name: 'Delete', exact: true }).click()
+      await processStepAction(page, 0, 'Delete')
       for (const [index, [stepName, type]] of [
         [step.name, 'operation'],
         ['done', 'end'],

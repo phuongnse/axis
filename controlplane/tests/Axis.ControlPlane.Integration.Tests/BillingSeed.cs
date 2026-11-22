@@ -5,7 +5,7 @@ using Npgsql;
 
 namespace Axis.ControlPlane.Integration.Tests;
 
-/// <summary>The catalogue and the subscriptions that the billing tests share.</summary>
+/// <summary>The catalogue that the billing API tests share.</summary>
 internal static class BillingSeed
 {
     public static PlanCatalogue Catalogue()
@@ -28,35 +28,47 @@ internal static class BillingSeed
                     "workerWeight": 2,
                     "authoringRequests": 200
                   },
-                  "prices": [{ "currency": "VND", "month": 4900000 }, { "currency": "USD", "month": 1900 }],
-                  "addOns": [{ "code": "users-10", "users": 10, "prices": [{ "currency": "VND", "month": 500000 }, { "currency": "USD", "month": 20 }] }]
+                  "addOns": [{ "code": "users-10", "users": 10 }]
+                }, {
+                  "code": "team",
+                  "version": 2,
+                  "name": { "en": "Team", "vi": "Nhóm" },
+                  "includedUsers": 25,
+                  "quotas": {
+                    "storage": 21474836480,
+                    "applications": 5,
+                    "emailsPerDay": 2000,
+                    "packageCpuSecondsPerDay": 3600,
+                    "concurrentImports": 2,
+                    "concurrentConnectorCalls": 10,
+                    "concurrentQueries": 10,
+                    "workerWeight": 2,
+                    "authoringRequests": 200
+                  },
+                  "addOns": [{ "code": "users-10", "users": 10 }]
+                }, {
+                  "code": "trial",
+                  "version": 1,
+                  "trial": true,
+                  "name": { "en": "Trial", "vi": "Dùng thử" },
+                  "includedUsers": 10,
+                  "quotas": {
+                    "storage": 1073741824,
+                    "applications": 2,
+                    "emailsPerDay": 200,
+                    "packageCpuSecondsPerDay": 0,
+                    "concurrentImports": 1,
+                    "concurrentConnectorCalls": 2,
+                    "concurrentQueries": 2,
+                    "workerWeight": 1,
+                    "authoringRequests": 20
+                  },
+                  "addOns": []
                 }] } }
                 """)))
             .Build();
         var options = new ControlPlaneOptions();
         configuration.GetSection(ControlPlaneOptions.SectionName).Bind(options);
         return PlanCatalogue.Create(options.Plans);
-    }
-
-    /// <summary>A subscription of a verified sign-up that pins the team plan in VND for the period, or none when the period is null.</summary>
-    public static async Task<Guid> SubscriptionAsync(NpgsqlDataSource dataSource, string tenant, string? period, CancellationToken cancellationToken)
-    {
-        var signUp = Guid.CreateVersion7();
-        var id = Guid.CreateVersion7();
-        await ControlPlaneDatabase.ExecuteAsync(
-            dataSource,
-            $"""
-            INSERT INTO control_plane.sign_ups (id, full_name, email, normalised_email, business_name, subdomain, language, application, state, expires_at)
-            VALUES ('{signUp}', 'An', '{tenant}@example.com', '{tenant}@example.com', 'Acme', '{tenant}', 'en', '', 'verified', now())
-            """,
-            cancellationToken);
-        await ControlPlaneDatabase.ExecuteAsync(
-            dataSource,
-            $"""
-            INSERT INTO control_plane.subscriptions (id, tenant_id, sign_up_id, trial_ends_at, step_id, state{(period is null ? "" : ", plan_code, plan_version, currency, period")})
-            VALUES ('{id}', '{tenant}', '{signUp}', now(), '{Guid.CreateVersion7()}', 'trialing'{(period is null ? "" : $", 'team', 1, 'VND', '{period}'")})
-            """,
-            cancellationToken);
-        return id;
     }
 }

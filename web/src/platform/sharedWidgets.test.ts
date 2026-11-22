@@ -1,8 +1,6 @@
-/// <reference types="node" />
 // Holds the table in docs/reference/shared-widgets.md#which-widget to the SPA's exports.
-import { readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { docsTables, tablesIn } from '../test/docTables'
 
 /** The header of the table that names the shared widget of each job. */
 const tableHeader = /^\|\s*Job\s*\|\s*Shared widget\s*\|/
@@ -18,22 +16,6 @@ const serverPath = /`src\/Axis\./
 const exportPattern = /^export (?:default )?(?:async )?(?:function\*?|const|let|class) (\w+)/gm
 
 type Documented = { all: Set<string>; required: Set<string> }
-
-/** The rows under each table header, without the separator line. A table ends at the first line that is not a row. */
-function tablesIn(markdown: string): string[][] {
-  const lines = markdown.split('\n')
-  const tables: string[][] = []
-  lines.forEach((line, index) => {
-    if (!tableHeader.test(line)) return
-    const rows: string[] = []
-    for (const row of lines.slice(index + 1)) {
-      if (!row.startsWith('|')) break
-      if (!/^\|\s*-+/.test(row)) rows.push(row)
-    }
-    tables.push(rows)
-  })
-  return tables
-}
 
 /** The names that the rows name: all of them, and those the SPA must export. */
 function documentedNames(rows: string[]): Documented {
@@ -77,7 +59,7 @@ describe('the Which widget table', () => {
       '',
       'Text.',
     ]
-    expect(tablesIn(doc.join('\n'))).toEqual([['| A button | `AxisButton` |']])
+    expect(tablesIn(doc.join('\n'), tableHeader)).toEqual([['| A button | `AxisButton` |']])
   })
 
   it('names the widgets of a row without a planned marker as required', () => {
@@ -128,11 +110,7 @@ describe('the Which widget table against the SPA', () => {
     eager: true,
   }) as Record<string, string>
 
-  // Vitest runs from web/, so the docs are one folder up.
-  const docsRoot = join(process.cwd(), '../docs')
-  const tables = readdirSync(docsRoot, { recursive: true, encoding: 'utf8' })
-    .filter((file) => file.endsWith('.md'))
-    .flatMap((file) => tablesIn(readFileSync(join(docsRoot, file), 'utf8')))
+  const tables = docsTables(tableHeader)
 
   it('finds the sources', () => {
     expect(Object.keys(sources).length).toBeGreaterThan(50)
