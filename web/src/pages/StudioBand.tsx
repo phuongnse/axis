@@ -62,7 +62,7 @@ export function StudioBand({
       <Flex align="center" gap="middle" style={{ minWidth: 0 }}>
         {errors + warnings > 0 && (
           <AxisButton
-            role="plain"
+            role="subtle"
             data-testid="studio-problems"
             aria-expanded={problemsOpen}
             aria-controls={problemsPanelId}

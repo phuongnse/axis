@@ -62,7 +62,7 @@ export function SaveBar({
               {history && (
                 <>
                   <AxisButton
-                    role="icon"
+                    role="subtle"
                     nameKey="shell.studio.undo"
                     icon={<UndoOutlined />}
                     aria-keyshortcuts="Control+Z Meta+Z"
@@ -70,7 +70,7 @@ export function SaveBar({
                     onClick={history.onUndo}
                   />
                   <AxisButton
-                    role="icon"
+                    role="subtle"
                     nameKey="shell.studio.redo"
                     icon={<RedoOutlined />}
                     aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"

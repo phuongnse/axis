@@ -3,7 +3,6 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useSelectedItemTint } from '../platform/antTheme'
 import { AxisField } from '../platform/AxisField'
 import { StatusTag } from '../platform/StatusTag'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
@@ -30,7 +29,6 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
 import { useTableView } from '../platform/useTableView'
 import { ExpressionField } from './ExpressionField'
 import { newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
@@ -199,17 +197,15 @@ function MatrixCell({
   onSelect: () => void
 }) {
   const t = useText()
-  const { colour } = useDesignTokens()
-  const tint = useSelectedItemTint()
   return (
-    // A selected cell is marked as a menu marks its chosen item: the selected tint and `primaryText`, see
-    // docs/reference/actions-and-controls.md#menus ('A marked choice on the selected tint').
+    // A selected cell is marked as a menu marks its chosen item, through `selected`, see
+    // docs/reference/actions-and-controls.md#buttons.
     <AxisButton
-      role="plain"
+      role="subtle"
       size="small"
-      aria-pressed={selected}
+      selected={selected}
       data-testid={`studio-matrix-cell-${role.name}-${cell.kind}-${cell.target}`}
-      style={{ height: 'auto', minWidth: 32, ...(selected ? { background: tint, color: colour.primaryText } : {}) }}
+      style={{ height: 'auto', minWidth: 32 }}
       onClick={onSelect}
     >
       <Flex wrap gap={4} align="center">
@@ -536,7 +532,8 @@ function OwnGrants({
                 </Typography.Text>
               )}
               <AxisButton
-                role="destructive"
+                role="secondary"
+                destructive
                 size="small"
                 disabled={grants.length === 1}
                 onClick={() => edit(`/grants/${index}`, undefined)}

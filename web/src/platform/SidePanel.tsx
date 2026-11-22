@@ -112,7 +112,7 @@ export function SidePanel({
           </Flex>
           {onClose !== undefined && (
             <AxisButton
-              role="icon"
+              role="subtle"
               nameKey={closeNameKey}
               icon={<CloseOutlined />}
               data-testid={closeTestId}

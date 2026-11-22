@@ -157,7 +157,8 @@ export function UserPage() {
                       </Flex>
                       {(row.given || row.declared) && (
                         <AxisButton
-                          role={row.given ? 'destructive' : 'secondary'}
+                          role="secondary"
+                          destructive={row.given}
                           disabled={busy}
                           onClick={() => setPending({ give: !row.given, section, role: row.role })}
                         >

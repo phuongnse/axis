@@ -977,7 +977,7 @@ function KpiPanel({
                 <LabelTexts pointer={`${base}/comparison/label`} value={comparison.label} onChange={onChange} />
               </PageFieldGroup>
               <div>
-                <AxisButton role="destructive" onClick={() => onChange(`${base}/comparison`, undefined)}>
+                <AxisButton role="secondary" destructive onClick={() => onChange(`${base}/comparison`, undefined)}>
                   {t('shell.studio.page.removeComparison')}
                 </AxisButton>
               </div>
@@ -1007,7 +1007,8 @@ function KpiPanel({
                 <NavigateFields pointer={`${base}/navigate`} action={navigate} onChange={onChange} />
                 <div>
                   <AxisButton
-                    role="destructive"
+                    role="secondary"
+                    destructive
                     onClick={() => {
                       onChange(`${base}/navigate`, undefined)
                       onSelect(base)
@@ -1519,7 +1520,7 @@ function ParameterExpressions({
                     />
                   </AxisField>
                 </div>
-                <AxisButton role="destructive" onClick={() => onChange(rowPointer, undefined)}>
+                <AxisButton role="secondary" destructive onClick={() => onChange(rowPointer, undefined)}>
                   {t('shell.studio.process.removeMapping')}
                 </AxisButton>
               </Flex>

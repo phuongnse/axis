@@ -137,7 +137,12 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false,
           </>
         )}
         {editable && !field.required && value !== null && (
-          <AxisButton role="destructive" aria-label={`${t('shell.form.removeFile')} ${label}`} onClick={remove}>
+          <AxisButton
+            role="secondary"
+            destructive
+            aria-label={`${t('shell.form.removeFile')} ${label}`}
+            onClick={remove}
+          >
             {t('shell.form.removeFile')}
           </AxisButton>
         )}

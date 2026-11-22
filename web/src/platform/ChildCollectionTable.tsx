@@ -188,7 +188,7 @@ export function ChildCollectionTable({
                     value={aligned[index]?.[child.name] ?? ''}
                   />
                   <AxisButton
-                    role="icon"
+                    role="subtle"
                     joined
                     nameKey="shell.form.choose"
                     nameSuffix={`${label} ${index + 1}`}
@@ -202,7 +202,7 @@ export function ChildCollectionTable({
                   />
                   {!child.required && row[child.name] != null && (
                     <AxisButton
-                      role="icon"
+                      role="subtle"
                       joined
                       nameKey="shell.form.clear"
                       nameSuffix={`${label} ${index + 1}`}

@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
+import { useSelectedItemTint } from './antTheme'
 import { Chevron } from './Chevron'
 import type { ButtonRole } from './buttonRoles'
 import { fillText } from './fillText'
@@ -23,15 +24,40 @@ type Base = Omit<ButtonProps, 'type' | 'color' | 'variant' | 'danger' | 'role' |
   ref?: Ref<HTMLButtonElement>
 }
 
+/** What a chosen subtle button says: `true` or `false` for a button of a list of choices, or where it leads. */
+type Selected = boolean | 'page' | 'step'
+
+/**
+ * `destructive` is the tone any role but `link` takes, and `selected` marks a chosen subtle button, see
+ * docs/reference/actions-and-controls.md#buttons.
+ */
+type TextButton =
+  | {
+      role: Exclude<ButtonRole, 'subtle' | 'link'>
+      destructive?: boolean
+      selected?: never
+    }
+  | {
+      role: 'subtle'
+      destructive?: boolean
+      selected?: Selected
+    }
+  | {
+      role: 'link'
+      destructive?: never
+      selected?: never
+    }
+
 export type AxisButtonProps =
-  | (Base & {
-      role: Exclude<ButtonRole, 'icon'>
-      icon?: never
-      /** A text trigger that opens a menu ends in a caret, see docs/reference/actions-and-controls.md#menus. */
-      caret?: boolean
-    })
+  | (Base &
+      TextButton & {
+        icon?: never
+        nameKey?: never
+        /** A text trigger that opens a menu ends in a caret, see docs/reference/actions-and-controls.md#menus. */
+        caret?: boolean
+      })
   | (Omit<Base, 'children' | 'aria-label'> & {
-      role: 'icon'
+      role: 'subtle'
       icon: ReactNode
       /** The text key of the button's name, which is its tooltip and its accessible name. */
       nameKey: string
@@ -39,6 +65,8 @@ export type AxisButtonProps =
       nameValues?: Record<string, string>
       /** Draws the icon in `dangerText`. */
       destructive?: boolean
+      /** Draws the button on the selected tint in `primaryText` and sets `aria-pressed`, or `aria-current` for a string. */
+      selected?: Selected
       /** Appended to the accessible name only, such as a row number. The tooltip stays the name. */
       nameSuffix?: string
       /** Draws a bordered default button, to sit joined to an input in a Space.Compact. */
@@ -53,7 +81,38 @@ export type AxisButtonProps =
 
 const ActionRowContext = createContext(false)
 
-type IconButtonProps = Extract<AxisButtonProps, { role: 'icon' }>
+type IconButtonProps = Extract<AxisButtonProps, { nameKey: string }>
+
+function isIconButton(props: AxisButtonProps): props is IconButtonProps {
+  return props.nameKey !== undefined
+}
+
+type Marks = { 'aria-pressed'?: boolean | 'true' | 'false' | 'mixed'; 'aria-current'?: unknown }
+
+/**
+ * What `selected` gives a subtle button: the selected tint behind `primaryText`, and the one attribute that says so, in
+ * place of any `aria-pressed` or `aria-current` the caller passes. Without `selected`, the caller's attributes stay.
+ */
+function withSelected<T extends Marks>(
+  selected: Selected | undefined,
+  rest: T,
+  tint: string,
+  text: string,
+  disabled?: boolean,
+): {
+  rest: Omit<T, 'aria-pressed' | 'aria-current'> & { 'aria-pressed'?: boolean; 'aria-current'?: 'page' | 'step' }
+  style: CSSProperties
+} {
+  if (selected === undefined) {
+    return { rest: rest as never, style: {} }
+  }
+  const { 'aria-pressed': _pressed, 'aria-current': _current, ...others } = rest
+  const mark = typeof selected === 'boolean' ? { 'aria-pressed': selected } : { 'aria-current': selected }
+  return {
+    rest: { ...others, ...mark },
+    style: selected ? { background: tint, ...(disabled ? {} : { color: text }) } : {},
+  }
+}
 
 /** Opens on hover and Tab focus, and a click hides it until the pointer comes back, except to say `doneKey`. */
 function IconButton(props: IconButtonProps) {
@@ -64,6 +123,7 @@ function IconButton(props: IconButtonProps) {
     nameKey,
     nameValues,
     destructive,
+    selected,
     nameSuffix,
     joined,
     doneKey,
@@ -73,8 +133,10 @@ function IconButton(props: IconButtonProps) {
     onClick,
     onMouseEnter,
     onMouseLeave,
-    ...rest
+    ...attributes
   } = props
+  const tint = useSelectedItemTint()
+  const chosen = withSelected(selected, attributes, tint, colour.primaryText, disabled)
   const [open, setOpen] = useState(false)
   const [shownDone, setShownDone] = useState(doneKey)
   // The click that did the work has hushed the tooltip, so saying it is done opens it again.
@@ -87,7 +149,7 @@ function IconButton(props: IconButtonProps) {
   const pointerOver = useRef(false)
   const hushed = useRef(false)
   const name = nameValues ? fillText(t(nameKey), nameValues) : t(nameKey)
-  const tint: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
+  const tone: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
   return (
     <Tooltip
       title={doneKey === undefined ? name : t(doneKey)}
@@ -98,12 +160,12 @@ function IconButton(props: IconButtonProps) {
       }
     >
       <Button
-        {...rest}
+        {...chosen.rest}
         type={joined ? 'default' : 'text'}
         disabled={disabled}
         aria-label={nameSuffix ? `${name} ${nameSuffix}` : name}
         icon={<span aria-hidden>{icon}</span>}
-        style={{ ...tint, ...style }}
+        style={{ ...tone, ...chosen.style, ...style }}
         onMouseEnter={(event) => {
           pointerOver.current = true
           onMouseEnter?.(event)
@@ -145,8 +207,8 @@ function safeJustify(justify: FlexProps['justify']): CSSProperties['justifyConte
 
 /**
  * A row of actions that has a solid `finish` button, see docs/reference/actions-and-controls.md#buttons. Beside it,
- * `main`, `secondary` and `destructive` buttons are text buttons in their own colour, so the finish button is the only
- * filled shape. The row wraps. A row with `fold` keeps one line instead: it draws `children`, then the `fold` actions
+ * `main` and `secondary` buttons, in the `destructive` tone or not, are text buttons in their own colour, so the finish
+ * button is the only filled shape. The row wraps. A row with `fold` keeps one line instead: it draws `children`, then the `fold` actions
  * as secondary buttons, then `end`. When its content is wider than the row, the `fold` actions become the entries of
  * one "…" icon menu named More actions, in their order. They are buttons again when the row is as wide as the content
  * was before it folded. With `outlined`, the row keeps those buttons outlined, as a bar at the foot of one pane does,
@@ -232,7 +294,7 @@ export function AxisActionRow({
                 'aria-label': t('shell.actionRow.more'),
               }}
             >
-              <AxisButton role="icon" nameKey="shell.actionRow.more" icon={<EllipsisOutlined />} />
+              <AxisButton role="subtle" nameKey="shell.actionRow.more" icon={<EllipsisOutlined />} />
             </Dropdown>
           ) : (
             fold.map((action) => (
@@ -254,25 +316,30 @@ export function AxisActionRow({
 }
 
 /**
- * The one button of Axis, see docs/reference/actions-and-controls.md#buttons. `finish` completes a form or a dialog and
- * is solid primary. `main` is the main action of a page and is an outline in `primaryText`. `secondary` is every other
- * action and is the grey outline. `destructive` removes data and is an outline in `dangerText`. `icon` has no text, so
- * it takes a text key and shows the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless
- * `joined` draws it as a bordered default button for a control joined to an input. Inside an `AxisActionRow`, `main`,
- * `secondary` and `destructive` are text buttons, `main` in `primaryText` and `destructive` in `dangerText`. `plain` is
- * a borderless text button in the text colour, for header controls such as the account button. `caret` adds a down
- * caret after the text of any text role. `link` is a button drawn as a link, in `primaryText`, for an action that goes to
- * no address. The role is not passed on to the DOM.
+ * The one button of Axis, see docs/reference/actions-and-controls.md#buttons. The role is the weight. `finish` completes
+ * a form or a dialog and is solid primary. `main` is the main action of a region and is an outline in `primaryText`.
+ * `secondary` is every other action and is the grey outline. `subtle` is a borderless text button in the text colour,
+ * for tools and header controls. With an `icon` and a `nameKey` it is an icon-only button, which has no text, so it
+ * shows the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless `joined` draws it as a
+ * bordered default button for a control joined to an input. The `destructive` tone, which any role but `link` takes,
+ * says the action removes something: `main`, `secondary` and `subtle` draw in `dangerText`, and `finish` is a solid
+ * `danger` fill with white text. `selected` draws a subtle button on the selected tint in `primaryText`, and sets the
+ * one `aria-pressed`, or `aria-current` for `"page"` and `"step"`, in place of any the caller passes. Inside an
+ * `AxisActionRow`, `main` and `secondary` are text buttons, `main` in `primaryText`. `caret` adds a down caret after
+ * the text of any text role. `link` is a button drawn as a link, in `primaryText`, for an action that goes to no
+ * address. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
+  const tint = useSelectedItemTint()
   const inRow = useContext(ActionRowContext)
 
-  if (props.role === 'icon') return <IconButton {...props} />
+  if (isIconButton(props)) return <IconButton {...props} />
 
-  const { role, style, disabled, caret, children, ...rest } = props
+  const { role, style, disabled, caret, children, destructive, selected, ...attributes } = props
+  const chosen = withSelected(selected, attributes, tint, colour.primaryText, disabled)
   const body = {
-    ...rest,
+    ...chosen.rest,
     children: caret ? [children, <Chevron key="caret" />] : children,
   }
   const outline = (text: string): CSSProperties => (disabled ? {} : { color: text, borderColor: text })
@@ -280,31 +347,52 @@ export function AxisButton(props: AxisButtonProps) {
   const variant = inRow ? 'text' : 'outlined'
   switch (role) {
     case 'finish':
-      return <Button {...body} type="primary" disabled={disabled} style={style} />
+      return destructive ? (
+        <Button
+          {...body}
+          type="primary"
+          danger
+          disabled={disabled}
+          style={
+            disabled
+              ? style
+              : { background: colour.danger, borderColor: colour.danger, color: colour.onPrimary, ...style }
+          }
+        />
+      ) : (
+        <Button {...body} type="primary" disabled={disabled} style={style} />
+      )
     case 'main':
+    case 'secondary':
+      if (role === 'secondary' && !destructive) {
+        return <Button {...body} type={inRow ? 'text' : 'default'} disabled={disabled} style={style} />
+      }
       return (
         <Button
           {...body}
-          color="primary"
+          color={destructive ? 'danger' : 'primary'}
           variant={variant}
           disabled={disabled}
-          style={{ ...(inRow ? tinted(colour.primaryText) : outline(colour.primaryText)), ...style }}
+          style={{
+            ...(inRow
+              ? tinted(destructive ? colour.dangerText : colour.primaryText)
+              : outline(destructive ? colour.dangerText : colour.primaryText)),
+            ...style,
+          }}
         />
       )
-    case 'destructive':
-      return (
+    case 'subtle':
+      return destructive ? (
         <Button
           {...body}
           color="danger"
-          variant={variant}
+          variant="text"
           disabled={disabled}
-          style={{ ...(inRow ? tinted(colour.dangerText) : outline(colour.dangerText)), ...style }}
+          style={{ ...tinted(colour.dangerText), ...chosen.style, ...style }}
         />
+      ) : (
+        <Button {...body} type="text" disabled={disabled} style={{ ...chosen.style, ...style }} />
       )
-    case 'secondary':
-      return <Button {...body} type={inRow ? 'text' : 'default'} disabled={disabled} style={style} />
-    case 'plain':
-      return <Button {...body} type="text" disabled={disabled} style={style} />
     case 'link':
       return (
         <Button
@@ -327,7 +415,7 @@ export function AxisButtonGroup({
   nameKey,
   actions,
 }: {
-  role: 'main' | 'secondary' | 'destructive'
+  role: 'main' | 'secondary'
   nameKey: string
   actions: readonly {
     key: string
@@ -391,7 +479,7 @@ export function AxisSplitButton({
         {action.label}
       </AxisButton>
       <Dropdown trigger={['click']} autoFocus menu={{ items: menuOf(menu), 'aria-label': t('shell.actionRow.more') }}>
-        <AxisButton role="icon" joined nameKey="shell.actionRow.more" nameSuffix={nameSuffix} icon={<Chevron />} />
+        <AxisButton role="subtle" joined nameKey="shell.actionRow.more" nameSuffix={nameSuffix} icon={<Chevron />} />
       </Dropdown>
     </Space.Compact>
   )

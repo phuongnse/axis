@@ -95,7 +95,7 @@ export function AppSwitcher({ locale }: { locale: string }) {
 
   return (
     <Dropdown trigger={['click']} menu={{ items, selectable: true, selectedKeys, 'aria-label': label }}>
-      <AxisButton role="icon" nameKey="shell.appSwitcher.label" icon={<AppstoreOutlined />} />
+      <AxisButton role="subtle" nameKey="shell.appSwitcher.label" icon={<AppstoreOutlined />} />
     </Dropdown>
   )
 }

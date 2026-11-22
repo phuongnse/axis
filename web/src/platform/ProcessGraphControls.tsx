@@ -59,7 +59,7 @@ export function ProcessGraphControls({
   const options = useMemo(() => steps.map((step) => ({ name: step.id, label: step.label })), [steps])
   const findStep = t('shell.inspector.graph.findStep')
   const button = (nameKey: string, icon: ReactNode, key: string | undefined, onClick: () => void) => (
-    <AxisButton role="icon" nameKey={nameKey} icon={icon} aria-keyshortcuts={key} onClick={onClick} />
+    <AxisButton role="subtle" nameKey={nameKey} icon={icon} aria-keyshortcuts={key} onClick={onClick} />
   )
   return (
     <>
@@ -116,7 +116,7 @@ export function ProcessGraphControls({
               }}
             >
               <AxisButton
-                role="icon"
+                role="subtle"
                 nameKey="shell.inspector.graph.download"
                 icon={<DownloadOutlined />}
                 loading={downloading}

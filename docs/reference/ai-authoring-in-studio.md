@@ -209,7 +209,7 @@ to 2,000 characters, and its dialog has Cancel. A failure shows inside the dialo
   comment, then the checks and the review run again." Its button is **Ask AI to change it**.
 - **Drop…** is a secondary action that opens a `small` dialog, "Drop this request?". It says that AI stops
   working on the request and that its draft is deleted. It has Cancel and no field, and its button is **Drop**, in the
-  destructive role. A failed drop shows in [the page's alert](#the-heading).
+  destructive tone. A failed drop shows in [the page's alert](#the-heading).
 - **Send again** _(planned for M35)_ is the main action of a failed request. It sends the request's words as a new request and
   opens that request's page.
 

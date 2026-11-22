@@ -212,7 +212,7 @@ export function Shell({
           >
             {sidebar && (
               <AxisButton
-                role="icon"
+                role="subtle"
                 nameKey={collapsed ? 'shell.navigation.expand' : 'shell.navigation.collapse'}
                 icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
                 aria-expanded={!collapsed}

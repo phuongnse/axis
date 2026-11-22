@@ -57,7 +57,7 @@ export function PreferencesMenu({
 
   return (
     <Dropdown trigger={['click']} menu={{ items, selectable: true, selectedKeys, onClick: pick, 'aria-label': label }}>
-      <AxisButton role="icon" nameKey="shell.preferences.label" icon={<SettingOutlined />} />
+      <AxisButton role="subtle" nameKey="shell.preferences.label" icon={<SettingOutlined />} />
     </Dropdown>
   )
 }

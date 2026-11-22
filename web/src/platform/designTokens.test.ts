@@ -61,6 +61,10 @@ describe.each(['light', 'dark'] as const)('colour contrast in %s mode', (mode) =
     expect(contrast(colourTokens[name][mode], colourTokens[background][mode])).toBeGreaterThanOrEqual(3)
   })
 
+  it('onPrimary reaches 4.5:1 on danger', () => {
+    expect(contrast(colourTokens.onPrimary[mode], colourTokens.danger[mode])).toBeGreaterThanOrEqual(4.5)
+  })
+
   it('onPrimary reaches 4.5:1 on primary', () => {
     expect(contrast(colourTokens.onPrimary[mode], colourTokens.primary[mode])).toBeGreaterThanOrEqual(4.5)
   })
