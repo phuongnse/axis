@@ -92,12 +92,11 @@ export async function createResource(page: Page, kind: string, value: string) {
 }
 
 /**
- * Deletes the open resource: it opens the "…" menu of the page heading, picks Delete… and confirms the dialog. It returns
- * once the dialog is gone.
+ * Deletes the open resource: it clicks Delete… on the page heading and confirms the dialog. It returns once the dialog is
+ * gone.
  */
 export async function deleteResource(page: Page) {
-  await page.getByRole('button', { name: 'More actions', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Delete…', exact: true }).click()
+  await page.getByRole('button', { name: 'Delete…', exact: true }).click()
   await confirmDialog(page, 'Delete')
 }
 

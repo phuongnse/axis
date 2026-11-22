@@ -1341,9 +1341,39 @@ describe('StudioPage', () => {
   })
 
   async function openDeleteDialog() {
-    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete…' }))
   }
+
+  it('draws Delete… on the heading in the destructive tone, with no "…" menu beside it', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+
+    const heading = await screen.findByTestId('studio-resource-details')
+    expect(within(heading).queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    expect(within(heading).getByRole('button', { name: 'Delete…' })).toHaveStyle({
+      color: designTokensFor('light').colour.dangerText,
+      borderColor: designTokensFor('light').colour.dangerText,
+    })
+  })
+
+  it('turns Delete… off while Studio reconnects, and on again once it is back', async () => {
+    const outage: Outage = { down: null }
+    stubServer(undefined, undefined, outage)
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    await openEntityField(1)
+    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await userEvent.clear(maxLength)
+    await userEvent.type(maxLength, '250')
+
+    outage.down = { status: null }
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByTestId('studio-reconnecting', {}, { timeout: 3000 })
+    expect(screen.getByRole('button', { name: 'Delete…' })).toBeDisabled()
+
+    outage.down = null
+    await waitFor(() => expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument(), { timeout: 3000 })
+    expect(screen.getByRole('button', { name: 'Delete…' })).toBeEnabled()
+  })
 
   it('closes the delete dialog and opens the Used by tab from See what uses it', async () => {
     stubServer()
@@ -1431,7 +1461,7 @@ describe('StudioPage', () => {
 
     await screen.findByTestId('studio-editor')
     expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: 'Delete…' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete…' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
   })
 
@@ -1616,8 +1646,7 @@ describe('StudioPage leaving unsaved changes', () => {
     const router = renderGuardedPage([entityAddress])
     await editMaxLength()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete…' }))
     // The field drawer is open too, so the dialog is the one that holds Delete.
     await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
 

@@ -197,7 +197,7 @@ so an author sees what a change or a delete touches. How it shows is in [Used by
 
 Delete removes a resource's file, and asks first, because other resources may use it.
 
-- **On the heading** _(planned)_. Delete… is a secondary button in the destructive tone at the right of the resource's
+- **On the heading**. Delete… is a secondary button in the destructive tone at the right of the resource's
   [heading](studio-workspace.md#page-heading), so no tab shows it apart from the others.
 - **It asks.** Delete always opens a confirm dialog, which warns and names the count when the
   resource's `usedBy` count is above 0. The author can still confirm. The application manifest has no Delete.
