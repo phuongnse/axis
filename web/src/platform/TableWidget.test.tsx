@@ -592,11 +592,30 @@ describe('TableWidget', () => {
         }))
       })
 
-      it('folds the row actions into one Actions button', async () => {
+      it('shows one row action besides the open link as a button, not a menu', async () => {
         stubRecords()
         renderWidget('', {
           ...noteWidget,
           rowActions: [detail, { ...createNote, labelKey: 'note.edit', record: 'id' }],
+        })
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+        const buttons = within(row).getAllByRole('button')
+        expect(buttons).toHaveLength(1)
+        expect(buttons[0]).toHaveAccessibleName('Edit')
+        expect(within(row).getByRole('link', { name: 'Buy paper' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+      })
+
+      it('folds two row actions besides the open link into one Actions button', async () => {
+        stubRecords()
+        renderWidget('', {
+          ...noteWidget,
+          rowActions: [
+            detail,
+            { ...createNote, labelKey: 'note.edit', record: 'id' },
+            { ...createNote, labelKey: 'note.close', record: 'id' },
+          ],
         })
         const row = await screen.findByRole('row', { name: /Buy paper/ })
 
@@ -607,7 +626,7 @@ describe('TableWidget', () => {
         expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
       })
 
-      it('opens the target page from a menu entry, from the table address', async () => {
+      it('opens the target page from the row button, from the table address', async () => {
         stubRecords()
         renderWidget('?page=2', {
           ...noteWidget,
@@ -615,8 +634,7 @@ describe('TableWidget', () => {
         })
         const row = await screen.findByRole('row', { name: /Buy paper/ })
 
-        await userEvent.click(within(row).getByRole('button', { name: 'Actions' }))
-        await userEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }))
+        await userEvent.click(within(row).getByRole('button', { name: 'Edit' }))
 
         await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(`/e2e/noteform/${noteId}`))
         expect(search()).toBe('')

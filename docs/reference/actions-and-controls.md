@@ -89,7 +89,7 @@ widget names a role, never an Ant Design button type.
 - **Icon-only buttons** are only for actions repeated on every row, or where space is tight, and main
   toolbar actions keep their text. Every icon-only button shows its name as a tooltip on hover and on
   keyboard focus, and has the same text, from the text resources, as its accessible name. At narrow
-  width row actions fold into a menu of text entries, so touch users lose nothing.
+  width a row with two or more actions folds into a menu of text entries, so touch users lose nothing.
 - **The platform picks the icons.** Configuration names no icon, except a site's navigation entry,
   which names one from Axis's own list, see [navigation icons](shell.md#navigation-icons). So the
   platform gives an icon only to an action whose meaning it knows.
@@ -448,7 +448,10 @@ be kept right.
   [text](#text).
 - **Row actions.** An action on one row sits on the row. One whose meaning the platform knows, such as
   open, delete or activate a release, is an icon button, and one an author configured keeps its text.
-  From three actions on, or at narrow width, they fold into one "…" menu of text entries. See [menus](#menus).
+  From three actions on, or at narrow width from two on, they fold into one "…" menu of text entries. A table
+  set up for three or more actions folds each row that has two or more. A row with one action shows it as a
+  button, even at narrow width. A known Remove or Delete is the trash icon in `dangerText`, named by a tooltip.
+  See [menus](#menus).
 - **A known action is its icon wherever its row is** _(planned)_. A row's Remove or Delete that is a button is the
   trash icon in `dangerText`, named by a tooltip, in a list's row as in a table's.
 - **A column of row controls has no header text** _(planned)_. The column of a row's "…" or icon buttons, and the

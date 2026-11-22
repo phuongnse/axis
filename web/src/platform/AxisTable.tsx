@@ -1,4 +1,4 @@
-import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
 import { ConfigProvider, Dropdown, Flex, Input, Pagination, Table, type TableColumnType, type TableProps } from 'antd'
 import {
   useContext,
@@ -105,6 +105,11 @@ export interface AxisRowAction {
   labelKey: string
   icon?: ReactNode
   destructive?: boolean
+  /**
+   * A known meaning. `remove` is a known Remove or Delete, which `RowActions` draws as the trash icon in `dangerText`,
+   * named by its tooltip, see docs/reference/actions-and-controls.md#tables.
+   */
+  meaning?: 'remove'
   disabled?: boolean
   /** Appended to the accessible name of an icon button only, such as a row number. The tooltip stays the name. */
   nameSuffix?: string
@@ -218,15 +223,15 @@ function valueCompare(locale: string): (left: string | number, right: string | n
 const freeTextMinWidth = 160
 
 /**
- * The row's actions fold into one menu from this many on, and at narrow width whatever their number, see
- * docs/reference/actions-and-controls.md#tables.
+ * A row's actions fold into one menu from this many on, and at narrow width from two on, see
+ * docs/reference/actions-and-controls.md#tables. A table set up for this many actions folds each row with two or more.
  */
 const foldFrom = 3
 
 /**
  * The one table of the platform, see docs/reference/actions-and-controls.md#tables. It draws the toolbar in its fixed
- * order, with the Columns button after Search and Filter for a view that turns it on, then the Views button for a view with `saved`, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
- * from three on or below 992 px, the row checkboxes and the selection bar of the bulk actions, the paging, the columns that move under their row and then the sideways scrolling when the page is narrower than the columns, and the em
+ * order, with the Columns button after Search and Filter for a view that turns it on, then the Views button for a view with `saved`, the columns by their kind, rows and a header of the `tableRow` size, the row actions, which a row
+ * folds into one "…" menu from three on, or below 992 px from two on, the row checkboxes and the selection bar of the bulk actions, the paging, the columns that move under their row and then the sideways scrolling when the page is narrower than the columns, and the em
  * dash for an empty cell.
  */
 export function AxisTable<T extends object>({
@@ -280,7 +285,6 @@ export function AxisTable<T extends object>({
   const foldable = rowsIn !== undefined || details !== undefined
   const foldWidth = tokens.size.smallControl
   const foldIndent = foldWidth + tokens.spacing.xs
-  const narrow = useNarrowWidth()
   // The widths the columns need when drawn and not stretched. A moved column is not drawn, so it is remembered.
   const naturalWidths = useRef(new Map<string, number>())
   const [room, setRoom] = useState<{ moved: string[]; scrolls: boolean; lineWidth: number }>({
@@ -299,7 +303,6 @@ export function AxisTable<T extends object>({
   // Each free-text column takes an equal share of the width. Without one, the last column takes what is left.
   const share = freeTexts > 0 ? `${100 / freeTexts}%` : undefined
   const lastKey = shown.at(-1)?.key
-  const fold = narrow || (rowActions?.configured ?? 0) >= foldFrom
 
   // The table measures its own width after every draw and when it resizes, then moves columns under their row.
   useLayoutEffect(() => {
@@ -550,7 +553,10 @@ export function AxisTable<T extends object>({
       title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
       onHeaderCell: () => ({ ...cell, 'data-column-key': actionsKey }),
       onCell: () => ({ style: { ...cell.style, ...staysRoom } }),
-      render: (_value: unknown, row: T) => <RowActions actions={rowActions.actions(row)} fold={fold} />,
+      render: (_value: unknown, row: T) => {
+        const actions = rowActions.actions(row)
+        return <RowActions actions={actions} fold={rowActions.configured >= foldFrom && (actions?.length ?? 0) > 1} />
+      },
     })
   }
 
@@ -899,22 +905,29 @@ function MovedCells({
 }
 
 /**
- * A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. It is exported for a list
- * that is not a table, such as the resource form's rows, which passes `fold` to keep its actions in the "…" menu, see
+ * A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. A row folds from three actions
+ * on, and at narrow width from two on, so a menu never holds one entry. A known Remove, `meaning: 'remove'`, is the trash
+ * icon in `dangerText` and a red entry in a menu. It is exported for a list that is not a table. A list that passes
+ * `fold` keeps its "…" menu, even with one action, until its own part removes `fold`, see
  * docs/reference/actions-and-controls.md#tables.
  */
-export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold: boolean }) {
+export function RowActions({ actions, fold = false }: { actions: AxisRowAction[] | null; fold?: boolean }) {
   const t = useText()
+  const narrow = useNarrowWidth()
   if (actions === null || actions.length === 0) {
     return null
   }
-  if (fold) {
+  const shown = actions.map((action) =>
+    action.meaning === 'remove' ? { ...action, icon: <DeleteOutlined />, destructive: true } : action,
+  )
+  const folded = fold || (shown.length > 1 && (narrow || shown.length >= foldFrom))
+  if (folded) {
     return (
       <Dropdown
         trigger={['click']}
         autoFocus
         menu={{
-          items: menuOf(actions.map((action) => ({ ...action, label: t(action.labelKey) }))),
+          items: menuOf(shown.map((action) => ({ ...action, label: t(action.labelKey) }))),
           'aria-label': t('shell.table.rowActions'),
         }}
       >
@@ -924,7 +937,7 @@ export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null;
   }
   return (
     <Flex gap="small">
-      {actions.map((action) =>
+      {shown.map((action) =>
         action.icon ? (
           <AxisButton
             key={action.key}

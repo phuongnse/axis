@@ -4,13 +4,13 @@ import { noSideways, phoneWidth } from '../phone'
 import { pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
-// At phone width, requester creates a draft ticket and opens it from the folded row actions, and lead sees the Dashboard.
+// At phone width, requester creates a draft ticket and opens it from the row's one action, and lead sees the Dashboard.
 test.use({ storageState: sessionFile('requester'), viewport: { width: phoneWidth, height: 812 } })
 
 const appPath = '/api/apps/ServiceDesk'
 const recordsPath = `${appPath}/entities/Ticket/records`
 
-test('requester creates a draft ticket at phone width and opens it from the folded row actions', async ({ page }) => {
+test("requester creates a draft ticket at phone width and opens it from the row's View button", async ({ page }) => {
   const title = `Zz Phone ${Date.now()}-${test.info().retry}`
   await page.goto('/service-desk/mytickets?pageSize=100')
   await expect(page.getByRole('table').first()).toBeVisible()
@@ -38,11 +38,10 @@ test('requester creates a draft ticket at phone width and opens it from the fold
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page).toHaveURL(/\/service-desk\/mytickets\?pageSize=100$/)
 
-  // The row actions fold into one Actions menu on a phone.
+  // The row's one action is a button on a phone, not a menu of one.
   const row = page.getByRole('row', { name: new RegExp(title) })
   await expect(row.getByRole('button')).toHaveCount(1)
-  await row.getByRole('button', { name: 'Actions', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'View', exact: true }).click()
+  await row.getByRole('button', { name: 'View', exact: true }).click()
 
   await expect(page).toHaveURL(/\/service-desk\/ticketdetail\?ticket=[^&]+$/)
   await expect(page.getByTestId('detail')).toContainText(title)

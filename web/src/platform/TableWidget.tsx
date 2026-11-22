@@ -138,9 +138,10 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * action is the link of its cell, with a real address when the SPA can build it, so Ctrl+click opens a new tab. It
  * is plain text when `visibleWhen` hides the action, and shows the action's label when the cell is empty. A file
  * column keeps its download link, so then no action is the link. The other row actions show in the row, a delete
- * as a trash icon. Three or more configured ones, or any number below 992 px, fold into one "Actions" menu. The
- * toolbar always shows. Its right side has a Refresh button that loads the current page of rows again, then Import,
- * Export and the toolbar actions, with the first toolbar action last. The table is drawn on `AxisTable`, which owns the
+ * as a trash icon. Three or more configured ones fold a row into one "Actions" menu, and below 992 px a row with two or
+ * more does, so a row with one action shows it as a button. The toolbar always shows. Its right side has a Refresh
+ * button that loads the current page of rows again, then Import, Export and the toolbar actions, with the first toolbar
+ * action last. The table is drawn on `AxisTable`, which owns the
  * toolbar order, the column widths, the 40 px rows, the folding of row actions, the paging and the em dash of an empty
  * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at the
  * edge of their column. Every other column, an enum too, fits its content.

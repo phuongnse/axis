@@ -262,7 +262,7 @@ A child collection field shows its rows as a table under the field's label.
 - **Table.** The table is the shared table, see [tables](actions-and-controls.md#tables). A reference
   cell's input keeps at least 240px and the other inputs at least 160px.
 - **Rows.** Delete row is the row's icon action: a trash icon button in `dangerText`, with its name as
-  a tooltip on hover and on keyboard focus. Below 992px it folds into the row's "…" menu. Add row is the table
+  a tooltip on hover and on keyboard focus. Below 992px it stays a trash icon, as the row's one action, and does not fold. Add row is the table
   toolbar's main action, above the table on the right, outlined at the main level of
   [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`, and
   focus moves to the row's first input.

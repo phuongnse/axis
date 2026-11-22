@@ -125,12 +125,11 @@ export function EndpointValues({
                 </Flex>
                 {componentDisabled ? null : (
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',
                         labelKey: 'shell.studio.endpoint.removeMapping',
-                        destructive: true,
+                        meaning: 'remove',
                         onClick: () => onChange(pointer, undefined),
                       },
                     ]}

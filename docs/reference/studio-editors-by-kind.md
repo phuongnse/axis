@@ -220,7 +220,7 @@ panel, its undo and its drag and drop.
   nothing: it does not navigate, start a process, open a delete confirmation or call `/api/apps/`.
 - **Actions that fold.** A KPI's navigate action is a subtle button on the label line, and the
   tile is not a link. A table's first `navigate` row action draws as the link of its identifying
-  column, which selects the action as a button does. At narrow width a table's row actions fold into a
+  column, which selects the action as a button does. At narrow width a table row with two or more actions folds into a
   menu, and three or more other row actions fold into the "…" menu at any width, see
   [frontend](frontend.md). The canvas cannot open that menu, because it cancels the click, so the
   author selects such an action from the tree and the panel.

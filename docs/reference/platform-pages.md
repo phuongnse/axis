@@ -160,7 +160,8 @@ sorts and pages them, see [the list route](user-administration.md#read-routes).
 
 ### Disabling, enabling and resetting an authenticator
 
-- **Which commands.** A row's commands are entries of its "…" row-actions menu, not buttons. A row that is
+- **Which commands.** A row's commands are entries of its "…" row-actions menu when it has two or more. A row with one
+  command, such as a person who signs in through a provider, shows it as a button. A row that is
   `active` or `invited` has "Disable", and a row that is `disabled` has "Enable" instead. A row for an
   account, not a brokered user, has "Reset authenticator". Disable also shows on the administrator's own
   row, where the server answers `409`.
