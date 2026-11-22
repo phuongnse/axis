@@ -1,5 +1,5 @@
 import { Flex, Radio, type FormItemProps } from 'antd'
-import { useId, type ReactNode } from 'react'
+import { useId } from 'react'
 import { AxisField, type AxisFieldStatus } from './AxisField'
 import { StatusTag } from './StatusTag'
 import { useDesignTokens } from './themeMode'
@@ -11,12 +11,6 @@ export interface AxisChoiceOption {
   /** The line under the option's label. The radio's description. An empty help draws nothing. */
   help: string
   mark?: string
-  /**
-   * Proposed, #3264: the settings that belong to this option, shown under it while it is chosen, set in to where the
-   * options' text starts, so they read as the chosen option's and not as more options, as Polaris's choice list shows
-   * a chosen choice's children. Only a choice the screen holds shows it.
-   */
-  detail?: ReactNode
 }
 
 type Shared = {
@@ -35,7 +29,6 @@ type FormMode = Shared & {
   value?: never
   onChange?: never
   required?: never
-  hideLabel?: never
 }
 
 type OwnMode = Shared & {
@@ -48,11 +41,6 @@ type OwnMode = Shared & {
   onChange: (value: string) => void
   /** Marks the field required, as for {@link AxisField}. The screen checks the choice. */
   required?: boolean
-  /**
-   * Proposed, #3264: hides the label from the eye, as for {@link AxisField}, for a choice that a group's title already
-   * names, such as the Value group's way the value comes from. It still names the choice.
-   */
-  hideLabel?: boolean
 }
 
 function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
@@ -71,43 +59,25 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
   const { label, help, options } = props
   const optionId = useId()
   const groupName = useId()
-  const { colour, spacing, type } = useDesignTokens()
-  const radios = (chosen?: string) => (
+  const { colour } = useDesignTokens()
+  const radios = (
     <Flex vertical>
       {options.map((option, index) => {
         const helpId = `${optionId}-${index}-help`
         return (
-          <div key={option.value}>
-            <Radio value={option.value} aria-describedby={option.help === '' ? undefined : helpId}>
-              <Flex gap="small" align="center" wrap>
-                <span>{option.label}</span>
-                {option.mark && <StatusTag tone="neutral">{option.mark}</StatusTag>}
-              </Flex>
-              {option.help !== '' && (
-                // Proposed, #3264: an option's help is a field's help, at the help's size, see
-                // docs/reference/frontend.md#platform-field-help.
-                <span
-                  id={helpId}
-                  style={{ display: 'block', fontSize: 12, lineHeight: '20px', color: colour.textMuted }}
-                >
-                  {option.help}
-                </span>
-              )}
-            </Radio>
-            {option.detail !== undefined && option.value === chosen && (
-              // The settings start where the option's text does, after the 16px radio and Ant Design's 8px gap.
-              <div
-                style={{
-                  paddingInlineStart: 16 + spacing.xs,
-                  marginBlock: spacing.xs,
-                  // Ant Design's radio group sets its font size to 0, so the settings take the body size back.
-                  fontSize: type.fontSize,
-                }}
-              >
-                {option.detail}
-              </div>
+          <Radio key={option.value} value={option.value} aria-describedby={option.help === '' ? undefined : helpId}>
+            <Flex gap="small" align="center" wrap>
+              <span>{option.label}</span>
+              {option.mark && <StatusTag tone="neutral">{option.mark}</StatusTag>}
+            </Flex>
+            {option.help !== '' && (
+              // Proposed, #3264: an option's help is a field's help, at the help's size, see
+              // docs/reference/frontend.md#platform-field-help.
+              <span id={helpId} style={{ display: 'block', fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>
+                {option.help}
+              </span>
             )}
-          </div>
+          </Radio>
         )
       })}
     </Flex>
@@ -115,14 +85,14 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
   if (isOwnMode(props)) {
     const { value, onChange, required } = props
     return (
-      <AxisField label={label} help={help} required={required} hideLabel={props.hideLabel}>
+      <AxisField label={label} help={help} required={required}>
         <Radio.Group
           aria-label={label}
           name={groupName}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         >
-          {radios(value)}
+          {radios}
         </Radio.Group>
       </AxisField>
     )
@@ -137,7 +107,7 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
       initialValue={initialValue}
       status={status}
     >
-      <Radio.Group aria-label={label}>{radios()}</Radio.Group>
+      <Radio.Group aria-label={label}>{radios}</Radio.Group>
     </AxisField>
   )
 }

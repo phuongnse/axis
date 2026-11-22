@@ -851,10 +851,22 @@ const fieldTypeChoiceOrder: readonly DesignerType[] = [
  */
 type DesignerType = FieldType | 'person'
 
-/** The designer's type of a field: Person for a text field that holds a user, its own type otherwise. */
+/**
+ * The designer's type of a field: Person for a text field that holds a user, picked by people (`userId`) or the
+ * record's creator (`creator`), its own type otherwise.
+ */
 function designerType(field: Content): string {
   const type = text(field.type)
-  return type === 'text' && field.userId === true ? 'person' : type
+  return type === 'text' && (field.userId === true || field.creator === true) ? 'person' : type
+}
+
+/**
+ * The field with its value coming from `source`. A person picked by people holds a user's id, `userId`, and the
+ * record's creator is `creator`, which the compiler takes without `userId`.
+ */
+function changeValueSource(field: Content, source: ValueSource): Content {
+  const next = withValueSource(field, source)
+  return designerType(field) === 'person' && source === 'entered' ? { ...next, userId: true } : next
 }
 
 /**
@@ -1414,7 +1426,10 @@ function Settings({
     (setting) => setting !== 'userId' && !(person && ['maxLength', 'minLength', 'searchable'].includes(setting)),
   )
   const type = text(field.type)
-  const sources = person ? ['entered' as const] : valueSourcesOf(type)
+  // A person is picked by people or is the record's creator; a text has no creator, which is a person.
+  const sources: ValueSource[] = person
+    ? ['entered', 'creator']
+    : valueSourcesOf(type).filter((source) => source !== 'creator')
   const name = text(field.name)
   // A validation's `field` must name a field, so a field with no name has none and adds none.
   const list: unknown[] | undefined =
@@ -1662,26 +1677,25 @@ function Settings({
             >
               <Flex vertical gap="small" style={{ minWidth: 240 }}>
                 {choice && (
-                  <AxisChoiceField
-                    {...fieldTexts(t, 'fields.valueSource')}
-                    // The group's title, Value, names the choice to the eye.
-                    hideLabel
-                    value={valueSourceOf(field)}
-                    // Proposed, #3264: the chosen way's settings sit under it, so they read as its own.
-                    options={sources.map((source) => ({
-                      value: source,
-                      ...fieldTexts(t, `fields.valueSource.${source}`),
-                      detail:
-                        source === valueSourceOf(field) && drawnSettings.length > 0 ? (
-                          <Flex vertical gap="small">
-                            {drawnSettings}
-                          </Flex>
-                        ) : undefined,
-                    }))}
-                    onChange={(next) => onChange(pointer, withValueSource(field, next as ValueSource))}
-                  />
+                  // Proposed, #3264: where the value comes from is one choice in a list, each way with a line that
+                  // says what it is, as the Type list has; the chosen way's settings follow it at the panel's width.
+                  <div data-testid={`studio-field-${pointer}/valueSource`}>
+                    <AxisField {...fieldTexts(t, 'fields.valueSource')} required>
+                      <Select
+                        virtual={false}
+                        value={valueSourceOf(field)}
+                        options={sources.map((source) => ({
+                          value: source,
+                          label: t(`shell.studio.field.entity.fields.valueSource.${source}`),
+                          help: t(`shell.studio.field.entity.fields.valueSource.${source}.help`),
+                        }))}
+                        optionRender={({ data }) => <TypeOption label={data.label} help={data.help} />}
+                        onChange={(next: string) => onChange(pointer, changeValueSource(field, next as ValueSource))}
+                      />
+                    </AxisField>
+                  </div>
                 )}
-                {choice ? null : drawnSettings}
+                {drawnSettings}
                 {group === 'validation' && (
                   <>
                     {atField.map(({ validation, position }) => (
