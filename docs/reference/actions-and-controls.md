@@ -32,7 +32,7 @@ widget names a role, never an Ant Design button type.
   Save or Next removes nothing, so it is never red.
 - **A removal finishes in solid red.** A dialog that confirms a removal ends in a solid red Delete, drawn through
   `DialogFooter`, with a light Cancel beside it.
-- **An open resource's Delete… is secondary** _(planned)_. An open resource's Delete… is a secondary button in the
+- **An open resource's Delete… is secondary**. An open resource's Delete… is a secondary button in the
   destructive tone.
 - **A chosen subtle button is marked through `selected`.** `AxisButton`'s `selected` draws a subtle button on the
   selected tint in `primaryText` and sets the one `aria-pressed` itself, or `aria-current` for a page or a step, in place

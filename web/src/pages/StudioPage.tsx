@@ -57,7 +57,6 @@ import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioAskAi } from './StudioAskAi'
 import { StudioProblems } from './StudioProblems'
-import { StudioResourceMenu } from './StudioResourceMenu'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { StudioPublishPage } from './StudioPublishPage'
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
@@ -698,10 +697,14 @@ function StudioWorkspace() {
                               </AxisButton>
                             )}
                             {selected.kind !== 'application' && (
-                              <StudioResourceMenu
+                              <AxisButton
+                                role="secondary"
+                                destructive
                                 disabled={reconnecting}
-                                onDelete={() => editor.current?.askDelete()}
-                              />
+                                onClick={() => editor.current?.askDelete()}
+                              >
+                                {t('shell.studio.delete.button')}
+                              </AxisButton>
                             )}
                           </AxisActionRow>
                         </PageActions>
