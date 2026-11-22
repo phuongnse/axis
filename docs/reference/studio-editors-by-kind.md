@@ -74,8 +74,8 @@ Add comparison adds a comparison with its own measure picker and label, and Add 
 [navigate action](#navigate-actions). Each of the two adds is a grey button, and each Remove comparison and
 Remove navigate action is a red button. A `chart` panel has a data source picker, a kind picker over `bar`,
 `line` and `pie`, a category picker, a title, and a list of measures, each with a picker and a label. Add
-measure is a secondary button on the Measures title row, and each measure's Remove measure is in its "…"
-menu, which is off when one measure is left.
+measure is a secondary button on the Measures title row, and each measure's Remove measure is a trash icon,
+off when one measure is left.
 Every field and group of both panels shows its label and help. A chart's title and a section's title
 share one text, Title, with one help.
 
@@ -105,7 +105,7 @@ itself with other parameters.
 - **Adding one.** The Adds of an action list are one group of secondary buttons on the list's title
   row. A table's row actions offer Add navigate action and Add delete action, its toolbar actions offer
   only Add navigate action, and a form or a detail also offers Add action for `startProcess`. Each
-  action is a row with no box, and its Remove action is in the row's "…" menu. A new action is named
+  action is a row with no box, and its Remove action is a trash icon at the row's end. A new action is named
   `<action type><n>`, such as `navigate1`, with the first free `n` in its list. A KPI's `navigate` has no
   name, because the schema refuses one.
 - **Record.** An empty Record box removes the `record` key.
@@ -123,13 +123,13 @@ The Parameters section sits between General and Widgets. Its Add parameter is a 
 right of the heading, and a page with no parameters says so in one line. Each parameter is a row with no
 box. It has a name, a type picker over `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum`
 and `reference`, and a Required switch. The name, type and Required switch sit one to a row, each as wide as
-the field it fills. Remove parameter is an entry of the row's "…" menu at its top right, the same menu as a
-table's [row actions](actions-and-controls.md#tables). Add parameter appends a `text` parameter
+the field it fills. Remove parameter is a trash icon at the row's top right, named by its tooltip, as a
+table's [row actions](actions-and-controls.md#tables) show a known Remove. Add parameter appends a `text` parameter
 with an empty name. A `reference` parameter also has a target entity picker, and an `enum` parameter its
 values. A type change removes the `target` or the `values` that the new type does not take, and switching Required off removes the `required` key.
 The names answer lists each page's parameters, which is how a navigate action knows them. A
 `parameters` that is not a list points to the JSON view, and a parameter that is not an object shows that
-line with no menu.
+line with no Remove.
 
 ### Widget tree
 
@@ -142,10 +142,10 @@ body as nested lists, and a row opens its widget's panel at its own pointer, suc
   A new `columns` starts with the columns `column1` and `column2` of width 6, a new `tabs` with `tab1`,
   and a new `section` empty.
 - **Moving.** Every row has a Move to picker and a "…" menu at its end, with Move up, Move down and
-  Delete. The menu's actions replace only the list that holds the widget, Move up is off on the list's first
-  row and Move down on its last, and Delete is destructive. The row's button that selects the widget is
-  a subtle button on the selected tint in `primaryText`, with `aria-pressed="true"` while the widget is selected and
-  `aria-pressed="false"` otherwise.
+  Delete. Delete comes last, after a divider, and is destructive. The menu's actions replace only the list
+  that holds the widget, Move up is off on the list's first row and Move down on its last. The row's button
+  that selects the widget is a subtle button on the selected tint in `primaryText`, with `aria-pressed="true"`
+  while the widget is selected and `aria-pressed="false"` otherwise.
   Move to lists every other widget list as a path, such as
   `Page › columns 1 › Column 2`, leaves out the widget's own list and the lists inside it, and replaces
   the page's `widgets` in one change. A type change or a move keeps the widget's name.
@@ -162,10 +162,10 @@ that is not a list, points to the JSON view.
 - **Columns.** A `columns` panel shows a width box from 1 to 12 for each column, and the compiler
   reports widths that do not add up to 12 after the save. Each column is a row with no box. Add column
   is a secondary button on the Columns title row, and it adds a column that takes what is left of 12,
-  or 1 when nothing is left, and keeps the other widths. Remove column is in the column's "…" menu and
-  drops a column with its widgets.
+  or 1 when nothing is left, and keeps the other widths. Remove column is a trash icon at the column's end
+  and drops a column with its widgets.
 - **Tabs.** A `tabs` panel shows each tab's [label](studio-resource-form.md#labels) as a row with no
-  box. Add tab is a secondary button on the Tabs title row, and Remove tab is in the tab's "…" menu.
+  box. Add tab is a secondary button on the Tabs title row, and Remove tab is a trash icon at the tab's end.
 - **Names.** An added column or tab is named with the first free `column<n>` or `tab<n>` among its
   siblings, ignoring letter case.
 - **Section.** A `section` panel shows the title as a tab's label shows, and a Collapsed switch.
