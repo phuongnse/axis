@@ -14,7 +14,7 @@ import { newWidget } from '../platform/pageWidgets'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
-import { chooseOption, shownMenu } from '../test/antd'
+import { chooseOption } from '../test/antd'
 import { StudioEditor } from './StudioEditor'
 import { StudioPageCanvas } from './StudioPageCanvas'
 import { editJson, jsonText } from '../test/jsonView'
@@ -859,8 +859,7 @@ describe('the Design tab of a page', () => {
       expect(within(list).getByTestId('studio-action-1')).not.toHaveAttribute('aria-current')
 
       const action = within(list).getByTestId('studio-action-2')
-      await userEvent.click(within(action).getAllByRole('button', { name: 'Actions' })[0])
-      await userEvent.click(within(await shownMenu('Actions')).getByRole('menuitem', { name: 'Remove action' }))
+      await userEvent.click(within(action).getByRole('button', { name: 'Remove action' }))
 
       expect(within(list).queryByTestId('studio-action-2')).not.toBeInTheDocument()
       expect(within(list).getByTestId('studio-action-1')).not.toHaveAttribute('aria-current')

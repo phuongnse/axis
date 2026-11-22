@@ -311,11 +311,8 @@ test.describe('the author builds the asset management application with Studio on
       if (list.aggregate.groupBy.length === 0) {
         // The form has no empty array to start from, so the author adds an entry and removes it to write `[]`.
         await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
-        await groupBy.getByRole('button', { name: 'Actions', exact: true }).click()
-        await page
-          .getByRole('menu', { name: 'Actions', exact: true })
-          .getByRole('menuitem', { name: 'Remove', exact: true })
-          .click()
+        // A single Remove is the row's trash icon, not an entry of a "…" menu.
+        await groupBy.getByRole('button', { name: 'Remove', exact: true }).click()
       }
       for (const [index, measure] of list.aggregate.measures.entries()) {
         const at = `studio-field-/aggregate/measures/${index}`

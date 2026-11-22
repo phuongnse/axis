@@ -40,8 +40,8 @@ function sectionNames(sections: unknown): string[] {
 
 /**
  * The `steps` of a form as rows, see docs/reference/studio-form-editors.md#form-steps: a title and the sections the step
- * shows, with a "…" menu that moves or deletes the step. The section picker lists the named sections of the form, so the
- * author picks names and does not type them. Removing the last step removes `steps`, which turns the form back into one
+ * shows, with a "…" menu of Move up, Move down and Delete step, which comes last after a divider. The section picker
+ * lists the named sections of the form, so the author picks names and does not type them. Removing the last step removes `steps`, which turns the form back into one
  * page. The rows sit in a part headed with the steps' title and help, and edit the draft through `onChange`. A read-only
  * tab, as while the JSON has an error, shows neither Add step nor a step's menu. A `steps` that is not a list is left to
  * the JSON view.
@@ -110,7 +110,7 @@ export function FormSteps({
       {
         key: 'remove',
         labelKey: 'shell.studio.formSteps.removeStep',
-        destructive: true,
+        meaning: 'remove',
         onClick: () => remove(index),
       },
     ]
@@ -163,7 +163,7 @@ export function FormSteps({
                     </AxisField>
                   </div>
                 </Flex>
-                {componentDisabled ? null : <RowActions fold actions={actionsOf(index)} />}
+                {componentDisabled ? null : <RowActions actions={actionsOf(index)} />}
               </Flex>
             )
           })}

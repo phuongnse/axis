@@ -62,7 +62,7 @@ a row. The picker lists the sections that have a `name`, so an unnamed section i
 removes `steps`, and the form goes back to one page. A condition offers the fields that the form lists, because a
 condition reads only those. A `steps` value that is not a list is left to the JSON view.
 
-- **The step menu.** A step's "…" menu holds Move up, Move down and Delete step, in that order. Move up is off on the
-  first step and Move down is off on the last. Delete step is a destructive entry, and it removes that step.
+- **The step menu.** A step's "…" menu holds Move up and Move down, then Delete step after a divider. Move up is off on
+  the first step and Move down is off on the last. Delete step is a destructive entry, and it removes that step.
 - **Read-only.** While the tab is read-only, such as while the JSON has an error, the part shows neither Add step nor
   any step's menu.
