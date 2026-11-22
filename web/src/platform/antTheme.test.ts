@@ -367,6 +367,25 @@ describe('theme values', () => {
     expect(unmarked({ '../pages/Sample.tsx': '<Form layout="vertical">' })).toEqual(['../pages/Sample.tsx'])
   })
 
+  /** The files with a form that does not take the focus to its first field in error, the sign-in pages included. */
+  function unfocused(files: Record<string, string>) {
+    return Object.entries(files)
+      .filter(
+        ([, text]) =>
+          (text.match(/<Form[\s>]/g)?.length ?? 0) !==
+          (text.match(/\bscrollToFirstError=\{\{ focus: true \}\}/g)?.length ?? 0),
+      )
+      .map(([file]) => file)
+  }
+
+  it('takes the focus to the first field in error in every form', () => {
+    expect(unfocused(sources)).toEqual([])
+  })
+
+  it('names a form that does not take the focus to its first error', () => {
+    expect(unfocused({ '../pages/Sample.tsx': '<Form layout="vertical">' })).toEqual(['../pages/Sample.tsx'])
+  })
+
   it('keeps theme values in the token file and the mapping only', () => {
     const found = Object.entries(sources).flatMap(([file, text]) =>
       Object.entries(forbidden)

@@ -198,9 +198,13 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   `AxisField` and `AxisFieldGroup` take `error` for a field the screen holds, `AxisFieldGroup` takes `required` and
   `fold`, and `LabelTexts` takes `invalid`. An error shows from the refused action on, and while the value stays wrong.
   It goes as soon as the value is right.
-- **One way to the first error** _(planned)_. A refused action that submits what a person typed, such as Save, Add, Done
-  or Next, moves the focus to the first box in error and scrolls it into view. A screen that holds its fields calls
-  `focusFirstError`, and an Ant Design form sets `scrollToFirstError={{ focus: true }}`.
+- **One way to the first error**. A refused action that submits what a person typed, such as Save, Add, Done or Next,
+  moves the focus to the first box in error and scrolls it into view. An Ant Design form sets
+  `scrollToFirstError={{ focus: true }}`, and a Vitest check refuses a form in `web/src` that does not, the sign-in
+  pages included. A button that sends a dialog's form submits the form, so a refused click focuses the field. A file
+  picker cannot take the focus, so its dialog focuses its Choose button.
+- **A screen that holds its fields focuses its first error** _(planned)_. Such a screen calls `focusFirstError`, which
+  moves the focus to the first box in error the same way.
 - **One look for yes or no** _(planned)_. A yes-or-no setting is a checkbox with its label on its right and its help under
   the label, the same in a form as on a screen that holds its fields. A switch is for a setting that takes effect as it
   is turned on, and no other.

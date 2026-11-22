@@ -90,7 +90,13 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
         {sendFailed && (
           <AxisAlert data-testid="studio-ask-ai-error" kind="error" message={t('shell.studio.askAi.sendFailed')} />
         )}
-        <Form form={form} layout="vertical" requiredMark={requiredMark} onFinish={send}>
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={requiredMark}
+          scrollToFirstError={{ focus: true }}
+          onFinish={send}
+        >
           <Flex vertical gap="large">
             <AxisField
               name="text"

@@ -101,12 +101,7 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
           {!job && <OkBtn />}
         </>
       )}
-      onOk={() =>
-        void form.validateFields().then(
-          (values) => create(values),
-          () => {},
-        )
-      }
+      onOk={() => form.submit()}
       onCancel={close}
     >
       {job ? (
@@ -114,7 +109,14 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
       ) : (
         <Flex vertical gap="middle">
           {error && <AxisAlert data-testid="cell-create-error" kind="error" message={error} />}
-          <Form form={form} layout="vertical" name="create-cell-tenant" requiredMark={requiredMark}>
+          <Form
+            form={form}
+            layout="vertical"
+            name="create-cell-tenant"
+            requiredMark={requiredMark}
+            scrollToFirstError={{ focus: true }}
+            onFinish={(values) => void create(values)}
+          >
             <Flex vertical gap={spacing.lg}>
               <AxisField
                 name="id"

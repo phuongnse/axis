@@ -24,6 +24,7 @@ export function ResetPasswordPage({ context }: { context: ResetPasswordContext }
         action={loginAction}
         layout="vertical"
         requiredMark={false}
+        scrollToFirstError={{ focus: true }}
         initialValues={{ username }}
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}

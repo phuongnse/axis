@@ -36,6 +36,7 @@ export function UpdateProfilePage({ context }: { context: UpdateProfileContext }
         action={loginAction}
         layout="vertical"
         requiredMark={false}
+        scrollToFirstError={{ focus: true }}
         initialValues={initialValues}
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}

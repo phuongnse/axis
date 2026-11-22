@@ -507,6 +507,19 @@ describe('CellTenantsPage', () => {
     expect(sent).toHaveLength(0)
   })
 
+  it('puts the focus on the tenant ID when Create finds it empty, and sends nothing', async () => {
+    const { sent } = stubCreate([])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+    await user.click(createButton(dialog))
+
+    expect(await within(dialog).findByText('Enter the tenant ID.')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/^Tenant ID\*?$/)).toHaveFocus()
+    expect(sent).toHaveLength(0)
+  })
+
   it('shows the title of a refusal in the open dialog', async () => {
     stubCreate([{ status: 409, body: { title: 'A tenant of the cell already has this id.' } }])
     const user = userEvent.setup()
