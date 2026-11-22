@@ -202,7 +202,7 @@ function renderEditor(provided: StudioNames = names) {
               resources={[item]}
               path={null}
               diagnosticPaths={[]}
-              onOpen={vi.fn()}
+              addressOf={() => ''}
               onSaved={vi.fn()}
               onTextsWritten={vi.fn()}
               onDeleted={vi.fn()}

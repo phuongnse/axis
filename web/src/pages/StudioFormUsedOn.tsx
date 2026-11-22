@@ -11,23 +11,24 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { ResourceReference } from './ResourceReference'
 
-/** Opens a resource. `path` is set for a reference entry, where the reference sits in that resource. */
-export type OpenResource = (id: string, path: string | null) => void
+/** The address of a resource. `path` is set for a reference entry, where the reference sits in that resource. */
+export type ResourceAddressOf = (id: string, path: string | null) => string
 
 /** A `widget form` or `task form` reference whose holder is a resource. */
 export type FormUse = StudioReference & { node: Extract<StudioReferenceNode, { type: 'resource' }> }
 
 /**
  * The pages and process steps that use a form. An entry is its resource as a link, with its kind muted, and then its
- * relation in words, as the Used by tab says it. The link opens the resource at the reference's path.
+ * relation in words, as the Used by tab says it. The link goes to the resource at the reference's path, built by
+ * `addressOf`, and opens in a new tab with Ctrl+click, see docs/reference/actions-and-controls.md#opening-things.
  */
 export function StudioFormUsedOn({
   entries,
-  onOpen,
+  addressOf,
   resources,
 }: {
   entries: FormUse[] | 'failed' | undefined
-  onOpen: OpenResource
+  addressOf: ResourceAddressOf
   resources: readonly StudioResourceItem[]
 }) {
   const t = useText()
@@ -50,7 +51,7 @@ export function StudioFormUsedOn({
                 <ResourceReference
                   resource={resources.find((item) => item.id === entry.node.id) ?? entry.node}
                   file={entry.file}
-                  onOpen={() => onOpen(entry.node.id, entry.path)}
+                  href={addressOf(entry.node.id, entry.path)}
                 />
                 <Typography.Text>{t(relationTextKey(entry.relation))}</Typography.Text>
               </Flex>

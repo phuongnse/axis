@@ -542,14 +542,15 @@ A thing opens at one of three levels, chosen by what the person does, never by t
 - **A link goes to an address** _(planned)_. A link is a real `<a href>` or the router's link, so it opens in a new
   tab and its address can be copied. It is in `primaryText`, underlined in running text and on hover when it stands
   alone. An action with no address is a button, never a link.
-- **What opens a view gets an address** _(planned)_. A resource named in Problems, test results or a form's Used on
-  links to the resource at its path. A shared grant's Open policy links to the policy. A field's name links to
-  `&field=<name>`. A list of objects' first cell links to `&item=<pointer>`, which opens the item. See
-  [Studio's route and address](studio.md#route-and-address).
+- **What opens a view gets an address.** A resource named in Problems, test results or a form's Used on is a
+  real link to the resource at its path, and a shared grant's Open policy links to the policy. Ctrl+click opens
+  either in a new tab. See [Studio's route and address](studio.md#route-and-address).
+- **A field's name and a list's first cell get an address** _(planned)_. A field's name links to `&field=<name>`.
+  A list of objects' first cell links to `&item=<pointer>`, which opens the item.
 - **A package file's place is a link.** A package file's place, such as `lib/x.py, line 3`, links to
   `&view=packages&package=<id>&file=<path>&line=<n>`, which opens the file at that line. See
   [Studio's route and address](studio.md#route-and-address).
-- **A reference reads as words** _(planned)_. A resource's name and its muted kind are inline text, so a reference
+- **A reference reads as words.** A resource's name and its muted kind are inline text, so a reference
   follows the words before it on their line and wraps as words do.
 - **A link in a value opens in the same site** _(planned)_. A reference in a value is an inline link only when the
   thing it names opens in the same site, such as a record, an instance, a sub-process or a step's run. A thing in

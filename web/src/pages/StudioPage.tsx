@@ -515,13 +515,8 @@ function StudioWorkspace() {
     pickApplication(name)
   }
 
-  function openReference(id: string, referencePath: string | null) {
-    navigate(studioResourceAddress(application!, id, referencePath))
-  }
-
-  function selectDiagnostic(id: string, diagnosticPath: string) {
-    openReference(id, diagnosticPath)
-  }
+  /** The address of a resource, at a path when one is given, for the links that open a resource at a place, see docs/reference/actions-and-controls.md#opening-things. */
+  const addressOf = (id: string, referencePath: string | null) => studioResourceAddress(application!, id, referencePath)
 
   if (apps === undefined) {
     return null
@@ -612,7 +607,7 @@ function StudioWorkspace() {
                     : current,
                 )
               }
-              onOpenScenario={selectDiagnostic}
+              scenarioAddressOf={addressOf}
               onBusyChange={setRequestBusy}
               ref={publishing}
             >
@@ -680,7 +675,7 @@ function StudioWorkspace() {
                       application={application!}
                       folderRevision={folderRevision}
                       names={names}
-                      onOpenPolicy={(id) => navigate(studioResourceAddress(application!, id))}
+                      policyAddressOf={(id) => studioResourceAddress(application!, id)}
                       onWritten={onWritten}
                     />
                   </PageLayout>
@@ -732,7 +727,7 @@ function StudioWorkspace() {
                                 resources={loaded.resources}
                                 path={path}
                                 diagnosticPaths={diagnosticPaths}
-                                onOpen={openReference}
+                                addressOf={addressOf}
                                 onSaved={(diagnostics, created) => {
                                   setFolder({
                                     ...loaded,
@@ -835,7 +830,7 @@ function StudioWorkspace() {
               <StudioProblems
                 diagnostics={loaded.diagnostics}
                 resources={loaded.resources}
-                onSelect={selectDiagnostic}
+                addressOf={addressOf}
                 fileAddressOf={(file, line) => studioFileAddress(application!, file, line)}
                 onClose={() => setOpenPanel(null)}
               />

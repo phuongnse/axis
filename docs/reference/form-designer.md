@@ -149,7 +149,7 @@ The Used on list above the canvas shows the pages and process steps that use the
 changes every one of them. It is the Used by tab's list filtered to the `widget form` and `task form`
 relations. Each entry shows its resource as a link named by its title, with its kind muted after it, and then
 its relation in the Used by tab's words. It loads once when the form opens, so it can be stale like the `usedBy`
-counts. The link opens the resource at the reference's path.
+counts. The link goes to the resource at the reference's path, and Ctrl+click opens it in a new tab.
 
 ## Module forms
 

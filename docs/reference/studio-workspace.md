@@ -105,15 +105,16 @@ not modal, so the page stays usable while it is open. It lists every error and t
 with its severity, code and message, then its resource as a link, with the kind muted after it. A problem
 that names no resource shows its file with its line. A package file's place is a link to that file at its line, and
 another file's place is muted text. Opening the link opens its resource at the place the
-problem names and leaves the panel open, so an author can fix one problem after another. The panel scrolls on its own and stops at its
+problem names and leaves the panel open, so an author can fix one problem after another. Ctrl+click opens the
+resource in a new tab. The panel scrolls on its own and stops at its
 end, as [scroll areas](actions-and-controls.md#scroll-areas) say. A package's workspace lists its own problems with the
 same list in its output panel, where a package file's problem is a link that opens the file in the workspace, see
 [a package's files](studio-packages.md#a-packages-files).
 
 - **A problem's row**. Its severity is a status tag in words, Error in `danger` or Warning in `attention`, from the
-  texts `shell.studio.problems.severity.error` and `shell.studio.problems.severity.warning`. Its code and message
-  follow it.
-- **A problem's resource or file** _(planned)_. It follows the problem's message when the row fits it.
+  texts `shell.studio.problems.severity.error` and `shell.studio.problems.severity.warning`. The tag sits `spacing-xs`
+  from a text column of its own, which holds the code and message, so a long message wraps under itself. The
+  resource or file follows the message on its line, and goes to the next line only when the line is full.
 - **The shared frame.** The panel is drawn in `SidePanel`, the one side panel frame of every page, at the
   width the person last chose, see [layout](shell.md#layout).
 
