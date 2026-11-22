@@ -774,6 +774,64 @@ public sealed class ControlPlaneOptionsTests
         Assert.DoesNotContain(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "refreshDisposableDomains");
     }
 
+    [Theory]
+    [InlineData("https://idp-4f9c.example/realms/billing", null, null, "Audience")]
+    [InlineData("https://idp-4f9c.example/realms/billing", "axis-control-plane", null, "ClientId")]
+    [InlineData(null, "axis-control-plane", "billing-client-4f9c", "Authority")]
+    [InlineData("http://idp-4f9c.example/realms/billing", "axis-control-plane", "billing-client-4f9c", "Authority")]
+    [InlineData("not a url 4f9c", "axis-control-plane", "billing-client-4f9c", "Authority")]
+    public void A_billing_client_that_is_half_set_or_has_an_authority_that_is_not_https_stops_the_start_and_the_message_holds_no_value(
+        string? authority,
+        string? audience,
+        string? clientId,
+        string refused)
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:Billing:Authority"] = authority,
+            ["ControlPlane:Billing:Audience"] = audience,
+            ["ControlPlane:Billing:ClientId"] = clientId,
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains($"ControlPlane:Billing:{refused}", exception.Message, StringComparison.Ordinal);
+        foreach (var value in new[] { authority, audience, clientId }.OfType<string>())
+        {
+            Assert.DoesNotContain(value, exception.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void A_billing_client_with_an_https_authority_an_audience_and_a_client_id_loads()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:Billing:Authority"] = "https://idp.example/realms/billing",
+            ["ControlPlane:Billing:Audience"] = "axis-control-plane",
+            ["ControlPlane:Billing:ClientId"] = "billing-client",
+        });
+
+        using var client = factory.CreateClient();
+
+        Assert.True(factory.Services.GetRequiredService<ControlPlaneOptions>().Billing.IsComplete);
+    }
+
+    [Fact]
+    public async Task Without_the_billing_settings_every_billing_route_answers_401_with_a_bearer_challenge()
+    {
+        using var factory = ControlPlaneFactory.Create();
+        using var client = factory.CreateClient();
+
+        var response = await client.PutAsync(
+            "/api/billing/v1/tenants/acme/subscription/paid-through",
+            new StringContent("""{"paidThrough":"2027-01-31"}""", System.Text.Encoding.UTF8, "application/json"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("Bearer", Assert.Single(response.Headers.WwwAuthenticate).Scheme);
+    }
+
     [Fact]
     public void With_no_sign_up_document_the_service_starts()
     {

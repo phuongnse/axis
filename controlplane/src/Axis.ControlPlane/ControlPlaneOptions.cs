@@ -18,6 +18,7 @@ namespace Axis.ControlPlane;
 /// The sign-up documents are optional as a group, and once one is set, all of them are required. The sign-up challenge key is optional, and when set it must be base64 of at least 32 bytes.
 /// The sign-up disposable domain list is optional as a pair, and once one of its settings is set, both are required, as an https URL and a 64-character hex SHA-256.
 /// The plans are optional, and each needs a code, a version, both names, included users, every quota except the users, and a price in each currency, unless it is a trial plan, which has no price. A number is plain digits.
+/// The billing client's settings are optional as a group, and once one is set, all of them are required, with an https authority.
 /// The PayOS provider is optional, and with <c>PayOs</c> the base URL, the client id, the API key and the checksum key are required.
 /// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
@@ -75,6 +76,9 @@ public sealed partial class ControlPlaneOptions
 
     /// <summary>The PayOS adapter that creates the payment links of the <c>VND</c> invoices. Optional.</summary>
     public ControlPlanePayOsOptions PayOs { get; set; } = new();
+
+    /// <summary>The identity provider and client that the operator's billing system signs in with. Optional.</summary>
+    public ControlPlaneBillingOptions Billing { get; set; } = new();
 
     /// <summary>What the sign-up page offers. Optional.</summary>
     public SignUpOptions SignUp { get; set; } = new();
@@ -182,6 +186,7 @@ public sealed partial class ControlPlaneOptions
 
         problems.AddRange(DnsProblems(options.Dns, RequiresVerifiedTls(environment)));
         problems.AddRange(PayOsProblems(options.PayOs, RequiresVerifiedTls(environment)));
+        problems.AddRange(BillingProblems(options.Billing));
         problems.AddRange(SignUpProblems(options.SignUp));
         problems.AddRange(PlanCatalogue.Problems(options.Plans));
 
@@ -333,6 +338,29 @@ public sealed partial class ControlPlaneOptions
 
         AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDocumentOptions.Urls)}:en", document.Urls.En);
         AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDocumentOptions.Urls)}:vi", document.Urls.Vi);
+    }
+
+    private static List<string> BillingProblems(ControlPlaneBillingOptions billing)
+    {
+        var problems = new List<string>();
+        if (!billing.IsSet)
+        {
+            return problems;
+        }
+
+        var prefix = $"{SectionName}:{nameof(Billing)}";
+        AddHttpsUrlProblem(problems, $"{prefix}:{nameof(ControlPlaneBillingOptions.Authority)}", billing.Authority);
+        if (string.IsNullOrWhiteSpace(billing.Audience))
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneBillingOptions.Audience)} is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(billing.ClientId))
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneBillingOptions.ClientId)} is required.");
+        }
+
+        return problems;
     }
 
     private static List<string> PayOsProblems(ControlPlanePayOsOptions payOs, bool outsideDevelopment)

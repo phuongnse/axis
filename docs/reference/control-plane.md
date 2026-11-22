@@ -24,9 +24,10 @@ through a cell's API.
   [image and chart](#image-and-chart).
 - **The operator's billing system** _(planned for M34)_. The operator's own billing system holds the
   prices, invoices and payments, and calls the control plane's billing API.
-- **A billing API** _(planned for M34)_. The operator's billing system sets a tenant's plan, add-ons and
-  paid-through date and reads its state through the [billing API](billing-api.md), with a client and a
-  scope of its own.
+- **A billing API.** The operator's billing system sets a tenant's paid-through date through the
+  [billing API](billing-api.md#setting-the-paid-through-date), with a client and a scope of its own.
+- **The rest of the billing API** _(planned for M34)_. The operator's billing system also sets a tenant's
+  plan and add-ons, ends a subscription and reads a tenant's state and usage through the same API.
 
 ## Two parts
 
@@ -170,9 +171,9 @@ every business change.
     receiver can drop the copy.
 - **Audit.** Every change to a subscription, a payment, an invoice or an account writes an
   append-only audit record with its actor: a person who signs up, a
-  provider's webhook, a job, or an operator.
+  provider's webhook, a job, an operator, or the billing client.
   - **The `control_plane.audit_records` table.** `id`, `occurred_at`, `actor_kind` (`account`,
-    `webhook`, `job` or `operator`), `actor`, `action` and `subject`. The database rejects every
+    `webhook`, `job`, `operator` or `billing`), `actor`, `action` and `subject`. The database rejects every
     update, delete and truncate with `restrict_violation`, raw SQL included, and the control plane's
     code has only an append and a read.
   - **Who writes it.** The handler or the command that makes the change appends the record in the
@@ -180,7 +181,7 @@ every business change.
     actor. An operator command's record has the actor kind `operator` and the `--operator` name as
     the actor. The job runner writes none itself, because claiming and retrying are bookkeeping and not a
     business change.
-  - **The billing client** _(planned for M34)_. A call of the billing API writes its record with the actor
+  - **The billing client.** A call of the billing API writes its record with the actor
     kind `billing` and the client id as actor, see [audit records](billing-api.md#audit-records).
 
 ## Operators
@@ -235,7 +236,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
   their settings is set, all of them are required. The sign-up challenge key is optional. The disposable domain list is optional, and once one of its
-  settings is set, both are required. The public URL is optional. The PayOS provider is optional, and with `PayOs` the base URL and the client id, API
+  settings is set, both are required. The public URL is optional. The billing client's settings are optional, and once one of them is set, all of them are required. The PayOS provider is optional, and with `PayOs` the base URL and the client id, API
   key and checksum key are required.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, or the quota key, and never its value.
@@ -279,6 +280,9 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Dns:Zone` | The zone that holds the tenant subdomains, such as `vn.example.com` | A valid domain name, with `Rfc2136` |
 | `ControlPlane:Dns:KeyName` | The name of the TSIG key that the server knows | Not empty, with `Rfc2136` |
 | `ControlPlane:Dns:Key` | The TSIG HMAC-SHA256 key as base64, from the secret `ControlPlane__Dns__Key` | Valid base64, with `Rfc2136`. Never a value in a setting file or a message |
+| `ControlPlane:Billing:Authority` | The issuer URL of the operator's identity provider, which signs the billing client's tokens, see [signing in](billing-api.md#signing-in). Optional. Without the three `ControlPlane:Billing` settings every billing route answers `401` | An absolute `https` URL, when any `ControlPlane:Billing` setting is set |
+| `ControlPlane:Billing:Audience` | The audience that the billing client's token carries | Not empty, when any `ControlPlane:Billing` setting is set |
+| `ControlPlane:Billing:ClientId` | The id of the billing client, as the token's `client_id` or `azp` claim names it. It is the actor of the billing audit records | Not empty, when any `ControlPlane:Billing` setting is set |
 | `ControlPlane:PayOs:Provider` | The PayOS adapter: `Fake` or `PayOs`. Optional. With none the service registers no adapter, no payment link job and no webhook route or job | `Fake` is refused outside Development and Testing. Any other value is refused |
 | `ControlPlane:PayOs:BaseUrl` | The address of the PayOS API, such as `https://api-merchant.payos.vn` | An absolute `https` URL, with `PayOs` |
 | `ControlPlane:PayOs:ClientId` | The PayOS client id, from the secret `ControlPlane__PayOs__ClientId` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |

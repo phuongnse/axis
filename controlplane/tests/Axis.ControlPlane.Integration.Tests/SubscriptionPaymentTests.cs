@@ -1,7 +1,3 @@
-using System.Collections.Concurrent;
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
 using Axis.ControlPlane.Audit;
 using Axis.ControlPlane.Billing;
 using Axis.ControlPlane.Cells;
@@ -38,7 +34,7 @@ public sealed class SubscriptionPaymentTests : IAsyncLifetime
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine").Build();
     private readonly PlanCatalogue _catalogue = BillingSeed.Catalogue();
     private readonly LogCollector _logs = new();
-    private readonly CellHandler _cell = new();
+    private readonly CellStub _cell = new();
     private NpgsqlDataSource _dataSource = null!;
     private ILoggerFactory _loggers = null!;
     private CellClients _clients = null!;
@@ -73,7 +69,7 @@ public sealed class SubscriptionPaymentTests : IAsyncLifetime
         };
         controlPlane.Cells.Add(new CellOptions { Id = "vn-1", InternalUrl = "https://vn-1.test", TokenUrl = "https://vn-1.test/token", ClientId = "axis-controlplane" });
         controlPlane.CellSecrets["vn-1"] = "cell-secret";
-        _clients = new CellClients(controlPlane, new HandlerFactory(_cell), new CellClientOptions(), TimeProvider.System);
+        _clients = new CellClients(controlPlane, new StubHttpClientFactory(_cell), new CellClientOptions(), TimeProvider.System);
         _loggers = LoggerFactory.Create(builder => builder.AddProvider(_logs));
         var quotas = new SubscriptionQuotas(_dataSource, _dataSource, _clients, _catalogue, TimeProvider.System, _loggers.CreateLogger<SubscriptionQuotas>());
         var resume = new SubscriptionResume(_dataSource, _dataSource, _clients, _loggers.CreateLogger<SubscriptionResume>());
@@ -279,70 +275,4 @@ public sealed class SubscriptionPaymentTests : IAsyncLifetime
     private Task<int> Execute(string sql) => ControlPlaneDatabase.ExecuteAsync(_dataSource, sql, TestContext.Current.CancellationToken);
 
     private Task<T> ScalarAsync<T>(string sql) => ControlPlaneDatabase.ScalarAsync<T>(_dataSource, sql, TestContext.Current.CancellationToken);
-
-    private sealed class HandlerFactory(HttpMessageHandler handler) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
-    }
-
-    private sealed record ChangeCall(string Path, string? Key);
-
-    private sealed record PutCall(string Path, IReadOnlyDictionary<string, long> Set);
-
-    /// <summary>
-    /// Stands in for the cell <c>vn-1</c>: a token endpoint, the job route, <c>POST /api/cell/tenants/{id}/resume</c> and <c>PUT /api/cell/tenants/{id}/quotas</c>.
-    /// It records each call with its <c>Idempotency-Key</c>. While <see cref="FailResumes"/> is set a resume answers <c>500</c> and is still recorded.
-    /// </summary>
-    private sealed class CellHandler : HttpMessageHandler
-    {
-        private readonly ConcurrentQueue<ChangeCall> _resumes = new();
-        private readonly ConcurrentQueue<PutCall> _puts = new();
-        private readonly ConcurrentQueue<string> _calls = new();
-
-        public bool FailResumes { get; set; }
-
-        public IReadOnlyList<ChangeCall> Resumes => [.. _resumes];
-
-        public IReadOnlyList<PutCall> Puts => [.. _puts];
-
-        /// <summary>Every call that changes a tenant, as the method and the path, in the order it came.</summary>
-        public IReadOnlyList<string> Calls => [.. _calls];
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var path = request.RequestUri!.AbsolutePath;
-            if (path == "/token")
-            {
-                return Json(new { access_token = "token", expires_in = 3600, token_type = "Bearer" });
-            }
-
-            if (request.Method == HttpMethod.Get && path.StartsWith("/api/cell/jobs/", StringComparison.Ordinal))
-            {
-                return Json(new { id = Guid.Parse(path["/api/cell/jobs/".Length..]), kind = "job", tenantId = "any", state = "succeeded", createdAt = DateTimeOffset.UnixEpoch });
-            }
-
-            if (request.Method == HttpMethod.Post && path.EndsWith("/resume", StringComparison.Ordinal))
-            {
-                _calls.Enqueue($"POST {path}");
-                _resumes.Enqueue(new ChangeCall(path, request.Headers.TryGetValues("Idempotency-Key", out var keys) ? keys.Single() : null));
-                return FailResumes
-                    ? new HttpResponseMessage(HttpStatusCode.InternalServerError)
-                    : Json(new { id = Guid.NewGuid(), kind = "resume", tenantId = "any", state = "queued", createdAt = DateTimeOffset.UnixEpoch }, HttpStatusCode.Accepted);
-            }
-
-            if (request.Method == HttpMethod.Put && path.EndsWith("/quotas", StringComparison.Ordinal))
-            {
-                using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
-                var set = body.RootElement.GetProperty("set").EnumerateObject().ToDictionary(property => property.Name, property => property.Value.GetInt64());
-                _calls.Enqueue($"PUT {path}");
-                _puts.Enqueue(new PutCall(path, set));
-                return Json(new { quotas = set.ToDictionary(pair => pair.Key, pair => new { limit = pair.Value }) });
-            }
-
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        }
-
-        private static HttpResponseMessage Json(object body, HttpStatusCode status = HttpStatusCode.OK) =>
-            new(status) { Content = JsonContent.Create(body, options: JsonSerializerOptions.Web) };
-    }
 }

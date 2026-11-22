@@ -333,6 +333,41 @@ namespace Axis.ControlPlane.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.ControlPlane.BillingApi.BillingRequestRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("answer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("request_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_billing_requests");
+
+                    b.HasIndex(new[] { "IdempotencyKey", "CreatedAt" }, "ix_billing_requests_idempotency_key_created_at");
+
+                    b.ToTable("billing_requests", "control_plane");
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.SignUp.DisposableDomainRow", b =>
                 {
                     b.Property<string>("Domain")
@@ -607,7 +642,7 @@ namespace Axis.ControlPlane.Storage.Migrations
 
                     b.ToTable("audit_records", "control_plane", t =>
                         {
-                            t.HasCheckConstraint("ck_audit_records_actor_kind", "actor_kind IN ('account', 'webhook', 'job', 'operator')");
+                            t.HasCheckConstraint("ck_audit_records_actor_kind", "actor_kind IN ('account', 'webhook', 'job', 'operator', 'billing')");
                         });
                 });
 
@@ -793,6 +828,10 @@ namespace Axis.ControlPlane.Storage.Migrations
                     b.Property<DateTimeOffset?>("NextAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("next_at");
+
+                    b.Property<DateOnly?>("PaidThrough")
+                        .HasColumnType("date")
+                        .HasColumnName("paid_through");
 
                     b.Property<string>("Period")
                         .HasColumnType("text")

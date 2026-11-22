@@ -1,5 +1,6 @@
 using Axis.ControlPlane;
 using Axis.ControlPlane.Billing;
+using Axis.ControlPlane.BillingApi;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Emails;
@@ -154,6 +155,9 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
     healthChecks.Add(new HealthCheckRegistration("directory", sp => new DatabaseHealthCheck(sp.GetRequiredKeyedService<NpgsqlDataSource>("directory"), "The region directory database is unreachable."), failureStatus: null, tags: [HealthEndpoints.ReadyTag]));
 }
 
+// The billing client's sign-in and the policy of the billing routes, see docs/reference/billing-api.md#signing-in.
+builder.Services.AddBillingApiClient(options.Billing);
+
 builder.Services.AddProblemDetails();
 builder.Services.AddControlPlaneTelemetry(builder.Configuration, builder.Environment);
 
@@ -172,10 +176,15 @@ if (!forwardedHeaders.IsEmpty)
     app.UseWhen(context => context.Connection.RemoteIpAddress is not null, branch => branch.UseForwardedHeaders());
 }
 
+// After the forwarded headers and before the routes, so a billing route sees the caller's token. Only the billing routes ask for authorization.
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseStaticFiles();
 
 app.MapHealthEndpoints();
 app.MapSignUpEndpoints();
+app.MapBillingApiEndpoints(options.Billing);
 
 // The PayOS webhook, see docs/reference/payments.md#webhooks. Mapped only when a PayOS provider is named.
 if (!string.IsNullOrWhiteSpace(payOsProvider))

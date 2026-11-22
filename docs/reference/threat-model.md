@@ -14,4 +14,4 @@ an id is unique across every file.
 - **P**, [the identity provider and personal data](threat-model-identity-and-personal-data.md): the identity provider Axis ships and the personal data Axis holds.
 - **I**, [the installation](threat-model-installation.md): the operator's install, its images, hosts, databases, backups and secrets, and the cell console.
 - **B**, [the way Axis is built](threat-model-build.md): NexKit, CI, the AI agents and the repository.
-- **C**, [the control plane](threat-model-control-plane.md): the sign-up page, the control plane's calls to the cells, the directory's DNS writes and the payment webhooks.
+- **C**, [the control plane](threat-model-control-plane.md): the sign-up page, the control plane's calls to the cells, the directory's DNS writes, the payment webhooks and the billing API.

@@ -79,13 +79,7 @@ internal static class SubscriptionPayments
             }
         }
 
-        await AuditRecords.AppendAsync(transaction, actorKind, actorId, "subscription.active", subscriptionId.ToString(), cancellationToken);
-        await SubscriptionQuotas.EnqueueAsync(connection, transaction, subscriptionId, cancellationToken);
-        if (state is "pastDue" or "readOnly")
-        {
-            await SubscriptionResume.EnqueueAsync(connection, transaction, subscriptionId, newStep, cancellationToken);
-        }
-
+        await SubscriptionActivation.QueueAsync(transaction, subscriptionId, state, newStep, actorKind, actorId, cancellationToken);
         return true;
     }
 }

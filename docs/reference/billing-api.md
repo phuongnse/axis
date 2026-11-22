@@ -1,7 +1,5 @@
 # Billing API
 
-_(planned for M34)_
-
 The operator's billing system drives a tenant's commercial life through this API, as
 [D168](../decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md)
 agrees. It sets the tenant's plan, its add-ons and the date the tenant is paid through. It ends a
@@ -12,9 +10,9 @@ what a plan is on [plans](plans.md).
 ## Signing in
 
 The billing system signs in as a client of an identity provider that the operator names, and the
-control plane checks each token it sends. This rule is proposed in
+control plane checks each token it sends.
 [D169](../decisions/d169-the-billing-client-signs-in-with-oauth-client-credentials-from-the-operators-identity-provider.md)
-and is not yet agreed.
+agrees this rule.
 
 - **The client.** The billing system holds one client of that provider, and gets a token with the
   client credentials grant.
@@ -70,10 +68,16 @@ body. The first check that fails gives the answer.
 - **`404`** for a tenant id that this region's control plane holds no subscription for. This also covers a
   tenant of another region, so the answer never shows which tenants exist elsewhere.
 - **`422`** for a reused key with another request.
+- **`200`** for a call that changes a subscription: the answer is the subscription as
+  [reading a tenant](#reading-a-tenant) shows it, without `usage`. A caller ignores a field it does not
+  know, so `usage` can be added to these answers later. A replay answers the same text. A refused call keeps
+  nothing under its key, so a retry is checked again.
 
 Each call names its own `409` and `422` cases below.
 
 ## Setting the plan and add-ons
+
+_(planned for M34)_
 
 This call sets the tenant's plan and its user packs at once. The packs are add-ons, and the plan and
 packs decide the tenant's quotas, see [from a plan to the quotas](plans.md#from-a-plan-to-the-quotas).
@@ -88,7 +92,7 @@ Content-Type: application/json
 ```
 
 - **The whole list.** `addOns` is the whole list of packs the tenant keeps. An empty list drops every pack.
-- **The answer.** `200` with the tenant, as [reading a tenant](#reading-a-tenant) answers it.
+- **The answer.** `200` with the tenant, as [the shared answers](#answers-every-call-shares) say.
 - **The move.** The call pins the plan version and the packs. It queues `writeQuotas` in the same
   transaction, through the one helper that every move uses.
 - **`422`** for a plan code and version, or an add-on code, that `ControlPlane:Plans` does not list. It
@@ -112,17 +116,23 @@ Content-Type: application/json
 { "paidThrough": "2027-01-31" }
 ```
 
-- **The answer.** `200` with the tenant.
+- **The answer.** `200` with the tenant, as [the shared answers](#answers-every-call-shares) say.
 - **A subscription that becomes active.** A `trialing`, `pastDue`, `readOnly` or `cancelled` subscription
   becomes `active`. The move queues `writeQuotas`, and from `pastDue` or `readOnly` it also queues
   `resumeTenant`, as [states](subscriptions.md#states) says. An `active` subscription keeps its state and
   takes the new date.
-- **`422`** for a date before today in UTC.
+- **The move.** The call sets the next date to the start of the day after the paid-through date in UTC,
+  and clears the end of the paid period that a payment keeps, so the period roll-forward leaves the
+  subscription alone.
+- **`422`** for a date before today in UTC. The check comes after the replay check, so a retry on the next day
+  still gets the first answer.
 - **`409`** for a subscription that pins no plan. The plan is set first, see [the plan call](#setting-the-plan-and-add-ons).
 - **`409`** for a subscription that is `deleting` or `deleted`.
 - **The audit record.** `subscription.active` when the state moves, otherwise `subscription.paidThroughSet`.
 
 ## Ending a subscription
+
+_(planned for M34)_
 
 This call ends a subscription at its paid-through date. The tenant keeps working until that date, then
 follows the path of an unpaid tenant, as [states](subscriptions.md#states) says.
@@ -136,12 +146,14 @@ Idempotency-Key: <key>
 The call has no body.
 
 - **The move.** An `active` subscription becomes `cancelled`.
-- **The answer.** `200` with the tenant.
+- **The answer.** `200` with the tenant, as [the shared answers](#answers-every-call-shares) say.
 - **Already cancelled.** A `cancelled` subscription answers `200` with the tenant and writes nothing.
 - **`409`** for any other state: `trialing`, `pastDue`, `readOnly`, `deleting` or `deleted`.
 - **The audit record.** `subscription.cancelled`, once, when the move is made.
 
 ## Reading a tenant
+
+_(planned for M34)_
 
 This call reads the tenant's subscription and its usage. It changes nothing and writes no audit record.
 
@@ -156,7 +168,7 @@ The answer is `200` with the subscription, shaped like this example:
 {
   "tenantId": "3f2a6c1e-7b4d-4e0a-9d2f-5a1b8c9e0f12",
   "state": "active",
-  "nextAt": "2027-01-31T00:00:00Z",
+  "nextAt": "2027-02-01T00:00:00Z",
   "trialEndsAt": "2026-12-22T00:00:00Z",
   "paidThrough": "2027-01-31",
   "plan": { "code": "team", "version": 2 },
@@ -184,7 +196,6 @@ says. The record is written in the same transaction as the change.
 
 - **The record.** The actor kind is `billing`, the actor is the client id from the token, and the subject
   is the subscription id.
-- **The actions.** `subscription.planSet`, `subscription.paidThroughSet`, `subscription.active` and
-  `subscription.cancelled`.
+- **The actions.** Each call names its action in its own section.
 - **No record for a replay, a refusal or a read.** A replay answers the first answer again, a refused call
   changes nothing, and a read writes none.
