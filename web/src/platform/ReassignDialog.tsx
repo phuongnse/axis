@@ -83,8 +83,7 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
     setErrors(placed.form)
   }
 
-  const send = async () => {
-    const values = await form.validateFields()
+  const send = async (values: ReassignValues) => {
     const body: ReassignBody =
       values.kind === 'role'
         ? { role: values.role!, reason: values.reason }
@@ -112,13 +111,20 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
       okText={t('shell.task.reassignSend')}
       cancelText={t('shell.task.reassignCancel')}
       confirmLoading={sending}
-      onOk={() => void send().catch(() => undefined)}
+      onOk={() => form.submit()}
       onCancel={onClose}
       destroyOnHidden
     >
       <Flex vertical gap="middle">
         {errors.length > 0 && <AxisAlert data-testid="task-reassign-error" kind="error" message={errors.join(' ')} />}
-        <Form form={form} layout="vertical" requiredMark={requiredMark} initialValues={{ kind: 'role' }}>
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={requiredMark}
+          scrollToFirstError={{ focus: true }}
+          initialValues={{ kind: 'role' }}
+          onFinish={(values) => void send(values)}
+        >
           <Flex vertical gap={spacing.lg}>
             <AxisField name="kind" label={t('shell.task.reassignTarget')} help={t('shell.task.reassignTarget.help')}>
               <Radio.Group

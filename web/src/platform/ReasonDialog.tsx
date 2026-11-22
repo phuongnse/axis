@@ -67,8 +67,7 @@ export function ReasonDialog({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()
 
-  const send = async () => {
-    const { reason } = await form.validateFields()
+  const send = async (reason: string) => {
     setSending(true)
     setError(undefined)
     try {
@@ -95,13 +94,20 @@ export function ReasonDialog({
       okText={okText ?? t('shell.inspector.commands.send')}
       cancelText={cancelText ?? t('shell.inspector.commands.close')}
       confirmLoading={sending}
-      onOk={() => void send().catch(() => undefined)}
+      onOk={() => form.submit()}
       onCancel={onClose}
       destroyOnHidden
     >
       <Flex vertical gap="middle">
         {children}
-        <Form form={form} layout="vertical" requiredMark={requiredMark} initialValues={{ reason: initialValue }}>
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={requiredMark}
+          scrollToFirstError={{ focus: true }}
+          initialValues={{ reason: initialValue }}
+          onFinish={({ reason }) => void send(reason)}
+        >
           <AxisField
             name="reason"
             label={label ?? t('shell.inspector.commands.reason')}

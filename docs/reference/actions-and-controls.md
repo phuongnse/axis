@@ -200,10 +200,14 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **A box in error looks it in a form** _(planned)_. A form's field whose value the form refuses gets the same error look
   and `aria-invalid`. That covers the record form's fields and the forms that draw their own error line. `AxisFieldGroup`
   also takes `required` and `fold`, for #3264's build.
-- **One way to the first error**. A screen that holds its fields calls `focusFirstError` after a refused action, such as
-  Done, so the focus moves to the first box in error and scrolls it into view. The resource form's item dialog does this.
-- **Every Ant Design form takes the focus to its first error** _(planned)_. Each Ant Design form sets
-  `scrollToFirstError={{ focus: true }}`, so a refused Save, Add, OK or Next moves the focus to the first box in error.
+- **One way to the first error**. A refused action that submits what a person typed, such as Save, Add, Done or Next,
+  moves the focus to the first box in error and scrolls it into view. An Ant Design form sets
+  `scrollToFirstError={{ focus: true }}`, and a Vitest check refuses a form in `web/src` that does not, the sign-in
+  pages included. A button that sends a dialog's form submits the form, so a refused click focuses the field. A file
+  picker cannot take the focus, so its dialog focuses its Choose button.
+- **A screen that holds its fields focuses its first error**. Such a screen calls `focusFirstError` after a refused
+  action, such as Done, so the focus moves to the first box in error and scrolls it into view. The resource form's
+  item dialog does this.
 - **One look for yes or no** _(planned)_. A yes-or-no setting is a checkbox with its label on its right and its help under
   the label, the same in a form as on a screen that holds its fields. A switch is for a setting that takes effect as it
   is turned on, and no other.

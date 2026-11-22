@@ -36,6 +36,7 @@ export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorCon
         action={loginAction}
         layout="vertical"
         requiredMark={false}
+        scrollToFirstError={{ focus: true }}
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >

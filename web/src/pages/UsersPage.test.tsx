@@ -581,6 +581,19 @@ describe('UsersPage', () => {
     expect(posts(fetchMock)).toHaveLength(0)
   })
 
+  it('puts the focus on the empty email and sends nothing', async () => {
+    const fetchMock = stubInvitations()
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
+    const form = await confirmation('Invite a person')
+    await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))
+
+    expect(await within(form).findByText('Enter an email.')).toBeInTheDocument()
+    expect(within(form).getByLabelText(/^Email\*?$/)).toHaveFocus()
+    expect(screen.queryByText('Invite this person?')).toBeNull()
+    expect(posts(fetchMock)).toHaveLength(0)
+  })
+
   it.each([
     [403, 'Sign in again to give a platform role.'],
     [409, 'An account already uses this email.'],

@@ -1083,6 +1083,21 @@ describe('ProcessInstancePage', () => {
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
   })
 
+  it('puts the focus on the empty reason and sends nothing', async () => {
+    const fetchMock = stubApi({ detail: { status: 200, body: detailWith(['cancel']) } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId('inspector-command-cancel'))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    expect(await within(dialog).findByText('Enter a reason.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('textbox', { name: 'Reason' })).toHaveFocus()
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+  })
+
   it('shows the problem title of a refused command in the dialog', async () => {
     stubApi({
       detail: { status: 200, body: detailWith(['cancel']) },
@@ -1201,6 +1216,21 @@ describe('ProcessInstancePage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
     expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'No order was found', outcome: 'failed' })
+  })
+
+  it('puts the focus on the empty reason of a resolve and sends nothing', async () => {
+    const fetchMock = stubApi({ detail: { status: 200, body: detailWithResolvable() } })
+
+    renderHistory()
+
+    await openRun('registerPurchase')
+    await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    expect(await within(dialog).findByText('Enter a reason.')).toBeInTheDocument()
+    expect(within(dialog).getByRole('textbox', { name: 'Reason' })).toHaveFocus()
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
   })
 
   it('shows the message of a 400 under the output field it names, and keeps the dialog open', async () => {

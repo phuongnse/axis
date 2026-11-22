@@ -226,13 +226,7 @@ export function SavedItemsDialog<T>({
   const compare = nameCompare(locale)
   const items = saved.items.toSorted((left, right) => compare(saved.nameOf(left), saved.nameOf(right)))
 
-  const save = async () => {
-    let name: string
-    try {
-      name = (await form.validateFields()).name
-    } catch {
-      return
-    }
+  const save = async (name: string) => {
     setFailed(false)
     setSaving(true)
     const done = await saved.save(name.trim())
@@ -252,7 +246,7 @@ export function SavedItemsDialog<T>({
       okText={t(texts.save)}
       cancelText={t('shell.form.cancel')}
       confirmLoading={saving}
-      onOk={() => void save()}
+      onOk={() => form.submit()}
       onCancel={onClose}
       afterClose={() => {
         form.resetFields()
@@ -280,7 +274,14 @@ export function SavedItemsDialog<T>({
           </Flex>
         )}
         {failed && <AxisAlert kind="error" message={t(texts.saveFailed)} />}
-        <Form form={form} layout="vertical" requiredMark={requiredMark} initialValues={{ name: '' }} onFinish={save}>
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={requiredMark}
+          scrollToFirstError={{ focus: true }}
+          initialValues={{ name: '' }}
+          onFinish={({ name }) => void save(name)}
+        >
           <AxisField
             name="name"
             label={t(texts.name)}

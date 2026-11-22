@@ -1025,6 +1025,18 @@ describe('TaskPage', () => {
       expect(api.reassigns()).toEqual([])
     })
 
+    it('puts the focus on the first empty field, the role, and sends nothing', async () => {
+      const api = stubTaskApi({ reads })
+      renderPage()
+      const dialog = await openDialog()
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
+
+      expect(await within(dialog).findByText('Choose who gets the task.')).toBeInTheDocument()
+      expect(within(dialog).getByRole('combobox', { name: 'Role' })).toHaveFocus()
+      expect(api.reassigns()).toEqual([])
+    })
+
     it('shows a 400 under the field it names, with the dialog still open', async () => {
       for (const [kind, pointer] of [
         ['role', '/reason'],
