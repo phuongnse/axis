@@ -114,9 +114,9 @@ Content-Type: application/json
 
 - **The answer.** `200` with the tenant.
 - **A subscription that becomes active.** A `trialing`, `pastDue`, `readOnly` or `cancelled` subscription
-  becomes `active`. The move queues `writeQuotas`, and from `pastDue` or `readOnly` it also queues
-  `resumeTenant`, as [states](subscriptions.md#states) says. An `active` subscription keeps its state and
-  takes the new date.
+  becomes `active`. The move queues `writeQuotas`, and from `pastDue` or `readOnly` it also resumes the
+  tenant in its cell, which clears its [read-only status](subscriptions.md#the-read-only-tenant). An `active`
+  subscription keeps its state and takes the new date.
 - **`422`** for a date before today in UTC.
 - **`409`** for a subscription that pins no plan. The plan is set first, see [the plan call](#setting-the-plan-and-add-ons).
 - **`409`** for a subscription that is `deleting` or `deleted`.
