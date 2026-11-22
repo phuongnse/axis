@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Axis.Tenancy;
+using Microsoft.Extensions.Configuration;
 
 namespace Axis.ControlPlane.Plans;
 
@@ -175,6 +176,46 @@ public sealed partial class PlanCatalogue
         }
 
         return problems;
+    }
+
+    /// <summary>
+    /// Every setting of a plan or an add-on that the catalogue does not know, such as a leftover <c>Prices</c>, see <c>docs/reference/plans.md#the-catalogue</c>.
+    /// The binder drops such a setting without a word, so the start reads the settings themselves. A message names the setting and never holds its value.
+    /// </summary>
+    internal static List<string> SettingProblems(IConfigurationSection plans)
+    {
+        var problems = new List<string>();
+        foreach (var plan in plans.GetChildren())
+        {
+            AddUnknownSettings(problems, plan, "a plan", _planSettings);
+            foreach (var addOn in plan.GetSection(nameof(PlanOptions.AddOns)).GetChildren())
+            {
+                AddUnknownSettings(problems, addOn, "an add-on", _addOnSettings);
+            }
+        }
+
+        return problems;
+    }
+
+    private static readonly string[] _planSettings =
+    [
+        nameof(PlanOptions.Code),
+        nameof(PlanOptions.Version),
+        nameof(PlanOptions.Name),
+        nameof(PlanOptions.IncludedUsers),
+        nameof(PlanOptions.Trial),
+        nameof(PlanOptions.Quotas),
+        nameof(PlanOptions.AddOns),
+    ];
+
+    private static readonly string[] _addOnSettings = [nameof(PlanAddOnOptions.Code), nameof(PlanAddOnOptions.Users)];
+
+    private static void AddUnknownSettings(List<string> problems, IConfigurationSection entry, string of, string[] known)
+    {
+        foreach (var setting in entry.GetChildren().Where(child => !known.Contains(child.Key, StringComparer.OrdinalIgnoreCase)))
+        {
+            problems.Add($"The setting {setting.Path} is not a setting of {of}.");
+        }
     }
 
     // Every quota key of the platform except the users, which the plan's included users and add-ons set.

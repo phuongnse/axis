@@ -184,6 +184,7 @@ public sealed partial class ControlPlaneOptions
         problems.AddRange(BillingProblems(options.Billing));
         problems.AddRange(SignUpProblems(options.SignUp));
         problems.AddRange(PlanCatalogue.Problems(options.Plans));
+        problems.AddRange(PlanCatalogue.SettingProblems(configuration.GetSection($"{SectionName}:{nameof(Plans)}")));
 
         if (problems.Count > 0)
         {

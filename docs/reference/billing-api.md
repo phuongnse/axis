@@ -94,7 +94,7 @@ Content-Type: application/json
 - **The move.** The call pins the plan version and the packs. It queues `writeQuotas` in the same
   transaction, through the one helper that every move uses.
 - **At once, in any state.** The plan applies at once in every state except `deleting` and `deleted`, a
-  `trialing` subscription included. The call leaves the state, the dates and the period alone.
+  `trialing` subscription included. The call leaves the state and the dates alone.
 - **The same values again.** A call with the plan and packs the tenant already has is a new instruction. It
   writes the audit record and queues `writeQuotas` again.
 - **`422`** for a plan code and version, or an add-on code, that `ControlPlane:Plans` does not list. It

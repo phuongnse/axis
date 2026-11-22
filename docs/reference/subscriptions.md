@@ -20,8 +20,8 @@ commerce.
   delays a step and never skips one. Every change of state writes an audit record.
 - **The `control_plane.subscriptions` table.** `id`, `tenant_id`, `sign_up_id`, `state` (`trialing`,
   `active`, `pastDue`, `readOnly`, `cancelled`, `deleting` or `deleted`), `trial_ends_at`, `next_at`, `step_id`, `plan_code`,
-  `plan_version`, `period` (`month` or `year`), `paid_through` and `created_at`. The
-  plan and period are empty until a plan is set, see
+  `plan_version`, `paid_through` and `created_at`. The
+  plan is empty until a plan is set, see
   [the catalogue](plans.md#the-catalogue). `paid_through` is the date the tenant is paid through, set by the
   [billing API](billing-api.md#setting-the-paid-through-date), and it is empty until then. A
   subscription with a `paid_through` is a paid tenant. A [confirmed sign-up](sign-up.md#the-verify-page) starts the subscription as `trialing`, with the

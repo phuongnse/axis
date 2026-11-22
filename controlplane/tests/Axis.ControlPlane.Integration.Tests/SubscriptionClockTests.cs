@@ -535,11 +535,10 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
         await using var insert = _dataSource.CreateCommand(
             """
             INSERT INTO control_plane.subscriptions
-                (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id, plan_code, plan_version, period, paid_through)
+                (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id, plan_code, plan_version, paid_through)
             VALUES (@id, @tenant, @signUp, @state, @nextAt, @nextAt, @step,
                     CASE WHEN @paidThrough::date IS NULL THEN NULL ELSE 'team' END,
                     CASE WHEN @paidThrough::date IS NULL THEN NULL ELSE 1 END,
-                    CASE WHEN @paidThrough::date IS NULL THEN NULL ELSE 'month' END,
                     @paidThrough)
             """);
         insert.Parameters.AddWithValue("id", id);
