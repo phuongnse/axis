@@ -1,10 +1,19 @@
-import { DeleteOutlined } from '@ant-design/icons'
 import { ConfigProvider, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { StatusTag } from '../platform/StatusTag'
 import dayjs from 'dayjs'
-import { memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
@@ -89,9 +98,6 @@ const drawerGroups: {
 
 /** The titles of a pair's row, by the pair's first setting. */
 const pairTitles = { precision: 'fields.precisionScale', min: 'fields.limits', minLength: 'fields.length' } as const
-
-/** No field names: a validation drawn at its field has no field picker. */
-const noFieldNames: string[] = []
 
 /** Joins the field names into one text that tells whether the list changed. */
 const nameSeparator = '\u0000'
@@ -197,6 +203,23 @@ const Picker = memo(function Picker({
 })
 
 /**
+ * Proposed, #3264: the entity designer's side panels, a field's and a validation's, of which one shows at a time. A part
+ * that opens its panel takes the panels, which closes every other part's; a part registers how to close its own. The
+ * Validations part also registers how to open a validation or a new one at a field, which a field's panel uses.
+ */
+interface DesignerPanels {
+  take: (owner: 'fields' | 'validations') => void
+  register: (owner: 'fields' | 'validations', close: () => void) => () => void
+  /** Opens a validation, or a new one at a field, in the validation's panel. */
+  openValidation: (index: number) => void
+  addValidation: (field: string) => void
+  /** The Validations part says how it opens a validation and a new one. */
+  registerValidations: (opener: { open: (index: number) => void; add: (field: string) => void }) => () => void
+}
+
+const DesignerPanelsContext = createContext<DesignerPanels | null>(null)
+
+/**
  * The designer of an entity, in the sections General, Fields, Validations and Indexes, see
  * docs/reference/entity-designer.md#sections. General shows the entity's name, label, description and display field.
  * Fields is a table of name, label, type, Required, Unique and properties, and a field's name opens the field drawer with
@@ -256,59 +279,93 @@ export function EntityDesigner({
     .join(nameSeparator)
   const fieldNames = useMemo(() => (joinedNames === '' ? [] : joinedNames.split(nameSeparator)), [joinedNames])
   const pickDisplayField = useCallback((next: string | undefined) => onChange('/displayField', next), [onChange])
+  const closers = useRef(new Map<string, () => void>())
+  const validationsOpener = useRef<{ open: (index: number) => void; add: (field: string) => void } | null>(null)
+  const panels = useMemo<DesignerPanels>(
+    () => ({
+      take: (owner) => {
+        for (const [other, close] of closers.current) {
+          if (other !== owner) {
+            close()
+          }
+        }
+      },
+      register: (owner, close) => {
+        closers.current.set(owner, close)
+        return () => closers.current.delete(owner)
+      },
+      openValidation: (index) => validationsOpener.current?.open(index),
+      addValidation: (field) => validationsOpener.current?.add(field),
+      registerValidations: (opener) => {
+        validationsOpener.current = opener
+        return () => {
+          validationsOpener.current = null
+        }
+      },
+    }),
+    [],
+  )
 
   const designer = (
-    <div data-testid="studio-entity-designer">
-      <SectionParts>
-        <SectionPart testName="general" heading={sectionHeading(t, 'general')}>
-          <Flex vertical gap="middle">
-            <div data-testid="studio-field-/name">
-              <AxisField {...fieldTexts(t, 'name')} required>
-                <Input value={text(value.name)} onChange={(event) => onChange('/name', event.target.value)} />
-              </AxisField>
-            </div>
-            <div data-testid="studio-field-/label">
-              <AxisFieldGroup {...groupTexts(t, 'label')}>
-                <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
-              </AxisFieldGroup>
-            </div>
-            <div data-testid="studio-field-/description">
-              <AxisFieldGroup {...groupTexts(t, 'description')}>
-                <LabelTexts pointer="/description" value={value.description} onChange={onChange} multiline />
-              </AxisFieldGroup>
-            </div>
-            <Picker
-              pointer="/displayField"
-              {...fieldTexts(t, 'displayField')}
-              options={fieldNames}
-              value={value.displayField}
-              required={false}
-              onPick={pickDisplayField}
-            />
-          </Flex>
-        </SectionPart>
-        <Fields
-          fields={fields}
-          application={application}
-          path={path}
-          readOnly={readOnly}
-          origins={origins}
-          warnings={warnings}
-          onOriginsChange={onOriginsChange}
-          layer={layer}
-          validations={value.validations}
-          onChange={onChange}
-        />
-        <Validations
-          validations={value.validations}
-          fieldNames={fieldNames}
-          readOnly={readOnly}
-          layer={layer}
-          onChange={onChange}
-        />
-        <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} layer={layer} onChange={onChange} />
-      </SectionParts>
-    </div>
+    <DesignerPanelsContext.Provider value={panels}>
+      <div data-testid="studio-entity-designer">
+        <SectionParts>
+          <SectionPart testName="general" heading={sectionHeading(t, 'general')}>
+            <Flex vertical gap="middle">
+              <div data-testid="studio-field-/name">
+                <AxisField {...fieldTexts(t, 'name')} required>
+                  <Input value={text(value.name)} onChange={(event) => onChange('/name', event.target.value)} />
+                </AxisField>
+              </div>
+              <div data-testid="studio-field-/label">
+                <AxisFieldGroup {...groupTexts(t, 'label')}>
+                  <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
+                </AxisFieldGroup>
+              </div>
+              <div data-testid="studio-field-/description">
+                <AxisFieldGroup {...groupTexts(t, 'description')}>
+                  <LabelTexts pointer="/description" value={value.description} onChange={onChange} multiline />
+                </AxisFieldGroup>
+              </div>
+              <Picker
+                pointer="/displayField"
+                {...fieldTexts(t, 'displayField')}
+                options={fieldNames}
+                value={value.displayField}
+                required={false}
+                onPick={pickDisplayField}
+              />
+            </Flex>
+          </SectionPart>
+          <Fields
+            fields={fields}
+            application={application}
+            path={path}
+            readOnly={readOnly}
+            origins={origins}
+            warnings={warnings}
+            onOriginsChange={onOriginsChange}
+            layer={layer}
+            validations={value.validations}
+            onChange={onChange}
+          />
+          <Validations
+            validations={value.validations}
+            fields={fields ?? []}
+            readOnly={readOnly}
+            layer={layer}
+            onChange={onChange}
+          />
+          <Indexes
+            indexes={value.indexes}
+            fields={fields ?? []}
+            readOnly={readOnly}
+            layer={layer}
+            onChange={onChange}
+          />
+        </SectionParts>
+      </div>
+    </DesignerPanelsContext.Provider>
   )
 
   return readOnly ? <ConfigProvider componentDisabled>{designer}</ConfigProvider> : designer
@@ -493,15 +550,31 @@ const Fields = memo(function Fields({
   // What Add field found wrong with the new field, dropped whenever its panel goes.
   const [stagedErrors, setStagedErrors] = useState<{ label?: string; name?: string }>({})
 
+  const panels = useContext(DesignerPanelsContext)
+  // How the field's panels close when another part's panel opens: quietly, with the focus going to that panel.
+  const closeQuietly = useRef(() => {})
+  useLayoutEffect(() => {
+    closeQuietly.current = () => {
+      setStaged(null)
+      setStagedErrors({})
+      if (latest.current.shown !== null) {
+        setDrawer((current) => current && { ...current, open: false })
+        writeField(null, false)
+      }
+    }
+  })
+  useLayoutEffect(() => panels?.register('fields', () => closeQuietly.current()), [panels])
+
   const openDrawer = useCallback(
     (index: number) => {
+      panels?.take('fields')
       // One side panel shows at a time, so a field opened from the table takes the place of a new field's panel.
       setStaged(null)
       setStagedErrors({})
       setDrawer({ index, open: true })
       writeField(fieldName(latest.current.fields?.[index]), false)
     },
-    [writeField],
+    [writeField, panels],
   )
 
   const closeDrawer = useCallback(() => {
@@ -640,6 +713,7 @@ const Fields = memo(function Fields({
   }, [])
 
   function addField() {
+    panels?.take('fields')
     // An open field's panel gives way to the new field's, as one side panel shows at a time.
     // The new field's panel takes the place of an open field's, and the focus goes into it, not back to the row.
     if (latest.current.shown !== null) {
@@ -819,7 +893,6 @@ const Fields = memo(function Fields({
         readOnly={readOnly}
         warning={shown === null ? undefined : warnings?.get(shown)}
         validations={validations}
-        layer={layer}
         onChange={onChange}
         onClose={closeDrawer}
       />
@@ -836,7 +909,6 @@ const Fields = memo(function Fields({
           readOnly={false}
           warning={undefined}
           validations={undefined}
-          layer={layer}
           onChange={changeStaged}
           onClose={() => {
             setStaged(null)
@@ -946,11 +1018,14 @@ function nameFromLabel(label: string): string {
  * is empty, it does not start with a letter or has more than letters and digits, or another field has it, ignoring case.
  * Add field and an open field's panel check a name the same way.
  */
-function nameProblem(name: string, others: readonly string[]): string | undefined {
+function nameProblem(
+  name: string,
+  others: readonly string[],
+  takenKey = 'shell.studio.entity.fieldPanel.nameTaken',
+): string | undefined {
   if (name === '') return 'shell.studio.entity.fieldPanel.nameRequired'
   if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) return 'shell.studio.entity.fieldPanel.nameInvalid'
-  if (others.some((other) => other.toLowerCase() === name.toLowerCase()))
-    return 'shell.studio.entity.fieldPanel.nameTaken'
+  if (others.some((other) => other.toLowerCase() === name.toLowerCase())) return takenKey
   return undefined
 }
 
@@ -1170,7 +1245,6 @@ const FieldDrawer = memo(function FieldDrawer({
   readOnly,
   warning,
   validations,
-  layer,
   onChange,
   onClose,
 }: {
@@ -1184,7 +1258,6 @@ const FieldDrawer = memo(function FieldDrawer({
   readOnly: boolean
   warning: FieldWarning | undefined
   validations: unknown
-  layer: DesignerLayer | undefined
   onChange: ChangeHandler
   onClose: () => void
   onAdd?: () => void
@@ -1406,7 +1479,6 @@ const FieldDrawer = memo(function FieldDrawer({
                   matchSources={matchSources}
                   readOnly={readOnly}
                   validations={validations}
-                  layer={layer}
                   onChange={onChange}
                 />
               </SectionParts>
@@ -1432,7 +1504,6 @@ function Settings({
   matchSources,
   readOnly,
   validations,
-  layer,
   onChange,
 }: {
   index: number
@@ -1441,11 +1512,11 @@ function Settings({
   matchSources: (MatchSource | null)[] | undefined
   readOnly: boolean
   validations: unknown
-  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
   const { colour } = useDesignTokens()
+  const panels = useContext(DesignerPanelsContext)
   const pointer = `/fields/${index}`
   const person = designerType(field) === 'person'
   // A person's id is no text a person sizes or searches, and Person is its own type, so it shows none of those.
@@ -1676,17 +1747,8 @@ function Settings({
             <AxisActionRow outlined>
               <AxisButton
                 role="secondary"
-                onClick={() =>
-                  onChange('/validations', [
-                    ...list,
-                    {
-                      name: uniqueStepName(list, 'validation'),
-                      expression: '',
-                      message: { textKey: '' },
-                      field: name,
-                    },
-                  ])
-                }
+                // Proposed, #3264: a new validation at this field opens in the validation's panel, which takes this one's place.
+                onClick={() => panels?.addValidation(name)}
               >
                 {t('shell.studio.entity.addValidation')}
               </AxisButton>
@@ -1746,16 +1808,12 @@ function Settings({
               {group === 'validation' && (
                 <>
                   {atField.length === 0 && <EmptyState text={t('shell.studio.entity.noValidationsAtField')} />}
+                  {/* Proposed, #3264: the validations at this field are links that open each in the validation's panel. */}
                   {atField.map(({ validation, position }) => (
-                    <ValidationRow
+                    <AtFieldValidation
                       key={position}
-                      atField
-                      index={position}
                       validation={validation}
-                      fieldNames={noFieldNames}
-                      readOnly={readOnly}
-                      layer={layer}
-                      onChange={onChange}
+                      onOpen={() => panels?.openValidation(position)}
                     />
                   ))}
                 </>
@@ -2161,32 +2219,126 @@ const Indexes = memo(function Indexes({
   )
 })
 
-/** The validations of the entity as rows of a name, an expression, a message key and a field. */
+/** A validation at a field in the field's panel: its name, a link that opens it, and its message under it. */
+function AtFieldValidation({ validation, onOpen }: { validation: unknown; onOpen: () => void }) {
+  const [searchParams] = useSearchParams()
+  const content = isContent(validation) ? validation : {}
+  const name = text(content.name)
+  const message = useMessageText(content.message)
+  const { colour } = useDesignTokens()
+  const next = new URLSearchParams(searchParams)
+  next.delete('field')
+  next.set('validation', name)
+  return (
+    <div>
+      <Link
+        to={{ search: `?${next}` }}
+        onClick={(event) => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return
+          }
+          event.preventDefault()
+          onOpen()
+        }}
+      >
+        {name}
+      </Link>
+      {message !== '' && <div style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>{message}</div>}
+    </div>
+  )
+}
+
+/** A row of the Validations table: the validation and its place in the list. */
+interface ValidationTableRow {
+  index: number
+  validation: unknown
+}
+
+/** A validation's message as words, in the author's language, or the dash when it has none. */
+function MessageCell({ message }: { message: unknown }) {
+  const text = useMessageText(message)
+  return text === '' ? <EmptyDash /> : text
+}
+
+/** A validation's field by its label, else by its name, or the dash when it names none. */
+function FieldCell({ name, fields }: { name: unknown; fields: unknown[] }) {
+  const field = fields.find((candidate) => isContent(candidate) && candidate.name === name)
+  const label = useMessageText(isContent(field) ? field.label : undefined)
+  const own = text(name)
+  return own === '' ? <EmptyDash /> : label || own
+}
+
+/**
+ * Proposed, #3264: the entity's validations as a table like Fields, Name, Message and Field, ordered by a drag, each
+ * opening in the side panel by its name, as Salesforce lists validation rules by name. A validation's name is the
+ * author's, checked as a field's name is. Add validation opens a new validation in the panel and adds it only by its Add
+ * validation. A field's panel opens its validations here, and adds one at its field, through the designer's panels.
+ */
 const Validations = memo(function Validations({
   validations,
-  fieldNames,
+  fields,
   readOnly,
   layer,
   onChange,
 }: {
   validations: unknown
-  fieldNames: string[]
+  fields: unknown[]
   readOnly: boolean
   layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const [searchParams] = useSearchParams()
+  const panels = useContext(DesignerPanelsContext)
+  const labelDrafts = useContext(LabelTextsContext)
   const list = validations === undefined ? [] : Array.isArray(validations) ? validations : undefined
-  // What a move reads when it is pressed, so each row keeps the same handler between draws, as the Fields table does.
+  const [open, setOpen] = useState<number | null>(null)
+  const [staged, setStaged] = useState<Content | null>(null)
+  const [stagedErrors, setStagedErrors] = useState<{ name?: string; message?: string }>({})
   const latest = useRef({ list, onChange })
   useLayoutEffect(() => {
     latest.current = { list, onChange }
   })
-  const move = useCallback((index: number, offset: number) => {
+  useLayoutEffect(
+    () =>
+      panels?.register('validations', () => {
+        setOpen(null)
+        setStaged(null)
+        setStagedErrors({})
+      }),
+    [panels],
+  )
+  // How a field's panel opens a validation here: the latest handlers, read when a link is pressed.
+  const opener = useRef({ open: (_index: number) => {}, add: (_field: string) => {} })
+  useLayoutEffect(() => {
+    opener.current = {
+      open: (index) => {
+        panels?.take('validations')
+        setStaged(null)
+        setStagedErrors({})
+        setOpen(index)
+      },
+      add: (field) => {
+        panels?.take('validations')
+        setOpen(null)
+        setStagedErrors({})
+        setStaged({ name: '', expression: '', message: { textKey: '' }, field })
+      },
+    }
+  })
+  useLayoutEffect(
+    () =>
+      panels?.registerValidations({
+        open: (index) => opener.current.open(index),
+        add: (field) => opener.current.add(field),
+      }),
+    [panels],
+  )
+  const openAt = useCallback((index: number) => panels?.openValidation(index), [panels])
+  const move = useCallback((from: number, to: number) => {
     const { list: current, onChange: change } = latest.current
-    const next = [...(current ?? [])]
-    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
-    change('/validations', next)
+    change('/validations', moved(current ?? [], from, to))
+    setOpen((shown) => (shown === null ? null : movedIndex(shown, from, to)))
   }, [])
 
   if (list === undefined) {
@@ -2199,6 +2351,85 @@ const Validations = memo(function Validations({
     )
   }
 
+  const names = list.map((validation) => (isContent(validation) ? text(validation.name) : ''))
+  const fieldOptions = fields.flatMap((field) =>
+    isContent(field) && text(field.name) !== ''
+      ? [{ name: text(field.name), labelKey: isContent(field.label) ? text(field.label.textKey) || null : null }]
+      : [],
+  )
+
+  function changeStaged(pointer: string, value: unknown) {
+    setStagedErrors({})
+    const prefix = `/validations/${list!.length}`
+    if (pointer === prefix) {
+      setStaged(isContent(value) ? value : {})
+    } else if (pointer.startsWith(`${prefix}/`)) {
+      setStaged((current) => setAt(current ?? {}, pointer.slice(prefix.length), value) as Content)
+    }
+  }
+
+  function commitStaged() {
+    const key = isContent(staged?.message) ? text(staged.message.textKey) : ''
+    const problem = nameProblem(text(staged?.name), names, 'shell.studio.entity.validationPanel.nameTaken')
+    const errors = {
+      ...(problem === undefined ? {} : { name: t(problem) }),
+      ...(labelled(labelDrafts?.texts[key])
+        ? {}
+        : { message: t('shell.studio.entity.validationPanel.messageRequired') }),
+    }
+    if (errors.name !== undefined || errors.message !== undefined) {
+      setStagedErrors(errors)
+      return
+    }
+    onChange('/validations', [...list!, staged])
+    setStaged(null)
+    setStagedErrors({})
+  }
+
+  const columns: AxisColumn<ValidationTableRow>[] = [
+    {
+      key: 'name',
+      kind: 'freeText',
+      title: t('shell.studio.entity.validationColumn.name'),
+      render: (_, { validation, index }) => {
+        const name = isContent(validation) ? text(validation.name) : ''
+        const next = new URLSearchParams(searchParams)
+        next.set('validation', name)
+        return (
+          <Flex gap="small" align="center" wrap>
+            <Link
+              to={{ search: `?${next}` }}
+              onClick={(event) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                  return
+                }
+                event.preventDefault()
+                openAt(index)
+              }}
+            >
+              {name || t('shell.studio.entity.newValidation')}
+            </Link>
+            {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={name} />}
+          </Flex>
+        )
+      },
+    },
+    {
+      key: 'message',
+      kind: 'freeText',
+      title: t('shell.studio.entity.validationColumn.message'),
+      render: (_, { validation }) => <MessageCell message={isContent(validation) ? validation.message : undefined} />,
+    },
+    {
+      key: 'field',
+      kind: 'freeText',
+      title: t('shell.studio.entity.validationColumn.field'),
+      render: (_, { validation }) => (
+        <FieldCell name={isContent(validation) ? validation.field : undefined} fields={fields} />
+      ),
+    },
+  ]
+
   return (
     <SectionPart
       testName="validations"
@@ -2206,15 +2437,7 @@ const Validations = memo(function Validations({
       action={
         readOnly ? undefined : (
           <AxisActionRow outlined>
-            <AxisButton
-              role="secondary"
-              onClick={() =>
-                onChange('/validations', [
-                  ...list,
-                  { name: uniqueStepName(list, 'validation'), expression: '', message: { textKey: '' }, field: '' },
-                ])
-              }
-            >
+            <AxisButton role="secondary" onClick={() => panels?.addValidation('')}>
               {t('shell.studio.entity.addValidation')}
             </AxisButton>
           </AxisActionRow>
@@ -2222,27 +2445,222 @@ const Validations = memo(function Validations({
       }
     >
       <div data-testid="studio-field-/validations">
-        <Flex vertical gap="large">
-          {/* Proposed, #3264: a list that is a standing part of the entity says so when it is empty, through the one empty
-              state, see docs/reference/actions-and-controls.md#showing-what-is-empty. */}
-          {list.length === 0 && <EmptyState text={t('shell.studio.entity.noValidations')} />}
-          {list.map((validation, index) => (
-            <ValidationRow
-              key={index}
-              index={index}
-              validation={validation}
-              fieldNames={fieldNames}
-              readOnly={readOnly}
-              layer={layer}
-              onChange={onChange}
-              onMove={move}
-              last={index === list.length - 1}
-            />
-          ))}
+        <Flex vertical gap="small">
+          <AxisTable<ValidationTableRow>
+            dataSource={list.map((validation, index) => ({ validation, index }))}
+            rowKey={(row) => String(row.index)}
+            emptyText={t('shell.studio.entity.noValidations')}
+            rowAttributes={(row) =>
+              ({ 'data-testid': `studio-field-/validations/${row.index}` }) as React.HTMLAttributes<HTMLElement>
+            }
+            reorder={readOnly ? undefined : { onMove: move }}
+            rowActions={
+              readOnly
+                ? undefined
+                : {
+                    configured: 3,
+                    actions: ({ index }) => [
+                      {
+                        key: 'moveUp',
+                        labelKey: 'shell.studio.entity.moveUp',
+                        disabled: index === 0,
+                        onClick: () => move(index, index - 1),
+                      },
+                      {
+                        key: 'moveDown',
+                        labelKey: 'shell.studio.entity.moveDown',
+                        disabled: index === list.length - 1,
+                        onClick: () => move(index, index + 1),
+                      },
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.studio.entity.removeValidation',
+                        destructive: true,
+                        onClick: () => {
+                          setOpen((shown) =>
+                            shown === index ? null : shown !== null && shown > index ? shown - 1 : shown,
+                          )
+                          onChange(
+                            '/validations',
+                            list.filter((_, other) => other !== index),
+                          )
+                        },
+                      },
+                    ],
+                  }
+            }
+            columns={columns}
+          />
           <RemovedRows layer={layer} list="/validations" />
         </Flex>
       </div>
+      {open !== null && open < list.length && (
+        <ValidationPanel
+          index={open}
+          validation={list[open]}
+          otherNames={names.filter((_, other) => other !== open)}
+          fieldOptions={fieldOptions}
+          readOnly={readOnly}
+          onChange={onChange}
+          onClose={() => setOpen(null)}
+        />
+      )}
+      {staged !== null && (
+        <ValidationPanel
+          index={list.length}
+          validation={staged}
+          otherNames={names}
+          fieldOptions={fieldOptions}
+          readOnly={false}
+          onChange={changeStaged}
+          onClose={() => {
+            setStaged(null)
+            setStagedErrors({})
+          }}
+          onAdd={commitStaged}
+          errors={stagedErrors}
+        />
+      )}
     </SectionPart>
+  )
+})
+
+/**
+ * Proposed, #3264: a validation in the platform's side panel, as a field is: its name, its expression, its message in
+ * words and its field, picked by its label. An existing validation's edits go into the draft at once, its name only
+ * while it is valid, and Done closes the panel; a new one, `onAdd` given, is held by the panel until Add validation.
+ */
+const ValidationPanel = memo(function ValidationPanel({
+  index,
+  validation,
+  otherNames,
+  fieldOptions,
+  readOnly,
+  onChange,
+  onClose,
+  onAdd,
+  errors,
+}: {
+  index: number
+  validation: unknown
+  otherNames: readonly string[]
+  fieldOptions: ReferenceOption[]
+  readOnly: boolean
+  onChange: ChangeHandler
+  onClose: () => void
+  onAdd?: () => void
+  errors?: { name?: string; message?: string }
+}) {
+  const t = useText()
+  const { spacing } = useDesignTokens()
+  const pointer = `/validations/${index}`
+  const content = isContent(validation) ? validation : {}
+  const name = text(content.name)
+  const editing = onAdd === undefined
+  const [typed, setTyped] = useState<{ index: number; name?: string }>({ index })
+  if (typed.index !== index) {
+    setTyped({ index })
+  }
+  const shownName = typed.index === index && typed.name !== undefined ? typed.name : name
+  const nameError =
+    editing && typed.name !== undefined
+      ? nameProblem(typed.name, otherNames, 'shell.studio.entity.validationPanel.nameTaken')
+      : undefined
+  const expression = fieldTexts(t, 'validations.expression')
+  const [root, setRoot] = useState<HTMLElement | null>(null)
+  // The panel opens on its first box, the name, whichever validation it shows.
+  useEffect(() => {
+    root?.querySelector<HTMLElement>('input')?.focus()
+  }, [root, index])
+  useEffect(() => {
+    if (errors?.name !== undefined || errors?.message !== undefined) {
+      focusFirstError(root)
+    }
+  }, [errors, root])
+  const changeName = (next: string) => {
+    if (editing && nameProblem(next, otherNames, 'shell.studio.entity.validationPanel.nameTaken') !== undefined) {
+      setTyped({ index, name: next })
+      return
+    }
+    setTyped({ index })
+    onChange(`${pointer}/name`, next)
+  }
+  const close = () => {
+    setTyped({ index })
+    onClose()
+  }
+  const done = () => {
+    if (nameError === undefined) {
+      onClose()
+    } else {
+      focusFirstError(root)
+    }
+  }
+  const nameErrorText = errors?.name ?? (nameError === undefined ? undefined : t(nameError))
+  return (
+    <SidePanel
+      id="studio-validation-panel"
+      testId="studio-validation-panel"
+      title={editing ? name || t('shell.studio.entity.newValidation') : t('shell.studio.entity.newValidation')}
+      onClose={close}
+      closeNameKey="shell.studio.entity.validationPanel.close"
+      actions={
+        readOnly ? undefined : editing ? (
+          <AxisButton role="main" onClick={done}>
+            {t('shell.studio.entity.fieldPanel.done')}
+          </AxisButton>
+        ) : (
+          <>
+            <AxisButton role="secondary" onClick={close}>
+              {t('shell.studio.cancel')}
+            </AxisButton>
+            <AxisButton role="main" onClick={onAdd}>
+              {t('shell.studio.entity.addValidation')}
+            </AxisButton>
+          </>
+        )
+      }
+    >
+      <ContentInsetContext.Provider value={spacing.sm}>
+        <Flex vertical gap="middle" ref={setRoot} data-testid="studio-validation-content" key={index}>
+          <div data-testid={`studio-field-${pointer}/name`}>
+            <AxisField {...fieldTexts(t, 'validations.name')} required error={nameErrorText}>
+              <Input value={shownName} onChange={(event) => changeName(event.target.value)} />
+            </AxisField>
+          </div>
+          <div data-testid={`studio-field-${pointer}/expression`}>
+            <AxisField {...expression} required>
+              <Expression
+                pointer={`${pointer}/expression`}
+                name={expression.label}
+                value={text(content.expression)}
+                required
+                readOnly={readOnly}
+                onChange={onChange}
+              />
+            </AxisField>
+          </div>
+          <div data-testid={`studio-field-${pointer}/message`}>
+            <AxisFieldGroup {...groupTexts(t, 'validations.messageText')} required error={errors?.message}>
+              <LabelTexts
+                pointer={`${pointer}/message`}
+                value={content.message}
+                onChange={onChange}
+                invalid={errors?.message !== undefined}
+              />
+            </AxisFieldGroup>
+          </div>
+          <Picker
+            pointer={`${pointer}/field`}
+            {...fieldTexts(t, 'validations.field')}
+            options={fieldOptions}
+            value={content.field}
+            required
+            onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
+          />
+        </Flex>
+      </ContentInsetContext.Provider>
+    </SidePanel>
   )
 })
 
@@ -2261,112 +2679,3 @@ function useMessageText(label: unknown): string {
   const texts = drafts?.texts[key] ?? (names === undefined ? {} : textsOf(names, key))
   return (texts[author] || texts.en || '').trim()
 }
-
-/**
- * One validation of the entity, which draws again only when its own validation or the field names change. With
- * `atField`, as in the field drawer's Validation group, it has no field picker and its message is typed as label texts,
- * see docs/reference/entity-designer.md#settings. Its "…" menu holds Remove validation, and Move up and Move down too
- * when the section gives `onMove`, as the drawer does not, see docs/reference/entity-designer.md#validations. `last` is
- * the validation at the end of the section, where Move down is off.
- */
-const ValidationRow = memo(function ValidationRow({
-  index,
-  atField = false,
-  validation,
-  fieldNames,
-  readOnly,
-  layer,
-  onChange,
-  onMove,
-  last = false,
-}: {
-  index: number
-  atField?: boolean
-  validation: unknown
-  fieldNames: string[]
-  readOnly: boolean
-  layer: DesignerLayer | undefined
-  onChange: ChangeHandler
-  onMove?: (index: number, offset: number) => void
-  last?: boolean
-}) {
-  const t = useText()
-  const pointer = `/validations/${index}`
-  const content = isContent(validation) ? validation : {}
-  const expression = fieldTexts(t, 'validations.expression')
-  const message = useMessageText(content.message)
-  return (
-    <Flex vertical gap="small" data-testid={`studio-field-${pointer}`}>
-      <Flex gap="small" align="center" justify="space-between">
-        {/* Proposed, #3264: a validation is told by its message in the author's language, as people read it, and its
-            name, which the designer makes and keeps for layers, is never shown: Studio shows no internal code. */}
-        <Flex gap="small" align="center" style={{ minWidth: 0 }}>
-          <Typography.Text strong={message !== ''} type={message === '' ? 'secondary' : undefined}>
-            {message === '' ? t('shell.studio.entity.newValidation') : message}
-          </Typography.Text>
-          {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
-        </Flex>
-        {/* Proposed, #4902: a "…" menu never holds one entry, so a validation with Remove alone, in a field's panel, shows
-            it as an icon button, as a table row's delete is. */}
-        {readOnly ? null : (
-          <RowActions
-            fold={onMove !== undefined}
-            actions={[
-              ...(onMove === undefined
-                ? []
-                : [
-                    {
-                      key: 'moveUp',
-                      labelKey: 'shell.studio.entity.moveUp',
-                      disabled: index === 0,
-                      onClick: () => onMove(index, -1),
-                    },
-                    {
-                      key: 'moveDown',
-                      labelKey: 'shell.studio.entity.moveDown',
-                      disabled: last,
-                      onClick: () => onMove(index, 1),
-                    },
-                  ]),
-              {
-                key: 'remove',
-                labelKey: 'shell.studio.entity.removeValidation',
-                icon: <DeleteOutlined />,
-                destructive: true,
-                onClick: () => onChange(pointer, undefined),
-              },
-            ]}
-          />
-        )}
-      </Flex>
-      <div data-testid={`studio-field-${pointer}/expression`}>
-        <AxisField {...expression} required>
-          <Expression
-            pointer={`${pointer}/expression`}
-            name={expression.label}
-            value={text(content.expression)}
-            required
-            readOnly={readOnly}
-            onChange={onChange}
-          />
-        </AxisField>
-      </div>
-      {/* Proposed, #3264: the message is typed in words with its translations, as a field's label is. */}
-      <div data-testid={`studio-field-${pointer}/message`}>
-        <AxisFieldGroup {...groupTexts(t, 'validations.messageText')} required>
-          <LabelTexts pointer={`${pointer}/message`} value={content.message} onChange={onChange} />
-        </AxisFieldGroup>
-      </div>
-      {atField ? null : (
-        <Picker
-          pointer={`${pointer}/field`}
-          {...fieldTexts(t, 'validations.field')}
-          options={fieldNames}
-          value={content.field}
-          required
-          onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
-        />
-      )}
-    </Flex>
-  )
-})
