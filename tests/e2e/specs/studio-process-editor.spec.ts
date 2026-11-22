@@ -241,9 +241,12 @@ test.describe("Studio edits a process in the process editor", () => {
       .filter({ hasText: "AXC0070" })
       .first();
     await expect(diagnostic).toContainText("AXC0070");
-    await diagnostic
-      .getByRole("button", { name: "PurchaseRequestApproval", exact: true })
-      .click();
+    const link = diagnostic.getByRole("link", {
+      name: "PurchaseRequestApproval",
+      exact: true,
+    });
+    await expect(link).toHaveAttribute("href", /path=%2Fsteps%2F2%2Fotherwise/);
+    await link.click();
 
     await expect(page).toHaveURL(/path=%2Fsteps%2F2%2Fotherwise/);
     const otherwise = page.getByTestId("studio-field-/steps/2/otherwise");
