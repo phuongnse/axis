@@ -15,9 +15,11 @@ itself cannot be shared or reloaded either, because nothing in the address shows
 - **A table that is part of one thing is the exception** _(planned for M35)_. Its rows belong to that
   one thing, such as the lines of a child collection on a form, so a search or a filter of its own
   would split it.
-- **A view is a filter kept in the address.** A table has no control of its own for a view, so a link
-  opens the same rows for anyone who follows it. A table in a dialog keeps its view in the dialog
-  instead, because a dialog has no address of its own to share.
+- **A view is a filter kept in the address.** A table on a page holds no view of its own, so a link
+  opens the same rows for anyone who follows it. A person's saved view, of
+  [D153](d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md),
+  only writes its search, filter and sort into the address when it is opened. A table in a dialog keeps
+  its view in the dialog instead, because a dialog has no address of its own to share.
 
 ## Consequences
 
