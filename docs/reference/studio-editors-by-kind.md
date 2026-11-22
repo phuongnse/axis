@@ -74,7 +74,7 @@ Add comparison adds a comparison with its own measure picker and label, and Add 
 [navigate action](#navigate-actions). Each of the two adds is a grey button, and each Remove comparison and
 Remove navigate action is a red button. A `chart` panel has a data source picker, a kind picker over `bar`,
 `line` and `pie`, a category picker, a title, and a list of measures, each with a picker and a label. Add
-measure is a light text button on the Measures title row, and each measure's Remove measure is in its "…"
+measure is a secondary button on the Measures title row, and each measure's Remove measure is in its "…"
 menu, which is off when one measure is left.
 Every field and group of both panels shows its label and help. A chart's title and a section's title
 share one text, Title, with one help.
@@ -102,7 +102,7 @@ expression and parameter expressions. The page picker, label, record and paramet
 label and help. The page picker lists every page, the current one included, because a page may open
 itself with other parameters.
 
-- **Adding one.** The Adds of an action list are one group of light text buttons on the list's title
+- **Adding one.** The Adds of an action list are one group of secondary buttons on the list's title
   row. A table's row actions offer Add navigate action and Add delete action, its toolbar actions offer
   only Add navigate action, and a form or a detail also offers Add action for `startProcess`. Each
   action is a row with no box, and its Remove action is in the row's "…" menu. A new action is named
@@ -119,7 +119,7 @@ itself with other parameters.
 
 ### Page parameters
 
-The Parameters section sits between General and Widgets. Its Add parameter is a light text button on the
+The Parameters section sits between General and Widgets. Its Add parameter is a secondary button on the
 right of the heading, and a page with no parameters says so in one line. Each parameter is a row with no
 box. It has a name, a type picker over `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum`
 and `reference`, and a Required switch. The name, type and Required switch sit one to a row, each as wide as
@@ -160,11 +160,11 @@ that is not a list, points to the JSON view.
 
 - **Columns.** A `columns` panel shows a width box from 1 to 12 for each column, and the compiler
   reports widths that do not add up to 12 after the save. Each column is a row with no box. Add column
-  is a light text button on the Columns title row, and it adds a column that takes what is left of 12,
+  is a secondary button on the Columns title row, and it adds a column that takes what is left of 12,
   or 1 when nothing is left, and keeps the other widths. Remove column is in the column's "…" menu and
   drops a column with its widgets.
 - **Tabs.** A `tabs` panel shows each tab's [label](studio-resource-form.md#labels) as a row with no
-  box. Add tab is a light text button on the Tabs title row, and Remove tab is in the tab's "…" menu.
+  box. Add tab is a secondary button on the Tabs title row, and Remove tab is in the tab's "…" menu.
 - **Names.** An added column or tab is named with the first free `column<n>` or `tab<n>` among its
   siblings, ignoring letter case.
 - **Section.** A `section` panel shows the title as a tab's label shows, and a Collapsed switch.
@@ -292,9 +292,10 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 - **The process.** The Form tab has the General, Subject and Steps [sections](studio-resource-form.md#sections),
   and each field has a [field text](studio-resource-form.md#fields).
 - **Lists.** The lists of a process's parameters, a decision's branches, a task's outcomes and escalations, and an
-  operation's rows have Add on their title row as a light text button. Each row's actions, and each step card's, are
+  operation's rows have Add on their title row as a secondary button. Each row's actions, and each step card's, are
   entries of its "…" menu, the table's [row actions](actions-and-controls.md#tables). A task's deadline and a wait
-  for event's timeout have Add or Remove on their group's title row, also as a light text button. A read-only tab,
+  for event's timeout have Add or Remove on their group's title row, also as a secondary button, and Remove in the
+  destructive tone, so it is outlined in `dangerText`. A read-only tab,
   such as while the JSON has an error, shows no Add, no Remove and no menu.
 - **Subject.** A choice between Entity, which shows the entity picker, and Parameters, which shows rows
   of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, as the
@@ -364,7 +365,7 @@ Operations heading, and the JSON view stays as the second view of the same draft
   the connector's other operations. Its input and output fields are rows of name, type and required,
   one field to a line, and the schema's required keys carry the shared required mark. Add operation sits
   on the Operations heading. Each input, output and nested field list has its Add on its title row, as a
-  light text button. Each operation's Delete operation is in its "…" menu at its top right, and each row's
+  secondary button. Each operation's Delete operation is in its "…" menu at its top right, and each row's
   Delete is in its "…" menu, which also removes the fields nested in the row. A read-only tab, such as while the JSON has
   an error, shows no Add and no menu, as the Lists bullet of the [process editor](#process-editor) says.
   A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.

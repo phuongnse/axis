@@ -1,12 +1,13 @@
 import { useId, type ReactNode } from 'react'
-import { AxisActionRow } from './AxisButton'
+import { TitleRowActions } from './AxisButton'
 import { useDesignTokens } from './themeMode'
 
 /**
  * A titled group of fields, with its help: a `fieldset` that screen readers announce as a group named by its title
  * and described by its help, see docs/reference/actions-and-controls.md#fields. It holds fields that have no one input to
  * label, such as an object's fields, rows or a table. An empty help draws no help line. An `action` sits on the right of
- * the title row, drawn through `AxisActionRow` as a light text button, and the group is still named by its title alone.
+ * the title row, drawn through `TitleRowActions` in its own role, so a secondary button keeps its border, and the group is
+ * still named by its title alone.
  * An `error` draws the screen's refusal under the fields, in `dangerText`, and the group's description starts with it.
  * The group has no one input to mark, so the caller marks the inputs inside it, such as through `LabelTexts`' `invalid`.
  */
@@ -52,7 +53,7 @@ export function AxisFieldGroup({
           }}
         >
           <span id={titleId}>{title}</span>
-          <AxisActionRow>{action}</AxisActionRow>
+          <TitleRowActions>{action}</TitleRowActions>
         </legend>
       ) : (
         <legend style={legendStyle}>{title}</legend>

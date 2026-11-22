@@ -63,13 +63,13 @@ afterEach(() => {
 })
 
 describe('MappingRows', () => {
-  it('puts Add row on the title row as a text button and Remove in each row’s menu', async () => {
+  it('puts Add row on the title row as a secondary button and Remove in each row’s menu', async () => {
     const onChange = renderRows()
 
     const group = within(screen.getByRole('group', { name: title }))
     const add = group.getByRole('button', { name: 'Add row' })
     expect(add.closest('legend')).not.toBeNull()
-    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add).toHaveClass('ant-btn-variant-outlined')
     expect(group.getAllByRole('button', { name: 'Add row' })).toHaveLength(1)
     expect(group.queryByRole('button', { name: 'Remove' })).toBeNull()
 

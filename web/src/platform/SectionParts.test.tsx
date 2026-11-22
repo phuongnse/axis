@@ -10,7 +10,11 @@ import { SectionPart, SectionParts } from './SectionParts'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 
-const texts = { 'shell.section.show': 'Show section {title}', 'shell.section.hide': 'Hide section {title}' }
+const texts = {
+  'shell.section.show': 'Show section {title}',
+  'shell.section.hide': 'Hide section {title}',
+  'test.refresh': 'Refresh',
+}
 const catalogs = [{ texts, fallbackTexts: texts }]
 
 function renderSections(sections: React.ReactNode) {
@@ -92,18 +96,20 @@ describe('SectionPart', () => {
     expect(within(screen.getByRole('region', { name: 'Items' })).getByRole('button', { name: 'Add' })).toBeVisible()
   })
 
-  it('draws a title-row action as a borderless text button, the main and destructive ones in their colour', () => {
+  it('draws each title-row action in its own role, a secondary Add with its border and a tool subtle', () => {
+    const { colour } = designTokensFor('light')
     renderSections(
       <SectionPart
         testName="rows"
         heading={{ title: 'Rows' }}
         action={
           <>
-            <AxisButton role="secondary">Add row</AxisButton>
+            <AxisButton role="secondary">Add field</AxisButton>
             <AxisButton role="main">Import</AxisButton>
             <AxisButton role="secondary" destructive>
               Clear
             </AxisButton>
+            <AxisButton role="subtle" icon={<span />} nameKey="test.refresh" />
           </>
         }
       >
@@ -112,11 +118,19 @@ describe('SectionPart', () => {
     )
 
     const section = screen.getByRole('region', { name: 'Rows' })
-    for (const name of ['Add row', 'Import', 'Clear']) {
-      const button = within(section).getByRole('button', { name })
-      expect(button).toHaveClass('ant-btn-variant-text')
-      expect(button).not.toHaveClass('ant-btn-variant-outlined')
-    }
+    expect(within(section).getByRole('button', { name: 'Add field' })).toHaveClass('ant-btn-variant-outlined')
+    expect(within(section).getByRole('button', { name: 'Import' })).toHaveStyle({
+      color: colour.primaryText,
+      borderColor: colour.primaryText,
+    })
+    expect(within(section).getByRole('button', { name: 'Clear' })).toHaveClass('ant-btn-variant-outlined')
+    expect(within(section).getByRole('button', { name: 'Clear' })).toHaveStyle({
+      color: colour.dangerText,
+      borderColor: colour.dangerText,
+    })
+    const refresh = within(section).getByRole('button', { name: 'Refresh' })
+    expect(refresh).toHaveClass('ant-btn-variant-text')
+    expect(refresh.style.borderColor).toBe('')
   })
 
   it('draws nothing in the heading when it has no action', () => {

@@ -10,8 +10,9 @@ import { useUnsavedChanges } from './unsavedChanges'
 
 /**
  * The save bar of an editor, see docs/reference/studio-resource-form.md#save-bar. It draws through `ActionBar` in
- * `ShellBarSlot`, so it stays at the foot of the window and rests above the footer, and Discard folds into More actions
- * at a narrow width. It draws Undo and Redo only when the editor gives `history`. It is shown while there is something
+ * `ShellBarSlot`, so it stays at the foot of the window and rests above the footer. At a narrow width its actions wrap
+ * rather than fold, as Discard is its only action to fold and a menu of one entry is never drawn, see
+ * docs/reference/actions-and-controls.md#buttons. It draws Undo and Redo only when the editor gives `history`. It is shown while there is something
  * to save or, with `history`, a step can be redone, and it is not drawn otherwise. Discard asks first, because no Undo
  * brings the changes back, see docs/reference/actions-and-controls.md#undo-rather-than-confirm. `data-testid` names the
  * bar and `saveTestId` its Save button.

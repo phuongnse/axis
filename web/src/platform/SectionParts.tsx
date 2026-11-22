@@ -1,6 +1,6 @@
 import { Flex, Typography } from 'antd'
 import { Children, createContext, isValidElement, useContext, useId, useState, type ReactNode } from 'react'
-import { AxisActionRow, AxisButton } from './AxisButton'
+import { AxisButton, TitleRowActions } from './AxisButton'
 import { Chevron } from './Chevron'
 import { ContentInsetContext } from './contentInsetContext'
 import { useDesignTokens } from './themeMode'
@@ -53,8 +53,8 @@ type SectionPartName = { testName: string; testId?: undefined } | { testId: stri
  * A part of a page or a Studio section, see docs/reference/shell.md#layout and docs/reference/studio-resource-form.md#sections:
  * an optional heading, its optional line and a slot for an action on the right of the heading, with no panel. A part with no
  * heading is its fields alone. It draws the `borderSubtle` rule above itself when `SectionParts` says a part comes before it.
- * Its action is drawn through `AxisActionRow`, so a `main` or `secondary` button, in the destructive tone or not, is a text button, see
- * docs/reference/shell.md#layout ('A title row's actions are light'). Its rule reaches past the shell's content inset to the
+ * Its action is drawn through `TitleRowActions`, so each button keeps its role: a section's Add is a secondary button with its
+ * border, and a `main` action keeps its border too, see docs/reference/actions-and-controls.md#buttons. Its rule reaches past the shell's content inset to the
  * page area's edges, and stays inside where the inset is 0, see docs/reference/shell.md#layout ('Parts a rule apart').
  */
 export function SectionPart({
@@ -74,8 +74,8 @@ export function SectionPart({
    */
   fold?: { open: boolean; onToggle: () => void; title: string }
   /**
-   * On the right of the heading, such as a list's Add, drawn through `AxisActionRow`. A function child draws the slot in
-   * its place, and draws its own action through `AxisActionRow`.
+   * On the right of the heading, such as a list's Add, drawn through `TitleRowActions`. A function child draws the slot in
+   * its place, and draws its own action through `TitleRowActions`.
    */
   action?: ReactNode
   /** Sets `aria-busy` on the part while its body loads. */
@@ -147,7 +147,7 @@ export function SectionPart({
           {typeof children === 'function' ? (
             <div ref={setSlot} />
           ) : (
-            action !== null && action !== undefined && <AxisActionRow>{action}</AxisActionRow>
+            action !== null && action !== undefined && <TitleRowActions>{action}</TitleRowActions>
           )}
         </Flex>
         {body}

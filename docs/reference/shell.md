@@ -142,6 +142,8 @@ their own controls where they expect them.
 - **A title row's tools are light** _(planned)_. Tools such as the explorer's New and Refresh are subtle buttons, or
   icon-only ones with their names as tooltips, at the usual button size. A region's main action there keeps its border,
   as [buttons](actions-and-controls.md#buttons) says.
+- **A title row's actions keep their roles.** `TitleRowActions` draws the actions of a part's and a field group's title
+  row, each in its own role: a section's Add is a secondary button with its border, and a tool is subtle.
 - **A view switch sits above what it switches** _(planned)_. A switch between two views of one content, such as Form
   and JSON, is a row of line tabs right above that content, in the one look every tab row of the workspace has, see
   [tab bars](actions-and-controls.md#tab-bars).

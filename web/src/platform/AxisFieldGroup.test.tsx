@@ -72,7 +72,7 @@ describe('AxisFieldGroup', () => {
     expect(screen.queryByText('Enter a street.')).toBeNull()
   })
 
-  it('draws its action as a light text button on the title row, and names the group by its title alone', () => {
+  it('draws its secondary action on the title row with its border, and names the group by its title alone', () => {
     renderGroup(
       <AxisFieldGroup title="Rows" help="" action={<AxisButton role="secondary">Add row</AxisButton>}>
         <Input aria-label="Row" />
@@ -81,8 +81,8 @@ describe('AxisFieldGroup', () => {
 
     const group = screen.getByRole('group', { name: 'Rows' })
     const add = within(group).getByRole('button', { name: 'Add row' })
-    expect(add).toHaveClass('ant-btn-variant-text')
-    expect(add).not.toHaveClass('ant-btn-variant-outlined')
+    expect(add).toHaveClass('ant-btn-variant-outlined')
+    expect(add).not.toHaveClass('ant-btn-variant-text')
     expect(within(group).getByRole('textbox', { name: 'Row' })).toBeInTheDocument()
   })
 })

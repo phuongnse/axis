@@ -471,7 +471,7 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   [expression editor](#expression-editor) and its fields in a field picker. The selected cell is marked with the
   selected tint in `primaryText`, as a menu marks its chosen item. The panel's title row names the role and the target.
   The panel says the cell has no grant only when it shows none. An editable row whose cell has only shared grants lists
-  them and offers Add grant, a light text action on the panel's title row.
+  them and offers Add grant, a secondary button on the panel's title row.
 - **Where an edit goes.** An edit writes to `<Role>Access`, the PascalCase role name plus `Access`, so
   `department-manager` writes `DepartmentManagerAccess`. When the role has none, Save creates
   `policies/<role>-access.json` with `roles` set to that role only.

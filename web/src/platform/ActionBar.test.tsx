@@ -101,12 +101,12 @@ describe('ActionBar with pane', () => {
     expect(barOf(button).getAttribute('style')).toContain('padding-inline: 16px')
   })
 
-  it('draws a main action as a text button at the page inset without it', () => {
+  it('draws a main action as an outlined button at the page inset too, as it keeps its border', () => {
     renderIn(<ActionBar end={<AxisButton role="main">Run</AxisButton>} />)
 
     const button = screen.getByRole('button', { name: 'Run' })
-    expect(button).toHaveClass('ant-btn-variant-text')
-    expect(button).not.toHaveClass('ant-btn-variant-outlined')
+    expect(button).toHaveClass('ant-btn-variant-outlined')
+    expect(button).not.toHaveClass('ant-btn-variant-text')
     expect(barOf(button).getAttribute('style')).toContain('padding-inline: 24px')
   })
 
@@ -150,14 +150,12 @@ describe('SaveBar in an ActionBar', () => {
     expect(screen.getByTestId('studio-save-bar')).toHaveAttribute('data-action-bar')
   })
 
-  it('folds Discard into a disabled More actions entry while a save runs, and keeps Save a button', async () => {
+  it('keeps Discard a disabled button beside Save at narrow width, as one action to fold does not fold', () => {
     fakeWidths(300, 400)
     renderSaveBar(true)
 
-    expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
-
-    expect(await screen.findByRole('menuitem', { name: 'Discard' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
   })
 })

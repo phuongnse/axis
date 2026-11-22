@@ -1,6 +1,6 @@
 import { Checkbox, Flex, Select, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisActionRow, AxisButton, TitleRowActions } from '../platform/AxisButton'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
@@ -347,7 +347,7 @@ function stringsOf(value: unknown): string[] {
  * one patch with the version the policy was loaded at, or creates the policy when the role has none. Save is on while
  * a grant has no ticked action. A click then shows what to fix under that grant's actions, focuses its first box and
  * sends nothing, see docs/reference/actions-and-controls.md#fields. A save that succeeds and Reload clear that check.
- * Add grant is drawn in the panel's title row through `actionSlot`, as a light action, see docs/reference/shell.md#layout.
+ * Add grant is drawn in the panel's title row through `actionSlot`, as a secondary button, see docs/reference/shell.md#layout.
  * It says the role has no own grant only when the cell shows no grant at all, see docs/reference/studio.md#policy-matrix.
  */
 function OwnGrants({
@@ -366,7 +366,7 @@ function OwnGrants({
   names: StudioNames | null
   saved: boolean
   othersShown: boolean
-  /** The title row's slot of the grants panel, where Add grant is drawn as a light action. */
+  /** The title row's slot of the grants panel, where Add grant is drawn as a secondary button. */
   actionSlot: HTMLElement | null
   onWritten: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem) => void
 }) {
@@ -589,15 +589,15 @@ function OwnGrants({
           </Flex>
         )
       })}
-      {/* Add grant is a light action on the grants panel's title row, see docs/reference/shell.md#layout. */}
+      {/* Add grant is a secondary button on the grants panel's title row, see docs/reference/shell.md#layout. */}
       {actionSlot &&
         createPortal(
           // The row wraps the button where the portal is made, as context follows the React tree (see ObjectListTable).
-          <AxisActionRow>
+          <TitleRowActions>
             <AxisButton role="secondary" onClick={() => edit('/grants', [...grants, newGrant(target, grants)])}>
               {t('shell.studio.matrix.addGrant')}
             </AxisButton>
-          </AxisActionRow>,
+          </TitleRowActions>,
           actionSlot,
         )}
       <AxisActionRow>

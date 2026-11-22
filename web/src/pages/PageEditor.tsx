@@ -550,7 +550,7 @@ function PageField({ pointer, children }: { pointer: string; children: AxisField
 
 /**
  * A group of the page property at `pointer`, titled and helped by its path, see {@link pageFieldPath}. An `action` sits
- * on its title row as a light text button.
+ * on its title row as a secondary button.
  */
 function PageFieldGroup({ pointer, action, children }: { pointer: string; action?: ReactNode; children: ReactNode }) {
   const { group } = useFieldTexts('page')
@@ -1203,7 +1203,7 @@ function RecordField({
 
 /**
  * The width of each column of a columns widget. Each column is a row with no box, and its Remove column is in the row's
- * "…" menu, off when one column is left. Add column is a light text button on the Columns title row, see
+ * "…" menu, off when one column is left. Add column is a secondary button on the Columns title row, see
  * docs/reference/studio-editors-by-kind.md#container-panels.
  */
 function ColumnsPanel({
@@ -1283,7 +1283,7 @@ function ColumnsPanel({
 
 /**
  * The label of each tab of a tabs widget. Each tab is a row with no box, and its Remove tab is in the row's "…" menu, off
- * when one tab is left. Add tab is a light text button on the Tabs title row.
+ * when one tab is left. Add tab is a secondary button on the Tabs title row.
  */
 function TabsPanel({
   base,
@@ -1538,7 +1538,7 @@ function ParameterExpressions({
 /**
  * A list of actions of a widget, each with its fields. A `navigate` action has a page, a label, a `record` and
  * parameters. A `startProcess` action has a process and a label. A `delete` action has a label and a `visibleWhen`.
- * Any other action is JSON only, and can be removed. The Adds are one group of light text buttons on the list's title
+ * Any other action is JSON only, and can be removed. The Adds are one group of secondary buttons on the list's title
  * row: Add navigate action always, Add action for `startProcess` only when `startProcess` is set, and Add delete action
  * only when `deleteAction` is set. Each action is a row with no box, and Remove action is in its "…" menu. The row of
  * the action at `selected` has `aria-current` and a border in the primary colour, and scrolls into view. An Add

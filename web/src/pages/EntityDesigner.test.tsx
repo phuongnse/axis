@@ -1091,7 +1091,7 @@ describe('EntityDesigner', () => {
     }
   })
 
-  it('puts Add index and Add validation in the title row of their section, as text buttons outside the lists', () => {
+  it('puts Add index and Add validation in the title row of their section, as secondary buttons outside the lists', () => {
     renderDesigner(
       entity({
         indexes: [{ name: 'index1', fields: ['code'] }],
@@ -1106,8 +1106,8 @@ describe('EntityDesigner', () => {
       ['validations', 'Add validation'],
     ]) {
       const add = within(screen.getByTestId(`studio-section-${section}`)).getByRole('button', { name })
-      expect(add).toHaveClass('ant-btn-variant-text')
-      expect(add).not.toHaveClass('ant-btn-variant-outlined')
+      expect(add).toHaveClass('ant-btn-variant-outlined')
+      expect(add).not.toHaveClass('ant-btn-variant-text')
       expect(follows(add, screen.getByTestId(`studio-field-/${section}`))).toBe(true)
       expect(screen.getByTestId(`studio-field-/${section}`)).not.toContainElement(add)
     }
@@ -2080,15 +2080,15 @@ describe('the groups of the field drawer', () => {
       expect(onChange).toHaveBeenLastCalledWith('/validations/2', undefined)
     })
 
-    it('puts Add validation on the Validation group title row as a text button, and its menu has only Remove validation', async () => {
+    it('puts Add validation on the Validation group title row as a secondary button, and its menu has only Remove validation', async () => {
       const onChange = renderDesigner(entity({ validations: [validations[0]] }))
 
       const drawer = await openEntityField(0)
       const group = within(drawer).getByRole('group', { name: 'Validation' })
       const add = within(group).getByRole('button', { name: 'Add validation' })
       expect(group.querySelector('legend')).toContainElement(add)
-      expect(add).toHaveClass('ant-btn-variant-text')
-      expect(add).not.toHaveClass('ant-btn-variant-outlined')
+      expect(add).toHaveClass('ant-btn-variant-outlined')
+      expect(add).not.toHaveClass('ant-btn-variant-text')
 
       await userEvent.click(
         within(within(drawer).getByTestId('studio-field-/validations/0')).getByRole('button', { name: 'Actions' }),
