@@ -12,7 +12,15 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, chooseRowAction, openDropdown, openRowMenu, optionTexts, selectRoot } from '../test/antd'
+import {
+  chooseOption,
+  chooseRowAction,
+  emptyDescription,
+  openDropdown,
+  openRowMenu,
+  optionTexts,
+  selectRoot,
+} from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { ProcessEditor } from './ProcessEditor'
 
@@ -1342,5 +1350,71 @@ describe('ProcessEditor lists', () => {
       expect(screen.queryByRole('button', { name })).toBeNull()
     }
     expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
+  })
+})
+
+describe('ProcessEditor lists', () => {
+  it.each([
+    {
+      list: 'Parameters',
+      value: { ...process, entity: undefined, parameters: [] },
+      scope: '/parameters',
+      text: 'shell.studio.process.noParameters',
+    },
+    {
+      list: 'Escalations',
+      value: process,
+      scope: '/steps/1/escalations',
+      text: 'shell.studio.process.noEscalations',
+    },
+    {
+      list: 'Branches',
+      value: {
+        ...process,
+        steps: process.steps.map((step) => (step.name === 'financeCheck' ? { ...step, branches: [] } : step)),
+      },
+      scope: '/steps/2/branches',
+      text: 'shell.studio.process.noBranches',
+    },
+    {
+      list: 'Outcomes',
+      value: {
+        ...process,
+        steps: process.steps.map((step) => (step.name === 'managerApproval' ? { ...step, outcomes: [] } : step)),
+      },
+      scope: '/steps/1/outcomes',
+      text: 'shell.studio.process.noOutcomes',
+    },
+    {
+      list: 'Recipients',
+      value: complete,
+      scope: '/steps/0/escalations/0/notify/to',
+      text: 'shell.studio.process.noRecipients',
+    },
+  ])('shows the empty line of $list when it has no rows', ({ value, scope, text }) => {
+    renderEditor(value)
+
+    expect(emptyDescription(english[text], screen.getByTestId(`studio-field-${scope}`))).toBeInTheDocument()
+  })
+
+  it('shows the empty line of Recipients while the editor is read-only', () => {
+    renderEditor(complete, false, true)
+
+    expect(
+      emptyDescription(
+        english['shell.studio.process.noRecipients'],
+        screen.getByTestId('studio-field-/steps/0/escalations/0/notify/to'),
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('shows no empty line in an escalations list that has rows', () => {
+    renderEditor(complete)
+
+    expect(
+      within(screen.getByTestId('studio-field-/steps/0/escalations')).queryByText(
+        english['shell.studio.process.noEscalations'],
+      ),
+    ).toBeNull()
   })
 })

@@ -12,7 +12,7 @@ import { setAt } from '../platform/jsonPatch'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, flexOf, optionTexts, selectRoot } from '../test/antd'
+import { chooseOption, emptyDescription, flexOf, optionTexts, selectRoot } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { forbiddenOperationKeys, operationJsonOnlyKeys, withOperation } from './operationKeys'
 import { ProcessEditor } from './ProcessEditor'
@@ -1156,6 +1156,14 @@ describe('The operation panel field texts', () => {
     renderStep(value)
 
     expect(screen.getAllByRole('group', { name: label(path) })[0]).toHaveAccessibleDescription(help(path))
+  })
+
+  it('shows the empty line of an input with no rows inside the input group', () => {
+    renderStep({ operation: 'callConnector', connector, input: {} })
+
+    expect(
+      emptyDescription(texts['shell.studio.process.noMappings'], screen.getByTestId('studio-field-/steps/0/input')),
+    ).toBeInTheDocument()
   })
 
   it('describes the nested fields of an object input and of a list input', () => {

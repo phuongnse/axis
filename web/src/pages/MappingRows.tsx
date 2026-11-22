@@ -3,6 +3,7 @@ import { useContext } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -169,6 +170,7 @@ export function MappingRows({
               </Flex>
             )
           })}
+          {entries.length === 0 && <EmptyState text={t('shell.studio.process.noMappings')} />}
         </Flex>
       </AxisFieldGroup>
     </div>

@@ -5,6 +5,7 @@ import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { useFieldTexts } from './fieldTexts'
@@ -178,6 +179,7 @@ export function ConnectorInputRows({
               </Flex>
             )
           })}
+          {entries.length === 0 && <EmptyState text={t('shell.studio.process.noMappings')} />}
         </Flex>
       </AxisFieldGroup>
     </div>
