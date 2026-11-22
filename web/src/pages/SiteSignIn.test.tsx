@@ -4,7 +4,7 @@ import { ConfigProvider } from 'antd'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
-import { optionTexts, shownMenu } from '../test/antd'
+import { emptyDescription, optionTexts, shownMenu } from '../test/antd'
 import { SiteSignIn } from './SiteSignIn'
 
 function renderPicker(value: unknown, providers = ['accounts', 'company'], readOnly = false) {
@@ -78,7 +78,7 @@ describe('SiteSignIn', () => {
 
   it('removes the key with the last row and says that the site then allows every provider', async () => {
     const onChange = renderPicker(['company'])
-    expect(screen.queryByTestId('studio-sign-in-all')).not.toBeInTheDocument()
+    expect(screen.queryByText(platformEnglish['shell.studio.site.allProvidersHint'])).toBeNull()
 
     await userEvent.click(within(screen.getByTestId('studio-field-/signIn/0')).getByRole('button', { name: 'Actions' }))
     await shownMenu('Actions')
@@ -90,6 +90,6 @@ describe('SiteSignIn', () => {
   it('says that the site allows every provider while it lists none', () => {
     renderPicker(undefined)
 
-    expect(screen.getByTestId('studio-sign-in-all')).toBeVisible()
+    expect(emptyDescription(platformEnglish['shell.studio.site.allProvidersHint'])).toBeVisible()
   })
 })

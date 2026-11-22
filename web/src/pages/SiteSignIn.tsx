@@ -1,6 +1,7 @@
-import { ConfigProvider, Flex, Typography } from 'antd'
+import { ConfigProvider, Flex } from 'antd'
 import { AxisButton } from '../platform/AxisButton'
 import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { ReferencePicker } from './ReferencePicker'
@@ -69,11 +70,7 @@ export function SiteSignIn({
               )}
             </Flex>
           ))}
-          {entries.length === 0 && (
-            <Typography.Text type="secondary" data-testid="studio-sign-in-all">
-              {t('shell.studio.site.allProvidersHint')}
-            </Typography.Text>
-          )}
+          {entries.length === 0 && <EmptyState text={t('shell.studio.site.allProvidersHint')} />}
         </Flex>
       </div>
     </SectionPart>

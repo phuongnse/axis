@@ -10,7 +10,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { optionTexts, shownMenu } from '../test/antd'
+import { emptyDescription, optionTexts, shownMenu } from '../test/antd'
 import { IdentityProviderEditor } from './IdentityProviderEditor'
 
 const names = {
@@ -315,7 +315,15 @@ describe('IdentityProviderEditor', () => {
   it('says that a claim value gives the role of the same name when there are no rows', () => {
     renderEditor({ ...oidc, roles: undefined })
 
-    expect(screen.getByTestId('studio-identity-provider-same-name')).toBeVisible()
+    expect(emptyDescription(platformEnglish['shell.studio.identityProvider.sameNameHint'])).toBeVisible()
+  })
+
+  it('says in one line that sign-ins are not checked for an assurance level when there are none', () => {
+    renderEditor({ ...oidc, acr: undefined })
+
+    expect(
+      emptyDescription(platformEnglish['shell.studio.identityProvider.noAcr'], screen.getByTestId('studio-field-/acr')),
+    ).toBeVisible()
   })
 
   it('removes a claim key when its box is cleared, and claims with the last key', async () => {
