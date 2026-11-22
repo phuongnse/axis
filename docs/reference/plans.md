@@ -43,13 +43,12 @@ The numbers above show the shape only.
   in the middle of what they agreed. A plan version that a subscription pins is never removed.
 - **The start check.** The control plane checks `ControlPlane:Plans` at start and stops on a bad
   catalogue. It refuses a number that is not plain digits, a missing
-  quota key, a repeated code and version, a trial plan with an add-on, a trial plan with more than 10 included
+  quota key, a setting that a plan or an add-on does not have, a repeated code and version, a trial plan with an add-on, a trial plan with more than 10 included
   users, and a second trial plan code. The message
   names the plan code, version and setting, and never holds a value. The quota keys it requires are
   the platform's own list of quotas except `users`, so a new quota makes every catalogue invalid
   until its plans set it. An empty catalogue is valid.
-- **The pin.** A subscription holds a plan code and version and a period (`month` or
-  `year`). They are empty until the [billing API](billing-api.md#setting-the-plan-and-add-ons) sets a plan,
+- **The pin.** A subscription holds a plan code and version, with no billing period. They are empty until the [billing API](billing-api.md#setting-the-plan-and-add-ons) sets a plan,
   and a trial works without them. After the
   migrations the start reads every pinned version, and it stops when `ControlPlane:Plans` no longer
   lists one, naming each missing plan code and version.

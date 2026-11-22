@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Subscriptions;
 /// <summary>
 /// Sets the plan version and the user packs of a subscription, see <c>docs/reference/billing-api.md#setting-the-plan-and-add-ons</c>. The subscription
 /// pins the plan version, its packs are replaced by the ones given, and the move writes <c>subscription.planSet</c> and queues <c>writeQuotas</c> through
-/// <see cref="SubscriptionQuotas.EnqueueAsync"/>, as <c>docs/reference/plans.md#from-a-plan-to-the-quotas</c> says. The state and the period stay as they are. The caller
+/// <see cref="SubscriptionQuotas.EnqueueAsync"/>, as <c>docs/reference/plans.md#from-a-plan-to-the-quotas</c> says. The state stays as it is. The caller
 /// has locked the subscription's row, and has checked that the plan version and each add-on are in the catalogue.
 /// </summary>
 internal static class SubscriptionPlanChange

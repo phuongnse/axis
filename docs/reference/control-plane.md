@@ -298,7 +298,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Privacy:Urls:vi` | The Vietnamese address of the privacy policy | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:ChallengeKey` | The HMAC-SHA256 key, as base64, that signs the [sign-up page's proof-of-work challenges](sign-up.md#bots-and-abuse). A key derived from it also seals the [resend token](sign-up.md#check-your-inbox). Optional. Without it `GET /api/sign-up/challenge`, `POST /api/sign-up` and `POST /api/sign-up/resend` answer `503`, so nobody can sign up. Comes from the secret `ControlPlane__SignUp__ChallengeKey`, never from a setting file | Base64 of at least 32 bytes, when set. The message never holds the value |
 | `ControlPlane:SignUp:LicencesUrl` | The address of the licences page that the legal line links. Optional | An absolute `https` URL, when a document is set |
-| `ControlPlane:Plans:<n>:Code` | The plan code, such as `team`. The whole `ControlPlane:Plans` list is optional | Lowercase letters and digits, joined by single hyphens |
+| `ControlPlane:Plans:<n>:Code` | The plan code, such as `team`. The whole `ControlPlane:Plans` list is optional | Lowercase letters and digits, joined by single hyphens. A plan and an add-on hold no setting other than the rows below |
 | `ControlPlane:Plans:<n>:Version` | The version of the plan. The code and version are unique, and a subscription's pinned version must stay | Plain digits, at least 1, and the code and version not repeated |
 | `ControlPlane:Plans:<n>:Name:en` | The English name of the plan | Not empty |
 | `ControlPlane:Plans:<n>:Name:vi` | The Vietnamese name of the plan | Not empty |
