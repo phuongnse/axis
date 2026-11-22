@@ -128,20 +128,12 @@ export function SectionPart({
       <section aria-labelledby={headingId} data-testid={dataTestId} aria-busy={busy}>
         <Flex justify="space-between" align="flex-start" gap="small" style={{ marginBottom: spacing.sm }}>
           {fold ? (
-            // Proposed, #5039: the fold stands level with the heading's title, as the heading has a line under it.
-            <Flex align="flex-start" gap="small">
-              {/* Outside the heading, so the region's name from the heading holds no button name. */}
-              <AxisButton
-                role="icon"
-                icon={<Chevron point={fold.open ? 'down' : 'right'} />}
-                nameKey={fold.open ? 'shell.section.hide' : 'shell.section.show'}
-                nameValues={{ title: fold.title }}
-                aria-expanded={fold.open}
-                aria-controls={bodyId}
-                onClick={fold.onToggle}
-              />
+            // Proposed, #5039: a fold's heading starts where every heading does, level with its content, and the whole
+            // heading opens and closes it, as Material's expansion panel and Ant Design's Collapse with its icon at the
+            // end do. The fold's button stands at the end of the heading's row.
+            <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={fold.onToggle}>
               {headingBlock}
-            </Flex>
+            </div>
           ) : (
             headingBlock
           )}
@@ -149,6 +141,18 @@ export function SectionPart({
             <div ref={setSlot} />
           ) : (
             action !== null && action !== undefined && <AxisActionRow>{action}</AxisActionRow>
+          )}
+          {fold && (
+            // Outside the heading, so the region's name from the heading holds no button name.
+            <AxisButton
+              role="icon"
+              icon={<Chevron point={fold.open ? 'down' : 'right'} />}
+              nameKey={fold.open ? 'shell.section.hide' : 'shell.section.show'}
+              nameValues={{ title: fold.title }}
+              aria-expanded={fold.open}
+              aria-controls={bodyId}
+              onClick={fold.onToggle}
+            />
           )}
         </Flex>
         {body}
