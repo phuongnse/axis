@@ -32,7 +32,8 @@ import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment, setAt } from '../platform/jsonPatch'
 import { SidePanel } from '../platform/SidePanel'
 import { focusFirstError } from '../platform/focusFirstError'
-import { PartBoundary, SectionPart, SectionParts } from '../platform/SectionParts'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { ContentInsetContext } from '../platform/contentInsetContext'
 import { withoutModulePrefix, type StudioNames } from '../platform/studio'
 import { studioResourceAddress } from '../platform/studioAddress'
 import { labelText, referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
@@ -1124,6 +1125,7 @@ const FieldDrawer = memo(function FieldDrawer({
   otherNames: readonly string[]
 }) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   const content = isContent(field) ? field : {}
   const name = text(content.name)
   const type = text(content.type)
@@ -1259,7 +1261,9 @@ const FieldDrawer = memo(function FieldDrawer({
           )
         }
       >
-        <PartBoundary>
+        {/* Proposed, #3264: the panel's parts are parted by rules that run from its edge to its scrollbar, as a page's
+            parts are, see docs/reference/shell.md#layout. */}
+        <ContentInsetContext.Provider value={spacing.sm}>
           {index !== null && (
             <Flex vertical gap="middle" data-testid="studio-field-drawer" key={index} ref={setRoot} tabIndex={-1}>
               {warning && (
@@ -1273,66 +1277,70 @@ const FieldDrawer = memo(function FieldDrawer({
                   )}
                 />
               )}
-              <AxisFieldGroup heading {...groupTexts(t, 'fields.group.general')}>
-                <Flex vertical gap="middle">
-                  {/* Proposed, #3264: the label first, typed in words with its translations as the entity's label
+              <SectionParts>
+                <SectionPart testName="field-general">
+                  <AxisFieldGroup heading {...groupTexts(t, 'fields.group.general')}>
+                    <Flex vertical gap="middle">
+                      {/* Proposed, #3264: the label first, typed in words with its translations as the entity's label
                       is, then the name, which a new field takes from its label until the name is changed by hand. */}
-                  <div data-testid={`studio-field-${pointer}/label`}>
-                    <AxisFieldGroup {...groupTexts(t, 'fields.label')} required error={labelErrorText}>
-                      <LabelTextsContext.Provider value={namingTexts}>
-                        <LabelTexts
-                          pointer={`${pointer}/label`}
-                          value={content.label}
-                          onChange={onChange}
-                          invalid={labelErrorText !== undefined}
-                        />
-                      </LabelTextsContext.Provider>
-                    </AxisFieldGroup>
-                  </div>
-                  <div data-testid={`studio-field-${pointer}/name`}>
-                    <AxisField
-                      {...fieldTexts(t, 'fields.name')}
-                      required
-                      error={errors?.name ?? (nameError === undefined ? undefined : t(nameError))}
-                    >
-                      <Input value={shownName} onChange={(event) => changeName(event.target.value)} />
-                    </AxisField>
-                  </div>
-                  <div data-testid={`studio-field-${pointer}/type`}>
-                    <AxisField {...fieldTexts(t, 'fields.type')} required>
-                      <Select
-                        showSearch
-                        optionFilterProp="label"
-                        virtual={false}
-                        value={type === '' ? undefined : type}
-                        // Proposed, #3264: the types by name in words, each with a line that says what it holds, as
-                        // the choice of a new field's type is made here.
-                        options={fieldTypeChoices(t)}
-                        optionRender={({ data }) => <TypeOption label={data.label} help={data.help} />}
-                        onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
-                      />
-                    </AxisField>
-                  </div>
-                  <div data-testid={`studio-field-${pointer}/help`}>
-                    <AxisFieldGroup {...groupTexts(t, 'fields.helpText')}>
-                      <LabelTexts pointer={`${pointer}/help`} value={content.help} onChange={onChange} />
-                    </AxisFieldGroup>
-                  </div>
-                </Flex>
-              </AxisFieldGroup>
-              <Settings
-                index={index}
-                field={content}
-                currencyNames={currencyNames}
-                matchSources={matchSources}
-                readOnly={readOnly}
-                validations={validations}
-                layer={layer}
-                onChange={onChange}
-              />
+                      <div data-testid={`studio-field-${pointer}/label`}>
+                        <AxisFieldGroup {...groupTexts(t, 'fields.label')} required error={labelErrorText}>
+                          <LabelTextsContext.Provider value={namingTexts}>
+                            <LabelTexts
+                              pointer={`${pointer}/label`}
+                              value={content.label}
+                              onChange={onChange}
+                              invalid={labelErrorText !== undefined}
+                            />
+                          </LabelTextsContext.Provider>
+                        </AxisFieldGroup>
+                      </div>
+                      <div data-testid={`studio-field-${pointer}/name`}>
+                        <AxisField
+                          {...fieldTexts(t, 'fields.name')}
+                          required
+                          error={errors?.name ?? (nameError === undefined ? undefined : t(nameError))}
+                        >
+                          <Input value={shownName} onChange={(event) => changeName(event.target.value)} />
+                        </AxisField>
+                      </div>
+                      <div data-testid={`studio-field-${pointer}/type`}>
+                        <AxisField {...fieldTexts(t, 'fields.type')} required>
+                          <Select
+                            showSearch
+                            optionFilterProp="label"
+                            virtual={false}
+                            value={type === '' ? undefined : type}
+                            // Proposed, #3264: the types by name in words, each with a line that says what it holds, as
+                            // the choice of a new field's type is made here.
+                            options={fieldTypeChoices(t)}
+                            optionRender={({ data }) => <TypeOption label={data.label} help={data.help} />}
+                            onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
+                          />
+                        </AxisField>
+                      </div>
+                      <div data-testid={`studio-field-${pointer}/help`}>
+                        <AxisFieldGroup {...groupTexts(t, 'fields.helpText')}>
+                          <LabelTexts pointer={`${pointer}/help`} value={content.help} onChange={onChange} />
+                        </AxisFieldGroup>
+                      </div>
+                    </Flex>
+                  </AxisFieldGroup>
+                </SectionPart>
+                <Settings
+                  index={index}
+                  field={content}
+                  currencyNames={currencyNames}
+                  matchSources={matchSources}
+                  readOnly={readOnly}
+                  validations={validations}
+                  layer={layer}
+                  onChange={onChange}
+                />
+              </SectionParts>
             </Flex>
           )}
-        </PartBoundary>
+        </ContentInsetContext.Provider>
       </SidePanel>
     )
   )
@@ -1570,8 +1578,9 @@ function Settings({
     ]
   }
 
+  // Each group is a part of the panel, so a rule parts it from the one before, the General group's included.
   return (
-    <>
+    <SectionParts>
       {drawerGroups.map(({ name: group, settings }) => {
         const drawnSettings = settings.flatMap(drawnEntry)
         const choice = group === 'value' && sources.length > 1
@@ -1602,60 +1611,61 @@ function Settings({
             </AxisActionRow>
           ) : undefined
         return (
-          <AxisFieldGroup
-            key={group}
-            heading
-            {...groupTexts(t, group === 'type' ? `fields.group.type.${type}` : `fields.group.${group}`)}
-            action={addValidation}
-            fold={
-              group === 'searchPrivacy'
-                ? { open: privacyOpen, onToggle: () => setPrivacyOpen((open) => !open), state: privacyState }
-                : undefined
-            }
-          >
-            <Flex vertical gap="small" style={{ minWidth: 240 }}>
-              {choice && (
-                <AxisChoiceField
-                  {...fieldTexts(t, 'fields.valueSource')}
-                  // The group's title, Value, names the choice to the eye.
-                  hideLabel
-                  value={valueSourceOf(field)}
-                  // Proposed, #3264: the chosen way's settings sit under it, so they read as its own.
-                  options={sources.map((source) => ({
-                    value: source,
-                    ...fieldTexts(t, `fields.valueSource.${source}`),
-                    detail:
-                      source === valueSourceOf(field) && drawnSettings.length > 0 ? (
-                        <Flex vertical gap="small">
-                          {drawnSettings}
-                        </Flex>
-                      ) : undefined,
-                  }))}
-                  onChange={(next) => onChange(pointer, withValueSource(field, next as ValueSource))}
-                />
-              )}
-              {choice ? null : drawnSettings}
-              {group === 'validation' && (
-                <>
-                  {atField.map(({ validation, position }) => (
-                    <ValidationRow
-                      key={position}
-                      atField
-                      index={position}
-                      validation={validation}
-                      fieldNames={noFieldNames}
-                      readOnly={readOnly}
-                      layer={layer}
-                      onChange={onChange}
-                    />
-                  ))}
-                </>
-              )}
-            </Flex>
-          </AxisFieldGroup>
+          <SectionPart key={group} testName={`field-${group}`}>
+            <AxisFieldGroup
+              heading
+              {...groupTexts(t, group === 'type' ? `fields.group.type.${type}` : `fields.group.${group}`)}
+              action={addValidation}
+              fold={
+                group === 'searchPrivacy'
+                  ? { open: privacyOpen, onToggle: () => setPrivacyOpen((open) => !open), state: privacyState }
+                  : undefined
+              }
+            >
+              <Flex vertical gap="small" style={{ minWidth: 240 }}>
+                {choice && (
+                  <AxisChoiceField
+                    {...fieldTexts(t, 'fields.valueSource')}
+                    // The group's title, Value, names the choice to the eye.
+                    hideLabel
+                    value={valueSourceOf(field)}
+                    // Proposed, #3264: the chosen way's settings sit under it, so they read as its own.
+                    options={sources.map((source) => ({
+                      value: source,
+                      ...fieldTexts(t, `fields.valueSource.${source}`),
+                      detail:
+                        source === valueSourceOf(field) && drawnSettings.length > 0 ? (
+                          <Flex vertical gap="small">
+                            {drawnSettings}
+                          </Flex>
+                        ) : undefined,
+                    }))}
+                    onChange={(next) => onChange(pointer, withValueSource(field, next as ValueSource))}
+                  />
+                )}
+                {choice ? null : drawnSettings}
+                {group === 'validation' && (
+                  <>
+                    {atField.map(({ validation, position }) => (
+                      <ValidationRow
+                        key={position}
+                        atField
+                        index={position}
+                        validation={validation}
+                        fieldNames={noFieldNames}
+                        readOnly={readOnly}
+                        layer={layer}
+                        onChange={onChange}
+                      />
+                    ))}
+                  </>
+                )}
+              </Flex>
+            </AxisFieldGroup>
+          </SectionPart>
         )
       })}
-    </>
+    </SectionParts>
   )
 }
 

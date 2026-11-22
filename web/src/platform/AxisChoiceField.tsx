@@ -12,9 +12,9 @@ export interface AxisChoiceOption {
   help: string
   mark?: string
   /**
-   * Proposed, #3264: the settings that belong to this option, shown under it while it is chosen, set in from the radios
-   * behind a `borderSubtle` rule that runs down from the radio, so they read as the chosen option's and not as more
-   * options. Only a choice the screen holds shows it.
+   * Proposed, #3264: the settings that belong to this option, shown under it while it is chosen, set in to where the
+   * options' text starts, so they read as the chosen option's and not as more options, as Polaris's choice list shows
+   * a chosen choice's children. Only a choice the screen holds shows it.
    */
   detail?: ReactNode
 }
@@ -71,7 +71,7 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
   const { label, help, options } = props
   const optionId = useId()
   const groupName = useId()
-  const { colour, spacing, type } = useDesignTokens()
+  const { spacing, type } = useDesignTokens()
   const radios = (chosen?: string) => (
     <Flex vertical>
       {options.map((option, index) => {
@@ -90,13 +90,10 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
               )}
             </Radio>
             {option.detail !== undefined && option.value === chosen && (
-              // The rule runs down from the middle of the 16px radio, and the settings start where the option's text does.
+              // The settings start where the option's text does, after the 16px radio and Ant Design's 8px gap.
               <div
                 style={{
-                  marginInlineStart: 7,
-                  paddingInlineStart: 16,
-                  borderInlineStart: `1px solid ${colour.borderSubtle}`,
-                  paddingBlock: spacing.xs,
+                  paddingInlineStart: 16 + spacing.xs,
                   marginBlock: spacing.xs,
                   // Ant Design's radio group sets its font size to 0, so the settings take the body size back.
                   fontSize: type.fontSize,
