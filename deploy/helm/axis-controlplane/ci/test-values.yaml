@@ -1,5 +1,5 @@
-# Values for the lint, the schema check and the render tests. They set the region and the tenant domain, set the mail sender, relay and user name, pick the PayOS provider, name the
-# connection string, mail password, challenge key, PayOS keys and certificate Secrets, list two cells with the client certificate and the authority, run two replicas and set resources and one image pull Secret, so the
+# Values for the lint, the schema check and the render tests. They set the region and the tenant domain, set the mail sender, relay and user name, name the
+# connection string, mail password, challenge key and certificate Secrets, list two cells with the client certificate and the authority, run two replicas and set resources and one image pull Secret, so the
 # checks cover every branch of the templates.
 image:
   pullSecrets:
@@ -18,8 +18,6 @@ controlPlane:
   mail:
     host: smtp.example.com
     userName: relay-user
-  payOs:
-    provider: PayOs
   cells:
     - id: vn-1
       internalUrl: https://cell.vn-1.internal.example.com
@@ -41,8 +39,6 @@ secrets:
     name: axis-controlplane-mail
   challengeKey:
     name: axis-controlplane-sign-up
-  payOs:
-    name: axis-controlplane-payos
   certificate:
     name: axis-controlplane-tls
   cellClientCertificate:

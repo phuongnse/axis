@@ -25,18 +25,6 @@ public sealed class PlanCatalogueTests
     // A trial plan runs no package, so the same quotas with a package run time of 0.
     private static readonly string _trialQuotas = Quotas.Replace("\"packageCpuSecondsPerDay\": 3600", "\"packageCpuSecondsPerDay\": 0", StringComparison.Ordinal);
 
-    private const string Prices = """
-        "prices": [{ "currency": "VND", "month": 990000 }, { "currency": "USD", "month": 3900 }]
-        """;
-
-    private const string DecimalPrice = """
-        "prices": [{ "currency": "VND", "month": 990000.5 }, { "currency": "USD", "month": 3900 }]
-        """;
-
-    private const string VndOnly = """
-        "prices": [{ "currency": "VND", "month": 990000 }]
-        """;
-
     [Fact]
     public void A_valid_catalogue_has_no_problems()
     {
@@ -49,30 +37,6 @@ public sealed class PlanCatalogueTests
     public void An_empty_catalogue_is_valid()
     {
         Assert.Empty(PlanCatalogue.Problems(Bind("[]")));
-    }
-
-    [Fact]
-    public void A_decimal_price_is_refused_naming_the_plan_and_the_setting()
-    {
-        var plans = Bind($"[{Plan(1)}, {Plan(2, prices: DecimalPrice)}]");
-
-        var problem = Assert.Single(PlanCatalogue.Problems(plans));
-
-        Assert.Contains("ControlPlane:Plans:1:Prices:0:Month", problem, StringComparison.Ordinal);
-        Assert.Contains("team version 2", problem, StringComparison.Ordinal);
-        Assert.DoesNotContain("990000", problem, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_missing_currency_is_refused_naming_the_plan_and_the_setting()
-    {
-        var plans = Bind($"[{Plan(1)}, {Plan(2, prices: VndOnly)}]");
-
-        var problem = Assert.Single(PlanCatalogue.Problems(plans));
-
-        Assert.Contains("ControlPlane:Plans:1:Prices", problem, StringComparison.Ordinal);
-        Assert.Contains("team version 2", problem, StringComparison.Ordinal);
-        Assert.Contains("USD", problem, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -120,20 +84,20 @@ public sealed class PlanCatalogueTests
     }
 
     [Fact]
-    public void A_trial_plan_with_a_price_is_refused_naming_the_plan_and_the_setting()
+    public void A_trial_plan_with_an_add_on_is_refused_naming_the_plan_and_the_setting()
     {
-        var plans = Bind($"[{Plan(1)}, {Plan(2, trial: true, addOns: "\"addOns\": []")}]");
+        var plans = Bind($"[{Plan(1)}, {Plan(2, trial: true)}]");
 
         var problem = Assert.Single(PlanCatalogue.Problems(plans));
 
-        Assert.Contains("ControlPlane:Plans:1:Prices", problem, StringComparison.Ordinal);
+        Assert.Contains("ControlPlane:Plans:1:AddOns", problem, StringComparison.Ordinal);
         Assert.Contains("team version 2", problem, StringComparison.Ordinal);
     }
 
     [Fact]
     public void A_trial_plan_with_a_package_run_time_is_refused_naming_the_plan_and_the_setting_and_not_the_value()
     {
-        var plans = Bind($"[{Plan(1)}, {Plan(2, quotas: Quotas, prices: "\"prices\": []", trial: true, addOns: "\"addOns\": []")}]");
+        var plans = Bind($"[{Plan(1)}, {Plan(2, quotas: Quotas, trial: true, addOns: "\"addOns\": []")}]");
 
         var problem = Assert.Single(PlanCatalogue.Problems(plans));
 
@@ -143,9 +107,9 @@ public sealed class PlanCatalogueTests
     }
 
     [Fact]
-    public void A_trial_plan_with_no_price_is_valid()
+    public void A_trial_plan_with_no_add_on_is_valid()
     {
-        var plans = Bind($"[{Plan(1, prices: "\"prices\": []", trial: true, addOns: "\"addOns\": []")}]");
+        var plans = Bind($"[{Plan(1, trial: true, addOns: "\"addOns\": []")}]");
 
         Assert.Empty(PlanCatalogue.Problems(plans));
     }
@@ -153,7 +117,7 @@ public sealed class PlanCatalogueTests
     [Fact]
     public void A_trial_plan_with_more_than_ten_included_users_is_refused_naming_the_plan_and_the_setting_and_not_the_value()
     {
-        var plans = Bind($"[{Plan(1)}, {Plan(2, prices: "\"prices\": []", trial: true, addOns: "\"addOns\": []", includedUsers: 12345678901)}]");
+        var plans = Bind($"[{Plan(1)}, {Plan(2, trial: true, addOns: "\"addOns\": []", includedUsers: 12345678901)}]");
 
         var problem = Assert.Single(PlanCatalogue.Problems(plans));
 
@@ -189,31 +153,25 @@ public sealed class PlanCatalogueTests
     }
 
     [Fact]
-    public void A_yearly_price_is_ten_times_the_monthly_price_for_a_plan_and_for_an_add_on()
+    public void A_plan_version_holds_its_names_included_users_quotas_and_add_ons_and_no_price()
     {
         var catalogue = PlanCatalogue.Create(Bind($"[{Plan(2)}]"));
 
         var plan = catalogue.Find("team", 2)!;
 
-        Assert.Equal(990000, plan.Price(PlanCurrencies.Vnd, PlanPeriods.Month));
-        Assert.Equal(9900000, plan.Price(PlanCurrencies.Vnd, PlanPeriods.Year));
-        Assert.Equal(39000, plan.Price(PlanCurrencies.Usd, PlanPeriods.Year));
-        var addOn = Assert.Single(plan.AddOns);
-        Assert.Equal(290000, addOn.Price(PlanCurrencies.Vnd, PlanPeriods.Month));
-        Assert.Equal(2900000, addOn.Price(PlanCurrencies.Vnd, PlanPeriods.Year));
-        Assert.Equal(12000, addOn.Price(PlanCurrencies.Usd, PlanPeriods.Year));
-        Assert.Throws<ArgumentException>(() => plan.Price("EUR", PlanPeriods.Month));
-        Assert.Throws<ArgumentException>(() => plan.Price(PlanCurrencies.Vnd, "week"));
+        Assert.Equal(("team", 2, "Team", "Nhóm", false, 25L), (plan.Code, plan.Version, plan.NameEn, plan.NameVi, plan.Trial, plan.IncludedUsers));
+        Assert.Equal(21474836480L, plan.Quotas[Axis.Tenancy.QuotaKeys.Storage]);
+        Assert.Equal(new PlanAddOn("users-10", 10), Assert.Single(plan.AddOns));
     }
 
     [Fact]
     public void A_catalogue_with_a_problem_stops_the_start_and_the_message_names_it()
     {
-        var plans = Bind($"[{Plan(2, prices: VndOnly)}]");
+        var plans = Bind($"[{Plan(2, quotas: Quotas.Replace("\"workerWeight\": 2,", "", StringComparison.Ordinal))}]");
 
         var exception = Assert.Throws<InvalidOperationException>(() => PlanCatalogue.Create(plans));
 
-        Assert.Contains("ControlPlane:Plans:0:Prices", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("ControlPlane:Plans:0:Quotas:workerWeight", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -239,7 +197,6 @@ public sealed class PlanCatalogueTests
     private static string Plan(
         int version,
         string? quotas = null,
-        string? prices = null,
         bool trial = false,
         string? addOns = null,
         string code = "team",
@@ -251,17 +208,16 @@ public sealed class PlanCatalogueTests
           "includedUsers": {{includedUsers ?? (trial ? 10 : 25)}},
           "trial": {{(trial ? "true" : "false")}},
           {{quotas ?? (trial ? _trialQuotas : Quotas)}},
-          {{prices ?? Prices}},
           {{addOns ?? """
           "addOns": [
-            { "code": "users-10", "users": 10, "prices": [{ "currency": "VND", "month": 290000 }, { "currency": "USD", "month": 1200 }] }
+            { "code": "users-10", "users": 10 }
           ]
           """}}
         }
         """;
 
     private static string TrialPlan(int version, string code) =>
-        Plan(version, prices: "\"prices\": []", trial: true, addOns: "\"addOns\": []", code: code);
+        Plan(version, trial: true, addOns: "\"addOns\": []", code: code);
 
     // The shape of the docs example, bound as the host binds it.
     private static List<PlanOptions> Bind(string plansJson)

@@ -1,14 +1,15 @@
 # Plans
 
-A plan is what a tenant of Axis SaaS pays its operator for: a price for the whole tenant and the quotas
-it sets. This page covers the catalogue of plans, how a plan becomes the tenant's quotas, add-ons, and
-changing a plan. The operator sets the prices from what the [cell load test](performance.md#cell-load-test)
+A plan is a named set of quotas for the whole tenant of Axis SaaS. The operator's own billing system
+holds the prices, see [D168](../decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md).
+This page covers the catalogue of plans, how a plan becomes the tenant's quotas, add-ons, and
+changing a plan. The operator sizes the quotas from what the [cell load test](performance.md#cell-load-test)
 and a running cell measure.
 
 ## The catalogue
 
 Plans are settings of the regional [control plane](control-plane.md), `ControlPlane:Plans`, so a
-price change needs no decision and no release.
+change of quotas needs no decision and no release.
 
 ```json
 {
@@ -27,43 +28,31 @@ price change needs no decision and no release.
     "workerWeight": 2,
     "authoringRequests": 200
   },
-  "prices": [{ "currency": "VND", "month": 990000 }, { "currency": "USD", "month": 3900 }],
   "addOns": [
-    { "code": "users-10", "users": 10, "prices": [{ "currency": "VND", "month": 290000 }, { "currency": "USD", "month": 1200 }] }
+    { "code": "users-10", "users": 10 }
   ]
 }
 ```
 
-The numbers above show the shape only. They are not prices.
+The numbers above show the shape only.
 
 - **Shape.** A plan has a `code`, a `version`, a `name` in `en` and `vi`, `includedUsers`, the
-  `quotas` of [tenant quotas](tenant-quotas.md#quotas) except `users`, `prices` and `addOns`.
-- **One price for the tenant.** A price is for the whole tenant, with `includedUsers` in it, not a
-  price for each user.
-- **What a price covers.** An operator's lowest price for a plan should cover its share of a cell's fixed
-  cost, counted with the cell 60% full of paying tenants, the cost of its quotas, the payment and invoice
-  fees, time for support, and the operator's margin. Axis does not set the price.
-- **Money in minor units.** Every amount is an integer in the currency's smallest unit: dong for
-  `VND`, cents for `USD`. No amount is a decimal or a float.
-- **A year costs ten months.** A plan gives only monthly prices. A yearly period costs 10 times the
-  monthly price.
-- **A price for each currency.** `VND` in `vn`, and `USD` for a customer that pays abroad. Axis
-  never converts a price at an exchange rate.
-- **Versions.** Changing a plan's quotas or prices adds a new version. A subscription pins the
-  version it bought and keeps it until its plan changes, so a price rise never reaches a customer
+  `quotas` of [tenant quotas](tenant-quotas.md#quotas) except `users`, and `addOns`.
+- **Versions.** Changing a plan's quotas adds a new version. A subscription pins the
+  version it bought and keeps it until its plan changes, so a change of quotas never reaches a customer
   in the middle of what they agreed. A plan version that a subscription pins is never removed.
 - **The start check.** The control plane checks `ControlPlane:Plans` at start and stops on a bad
-  catalogue. It refuses a number that is not plain digits, such as a decimal price, a missing
-  currency or quota key, a repeated code and version, a trial plan with a price, a trial plan with more than 10 included
+  catalogue. It refuses a number that is not plain digits, a missing
+  quota key, a repeated code and version, a trial plan with an add-on, a trial plan with more than 10 included
   users, and a second trial plan code. The message
   names the plan code, version and setting, and never holds a value. The quota keys it requires are
   the platform's own list of quotas except `users`, so a new quota makes every catalogue invalid
   until its plans set it. An empty catalogue is valid.
-- **The pin.** A subscription holds a plan code and version, a currency and a period (`month` or
-  `year`). They are empty until a plan is bought, and a trial works without them. After the
+- **The pin.** A subscription holds a plan code and version and a period (`month` or
+  `year`). They are empty until a plan is set, and a trial works without them. After the
   migrations the start reads every pinned version, and it stops when `ControlPlane:Plans` no longer
   lists one, naming each missing plan code and version.
-- **The trial's plan.** A plan marked `"trial": true` has no price and no add-ons.
+- **The trial's plan.** A plan marked `"trial": true` has no add-ons.
 - **No AI requests** _(planned for M35)_. A plan sets no `authoringRequests`, because each author's own key
   pays for the author's requests, see [a person's own key](model-bindings.md#a-persons-own-key).
 - **Package run time**. Each plan sets `packageCpuSecondsPerDay`, see
@@ -85,8 +74,6 @@ The control plane turns a subscription's plan and add-ons into the tenant's quot
   rows, and it carries no idempotency key. A `deleting` or `deleted` subscription, and one that pins
   no plan, gets no call. A job that cannot reach the cell, or whose tenant has no directory row, fails
   and the job queue retries it.
-- **A payment.** A payment that makes a subscription `active` queues `writeQuotas` in the same
-  transaction, see [states](subscriptions.md#states).
 - **The other events** _(planned for M34)_. When a subscription starts, changes its plan or adds or
   drops an add-on, the code that makes the move queues `writeQuotas` in the same transaction,
   through the one helper that every move uses.
