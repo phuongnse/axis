@@ -33,7 +33,7 @@ import {
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { kindName, kindSingular } from '../platform/studioKinds'
-import { studioResourceAddress } from '../platform/studioAddress'
+import { studioFileAddress, studioResourceAddress } from '../platform/studioAddress'
 import { starterKinds } from '../platform/studioStarters'
 import { StudioApplicationContext, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
@@ -167,7 +167,8 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * its Open policy link opens the policy in the Resources view. The band and the Problems panel show in every view.
  * The sidebar's Packages entry, `&view=packages`, shows `StudioPackages` under a Packages heading, and `&package=<id>` shows that
  * package's `StudioPackageWorkspace` in place of the list, under the same entry, read-only without `studioDeveloper`. With it, the workspace saves the package's files and tells Studio's folder state through `onWritten`, its heading's Build saves the files and builds the package, its explorer creates, renames, deletes and copies the path of the files and folders, and its output panel's Problems tab lists the problems of the folder's `diagnostics` that sit under `packages/<id>/` and of the last build, while its Output tab shows that build. New package… sits on the heading's right and shows only
- * when `GET /api/me` answers `studioDeveloper: true`, see docs/reference/studio-packages.md#the-packages-entry.
+ * when `GET /api/me` answers `studioDeveloper: true`, see docs/reference/studio-packages.md#the-packages-entry. The Problems
+ * panel links a package file's place to that file at its line, `&file=<path>&line=<n>`, and any other file's place is plain text.
  * `&view=releases` shows only the Releases heading and the release list. `&view=release&release=<number>` shows that
  * release's `StudioReleasePage` in place of the list, under the Releases entry, and its Activate… sends the same request as the list's.
  * `&view=requests&request=<id>` shows that authoring request's page in place of the content, and no sidebar entry is marked for it.
@@ -835,6 +836,7 @@ function StudioWorkspace() {
                 diagnostics={loaded.diagnostics}
                 resources={loaded.resources}
                 onSelect={selectDiagnostic}
+                fileAddressOf={(file, line) => studioFileAddress(application!, file, line)}
                 onClose={() => setOpenPanel(null)}
               />
             )}

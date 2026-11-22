@@ -1,6 +1,7 @@
 import { CloseOutlined } from '@ant-design/icons'
 import { Flex, Modal, Tabs } from 'antd'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { useLocation, useSearchParams } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, AxisButtonGroup } from '../platform/AxisButton'
 import { CodeBlock } from '../platform/CodeBlock'
@@ -11,6 +12,7 @@ import { PaneHeader } from '../platform/PaneHeader'
 import { QuotaRefusedError } from '../platform/quota'
 import { SaveBar } from '../platform/SaveBar'
 import { StatusTag, type StatusTone } from '../platform/StatusTag'
+import { studioFileAddress } from '../platform/studioAddress'
 import {
   buildStudioPackage,
   fetchStudioPackageFile,
@@ -82,10 +84,12 @@ function EmptyEditorArea({ boundary }: { boundary: React.RefObject<HTMLElement |
  * A package's workspace, `&view=packages&package=<id>`: the package's label as the heading with its kind and version
  * under it, the explorer's tree of its files on the left, the open files as tabs over the code editor, the status line
  * under them and the output panel, whose Problems tab lists the package's problems: the `diagnostics` whose file is under
- * `packages/<id>/` and the problems of the last build or test, each file a link that opens it in the workspace at the
- * problem's line, or at the top. Its Output tab shows the last build or test: the Build or Tests title row with its state
- * as a status tag, then the lines the host wrote. Its Tests tab lists the last package test, one row a test, and a failed
- * test's place opens its file at that line. The explorer is `StudioPackageExplorer`: with `canDevelop` it creates,
+ * `packages/<id>/` and the problems of the last build or test, each file a link to its address, `&file=<path>&line=<n>`,
+ * which opens the file at the problem's line, or at the top. Its Output tab shows the last build or test: the Build or
+ * Tests title row with its state as a status tag, then the lines the host wrote. Its Tests tab lists the last package
+ * test, one row a test, and a failed test's place is a link to its file at that line. The address's `file` and `line`
+ * open that file at its line when the workspace loads, and again on Back, Forward and a second click on the same link,
+ * see docs/reference/studio.md#route-and-address. The explorer is `StudioPackageExplorer`: with `canDevelop` it creates,
  * renames, deletes and copies the path of files and folders, and the workspace keeps their tabs: a rename moves the tabs
  * to the new paths with their unsaved text and a delete closes them. It reads the list again after each of those writes,
  * and on Refresh. An id that names no package shows a warning. Without `canDevelop` the editor is read-only and an info
@@ -196,33 +200,54 @@ function Workspace({
   const openFile = (path: string) => {
     setOpen((current) => (current.includes(path) ? current : [...current, path]))
     setActive(path)
-    if (requested.current.has(path)) {
-      return
+  }
+
+  // Reads each open file that is not read yet, so a tab opens at once and its text follows when it has arrived.
+  useEffect(() => {
+    for (const path of open) {
+      if (requested.current.has(path)) {
+        continue
+      }
+      requested.current.add(path)
+      fetchStudioPackageFile(application, row.id, path).then(
+        (file) =>
+          setFiles((current) => ({
+            ...current,
+            [path]: file === null ? 'failed' : { saved: file.content, text: file.content, version: file.version },
+          })),
+        (error: unknown) => {
+          console.warn(`Loading '${path}' of the package '${row.id}' failed`, error)
+          setFiles((current) => ({ ...current, [path]: 'failed' }))
+        },
+      )
     }
-    requested.current.add(path)
-    fetchStudioPackageFile(application, row.id, path).then(
-      (file) =>
-        setFiles((current) => ({
-          ...current,
-          [path]: file === null ? 'failed' : { saved: file.content, text: file.content, version: file.version },
-        })),
-      (error: unknown) => {
-        console.warn(`Loading '${path}' of the package '${row.id}' failed`, error)
-        setFiles((current) => ({ ...current, [path]: 'failed' }))
-      },
-    )
-  }
+  }, [open, application, row.id])
 
-  /** Opens a problem's file, or switches to it, and puts the cursor at the problem's line, or on line 1 without one. */
-  const openAt = (file: string, line?: number) => {
-    const path = file.slice(prefix.length)
-    pending.current = { path, line: line ?? 1 }
-    openFile(path)
-    setJump((count) => count + 1)
+  // The address's file opens at its line once for each navigation, on load, reload, Back and a second click on the same
+  // link, see docs/reference/studio.md#route-and-address. The navigation's key tells one navigation from the next, and
+  // a new key is followed while drawing, as EntityDesigner follows its address.
+  const [params] = useSearchParams()
+  const { key } = useLocation()
+  const file = params.get('file')
+  const lineParam = params.get('line')
+  const line = lineParam !== null && /^[1-9]\d*$/.test(lineParam) ? Number(lineParam) : undefined
+  const [followed, setFollowed] = useState<string | null>(null)
+  if (key !== followed) {
+    setFollowed(key)
+    if (file !== null) {
+      openFile(file)
+      setJump((count) => count + 1)
+    }
   }
+  // The address's line waits in `pending` for its editor. This effect sets it, rather than the drawing above, and it runs
+  // before the cursor effect below, which reads it.
+  useEffect(() => {
+    pending.current = file === null ? null : { path: file, line: line ?? 1 }
+  }, [key, file, line])
 
-  // Moves the cursor of the file that openAt asked for once its editor is there. The editor builds its view in an effect
-  // that runs before this one, so a file that loads later is reached through the editor's ref below, which bumps `jump`.
+  // Moves the cursor of the file that the address asked for once its editor is there. The editor builds its view in an
+  // effect that runs before this one, so a file that loads later is reached through the editor's ref below, which bumps
+  // `jump`.
   useEffect(() => {
     const target = pending.current
     const editor = target && editors.current.get(target.path)
@@ -664,7 +689,10 @@ function Workspace({
                       {problems.length === 0 ? (
                         <EmptyState text={t('shell.studio.problems.none')} />
                       ) : (
-                        <StudioProblemList diagnostics={problems} onOpenFile={openAt} />
+                        <StudioProblemList
+                          diagnostics={problems}
+                          fileAddressOf={(path, at) => studioFileAddress(application, path, at)}
+                        />
                       )}
                     </div>
                   ),
@@ -723,7 +751,11 @@ function Workspace({
                       {testRun === null ? (
                         <EmptyState text={t('shell.studio.packages.noTests')} />
                       ) : (
-                        <StudioTestResults request={testRun} onOpenFile={openAt} titled={false} />
+                        <StudioTestResults
+                          request={testRun}
+                          fileAddressOf={(path, at) => studioFileAddress(application, path, at)}
+                          titled={false}
+                        />
                       )}
                     </div>
                   ),

@@ -103,7 +103,8 @@ comes first, so it is never next to Publish….
 The band's errors and warnings open a Problems panel on the right, under the header. It is
 not modal, so the page stays usable while it is open. It lists every error and then every warning, each
 with its severity, code and message, then its resource as a link, with the kind muted after it. A problem
-that names no resource shows its file in muted text. Opening the link opens its resource at the place the
+that names no resource shows its file with its line. A package file's place is a link to that file at its line, and
+another file's place is muted text. Opening the link opens its resource at the place the
 problem names and leaves the panel open, so an author can fix one problem after another. The panel scrolls on its own and stops at its
 end, as [scroll areas](actions-and-controls.md#scroll-areas) say. A package's workspace lists its own problems with the
 same list in its output panel, where a package file's problem is a link that opens the file in the workspace, see

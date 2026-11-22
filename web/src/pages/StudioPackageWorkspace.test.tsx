@@ -220,12 +220,17 @@ function stubPackage(
   return puts
 }
 
-function renderWorkspace(canDevelop: boolean, packageId = 'tools', diagnostics: StudioDiagnostic[] = []) {
+function renderWorkspace(
+  canDevelop: boolean,
+  packageId = 'tools',
+  diagnostics: StudioDiagnostic[] = [],
+  entry = '/studio?app=Shop&view=packages&package=tools',
+) {
   const onWritten = vi.fn()
   render(
     // Without motion a closed dialog leaves the document at once, as jsdom runs no animations.
     <ConfigProvider theme={{ token: { motion: false } }}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[entry]}>
         <ThemeModeProvider>
           <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
             <footer />
@@ -939,7 +944,7 @@ describe('StudioPackageWorkspace', () => {
       expect(within(panel).queryByText('Problem in packages/other/axis-package.json')).not.toBeInTheDocument()
       expect(within(panel).queryByText('Problem in entities/a.json')).not.toBeInTheDocument()
 
-      await userEvent.click(within(panel).getByRole('button', { name: 'packages/tools/axis-package.json' }))
+      await userEvent.click(within(panel).getByRole('link', { name: 'packages/tools/axis-package.json' }))
 
       expect(await screen.findByRole('textbox', { name: 'axis-package.json' })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /axis-package\.json/, selected: true })).toBeInTheDocument()
@@ -953,7 +958,7 @@ describe('StudioPackageWorkspace', () => {
       ])
       await screen.findByTestId('studio-package-tree')
 
-      await userEvent.click(screen.getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' }))
 
       const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
       await waitFor(() =>
@@ -962,12 +967,34 @@ describe('StudioPackageWorkspace', () => {
       expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(3)
 
       // A file that is already open jumps again.
-      await userEvent.click(screen.getByRole('button', { name: 'packages/tools/adapter.py' }))
+      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/adapter.py' }))
       await screen.findByRole('textbox', { name: 'adapter.py' })
-      await userEvent.click(screen.getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' }))
       await waitFor(() =>
         expect(within(screen.getByTestId('studio-package-status')).getByText('Line 3, column 1')).toBeInTheDocument(),
       )
+    })
+
+    it("links a problem's file to its package file address, with its line", async () => {
+      stubPackage()
+      renderWorkspace(true, 'tools', [problem('packages/tools/lib/x.py', { line: 3 })])
+      await screen.findByTestId('studio-package-tree')
+
+      expect(within(output()).getByRole('link', { name: 'packages/tools/lib/x.py, line 3' })).toHaveAttribute(
+        'href',
+        '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3',
+      )
+    })
+
+    it('opens the file of its address at its line when the workspace loads', async () => {
+      stubPackage()
+      renderWorkspace(true, 'tools', [], '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3')
+
+      const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
+      await waitFor(() =>
+        expect(within(screen.getByTestId('studio-package-status')).getByText('Line 3, column 1')).toBeInTheDocument(),
+      )
+      expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(3)
     })
 
     it('says there are no problems when the package has none', async () => {
@@ -1210,7 +1237,7 @@ describe('StudioPackageWorkspace', () => {
       )
 
       await userEvent.click(panel.getByRole('tab', { name: 'Problems' }))
-      await userEvent.click(await screen.findByRole('button', { name: 'packages/tools/lib/x.py, line 2' }))
+      await userEvent.click(await screen.findByRole('link', { name: 'packages/tools/lib/x.py, line 2' }))
 
       const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
       await waitFor(() =>
@@ -1336,7 +1363,7 @@ describe('StudioPackageWorkspace', () => {
       expect(failed).toHaveTextContent('AssertionError: Hello Ada != Hi Ada')
       expect(panel.queryByRole('heading', { name: 'Test results' })).not.toBeInTheDocument()
 
-      await userEvent.click(within(failed).getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+      await userEvent.click(within(failed).getByRole('link', { name: 'packages/tools/lib/x.py, line 3' }))
 
       const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
       await waitFor(() =>
@@ -1392,7 +1419,7 @@ describe('StudioPackageWorkspace', () => {
       expect(await panel.findByText('No test ran. See the problems.', {}, { timeout: 3000 })).toBeInTheDocument()
       await userEvent.click(panel.getByRole('tab', { name: 'Problems' }))
 
-      expect(await screen.findByRole('button', { name: 'packages/tools/lib/x.py, line 2' })).toBeInTheDocument()
+      expect(await screen.findByRole('link', { name: 'packages/tools/lib/x.py, line 2' })).toBeInTheDocument()
     })
   })
 })

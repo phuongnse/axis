@@ -26,19 +26,19 @@ import { ResourceReference } from './ResourceReference'
  *
  * A package's `test` request, which holds `packageTests`, shows one row a test instead: passed or failed, the name, the
  * duration when the host sent it, and for a failure its message with its place after it, `packages/<id>/<file>, line N`.
- * The place is a link through `FileAtLine` when `onOpenFile` is given, and it calls it with that path and line. An ended
- * run with no test says that no test ran. With `titled` false the section has no heading, for a place that is named
- * already, such as the Tests tab. See docs/reference/studio-packages.md#a-packages-files.
+ * The place is a link through `FileAtLine` when `fileAddressOf` gives an address for the file, which opens the file at
+ * the line. An ended run with no test says that no test ran. With `titled` false the section has no heading, for a place
+ * that is named already, such as the Tests tab. See docs/reference/studio-packages.md#a-packages-files.
  */
 export function StudioTestResults({
   request,
   onSelect,
-  onOpenFile,
+  fileAddressOf,
   titled = true,
 }: {
   request: Pick<StudioRequest, 'kind' | 'status' | 'scenarios' | 'package' | 'packageTests'>
   onSelect?: (resourceId: string, path: string) => void
-  onOpenFile?: (file: string, line?: number) => void
+  fileAddressOf?: (file: string, line?: number) => string | undefined
   titled?: boolean
 }) {
   const t = useText()
@@ -61,7 +61,7 @@ export function StudioTestResults({
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {packageTests.map((test, index) => (
               <li key={`${index}:${test.name}`} data-testid="studio-test-result" data-outcome={test.outcome}>
-                <PackageTestRow test={test} packageId={request.package ?? ''} onOpenFile={onOpenFile} />
+                <PackageTestRow test={test} packageId={request.package ?? ''} fileAddressOf={fileAddressOf} />
               </li>
             ))}
           </ul>
@@ -132,11 +132,11 @@ function ScenarioRow({
 function PackageTestRow({
   test,
   packageId,
-  onOpenFile,
+  fileAddressOf,
 }: {
   test: StudioPackageTestResult
   packageId: string
-  onOpenFile?: (file: string, line?: number) => void
+  fileAddressOf?: (file: string, line?: number) => string | undefined
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -159,9 +159,7 @@ function PackageTestRow({
             {test.message !== null && (
               <Typography.Text type={failed ? 'danger' : 'secondary'}>{test.message}</Typography.Text>
             )}
-            {file !== null && (
-              <FileAtLine file={file} line={test.line} onOpen={onOpenFile && (() => onOpenFile(file, test.line))} />
-            )}
+            {file !== null && <FileAtLine file={file} line={test.line} href={fileAddressOf?.(file, test.line)} />}
           </Flex>
         )}
       </Flex>

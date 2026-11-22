@@ -105,10 +105,10 @@ them there.
   the host wrote, with no box of their own. A build that cannot be sent or followed shows the request alert.
 - **Problems.** The Problems tab lists the folder's diagnostics whose file is under `packages/<id>/`, errors then
   warnings, with the list of the [Problems panel](studio-workspace.md#problems-panel), or says "No problems.". After a
-  save it shows the problems that the save answered. A problem's file is a link, named by the file and, when the
-  diagnostic has a line, by ", line N". It opens the file in the workspace, or switches to its tab, with the cursor at
-  that line, or on line 1 when the diagnostic has none. A package's file shows in the band's Problems panel as plain
-  muted text.
+  save it shows the problems that the save answered. A problem's file is a link to its address,
+  `&file=<path>&line=<n>`, named by the file and, when the diagnostic has a line, by ", line N". It opens the file in the
+  workspace, or switches to its tab, with the cursor at that line, or on line 1 when the diagnostic has none. The band's
+  Problems panel links a package file's problem to the same address.
 - **Problems from a build or a test.** The diagnostics of a build, or of a test whose copy of the package the host
   refused, show in Problems like any other diagnostic, each opening its file at its line. They stay until the next
   build or test starts.
@@ -116,7 +116,7 @@ them there.
   row has room.
 - **Tests.** Once every file is saved, Run tests sends `POST .../test` with the package and follows the request until
   it ends. The Tests tab opens when it starts. It shows one row a test, with its result, name, duration and message.
-  A failed test's place, its file at its line, follows its message and opens there, as a problem's file does. The
+  A failed test's place is a link to its file at its line, after its message, as a problem's file is. The
   Output tab's title row then reads Tests, with the test's state as a status tag: queued, testing, passed or failed.
   Under it are the lines the host wrote. A test that cannot be sent or followed shows the request alert.
 - **Run.** Run… shows two panes parted by a rule that runs the panel's height. The Input pane is

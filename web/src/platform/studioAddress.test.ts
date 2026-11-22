@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { studioRequestAddress, studioResourceAddress } from './studioAddress'
+import { studioFileAddress, studioPackageAddress, studioRequestAddress, studioResourceAddress } from './studioAddress'
 
 describe('studioResourceAddress', () => {
   it('builds the address of a resource', () => {
@@ -67,5 +67,39 @@ describe('Studio addresses', () => {
       .filter(([, text]) => buildsResourceAddress.test(text))
       .map(([file]) => file)
     expect(builders).toEqual([])
+  })
+})
+
+describe('studioPackageAddress', () => {
+  it('builds the address of a package workspace', () => {
+    expect(studioPackageAddress('Shop', 'tools')).toBe('/studio?app=Shop&view=packages&package=tools')
+  })
+
+  it('adds the file in the package and its line', () => {
+    expect(studioPackageAddress('Shop', 'tools', 'lib/x.py')).toBe(
+      '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py',
+    )
+    expect(studioPackageAddress('Shop', 'tools', 'lib/x.py', 3)).toBe(
+      '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3',
+    )
+  })
+})
+
+describe('studioFileAddress', () => {
+  it("builds the address of a package's file at its line", () => {
+    expect(studioFileAddress('Shop', 'packages/tools/lib/x.py', 3)).toBe(
+      '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3',
+    )
+  })
+
+  it("builds the address of a package's file without a line", () => {
+    expect(studioFileAddress('Shop', 'packages/tools/lib/x.py')).toBe(
+      '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py',
+    )
+  })
+
+  it('returns no address for a file outside packages', () => {
+    expect(studioFileAddress('Shop', 'entities/a.json', 3)).toBeUndefined()
+    expect(studioFileAddress('Shop', 'packages/tools', 3)).toBeUndefined()
   })
 })

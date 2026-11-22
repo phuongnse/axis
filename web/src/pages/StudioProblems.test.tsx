@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { designTokensFor } from '../platform/designTokens'
+import { studioFileAddress } from '../platform/studioAddress'
 import { Shell } from '../platform/Shell'
 import { ShellAsideContext } from '../platform/shellAsideContext'
 import { TextProvider } from '../platform/TextProvider'
@@ -24,17 +25,27 @@ const error: StudioDiagnostic = {
 let aside: HTMLDivElement | undefined
 
 /** Renders the panel with the shell's right column, which is `aside`. */
-function renderProblems(diagnostics: StudioDiagnostic[]) {
+function renderProblems(
+  diagnostics: StudioDiagnostic[],
+  fileAddressOf?: (file: string, line?: number) => string | undefined,
+) {
   aside = document.createElement('div')
   document.body.append(aside)
   render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <ShellAsideContext.Provider value={{ target: aside, claim: () => () => {} }}>
-          <StudioProblems diagnostics={diagnostics} onSelect={vi.fn()} onClose={vi.fn()} />
-        </ShellAsideContext.Provider>
-      </TextProvider>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <ShellAsideContext.Provider value={{ target: aside, claim: () => () => {} }}>
+            <StudioProblems
+              diagnostics={diagnostics}
+              onSelect={vi.fn()}
+              fileAddressOf={fileAddressOf}
+              onClose={vi.fn()}
+            />
+          </ShellAsideContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
 }
 
@@ -71,6 +82,21 @@ describe('StudioProblems', () => {
     expect(screen.getByText('Error')).toHaveAttribute('data-tone', 'danger')
     expect(screen.getByText('Warning')).toHaveAttribute('data-tone', 'attention')
     expect(screen.queryByText('error')).not.toBeInTheDocument()
+  })
+
+  it("links a package file's problem to its address, and draws another file's problem as muted text", () => {
+    renderProblems([{ ...error, file: 'packages/tools/lib/x.py', line: 3 }, error], (file, line) =>
+      studioFileAddress('Shop', file, line),
+    )
+
+    expect(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' })).toHaveAttribute(
+      'href',
+      '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3',
+    )
+    expect(screen.queryByRole('link', { name: 'entities/purchase-request.json' })).not.toBeInTheDocument()
+    expect(screen.getByText('entities/purchase-request.json')).toHaveStyle({
+      color: designTokensFor('light').colour.textMuted,
+    })
   })
 
   it('stops the panel at its end, so the page does not scroll', () => {
@@ -180,24 +206,25 @@ describe('StudioProblemList', () => {
     expect(screen.queryByText(/Path:/)).not.toBeInTheDocument()
   })
 
-  it('makes the file of a problem with no resource a link named by its file and line when onOpenFile is given', async () => {
-    const onOpenFile = vi.fn()
+  it('makes the file of a problem with no resource a link to its address when fileAddressOf gives one', () => {
     render(
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioProblemList
-            diagnostics={[{ ...error, file: 'packages/tools/lib/x.py', line: 3 }, error]}
-            resources={resources}
-            onOpenFile={onOpenFile}
-          />
-        </TextProvider>
-      </ThemeModeProvider>,
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioProblemList
+              diagnostics={[{ ...error, file: 'packages/tools/lib/x.py', line: 3 }, error]}
+              resources={resources}
+              fileAddressOf={(file, line) => studioFileAddress('Shop', file, line)}
+            />
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
     )
 
-    await userEvent.click(screen.getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
-    expect(onOpenFile).toHaveBeenCalledWith('packages/tools/lib/x.py', 3)
-
-    await userEvent.click(screen.getByRole('button', { name: 'entities/purchase-request.json' }))
-    expect(onOpenFile).toHaveBeenLastCalledWith('entities/purchase-request.json', undefined)
+    expect(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' })).toHaveAttribute(
+      'href',
+      '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3',
+    )
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 })
