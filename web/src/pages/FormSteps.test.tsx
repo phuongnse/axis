@@ -141,16 +141,16 @@ describe('FormSteps', () => {
     }
   })
 
-  it('lists Move up, Move down and a destructive Delete step in each step menu, in that order', async () => {
+  it('lists Move up, Move down, a divider and a destructive Delete step last in each step menu', async () => {
     renderSteps(steps)
 
-    const menu = await openStepMenu(0)
-    expect(menu.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual([
-      'Move up',
-      'Move down',
-      'Delete step',
-    ])
-    expect(menu.getByRole('menuitem', { name: 'Delete step' })).toHaveClass('ant-dropdown-menu-item-danger')
+    await userEvent.click(within(screen.getByTestId('studio-field-/steps/0')).getByRole('button', { name: 'Actions' }))
+    const menu = await shownMenu('Actions')
+    const entries = menu.querySelectorAll('[role="menuitem"], [role="separator"]')
+    expect(
+      Array.from(entries, (entry) => (entry.getAttribute('role') === 'separator' ? '---' : entry.textContent)),
+    ).toEqual(['Move up', 'Move down', '---', 'Delete step'])
+    expect(within(menu).getByRole('menuitem', { name: 'Delete step' })).toHaveClass('ant-dropdown-menu-item-danger')
   })
 
   it('hides Add step and every step menu when the editor is read-only', () => {
