@@ -221,6 +221,28 @@ describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', 
     expect(secondary.style.color).toBe('')
   })
 
+  it('draws a destructive finish as a solid danger button, and a destructive secondary in dangerText', () => {
+    renderIn(
+      mode,
+      <>
+        <AxisButton role="finish" destructive>
+          Delete
+        </AxisButton>
+        <AxisButton role="secondary" destructive>
+          Delete…
+        </AxisButton>
+      </>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass(
+      'ant-btn-color-dangerous',
+      'ant-btn-variant-solid',
+    )
+    const secondary = screen.getByRole('button', { name: 'Delete…' })
+    expect(secondary).toHaveClass('ant-btn-variant-outlined')
+    expect(secondary).toHaveStyle({ color: colour.dangerText, borderColor: colour.dangerText })
+  })
+
   it('does not set the role on the DOM', () => {
     renderRoles()
 

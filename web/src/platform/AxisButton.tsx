@@ -35,9 +35,9 @@ export type AxisButtonProps =
       /** A text trigger that opens a menu ends in a caret, see docs/reference/actions-and-controls.md#menus. */
       caret?: boolean
       /**
-       * Proposed, #4902: the destructive tone, `dangerText`, for an action that removes. A tone of the main, secondary
-       * and subtle roles, never of the finish button, except in a dialog that confirms a removal, whose removal is the
-       * dialog's solid `danger` button, see docs/reference/actions-and-controls.md#buttons.
+       * Proposed, #4902: the destructive tone, for an action that removes or throws away. A role is a weight and a tone
+       * an effect, so every role takes it: main, secondary and subtle in `dangerText`, finish as a fill in `danger`, as
+       * a dialog that confirms a removal finishes, see docs/reference/actions-and-controls.md#buttons.
        */
       destructive?: boolean
     })
@@ -270,8 +270,8 @@ export function AxisActionRow({
  * `primaryText`, which it keeps wherever it sits, a title row included. `secondary` is most actions and is the grey
  * outline. `subtle` is a tool, such as Refresh or Undo, and is borderless in the text colour, with a light fill on hover.
  * `icon` is a subtle button with only an icon, so it takes a text key and shows the name as a tooltip on hover and on
- * keyboard focus; `joined` draws it bordered, for a control joined to an input. `destructive` is a tone of `main`,
- * `secondary` and `subtle`: `dangerText` for an action that removes. Inside an `AxisActionRow` beside a finish button,
+ * keyboard focus; `joined` draws it bordered, for a control joined to an input. `destructive` is a tone of every role,
+ * for an action that removes: `dangerText` on `main`, `secondary`, `subtle` and `icon`, and a `danger` fill on `finish`. Inside an `AxisActionRow` beside a finish button,
  * `main` and `secondary` are borderless in the text colour, or in `dangerText` when destructive, so the finish button is
  * the only filled shape and no button looks like a link. `caret` adds a down caret after the text of any text role.
  * Proposed, #4902: there is no `link` role, as no button looks like a link: what goes to an address is a real link, and
@@ -296,7 +296,7 @@ export function AxisButton(props: AxisButtonProps) {
   )
   switch (role) {
     case 'finish':
-      return <Button {...body} type="primary" disabled={disabled} style={style} />
+      return <Button {...body} type="primary" danger={danger} disabled={disabled} style={style} />
     case 'main':
       return inRow ? (
         borderless
