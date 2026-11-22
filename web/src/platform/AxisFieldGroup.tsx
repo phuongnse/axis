@@ -1,7 +1,6 @@
 import { useId, type ReactNode } from 'react'
-import { AxisActionRow, AxisButton } from './AxisButton'
+import { AxisActionRow } from './AxisButton'
 import { FieldError } from './AxisField'
-import { Chevron } from './Chevron'
 import { requiredMark } from './requiredMark'
 import { useDesignTokens } from './themeMode'
 
@@ -15,8 +14,6 @@ export function AxisFieldGroup({
   title,
   help,
   action,
-  fold,
-  heading = false,
   required = false,
   error,
   children,
@@ -24,17 +21,6 @@ export function AxisFieldGroup({
   title: string
   help: string
   action?: ReactNode
-  /**
-   * Proposed, #3264: a group of settings that are seldom changed folds, closed at first, behind the fold `SectionPart`
-   * has, before its title. While closed it shows `state` after its title in `textMuted`, such as which of its settings
-   * are on, so a setting is never out of sight unseen. Its help and its fields show only while it is open.
-   */
-  fold?: { open: boolean; onToggle: () => void; state: string }
-  /**
-   * Proposed, #3264: a group that heads a part of a long form, such as a field panel's General and Value, takes the
-   * look of a heading, in the text colour and heavier than a field's label, so a part is told from the fields in it.
-   */
-  heading?: boolean
   /** Proposed, #3264: marks the group required with the shared `requiredMark` after its title. The screen checks it. */
   required?: boolean
   /** Proposed, #3264: what the screen found wrong with the group's value, under its fields, as `AxisField`'s error. */
@@ -48,12 +34,7 @@ export function AxisFieldGroup({
   const hasAction = action !== null && action !== undefined
   // Proposed, #3264: a legend sits where a field's label sits and as far above the help, so a group's title and a
   // field's label line up, see docs/reference/actions-and-controls.md#fields. A browser pads a legend by 2px on each side.
-  const legendStyle = {
-    fontWeight: heading ? 600 : 500,
-    color: heading ? colour.text : colour.textMuted,
-    padding: 0,
-    paddingBottom: heading ? spacing.xs : 4,
-  }
+  const legendStyle = { fontWeight: 500, color: colour.textMuted, padding: 0, paddingBottom: 4 }
   return (
     <fieldset
       aria-labelledby={hasAction ? titleId : undefined}
@@ -102,24 +83,10 @@ export function AxisFieldGroup({
           </span>
           <AxisActionRow>{action}</AxisActionRow>
         </legend>
-      ) : fold ? (
-        <legend style={{ ...legendStyle, display: 'flex', alignItems: 'center', gap: spacing.xs, width: '100%' }}>
-          <AxisButton
-            role="icon"
-            size="small"
-            icon={<Chevron point={fold.open ? 'down' : 'right'} />}
-            nameKey={fold.open ? 'shell.fieldGroup.hide' : 'shell.fieldGroup.show'}
-            nameValues={{ title }}
-            aria-expanded={fold.open}
-            onClick={fold.onToggle}
-          />
-          <span>{title}</span>
-          {!fold.open && <span style={{ fontWeight: 400 }}>· {fold.state}</span>}
-        </legend>
       ) : (
         <legend style={legendStyle}>{requiredMark(title, { required })}</legend>
       )}
-      {(fold && !fold.open) || hasAction
+      {hasAction
         ? null
         : help !== '' && (
             <div
@@ -129,7 +96,7 @@ export function AxisFieldGroup({
               {help}
             </div>
           )}
-      {fold && !fold.open ? null : children}
+      {children}
       {error !== undefined && <FieldError id={errorId}>{error}</FieldError>}
     </fieldset>
   )

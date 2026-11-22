@@ -131,6 +131,15 @@ function groupTexts(t: (key: string) => string, path: string) {
   return { title: label, help }
 }
 
+/**
+ * Proposed, #5039: the heading and the line of a part of a field's panel, from its group's texts: a type's part is
+ * titled by the type, such as Text settings. Every part has its line, as a page's part has.
+ */
+function partHeading(t: (key: string) => string, group: string, type = '') {
+  const { label, help } = fieldTexts(t, group === 'type' ? `fields.group.type.${type}` : `fields.group.${group}`)
+  return { title: label, line: help }
+}
+
 /** The heading and the line of an entity's section, from `shell.studio.section.entity.<name>`, see docs/reference/entity-designer.md#sections. */
 function sectionHeading(t: (key: string) => string, name: 'general' | 'fields' | 'validations' | 'indexes') {
   const prefix = `shell.studio.section.entity.${name}`
@@ -1340,8 +1349,9 @@ const FieldDrawer = memo(function FieldDrawer({
                 />
               )}
               <SectionParts>
-                <SectionPart testName="field-general">
-                  <AxisFieldGroup heading {...groupTexts(t, 'fields.group.general')}>
+                {/* Proposed, #5039: a panel's part is a page's part, `SectionPart`, with its heading and its line. */}
+                <SectionPart testName="field-general" heading={partHeading(t, 'general')}>
+                  <>
                     <Flex vertical gap="middle">
                       {/* Proposed, #3264: the label first, typed in words with its translations as the entity's label
                       is, then the name, which a new field takes from its label until the name is changed by hand. */}
@@ -1387,7 +1397,7 @@ const FieldDrawer = memo(function FieldDrawer({
                         </AxisFieldGroup>
                       </div>
                     </Flex>
-                  </AxisFieldGroup>
+                  </>
                 </SectionPart>
                 <Settings
                   index={index}
@@ -1435,6 +1445,7 @@ function Settings({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const pointer = `/fields/${index}`
   const person = designerType(field) === 'person'
   // A person's id is no text a person sizes or searches, and Person is its own type, so it shows none of those.
@@ -1682,58 +1693,74 @@ function Settings({
             </AxisActionRow>
           ) : undefined
         return (
-          <SectionPart key={group} testName={`field-${group}`}>
-            <AxisFieldGroup
-              heading
-              {...groupTexts(t, group === 'type' ? `fields.group.type.${type}` : `fields.group.${group}`)}
-              action={addValidation}
-              fold={
-                group === 'searchPrivacy'
-                  ? { open: privacyOpen, onToggle: () => setPrivacyOpen((open) => !open), state: privacyState }
-                  : undefined
-              }
-            >
-              {/* Fields of a group stand as far apart as General's, see docs/reference/actions-and-controls.md#fields. */}
-              <Flex vertical gap="middle" style={{ minWidth: 240 }}>
-                {choice && (
-                  // Proposed, #3264: where the value comes from is one choice in a list, each way with a line that
-                  // says what it is, as the Type list has; the chosen way's settings follow it at the panel's width.
-                  <div data-testid={`studio-field-${pointer}/valueSource`}>
-                    <AxisField {...fieldTexts(t, 'fields.valueSource')} required>
-                      <Select
-                        virtual={false}
-                        value={valueSourceOf(field)}
-                        options={sources.map((source) => ({
-                          value: source,
-                          label: t(`shell.studio.field.entity.fields.valueSource.${source}`),
-                          help: t(`shell.studio.field.entity.fields.valueSource.${source}.help`),
-                        }))}
-                        optionRender={({ data }) => <TypeOption label={data.label} help={data.help} />}
-                        onChange={(next: string) => onChange(pointer, changeValueSource(field, next as ValueSource))}
-                      />
-                    </AxisField>
-                  </div>
-                )}
-                {drawnSettings}
-                {group === 'validation' && (
-                  <>
-                    {atField.length === 0 && <EmptyState text={t('shell.studio.entity.noValidationsAtField')} />}
-                    {atField.map(({ validation, position }) => (
-                      <ValidationRow
-                        key={position}
-                        atField
-                        index={position}
-                        validation={validation}
-                        fieldNames={noFieldNames}
-                        readOnly={readOnly}
-                        layer={layer}
-                        onChange={onChange}
-                      />
-                    ))}
-                  </>
-                )}
-              </Flex>
-            </AxisFieldGroup>
+          <SectionPart
+            key={group}
+            testName={`field-${group}`}
+            heading={
+              group === 'searchPrivacy' && !privacyOpen
+                ? {
+                    // A folded part says which of its settings are on, so a privacy setting is never out of sight unseen.
+                    ...partHeading(t, group, type),
+                    title: (
+                      <>
+                        {partHeading(t, group, type).title}{' '}
+                        <span style={{ fontWeight: 400, fontSize: 14, color: colour.textMuted }}>· {privacyState}</span>
+                      </>
+                    ),
+                  }
+                : partHeading(t, group, type)
+            }
+            action={addValidation}
+            fold={
+              group === 'searchPrivacy'
+                ? {
+                    open: privacyOpen,
+                    onToggle: () => setPrivacyOpen((open) => !open),
+                    title: partHeading(t, group, type).title,
+                  }
+                : undefined
+            }
+          >
+            {/* Fields of a group stand as far apart as General's, see docs/reference/actions-and-controls.md#fields. */}
+            <Flex vertical gap="middle" style={{ minWidth: 240 }}>
+              {choice && (
+                // Proposed, #3264: where the value comes from is one choice in a list, each way with a line that
+                // says what it is, as the Type list has; the chosen way's settings follow it at the panel's width.
+                <div data-testid={`studio-field-${pointer}/valueSource`}>
+                  <AxisField {...fieldTexts(t, 'fields.valueSource')} required>
+                    <Select
+                      virtual={false}
+                      value={valueSourceOf(field)}
+                      options={sources.map((source) => ({
+                        value: source,
+                        label: t(`shell.studio.field.entity.fields.valueSource.${source}`),
+                        help: t(`shell.studio.field.entity.fields.valueSource.${source}.help`),
+                      }))}
+                      optionRender={({ data }) => <TypeOption label={data.label} help={data.help} />}
+                      onChange={(next: string) => onChange(pointer, changeValueSource(field, next as ValueSource))}
+                    />
+                  </AxisField>
+                </div>
+              )}
+              {drawnSettings}
+              {group === 'validation' && (
+                <>
+                  {atField.length === 0 && <EmptyState text={t('shell.studio.entity.noValidationsAtField')} />}
+                  {atField.map(({ validation, position }) => (
+                    <ValidationRow
+                      key={position}
+                      atField
+                      index={position}
+                      validation={validation}
+                      fieldNames={noFieldNames}
+                      readOnly={readOnly}
+                      layer={layer}
+                      onChange={onChange}
+                    />
+                  ))}
+                </>
+              )}
+            </Flex>
           </SectionPart>
         )
       })}

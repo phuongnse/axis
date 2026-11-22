@@ -128,7 +128,8 @@ export function SectionPart({
       <section aria-labelledby={headingId} data-testid={dataTestId} aria-busy={busy}>
         <Flex justify="space-between" align="flex-start" gap="small" style={{ marginBottom: spacing.sm }}>
           {fold ? (
-            <Flex align="center" gap="small">
+            // Proposed, #5039: the fold stands level with the heading's title, as the heading has a line under it.
+            <Flex align="flex-start" gap="small">
               {/* Outside the heading, so the region's name from the heading holds no button name. */}
               <AxisButton
                 role="icon"
