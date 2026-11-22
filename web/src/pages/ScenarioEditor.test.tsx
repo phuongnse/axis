@@ -20,7 +20,7 @@ import {
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { flexOf, shownMenu } from '../test/antd'
+import { emptyDescription, flexOf, shownMenu } from '../test/antd'
 import { ScenarioEditor } from './ScenarioEditor'
 
 const english: Record<string, string> = platformEnglish
@@ -918,5 +918,71 @@ describe('ScenarioEditor sections', () => {
     expect(within(sections[1]).getByRole('button', { name: 'Add user' })).toBeVisible()
     expect(within(sections[2]).getByRole('button', { name: 'Add stub' })).toBeVisible()
     expect(within(sections[3]).getByRole('button', { name: 'Add step' })).toBeVisible()
+  })
+})
+
+describe('ScenarioEditor empty lists', () => {
+  it('says in each section what its emptiness means', () => {
+    renderEditor({ ...scenario([]), users: {}, stubs: [] })
+
+    const sections = screen.getAllByTestId(/^studio-section-/)
+    expect(emptyDescription(english['shell.studio.scenario.noUsers'], sections[1])).toBeVisible()
+    expect(emptyDescription(english['shell.studio.scenario.noStubs'], sections[2])).toBeVisible()
+    expect(emptyDescription(english['shell.studio.scenario.noSteps'], sections[3])).toBeVisible()
+  })
+
+  it('shows no empty line in a section that has an item', () => {
+    renderEditor({ ...scenario([fixtures.advanceTime]), stubs: [{ operation: 'billing/Refund', output: {} }] })
+
+    expect(screen.queryByText(english['shell.studio.scenario.noUsers'])).toBeNull()
+    expect(screen.queryByText(english['shell.studio.scenario.noSteps'])).toBeNull()
+    expect(screen.queryByText(english['shell.studio.scenario.noStubs'])).toBeNull()
+  })
+
+  it('says in a read-only editor what each empty section means', () => {
+    render(
+      providers(
+        <ConfigProvider componentDisabled>
+          <ScenarioEditor value={{ ...scenario([]), users: {}, stubs: [] }} onChange={vi.fn()} />
+        </ConfigProvider>,
+      ),
+    )
+
+    const sections = screen.getAllByTestId(/^studio-section-/)
+    expect(emptyDescription(english['shell.studio.scenario.noUsers'], sections[1])).toBeVisible()
+    expect(emptyDescription(english['shell.studio.scenario.noStubs'], sections[2])).toBeVisible()
+    expect(emptyDescription(english['shell.studio.scenario.noSteps'], sections[3])).toBeVisible()
+  })
+
+  it('says that an expectNotification step with no values has no value yet', () => {
+    renderEditor(onlyStep({ ...fixtures.expectNotification, values: {} }))
+
+    const card = screen.getByTestId('studio-field-/steps/0')
+    expect(emptyDescription(english['shell.studio.scenario.noValues'], card)).toBeVisible()
+  })
+
+  it('says that a createRecord step of a known entity with no values has no value yet', () => {
+    renderEditor(onlyStep({ ...fixtures.createRecord, values: {} }))
+
+    const card = screen.getByTestId('studio-field-/steps/0')
+    expect(emptyDescription(english['shell.studio.scenario.noValues'], card)).toBeVisible()
+  })
+
+  it('says that a stub with an empty output answers with an empty output', () => {
+    renderEditor(withStub({ connector: { name: 'Payments', operation: 'charge' }, output: {} }))
+
+    const stub = screen.getByTestId('studio-field-/stubs/0')
+    expect(emptyDescription(english['shell.studio.scenario.noOutput'], stub)).toBeVisible()
+  })
+
+  it.each([
+    'shell.studio.scenario.noUsers',
+    'shell.studio.scenario.noStubs',
+    'shell.studio.scenario.noSteps',
+    'shell.studio.scenario.noValues',
+    'shell.studio.scenario.noOutput',
+  ])('has %s in English and Vietnamese', (key) => {
+    expect(english[key]).toBeTruthy()
+    expect(vietnamese[key]).toBeTruthy()
   })
 })
