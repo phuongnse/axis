@@ -1,5 +1,6 @@
-import { Button, Checkbox, Divider, Flex, Form, Input, Typography } from 'antd'
+import { Checkbox, Divider, Flex, Form, Input, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { useId, useRef } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
 import { IdentityFrame } from './IdentityFrame'
@@ -31,10 +32,9 @@ function SignInBody({ context }: { context: SignInContext }) {
         </Typography.Paragraph>
       )}
       {providers.map((provider) => (
-        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-        <Button key={provider.alias} type="default" block onClick={() => goTo(provider.loginUrl)}>
+        <AxisButton key={provider.alias} role="secondary" block onClick={() => goTo(provider.loginUrl)}>
           {texts.continueWith.replace('{provider}', provider.label)}
-        </Button>
+        </AxisButton>
       ))}
       {accounts && providers.length > 0 && <Divider plain>{texts.or}</Divider>}
       {accounts && error && <AxisAlert kind="error" message={error} />}
@@ -92,10 +92,9 @@ function AccountForm({ context }: { context: SignInContext }) {
           </Form.Item>
         )}
         <input ref={credentialRef} type="hidden" name="credentialId" value="" />
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" htmlType="submit" block>
+        <AxisButton role="finish" htmlType="submit" block>
           {texts.signIn}
-        </Button>
+        </AxisButton>
       </Flex>
     </Form>
   )

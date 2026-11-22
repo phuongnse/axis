@@ -1,4 +1,5 @@
-import { Button, Typography } from 'antd'
+import { Typography } from 'antd'
+import { AxisButton } from '../platform/AxisButton'
 import { IdentityFrame } from './IdentityFrame'
 import type { PageExpiredContext } from './signInContext'
 
@@ -8,10 +9,9 @@ export function PageExpiredPage({ context }: { context: PageExpiredContext }) {
   return (
     <IdentityFrame title={title} frame={context}>
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button type="primary" href={continueUrl} block>
+      <AxisButton role="finish" href={continueUrl} block>
         {texts.continue}
-      </Button>
+      </AxisButton>
       <Typography.Link href={restartUrl}>{texts.startAgain}</Typography.Link>
     </IdentityFrame>
   )

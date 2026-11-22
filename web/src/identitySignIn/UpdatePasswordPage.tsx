@@ -1,5 +1,6 @@
-import { Button, Flex, Form, Input, Typography } from 'antd'
+import { Flex, Form, Input, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { useId, useRef } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
 import { IdentityFrame } from './IdentityFrame'
@@ -58,19 +59,17 @@ export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext
             <Input.Password name="password-confirm" autoComplete="new-password" />
           </Form.Item>
           <input ref={submitRef} type="hidden" name="logout-sessions" value="on" />
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button type="primary" htmlType="submit" block>
+          <AxisButton role="finish" htmlType="submit" block>
             {texts.setPassword}
-          </Button>
+          </AxisButton>
         </Flex>
       </Form>
       {appInitiated && (
         <form method="post" action={loginAction}>
           <input type="hidden" name="cancel-aia" value="true" />
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button htmlType="submit" name="cancel-aia" value="true" block>
+          <AxisButton role="secondary" htmlType="submit" name="cancel-aia" value="true" block>
             {texts.cancel}
-          </Button>
+          </AxisButton>
         </form>
       )}
     </IdentityFrame>

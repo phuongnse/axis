@@ -48,7 +48,7 @@ test.describe('author runs the test scenarios of the purchase request sample fro
     await expect(page.getByTestId('studio-test-result').filter({ hasText: 'department-budgets/ApproverCreatesBudget' })).toHaveCount(1)
   })
 
-  test('Run runs one broken scenario, and selecting its failure opens the failing step', async ({ page }) => {
+  test('Run runs one broken scenario, and following the scenario link of its failure opens the failing step', async ({ page }) => {
     const scenarioFile = path.join(copy, 'scenarios', 'approval-below-threshold.json')
     const scenario = JSON.parse(await readFile(scenarioFile, 'utf8')) as { steps: { values: Record<string, unknown> }[] }
     // The last step expects the approved status. Rejected breaks that expectation, at step 6.
@@ -66,7 +66,7 @@ test.describe('author runs the test scenarios of the purchase request sample fro
     await expect(failed).toHaveCount(1)
     await expect(failed).toContainText('Step 6')
 
-    await failed.getByRole('button').click()
+    await failed.getByRole('link', { name: 'ApprovalBelowThreshold', exact: true }).click()
     await expect(page).toHaveURL(/path=%2Fsteps%2F5/)
     await expect(page.getByTestId('studio-field-/steps/5')).toBeInViewport()
   })

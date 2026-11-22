@@ -1,5 +1,6 @@
-import { Button, Modal } from 'antd'
+import { Modal } from 'antd'
 import { startSignIn } from './api'
+import { AxisButton } from './AxisButton'
 import { useSignInNeeded } from './signInNeeded'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -22,10 +23,9 @@ export function SignInPromptDialog({ open }: { open: boolean }) {
       keyboard={false}
       mask={{ closable: false }}
       footer={
-        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-        <Button type="primary" onClick={() => startSignIn()}>
+        <AxisButton role="finish" onClick={() => startSignIn()}>
           {t('shell.account.signIn')}
-        </Button>
+        </AxisButton>
       }
     >
       {t('shell.signInPrompt.message')}

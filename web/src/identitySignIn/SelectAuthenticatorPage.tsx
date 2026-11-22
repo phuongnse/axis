@@ -1,5 +1,6 @@
-import { Button, Flex, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { IdentityFrame } from './IdentityFrame'
 import type { SelectAuthenticatorContext } from './signInContext'
 
@@ -17,9 +18,9 @@ export function SelectAuthenticatorPage({ context }: { context: SelectAuthentica
       <form method="post" action={loginAction}>
         <Flex vertical gap="small">
           {methods.map((method) => (
-            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-            <Button
+            <AxisButton
               key={method.id}
+              role="secondary"
               block
               htmlType="submit"
               name="authenticationExecution"
@@ -36,7 +37,7 @@ export function SelectAuthenticatorPage({ context }: { context: SelectAuthentica
                 <Typography.Text strong>{method.label}</Typography.Text>
                 {method.help && <Typography.Text type="secondary">{method.help}</Typography.Text>}
               </Flex>
-            </Button>
+            </AxisButton>
           ))}
         </Flex>
       </form>
