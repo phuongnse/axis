@@ -1,4 +1,4 @@
-import { Avatar, Button, Dropdown, type MenuProps } from 'antd'
+import { Avatar, Dropdown, type MenuProps } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { AxisButton } from './AxisButton'
@@ -50,10 +50,9 @@ export function UserMenu() {
       return null
     }
     return (
-      // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-      <Button type="text" onClick={() => startSignIn()}>
+      <AxisButton role="subtle" onClick={() => startSignIn()}>
         {t('shell.account.signIn')}
-      </Button>
+      </AxisButton>
     )
   }
 

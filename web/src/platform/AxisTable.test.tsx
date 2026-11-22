@@ -62,6 +62,7 @@ const texts = {
   'row.delete': 'Delete',
   'row.open': 'Open',
   'row.close': 'Close',
+  'row.revoke': 'Revoke',
   'shell.empty.noData': 'No data yet.',
   ...filterTexts,
 }
@@ -451,6 +452,20 @@ describe('AxisTable', () => {
       expect(within(row).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
       expect(within(row).getByRole('button', { name: 'Open' })).toHaveTextContent('Open')
       expect(within(row).queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+    })
+
+    it('draws a text action as a subtle button, and a destructive one in dangerText with no border', () => {
+      const revokeAction: AxisRowAction = { key: 'revoke', labelKey: 'row.revoke', destructive: true, onClick: vi.fn() }
+      renderTable({ rowActions: actionsFor(openAction, revokeAction) })
+
+      const row = screen.getByRole('row', { name: /Buy paper/ })
+      const open = within(row).getByRole('button', { name: 'Open' })
+      expect(open).toHaveClass('ant-btn-variant-text')
+      expect(open.style.color).toBe('')
+      const revoke = within(row).getByRole('button', { name: 'Revoke' })
+      expect(revoke).toHaveClass('ant-btn-variant-text')
+      expect(revoke).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
+      expect(revoke.style.borderColor).toBe('')
     })
 
     it('appends the name suffix of an icon action to its accessible name only', async () => {

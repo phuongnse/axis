@@ -1,5 +1,7 @@
-import { Button, Flex, Form, Input, Select, Space } from 'antd'
+import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
+import { Flex, Form, Input, Select, Space } from 'antd'
 import { useEffect, useState } from 'react'
+import { AxisButton } from './AxisButton'
 import { FieldInput } from './FieldInput'
 import { fetchRecord, type RecordItem, type RecordValue } from './records'
 import { requiredMark } from './requiredMark'
@@ -214,10 +216,22 @@ function ReferenceFilter({ parameter, id, value, onChange }: FilterInputProps) {
     <>
       <Space.Compact style={{ width: inputWidth + 150 }}>
         <Input id={id} readOnly value={label} />
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button onClick={() => setOpen(true)}>{t('shell.form.choose')}</Button>
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        {value !== null && <Button onClick={() => onChange(null)}>{t('shell.form.clear')}</Button>}
+        <AxisButton
+          role="subtle"
+          joined
+          nameKey="shell.form.choose"
+          icon={<SearchOutlined />}
+          onClick={() => setOpen(true)}
+        />
+        {value !== null && (
+          <AxisButton
+            role="subtle"
+            joined
+            nameKey="shell.form.clear"
+            icon={<CloseOutlined />}
+            onClick={() => onChange(null)}
+          />
+        )}
       </Space.Compact>
       <ReferenceLookup
         field={asField(parameter)}

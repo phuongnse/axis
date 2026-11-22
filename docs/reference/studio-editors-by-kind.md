@@ -217,7 +217,7 @@ panel, its undo and its drag and drop.
   marked by `aria-current`, outlined in the primary colour and scrolled into view. Adding a navigate, `startProcess` or `delete` action
   in the panel selects the new action, and removing an action selects its widget. The button runs
   nothing: it does not navigate, start a process, open a delete confirmation or call `/api/apps/`.
-- **Actions that fold.** A KPI's navigate action is a link-style button on the label line, and the
+- **Actions that fold.** A KPI's navigate action is a subtle button on the label line, and the
   tile is not a link. A table's first `navigate` row action draws as the link of its identifying
   column, which selects the action as a button does. At narrow width a table's row actions fold into a
   menu, and three or more other row actions fold into the "…" menu at any width, see

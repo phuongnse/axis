@@ -1,4 +1,4 @@
-import { Button, Flex, Form, Modal, Typography, Upload, type UploadFile } from 'antd'
+import { Flex, Form, Modal, Typography, Upload, type UploadFile } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import type { UploadChangeParam } from 'antd/es/upload'
 import { useEffect, useRef, useState } from 'react'
@@ -255,8 +255,9 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
               }}
               onRemove={reset}
             >
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button ref={chooseRef}>{t('shell.table.importChoose')}</Button>
+              <AxisButton role="secondary" ref={chooseRef}>
+                {t('shell.table.importChoose')}
+              </AxisButton>
             </Upload>
           </AxisField>
         </Form>

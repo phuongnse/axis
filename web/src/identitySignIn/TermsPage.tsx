@@ -1,5 +1,6 @@
-import { Button, Flex, Form } from 'antd'
+import { Flex, Form } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { useId, useRef } from 'react'
 import { AcceptTermsField } from '../platform/AcceptTermsField'
 import { useDesignTokens } from '../platform/themeMode'
@@ -43,18 +44,16 @@ export function TermsPage({ context }: { context: TermsContext }) {
             requiredMessage={texts.required}
           />
           <input ref={submitRef} type="hidden" name="accept" value="true" />
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button type="primary" htmlType="submit" block>
+          <AxisButton role="finish" htmlType="submit" block>
             {texts.continue}
-          </Button>
+          </AxisButton>
         </Flex>
       </Form>
       <form method="post" action={loginAction}>
         <input type="hidden" name="cancel" value="true" />
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button htmlType="submit" block>
+        <AxisButton role="secondary" htmlType="submit" block>
           {texts.decline}
-        </Button>
+        </AxisButton>
       </form>
     </IdentityFrame>
   )

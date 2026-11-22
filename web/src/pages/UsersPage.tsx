@@ -1,5 +1,6 @@
-import { Button, Flex, Modal, Result, Tabs, Typography } from 'antd'
+import { Flex, Modal, Result, Tabs, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn, type AxisRowAction } from '../platform/AxisTable'
 import { PageLayout } from '../platform/PageLayout'
@@ -270,9 +271,8 @@ export function UsersPage() {
                     }}
                     toolbar={{
                       main: (
-                        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                        <Button
-                          type="primary"
+                        <AxisButton
+                          role="main"
                           onClick={() => {
                             setDone(undefined)
                             setProblem(undefined)
@@ -280,7 +280,7 @@ export function UsersPage() {
                           }}
                         >
                           {t('shell.users.invite')}
-                        </Button>
+                        </AxisButton>
                       ),
                     }}
                     below={

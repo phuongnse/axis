@@ -22,7 +22,7 @@ one.
   form's layout.
 - **Ant Design through its documented API** _(planned for M35)_. Axis uses Ant Design only through its
   documented props, tokens and class names, so an upgrade of Ant Design does not break a screen.
-- **Every button is an `AxisButton`** _(planned)_. `AxisButton.tsx` is the one file that draws Ant Design's `Button`,
+- **Every button is an `AxisButton`**. `AxisButton.tsx` is the one file that draws Ant Design's `Button`,
   so `axis/no-antd-button` holds with no disable comment.
 
 ## Which widget

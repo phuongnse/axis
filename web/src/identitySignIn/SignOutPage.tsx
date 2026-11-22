@@ -1,4 +1,5 @@
-import { Button, Typography } from 'antd'
+import { Typography } from 'antd'
+import { AxisButton } from '../platform/AxisButton'
 import { IdentityFrame } from './IdentityFrame'
 import type { SignOutContext } from './signInContext'
 
@@ -15,10 +16,9 @@ export function SignOutPage({ context }: { context: SignOutContext }) {
       <form method="post" action={action}>
         <input type="hidden" name="session_code" value={sessionCode} />
         <input type="hidden" name="confirmLogout" value="on" />
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" htmlType="submit" block>
+        <AxisButton role="finish" htmlType="submit" block>
           {texts.signOut}
-        </Button>
+        </AxisButton>
       </form>
       {backUrl && <Typography.Link href={backUrl}>{texts.backToApplication}</Typography.Link>}
     </IdentityFrame>

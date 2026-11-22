@@ -1,6 +1,7 @@
-import { Button, Flex, Tabs } from 'antd'
+import { Flex, Tabs } from 'antd'
 import dayjs from 'dayjs'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { useCallback, useEffect, useState } from 'react'
 import { accountActionUrl, reauthenticateUrl } from '../platform/api'
 import { AxisTable } from '../platform/AxisTable'
@@ -136,20 +137,24 @@ export function AccountPage() {
                   {authenticators?.account && (
                     <SectionPart testName="password" heading={{ title: t('shell.account.password.title') }}>
                       <Flex vertical gap="small" align="flex-start">
-                        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                        <Button onClick={() => assignLocation(accountActionUrl('/account', 'UPDATE_PASSWORD'))}>
+                        <AxisButton
+                          role="secondary"
+                          onClick={() => assignLocation(accountActionUrl('/account', 'UPDATE_PASSWORD'))}
+                        >
                           {t('shell.account.password.change')}
-                        </Button>
+                        </AxisButton>
                       </Flex>
                     </SectionPart>
                   )}
                   {authenticators?.account && (
                     <SectionPart testName="authenticators" heading={{ title: t('shell.account.authenticators.title') }}>
                       <Flex vertical gap="small" align="flex-start">
-                        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                        <Button onClick={() => assignLocation(accountActionUrl('/account', 'CONFIGURE_TOTP'))}>
+                        <AxisButton
+                          role="secondary"
+                          onClick={() => assignLocation(accountActionUrl('/account', 'CONFIGURE_TOTP'))}
+                        >
                           {t('shell.account.authenticators.add')}
-                        </Button>
+                        </AxisButton>
                         <AxisTable<OwnAuthenticator>
                           rowKey={(authenticator) => authenticator.id}
                           view={{ query: authenticatorsView.view, onChange: authenticatorsView.setView, paging: false }}
@@ -181,8 +186,9 @@ export function AccountPage() {
                               kind: 'fixed',
                               title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
                               render: (_value, authenticator) => (
-                                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                                <Button
+                                <AxisButton
+                                  role="secondary"
+                                  destructive
                                   size="small"
                                   disabled={authenticators.authenticators.length <= 1}
                                   onClick={() =>
@@ -192,7 +198,7 @@ export function AccountPage() {
                                   }
                                 >
                                   {t('shell.account.authenticators.remove')}
-                                </Button>
+                                </AxisButton>
                               ),
                             },
                           ]}
@@ -222,22 +228,26 @@ export function AccountPage() {
                           kind="info"
                           message={t('shell.account.sessions.reauthenticate')}
                           action={
-                            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                            <Button size="small" onClick={() => assignLocation(reauthenticateUrl('/account'))}>
+                            <AxisButton
+                              role="secondary"
+                              size="small"
+                              onClick={() => assignLocation(reauthenticateUrl('/account'))}
+                            >
                               {t('shell.account.sessions.signInAgain')}
-                            </Button>
+                            </AxisButton>
                           }
                         />
                       )}
                       {sessions && (
                         <Flex vertical gap="small" align="flex-start">
-                          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                          <Button
+                          <AxisButton
+                            role="secondary"
+                            destructive
                             disabled={!endAllowed || sessions.sessions.every((session) => session.current)}
                             onClick={() => end(endOtherSessions)}
                           >
                             {t('shell.account.sessions.endOthers')}
-                          </Button>
+                          </AxisButton>
                           <AxisTable<OwnSession>
                             rowKey={(session) => session.id}
                             view={{ query: sessionsView.view, onChange: sessionsView.setView, paging: false }}
@@ -272,14 +282,15 @@ export function AccountPage() {
                                   session.current ? (
                                     <StatusTag tone="neutral">{t('shell.account.sessions.current')}</StatusTag>
                                   ) : (
-                                    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                                    <Button
+                                    <AxisButton
+                                      role="secondary"
+                                      destructive
                                       size="small"
                                       disabled={!endAllowed}
                                       onClick={() => end(() => endSession(session.id))}
                                     >
                                       {t('shell.account.sessions.end')}
-                                    </Button>
+                                    </AxisButton>
                                   ),
                               },
                             ]}

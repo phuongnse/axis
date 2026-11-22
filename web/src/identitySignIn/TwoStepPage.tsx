@@ -1,5 +1,6 @@
-import { Button, Flex, Form, Typography } from 'antd'
+import { Flex, Form, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { useId, useRef } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
 import { CodeField } from './CodeField'
@@ -41,20 +42,18 @@ export function TwoStepPage({ context }: { context: TwoStepContext }) {
             invalid={Boolean(error)}
           />
           <input ref={submitRef} type="hidden" name="login" value="Sign In" />
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button type="primary" htmlType="submit" block>
+          <AxisButton role="finish" htmlType="submit" block>
             {texts.verify}
-          </Button>
+          </AxisButton>
         </Flex>
       </Form>
       <Flex justify={tryAnotherWay ? 'space-between' : 'flex-start'}>
         {tryAnotherWay && (
           <form method="post" action={loginAction}>
             <input type="hidden" name="tryAnotherWay" value="on" />
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button type="link" htmlType="submit">
+            <AxisButton role="subtle" htmlType="submit">
               {texts.tryAnotherWay}
-            </Button>
+            </AxisButton>
           </form>
         )}
         <Typography.Link href={restartUrl}>{texts.backToSignIn}</Typography.Link>

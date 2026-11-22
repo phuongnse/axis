@@ -1,4 +1,5 @@
-import { Button, Flex } from 'antd'
+import { Flex } from 'antd'
+import { AxisButton } from './AxisButton'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useState, type ReactNode } from 'react'
 import { boundParameterQuery } from './boundParameters'
@@ -41,7 +42,7 @@ interface LoadState {
  * widget leaves unbound optional. With a navigate action the whole tile is a link to the
  * target page, ending in the action's label, and the action reads only the page's parameter values.
  * Without one, or when the SPA cannot build the address, the tile is plain. On the page designer's canvas the tile is
- * never a link: the navigate action is a link-style button on the label line, also when the SPA cannot build the address.
+ * never a link: the navigate action is a subtle button on the label line, also when the SPA cannot build the address.
  */
 export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetProps) {
   const t = useText()
@@ -126,10 +127,9 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
         )}
         {navigate && canvas.active && (
           <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button type="link" size="small" {...canvas.props('navigate')}>
+            <AxisButton role="subtle" size="small" {...canvas.props('navigate')}>
               {t(navigate.labelKey)}
-            </Button>
+            </AxisButton>
           </div>
         )}
         {navigate && !canvas.active && path && <div style={{ color: colour.primaryText }}>{t(navigate.labelKey)}</div>}

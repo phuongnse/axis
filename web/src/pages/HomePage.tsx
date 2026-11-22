@@ -1,5 +1,6 @@
-import { Button, Flex, Spin, Typography } from 'antd'
+import { Flex, Spin, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { CardPage } from '../platform/CardPage'
 import { createElement, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router'
@@ -59,10 +60,9 @@ export function SignInCard({ state, onSignIn = startSignIn }: { state: SignInCar
           {t('shell.home.signedOut.message')}
         </Typography.Paragraph>
       )}
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button type="primary" block onClick={() => onSignIn()}>
+      <AxisButton role="finish" block onClick={() => onSignIn()}>
         {t(refused ? 'shell.account.signIn' : 'shell.home.signedOut.signIn')}
-      </Button>
+      </AxisButton>
     </CardPage>
   )
 }
