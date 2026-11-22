@@ -519,7 +519,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
 
     const add = field('/steps/1/deadline').getByRole('button', { name: 'Add deadline' })
-    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add).toHaveClass('ant-btn-variant-outlined')
     expect(add.closest('legend')).not.toBeNull()
     await userEvent.click(add)
     expect(stepOf(latest, 1).deadline).toEqual({ after: '', next: '' })
@@ -528,7 +528,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(stepOf(latest, 1).deadline).toEqual({ after: 'P5D', next: 'submit' })
 
     const remove = field('/steps/1/deadline').getByRole('button', { name: 'Remove deadline' })
-    expect(remove).toHaveClass('ant-btn-variant-text')
+    expect(remove).toHaveClass('ant-btn-variant-outlined')
     expect(remove.closest('legend')).not.toBeNull()
     await userEvent.click(remove)
     expect(stepOf(latest, 1)).not.toHaveProperty('deadline')
@@ -743,14 +743,14 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(within(card).getByRole('textbox', { name: label('steps.timeout.after') })).toHaveValue('P2D')
 
     const remove = within(card).getByRole('button', { name: 'Remove timeout' })
-    expect(remove).toHaveClass('ant-btn-variant-text')
+    expect(remove).toHaveClass('ant-btn-variant-outlined')
     expect(remove.closest('legend')).not.toBeNull()
     await userEvent.click(remove)
 
     expect(stepOf(latest, 0)).not.toHaveProperty('timeout')
     expect(within(card).queryByRole('textbox', { name: label('steps.timeout.after') })).toBeNull()
     const add = within(card).getByRole('button', { name: 'Add timeout' })
-    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add).toHaveClass('ant-btn-variant-outlined')
     expect(add.closest('legend')).not.toBeNull()
     await userEvent.click(add)
     expect(stepOf(latest, 0).timeout).toEqual({ after: '', next: '' })
@@ -1295,12 +1295,12 @@ describe('ProcessEditor step actions', () => {
 })
 
 describe('ProcessEditor lists', () => {
-  it('puts Add outcome on the outcomes title row as a text button, and removes an outcome from its menu', async () => {
+  it('puts Add outcome on the outcomes title row as a secondary button, and removes an outcome from its menu', async () => {
     const latest = renderEditor()
     const outcomes = screen.getByTestId('studio-field-/steps/1/outcomes')
     const add = within(outcomes).getByRole('button', { name: 'Add outcome' })
 
-    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add).toHaveClass('ant-btn-variant-outlined')
     expect(add.closest('legend')).not.toBeNull()
 
     await chooseRowAction(screen.getByTestId('studio-field-/steps/1/outcomes/1'), 'Remove outcome')

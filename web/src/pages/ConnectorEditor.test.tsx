@@ -271,7 +271,7 @@ describe('ConnectorEditor', () => {
     const add = input.getByRole('button', { name: 'Add input' })
 
     expect(add.closest('legend')).not.toBeNull()
-    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add).toHaveClass('ant-btn-variant-outlined')
     const row = within(screen.getByTestId('studio-field-/operations/0/input/0'))
     expect(row.getByRole('button', { name: 'Actions' })).toBeVisible()
     expect(row.queryByRole('button', { name: 'Delete' })).toBeNull()

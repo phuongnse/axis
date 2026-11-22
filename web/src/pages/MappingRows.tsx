@@ -22,7 +22,7 @@ export type MappingTarget = { kind: 'expression' } | { kind: 'field'; label: str
  * A map of the draft as rows of a key and its target, at `pointer`. A row's key is picked from `keyOptions`, or typed
  * while they are unknown. The rows edit the draft through `onChange`: a rename keeps the row's place in the file, and
  * a value that is not an object is left to the JSON view, and so is a row whose entry is an object. Add sits on the
- * title row as a light text button, or as the add choice of the unmapped keys, and each row's Remove is in its "…" menu.
+ * title row as a secondary button, or as the add choice of the unmapped keys, and each row's Remove is in its "…" menu.
  * A read-only editor, Ant Design's `componentDisabled`, shows neither, see
  * docs/reference/studio-editors-by-kind.md#process-editor.
  */

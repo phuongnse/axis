@@ -73,7 +73,7 @@ export function NotifyFields({
 /**
  * The recipients as rows. A row is a choice of its recipient type, User, Role or Email, then the field of that type: a
  * user expression, a role picker or an email expression. A switch keeps one key, and each field sits on its own line.
- * Add recipient sits on the title row as a light text button and each row's Remove recipient is in its "…" menu. A
+ * Add recipient sits on the title row as a secondary button and each row's Remove recipient is in its "…" menu. A
  * read-only editor, Ant Design's `componentDisabled`, shows neither, see docs/reference/process-designer.md#notify.
  */
 function Recipients({

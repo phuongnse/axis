@@ -207,11 +207,12 @@ function safeJustify(justify: FlexProps['justify']): CSSProperties['justifyConte
 
 /**
  * A row of actions that has a solid `finish` button, see docs/reference/actions-and-controls.md#buttons. Beside it,
- * `main` and `secondary` buttons, in the `destructive` tone or not, are text buttons in their own colour, so the finish
- * button is the only filled shape. The row wraps. A row with `fold` keeps one line instead: it draws `children`, then the `fold` actions
- * as secondary buttons, then `end`. When its content is wider than the row, the `fold` actions become the entries of
- * one "…" icon menu named More actions, in their order. They are buttons again when the row is as wide as the content
- * was before it folded. With `outlined`, the row keeps those buttons outlined, as a bar at the foot of one pane does,
+ * every other action is a subtle button, so the finish button is the only filled shape, except a `main` action, which
+ * keeps its border in `primaryText`. The row wraps. A row with `fold` of two or more actions keeps one line instead: it
+ * draws `children`, then the `fold` actions as secondary buttons, then `end`. When its content is wider than the row,
+ * the `fold` actions become the entries of one "…" icon menu named More actions, in their order. They are buttons again
+ * when the row is as wide as the content was before it folded. A row with one `fold` action wraps instead, as a menu of
+ * one entry is never drawn. With `outlined`, the row keeps those buttons outlined, as a bar at the foot of one pane does,
  * because it has no `finish` button beside them.
  */
 export function AxisActionRow({
@@ -236,12 +237,14 @@ export function AxisActionRow({
   const foldedKeys = useRef('')
   const [folded, setFolded] = useState(false)
   const keys = fold?.map((action) => action.key).join('\n') ?? ''
+  // A menu of one entry is never drawn, so fewer than two fold actions wrap.
+  const folding = (fold?.length ?? 0) > 1
 
   // The row measures itself after every draw and when it resizes, the way a table measures its width.
   useLayoutEffect(() => {
     measureRef.current = () => {
       const row = rowRef.current
-      if (!row || !fold) {
+      if (!row || !folding) {
         return
       }
       if (foldedKeys.current !== keys) {
@@ -261,31 +264,28 @@ export function AxisActionRow({
     }
     measureRef.current()
   })
-  const folds = fold !== undefined
   useEffect(() => {
     const row = rowRef.current
-    if (!folds || !row || typeof ResizeObserver === 'undefined') {
+    if (!folding || !row || typeof ResizeObserver === 'undefined') {
       return
     }
     const observer = new ResizeObserver(() => measureRef.current())
     observer.observe(row)
     return () => observer.disconnect()
-  }, [folds])
+  }, [folding])
 
-  const rowProps = fold
-    ? {
-        ref: rowRef,
-        'data-fold-row': true,
-        wrap: false,
-        style: { flex: '1 1 auto', minWidth: 0, justifyContent: safeJustify(justify) },
-      }
-    : { wrap: true }
+  const rowProps = {
+    ref: fold ? rowRef : undefined,
+    'data-fold-row': folding || undefined,
+    wrap: !folding,
+    style: fold ? { flex: '1 1 auto', minWidth: 0, justifyContent: safeJustify(justify) } : undefined,
+  }
   return (
     <ActionRowContext.Provider value={!outlined}>
       <Flex gap="small" justify={justify} align={align} {...rowProps}>
         {children}
         {fold &&
-          (folded ? (
+          (folding && folded ? (
             <Dropdown
               trigger={['click']}
               autoFocus
@@ -316,18 +316,33 @@ export function AxisActionRow({
 }
 
 /**
+ * The actions of a title row, such as a section's or a field group's, each drawn in its own role, see
+ * docs/reference/shell.md#layout. Unlike an `AxisActionRow`, it draws no action as a text button, so a section's Add
+ * keeps its border and a tool stays subtle.
+ */
+export function TitleRowActions({ children }: { children: ReactNode }) {
+  return (
+    <ActionRowContext.Provider value={false}>
+      <Flex gap="small" align="center" wrap>
+        {children}
+      </Flex>
+    </ActionRowContext.Provider>
+  )
+}
+
+/**
  * The one button of Axis, see docs/reference/actions-and-controls.md#buttons. The role is the weight. `finish` completes
- * a form or a dialog and is solid primary. `main` is the main action of a region and is an outline in `primaryText`.
- * `secondary` is every other action and is the grey outline. `subtle` is a borderless text button in the text colour,
- * for tools and header controls. With an `icon` and a `nameKey` it is an icon-only button, which has no text, so it
- * shows the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless `joined` draws it as a
- * bordered default button for a control joined to an input. The `destructive` tone, which any role but `link` takes,
- * says the action removes something: `main`, `secondary` and `subtle` draw in `dangerText`, and `finish` is a solid
- * `danger` fill with white text. `selected` draws a subtle button on the selected tint in `primaryText`, and sets the
- * one `aria-pressed`, or `aria-current` for `"page"` and `"step"`, in place of any the caller passes. Inside an
- * `AxisActionRow`, `main` and `secondary` are text buttons, `main` in `primaryText`. `caret` adds a down caret after
- * the text of any text role. `link` is a button drawn as a link, in `primaryText`, for an action that goes to no
- * address. The role is not passed on to the DOM.
+ * a form or a dialog and is solid primary. `main` is the main action of a region and is an outline in `primaryText`,
+ * even beside a finish button. `secondary` is every other action and is the grey outline. `subtle` is a borderless text
+ * button in the text colour, for tools and header controls. With an `icon` and a `nameKey` it is an icon-only button,
+ * which has no text, so it shows the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless
+ * `joined` draws it as a bordered default button for a control joined to an input. The `destructive` tone, which any role
+ * but `link` takes, says the action removes something: `main`, `secondary` and `subtle` draw in `dangerText`, and
+ * `finish` is a solid `danger` fill with white text. `selected` draws a subtle button on the selected tint in
+ * `primaryText`, and sets the one `aria-pressed`, or `aria-current` for `"page"` and `"step"`, in place of any the caller
+ * passes. Inside an `AxisActionRow`, `secondary` and `subtle` are text buttons, and a destructive `secondary` is in
+ * `dangerText`. `caret` adds a down caret after the text of any text role. `link` is a button drawn
+ * as a link, in `primaryText`, for an action that goes to no address. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
@@ -344,7 +359,6 @@ export function AxisButton(props: AxisButtonProps) {
   }
   const outline = (text: string): CSSProperties => (disabled ? {} : { color: text, borderColor: text })
   const tinted = (text: string): CSSProperties => (disabled ? {} : { color: text })
-  const variant = inRow ? 'text' : 'outlined'
   switch (role) {
     case 'finish':
       return destructive ? (
@@ -363,22 +377,27 @@ export function AxisButton(props: AxisButtonProps) {
         <Button {...body} type="primary" disabled={disabled} style={style} />
       )
     case 'main':
+      // A region's main action keeps its border wherever it sits, even beside a finish button.
+      return (
+        <Button
+          {...body}
+          color={destructive ? 'danger' : 'primary'}
+          variant="outlined"
+          disabled={disabled}
+          style={{ ...outline(destructive ? colour.dangerText : colour.primaryText), ...style }}
+        />
+      )
     case 'secondary':
-      if (role === 'secondary' && !destructive) {
+      if (!destructive) {
         return <Button {...body} type={inRow ? 'text' : 'default'} disabled={disabled} style={style} />
       }
       return (
         <Button
           {...body}
-          color={destructive ? 'danger' : 'primary'}
-          variant={variant}
+          color="danger"
+          variant={inRow ? 'text' : 'outlined'}
           disabled={disabled}
-          style={{
-            ...(inRow
-              ? tinted(destructive ? colour.dangerText : colour.primaryText)
-              : outline(destructive ? colour.dangerText : colour.primaryText)),
-            ...style,
-          }}
+          style={{ ...(inRow ? tinted(colour.dangerText) : outline(colour.dangerText)), ...style }}
         />
       )
     case 'subtle':
