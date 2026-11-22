@@ -43,14 +43,6 @@ export function SidePanel({
   const { colour, spacing } = useDesignTokens()
   const { width, min, max, set } = useSidePanelWidth()
   const panel = useRef<HTMLElement>(null)
-  // The width the body keeps for its scrollbar, none where scrollbars overlay the content. The action bar keeps it too,
-  // so its actions end where the body's inputs end.
-  const [gutter, setGutter] = useState(0)
-  const measureGutter = useCallback((element: HTMLDivElement | null) => {
-    if (element !== null) {
-      setGutter(element.offsetWidth - element.clientWidth)
-    }
-  }, [])
 
   const onKeyDown = (event: KeyboardEvent) => {
     // The handle is on the panel's start edge, so the arrow that moves the edge away from the page widens it.
