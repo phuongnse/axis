@@ -5,24 +5,25 @@ import { StatusTag } from '../platform/StatusTag'
 import { severityText, severityTone, type StudioDiagnostic, type StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { problemsPanelId } from './StudioBand'
+import type { FileAddressOf, ResourceAddressOf } from '../platform/studioAddress'
 import { FileAtLine } from './FileAtLine'
 import { ResourceReference } from './ResourceReference'
 
 /**
  * The Problems panel of the open application, drawn in `SidePanel`: a column on the right, under the header, that
  * is not modal. It lists every error, then every warning, each with its code, message and resource. A problem's resource
- * is a link when it names one, and `onSelect` opens that resource at the problem's path while the panel stays open.
+ * is a link when it names one, to the address `addressOf` gives for that resource at the problem's path.
  * `onClose` runs from the close button. With no problem, it says so.
  */
 export function StudioProblems({
   diagnostics,
   resources,
-  onSelect,
+  addressOf,
   onClose,
 }: {
   diagnostics: StudioDiagnostic[]
   resources?: readonly StudioResourceItem[]
-  onSelect: (resourceId: string, path: string) => void
+  addressOf: ResourceAddressOf
   onClose: () => void
 }) {
   const t = useText()
@@ -39,7 +40,7 @@ export function StudioProblems({
       {diagnostics.length === 0 ? (
         <EmptyState text={t('shell.studio.problems.none')} />
       ) : (
-        <StudioProblemList diagnostics={diagnostics} resources={resources} onSelect={onSelect} />
+        <StudioProblemList diagnostics={diagnostics} resources={resources} addressOf={addressOf} />
       )}
     </SidePanel>
   )
@@ -47,21 +48,21 @@ export function StudioProblems({
 
 /**
  * The problems of a draft or a check, errors first, then warnings, each with its severity, code, message and resource. A
- * problem's resource is a link when `onSelect` is given, see {@link ResourceReference}, and `onSelect` opens that resource
- * at the problem's path. Without `onSelect`, the resource is plain text. A problem that names no resource shows its file,
- * as a link when `onOpenFile` is given, see {@link FileAtLine}, and `onOpenFile` opens that file at the problem's line.
+ * problem's resource is a link when `addressOf` is given, see {@link ResourceReference}, to the address of that resource
+ * at the problem's path. Without it, the resource is plain text. A problem that names no resource shows its file, as a
+ * link when `fileAddressOf` is given, see {@link FileAtLine}, to the address of that file at the problem's line.
  * The list has no margin of its own, see docs/reference/shared-widgets.md#which-widget.
  */
 export function StudioProblemList({
   diagnostics,
   resources,
-  onSelect,
-  onOpenFile,
+  addressOf,
+  fileAddressOf,
 }: {
   diagnostics: StudioDiagnostic[]
   resources?: readonly StudioResourceItem[]
-  onSelect?: (resourceId: string, path: string) => void
-  onOpenFile?: (file: string, line?: number) => void
+  addressOf?: ResourceAddressOf
+  fileAddressOf?: FileAddressOf
 }) {
   const ordered = [
     ...diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
@@ -71,7 +72,12 @@ export function StudioProblemList({
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {ordered.map((diagnostic, index) => (
         <li key={index}>
-          <DiagnosticRow diagnostic={diagnostic} resources={resources} onSelect={onSelect} onOpenFile={onOpenFile} />
+          <DiagnosticRow
+            diagnostic={diagnostic}
+            resources={resources}
+            addressOf={addressOf}
+            fileAddressOf={fileAddressOf}
+          />
         </li>
       ))}
     </ul>
@@ -82,13 +88,13 @@ export function StudioProblemList({
 function DiagnosticRow({
   diagnostic,
   resources,
-  onSelect,
-  onOpenFile,
+  addressOf,
+  fileAddressOf,
 }: {
   diagnostic: StudioDiagnostic
   resources?: readonly StudioResourceItem[]
-  onSelect?: (resourceId: string, path: string) => void
-  onOpenFile?: (file: string, line?: number) => void
+  addressOf?: ResourceAddressOf
+  fileAddressOf?: FileAddressOf
 }) {
   const t = useText()
   const resourceId = diagnostic.resourceId
@@ -100,17 +106,17 @@ function DiagnosticRow({
           <StatusTag tone={severityTone(diagnostic.severity)}>{severityText(t, diagnostic.severity)}</StatusTag>{' '}
           <strong>{diagnostic.code}</strong> {diagnostic.message}
         </span>
-        {resource === undefined && onOpenFile ? (
+        {resource === undefined && fileAddressOf ? (
           <FileAtLine
             file={diagnostic.file}
             line={diagnostic.line}
-            onOpen={() => onOpenFile(diagnostic.file, diagnostic.line)}
+            href={fileAddressOf(diagnostic.file, diagnostic.line)}
           />
         ) : (
           <ResourceReference
             resource={resource}
             file={diagnostic.file}
-            onOpen={resourceId !== null && onSelect ? () => onSelect(resourceId, diagnostic.path) : undefined}
+            href={resourceId !== null && addressOf ? addressOf(resourceId, diagnostic.path) : undefined}
           />
         )}
       </Flex>

@@ -30,3 +30,23 @@ export function studioApplicationAddress(application: string): string {
 export function studioReleaseAddress(application: string, number: number): string {
   return `/studio?${new URLSearchParams({ app: application, view: 'release', release: String(number) })}`
 }
+
+/**
+ * Proposed, #4902: the address of a package's file at a line, `&view=packages&package=<id>&file=<path>&line=<n>`, where
+ * `file` is the path inside the package. The workspace opens the file and puts the cursor on the line.
+ */
+export function studioPackageFileAddress(application: string, packageId: string, file: string, line?: number): string {
+  return `/studio?${new URLSearchParams({
+    app: application,
+    view: 'packages',
+    package: packageId,
+    file,
+    ...(line === undefined ? {} : { line: String(line) }),
+  })}`
+}
+
+/** Proposed, #4902: gives the address that opens a resource at a path, so a reference to it is a real link. */
+export type ResourceAddressOf = (resourceId: string, path: string | null) => string
+
+/** Proposed, #4902: gives the address that opens a file of the folder at a line, so a file's place is a real link. */
+export type FileAddressOf = (file: string, line?: number) => string

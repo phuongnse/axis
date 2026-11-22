@@ -20,7 +20,8 @@ import { dropOnForm } from './formPaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 import { StudioFormCanvas } from './StudioFormCanvas'
 import type { DesignerLayer } from './LayerMarkViews'
-import { type FormUse, type OpenResource, StudioFormUsedOn } from './StudioFormUsedOn'
+import type { ResourceAddressOf } from '../platform/studioAddress'
+import { type FormUse, StudioFormUsedOn } from './StudioFormUsedOn'
 
 /**
  * The Design tab of a form: the list of its uses (a module form has none), the canvas, and beside the canvas the field palette, the layout
@@ -45,7 +46,7 @@ export default function StudioFormDesign({
   onSelect,
   onChange,
   usedOn,
-  onOpen,
+  addressOf,
   resources,
   layer,
 }: {
@@ -62,7 +63,7 @@ export default function StudioFormDesign({
   onChange: ChangeHandler
   /** The list of uses. A module form has none. */
   usedOn?: FormUse[] | 'failed' | undefined
-  onOpen?: OpenResource
+  addressOf?: ResourceAddressOf
   /** The application's resources, which name the pages and process steps of the list of uses. */
   resources?: readonly StudioResourceItem[]
   /** The application's layer on a module form: its marks go on the outline rows. */
@@ -98,7 +99,7 @@ export default function StudioFormDesign({
     >
       <div data-testid="studio-form-design">
         <Flex vertical gap="middle">
-          {onOpen && <StudioFormUsedOn entries={usedOn} onOpen={onOpen} resources={resources ?? []} />}
+          {addressOf && <StudioFormUsedOn entries={usedOn} addressOf={addressOf} resources={resources ?? []} />}
           <StudioFormCanvas
             application={application}
             module={module}

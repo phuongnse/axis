@@ -179,7 +179,7 @@ export function ObjectListTable({
       if (at > 0) return shownText
       const mark = firstCellMark?.(row.index)
       const link = (
-        <AxisButton role="link" size="small" onClick={() => openEdit(row.index)}>
+        <AxisButton role="subtle" size="small" onClick={() => openEdit(row.index)}>
           {shownText ?? named(t('shell.studio.list.editTitle'))}
         </AxisButton>
       )

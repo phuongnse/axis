@@ -146,7 +146,7 @@ function patches(fetchMock: ReturnType<typeof stubFetch>) {
 }
 
 function renderMatrix(overrides: Partial<StudioPolicyMatrix> = {}) {
-  const onOpenPolicy = vi.fn()
+  const policyAddressOf = vi.fn(() => '/studio')
   const onWritten = vi.fn()
   render(
     <MemoryRouter>
@@ -156,14 +156,14 @@ function renderMatrix(overrides: Partial<StudioPolicyMatrix> = {}) {
             application={application}
             matrix={{ ...matrix, ...overrides }}
             names={names}
-            onOpenPolicy={onOpenPolicy}
+            policyAddressOf={policyAddressOf}
             onWritten={onWritten}
           />
         </TextProvider>
       </ThemeModeProvider>
     </MemoryRouter>,
   )
-  return Object.assign(onOpenPolicy, { onWritten })
+  return Object.assign(policyAddressOf, { onWritten })
 }
 
 afterEach(() => {
@@ -201,7 +201,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
 
   it('marks a shared grant and opens its policy', async () => {
     stubFetch()
-    const onOpenPolicy = renderMatrix()
+    const policyAddressOf = renderMatrix()
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
 
@@ -210,11 +210,11 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(within(grants[0]).getByText('Shared')).toBeInTheDocument()
     expect(within(grants[0]).queryByRole('checkbox')).not.toBeInTheDocument()
     await userEvent.click(within(grants[0]).getByRole('button', { name: 'Open policy' }))
-    expect(onOpenPolicy).toHaveBeenCalledWith(sharedPolicyId)
+    expect(policyAddressOf).toHaveBeenCalledWith(sharedPolicyId)
   })
 
   it('tags a module grant with its module and offers no link to open its policy', async () => {
-    const onOpenPolicy = renderMatrix({
+    const policyAddressOf = renderMatrix({
       roles: [
         {
           ...matrix.roles[1],
@@ -249,7 +249,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(within(grant).getByText('Shared')).toBeInTheDocument()
     expect(within(grant).getByText('approvals')).toBeInTheDocument()
     expect(within(grant).queryByRole('button', { name: 'Open policy' })).not.toBeInTheDocument()
-    expect(onOpenPolicy).not.toHaveBeenCalled()
+    expect(policyAddressOf).not.toHaveBeenCalled()
   })
 
   it('shows the filter and the fields of a grant of a read-only row, and all fields when none are listed', async () => {
@@ -689,7 +689,7 @@ describe('StudioPolicyMatrixTable reasons', () => {
               application={application}
               matrix={{ ...matrix, roles }}
               names={null}
-              onOpenPolicy={vi.fn()}
+              policyAddressOf={vi.fn(() => '/studio')}
               onWritten={vi.fn()}
             />
           </TextProvider>

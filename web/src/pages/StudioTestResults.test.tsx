@@ -11,6 +11,7 @@ import type {
 } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
 import { emptyDescription } from '../test/antd'
+import type { FileAddressOf } from '../platform/studioAddress'
 import { StudioTestResults } from './StudioTestResults'
 
 const approval: StudioScenarioResult = {
@@ -53,13 +54,13 @@ function request(overrides: Partial<StudioRequest>): StudioRequest {
 
 function renderResults(
   value: StudioRequest,
-  onSelect = vi.fn(),
-  extra: { onOpenFile?: (file: string, line?: number) => void; titled?: boolean } = {},
+  onSelect = vi.fn(() => '/studio'),
+  extra: { fileAddressOf?: FileAddressOf; titled?: boolean } = {},
 ) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioTestResults request={value} onSelect={onSelect} {...extra} />
+        <StudioTestResults request={value} addressOf={onSelect} {...extra} />
       </TextProvider>
     </ThemeModeProvider>,
   )
@@ -165,8 +166,12 @@ describe('StudioTestResults of a package test', () => {
     request({ status: 'failed', package: 'tools', packageTests: [passingTest, failingTest], ...overrides })
 
   it('shows a row a test with its result, name, duration and message, and the failed place opens its line', async () => {
-    const onOpenFile = vi.fn()
-    renderResults(packageTest(), vi.fn(), { onOpenFile })
+    const onOpenFile = vi.fn(() => '/studio')
+    renderResults(
+      packageTest(),
+      vi.fn(() => '/studio'),
+      { fileAddressOf: onOpenFile },
+    )
 
     const [passed, failed] = screen.getAllByTestId('studio-test-result')
     expect(passed).toHaveAttribute('data-outcome', 'passed')

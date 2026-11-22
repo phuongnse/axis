@@ -28,7 +28,7 @@ function renderProblems(diagnostics: StudioDiagnostic[]) {
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <ShellAsideContext.Provider value={{ target: aside, claim: () => () => {} }}>
-          <StudioProblems diagnostics={diagnostics} onSelect={vi.fn()} onClose={vi.fn()} />
+          <StudioProblems diagnostics={diagnostics} addressOf={vi.fn()} onClose={vi.fn()} />
         </ShellAsideContext.Provider>
       </TextProvider>
     </ThemeModeProvider>,
@@ -113,7 +113,7 @@ describe('StudioProblemList', () => {
     render(
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioProblemList diagnostics={[resourceError]} resources={resources} onSelect={onSelect} />
+          <StudioProblemList diagnostics={[resourceError]} resources={resources} addressOf={onSelect} />
         </TextProvider>
       </ThemeModeProvider>,
     )
@@ -126,7 +126,7 @@ describe('StudioProblemList', () => {
     render(
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioProblemList diagnostics={[error]} resources={resources} onSelect={vi.fn()} />
+          <StudioProblemList diagnostics={[error]} resources={resources} addressOf={vi.fn()} />
         </TextProvider>
       </ThemeModeProvider>,
     )
@@ -145,7 +145,7 @@ describe('StudioProblemList', () => {
           <StudioProblemList
             diagnostics={[{ ...error, file: 'packages/tools/lib/x.py', line: 3 }, error]}
             resources={resources}
-            onOpenFile={onOpenFile}
+            fileAddressOf={onOpenFile}
           />
         </TextProvider>
       </ThemeModeProvider>,

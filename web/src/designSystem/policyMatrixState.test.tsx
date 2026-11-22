@@ -15,7 +15,7 @@ const matrix = state!.fixtures![`/api/studio/apps/${application}/policy-matrix`]
 
 describe('the design-system Policy matrix state', () => {
   it('shows the Requester grant from RequesterPolicy as shared, with its Open policy link', async () => {
-    const onOpenPolicy = vi.fn()
+    const policyAddressOf = vi.fn(() => '/studio')
     render(
       <MemoryRouter>
         <ThemeModeProvider>
@@ -24,7 +24,7 @@ describe('the design-system Policy matrix state', () => {
               application={application}
               matrix={matrix}
               names={null}
-              onOpenPolicy={onOpenPolicy}
+              policyAddressOf={policyAddressOf}
               onWritten={vi.fn()}
             />
           </TextProvider>
@@ -43,6 +43,6 @@ describe('the design-system Policy matrix state', () => {
     const requester = matrix.roles.find((role) => role.name === 'Requester')!
     const [grant] = requester.cells.find((cell) => cell.target === 'Request')!.grants
     await userEvent.click(within(grants[0]).getByRole('button', { name: 'Open policy' }))
-    expect(onOpenPolicy).toHaveBeenCalledWith(grant.policyId)
+    expect(policyAddressOf).toHaveBeenCalledWith(grant.policyId)
   })
 })

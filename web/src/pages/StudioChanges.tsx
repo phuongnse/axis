@@ -171,7 +171,7 @@ function ChangeFile({
           <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
           {folded && (
             <AxisButton
-              role="link"
+              role="subtle"
               aria-expanded={open}
               aria-label={fillText(
                 t(open ? 'shell.studio.changes.hideDiffName' : 'shell.studio.changes.showDiffName'),

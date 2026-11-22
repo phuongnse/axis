@@ -12,7 +12,9 @@ function entityFieldRow(index: number): Promise<HTMLElement> {
 
 /** The link of the first cell of field `index`'s row: the field's name, which opens the field drawer. */
 function entityFieldLink(row: HTMLElement): HTMLElement {
-  return within(within(row).getAllByRole('cell')[0]).getAllByRole('button')[0]
+  // A named field is a link to its drawer's address; a field with no name is a button.
+  const cell = within(within(row).getAllByRole('cell')[0])
+  return cell.queryAllByRole('link')[0] ?? cell.getAllByRole('button')[0]
 }
 
 /** Makes field `index` ready to edit: clicks its name in the Fields table and returns the field drawer's dialog. */

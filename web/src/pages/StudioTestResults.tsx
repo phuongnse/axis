@@ -12,33 +12,34 @@ import type {
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { PlatformContext } from './context'
+import type { FileAddressOf, ResourceAddressOf } from '../platform/studioAddress'
 import { FileAtLine } from './FileAtLine'
 import { ResourceReference } from './ResourceReference'
 
 /**
  * The results of a test request, or the contract scenarios of a publish or validate: each scenario with passed or
  * failed, its time and, for a failure, its step and message. A scenario's name is its only link, with "Test scenario"
- * muted after it, see docs/reference/actions-and-controls.md#buttons. Selecting it calls `onSelect` with the scenario's
- * resource and the path of its failing step, or an empty path for a pass, so a pass opens at its top. Without `onSelect`
- * the name is plain text. A skipped contract scenario shows the relaxed point it covers and opens nothing. While the
+ * muted after it, see docs/reference/actions-and-controls.md#buttons. It links to the address `addressOf` gives for the
+ * scenario's resource at the path of its failing step, or an empty path for a pass, so a pass opens at its top. Without
+ * `addressOf` the name is plain text. A skipped contract scenario shows the relaxed point it covers and opens nothing. While the
  * request is queued or running it shows a note instead of rows, so an empty list never reads as a pass. An ended request
  * with no scenario results says that no scenario ran.
  *
  * A package's `test` request, which holds `packageTests`, shows one row a test instead: passed or failed, the name, the
  * duration when the host sent it, and for a failure its message with its place after it, `packages/<id>/<file>, line N`.
- * The place is a link through `FileAtLine` when `onOpenFile` is given, and it calls it with that path and line. An ended
+ * The place is a link through `FileAtLine` when `fileAddressOf` is given, to the address it gives for that path and line. An ended
  * run with no test says that no test ran. With `titled` false the section has no heading, for a place that is named
  * already, such as the Tests tab. See docs/reference/studio-packages.md#a-packages-files.
  */
 export function StudioTestResults({
   request,
-  onSelect,
-  onOpenFile,
+  addressOf,
+  fileAddressOf,
   titled = true,
 }: {
   request: Pick<StudioRequest, 'kind' | 'status' | 'scenarios' | 'package' | 'packageTests'>
-  onSelect?: (resourceId: string, path: string) => void
-  onOpenFile?: (file: string, line?: number) => void
+  addressOf?: ResourceAddressOf
+  fileAddressOf?: FileAddressOf
   titled?: boolean
 }) {
   const t = useText()
@@ -61,7 +62,7 @@ export function StudioTestResults({
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {packageTests.map((test, index) => (
               <li key={`${index}:${test.name}`} data-testid="studio-test-result" data-outcome={test.outcome}>
-                <PackageTestRow test={test} packageId={request.package ?? ''} onOpenFile={onOpenFile} />
+                <PackageTestRow test={test} packageId={request.package ?? ''} fileAddressOf={fileAddressOf} />
               </li>
             ))}
           </ul>
@@ -72,7 +73,7 @@ export function StudioTestResults({
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {scenarios.map((scenario) => (
             <li key={scenario.file} data-testid="studio-test-result" data-outcome={scenario.outcome}>
-              <ScenarioRow scenario={scenario} onSelect={onSelect} />
+              <ScenarioRow scenario={scenario} addressOf={addressOf} />
             </li>
           ))}
         </ul>
@@ -83,10 +84,10 @@ export function StudioTestResults({
 
 function ScenarioRow({
   scenario,
-  onSelect,
+  addressOf,
 }: {
   scenario: StudioScenarioResult | StudioSkippedScenarioResult
-  onSelect?: (resourceId: string, path: string) => void
+  addressOf?: ResourceAddressOf
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -116,7 +117,7 @@ function ScenarioRow({
           <ResourceReference
             resource={{ kind: 'scenario', name: scenario.name }}
             file={scenario.file}
-            onOpen={onSelect && (() => onSelect(scenario.resourceId, scenario.path ?? ''))}
+            href={addressOf?.(scenario.resourceId, scenario.path ?? '')}
           />
           <Typography.Text type="secondary">{formatDuration(scenario.durationMs, locale, t)}</Typography.Text>
         </Flex>
@@ -132,11 +133,11 @@ function ScenarioRow({
 function PackageTestRow({
   test,
   packageId,
-  onOpenFile,
+  fileAddressOf,
 }: {
   test: StudioPackageTestResult
   packageId: string
-  onOpenFile?: (file: string, line?: number) => void
+  fileAddressOf?: FileAddressOf
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -159,9 +160,7 @@ function PackageTestRow({
             {test.message !== null && (
               <Typography.Text type={failed ? 'danger' : 'secondary'}>{test.message}</Typography.Text>
             )}
-            {file !== null && (
-              <FileAtLine file={file} line={test.line} onOpen={onOpenFile && (() => onOpenFile(file, test.line))} />
-            )}
+            {file !== null && <FileAtLine file={file} line={test.line} href={fileAddressOf?.(file, test.line)} />}
           </Flex>
         )}
       </Flex>

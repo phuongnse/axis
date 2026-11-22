@@ -4,7 +4,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { StatusTag } from '../platform/StatusTag'
 import dayjs from 'dayjs'
 import { memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
@@ -746,6 +746,13 @@ const Fields = memo(function Fields({
   )
 })
 
+/** The search of the address with `field` set to `name`, the address of that field's drawer. */
+function fieldSearch(search: string, name: string): string {
+  const next = new URLSearchParams(search)
+  next.set('field', name)
+  return `?${next.toString()}`
+}
+
 /** The name of a field's row as a link that opens the field drawer, with the mark of a customization layer. */
 const NameCell = memo(function NameCell({
   index,
@@ -759,13 +766,32 @@ const NameCell = memo(function NameCell({
   onOpen: (index: number) => void
 }) {
   const t = useText()
+  const { search } = useLocation()
   const name = text(isContent(field) ? field.name : undefined)
   return (
     <Flex gap="small" align="center" wrap>
-      {/* A read-only designer turns its inputs off, but its name still opens the drawer. */}
-      <AxisButton role="link" size="small" disabled={false} onClick={() => onOpen(index)}>
-        {name || t('shell.studio.entity.unnamedField')}
-      </AxisButton>
+      {/* Proposed, #4902: a named field is a real link to its drawer's address, `&field=<name>`, so it opens in a new tab
+          and its address can be copied. A plain click opens the drawer in place, which writes the same address. A field
+          with no name has no address, so it is a subtle button. A read-only designer turns its inputs off, but its name
+          still opens the drawer. */}
+      {name ? (
+        <Link
+          to={{ search: fieldSearch(search, name) }}
+          preventScrollReset
+          onClick={(event) => {
+            if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+              event.preventDefault()
+              onOpen(index)
+            }
+          }}
+        >
+          {name}
+        </Link>
+      ) : (
+        <AxisButton role="subtle" size="small" disabled={false} onClick={() => onOpen(index)}>
+          {t('shell.studio.entity.unnamedField')}
+        </AxisButton>
+      )}
       {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
     </Flex>
   )

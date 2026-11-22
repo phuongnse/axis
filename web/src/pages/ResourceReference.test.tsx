@@ -26,7 +26,7 @@ describe.each(['light', 'dark'])('ResourceReference in %s mode', (mode) => {
 
   it('shows a link named by the title, with the kind after it and no file', async () => {
     const onOpen = vi.fn()
-    renderReference({ resource: entity, file, onOpen })
+    renderReference({ resource: entity, file, href: '/studio?app=PurchaseRequests&resource=r' })
 
     await userEvent.click(screen.getByRole('button', { name: 'Purchase requests' }))
     expect(onOpen).toHaveBeenCalledOnce()
@@ -43,7 +43,7 @@ describe.each(['light', 'dark'])('ResourceReference in %s mode', (mode) => {
   })
 
   it('shows the muted file and no button when there is no resource', () => {
-    renderReference({ resource: undefined, file, onOpen: vi.fn() })
+    renderReference({ resource: undefined, file, href: '/studio?app=PurchaseRequests&resource=r' })
 
     expect(screen.getByText(file)).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()

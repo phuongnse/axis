@@ -91,7 +91,8 @@ import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
 import { StudioAutoAccept } from './StudioAutoAccept'
-import type { FormUse, OpenResource } from './StudioFormUsedOn'
+import type { ResourceAddressOf } from '../platform/studioAddress'
+import type { FormUse } from './StudioFormUsedOn'
 import { fieldElement } from './studioFieldElement'
 import { StudioUsedBy } from './StudioUsedBy'
 import { TextTable, type TextColumn } from './TextTable'
@@ -207,7 +208,7 @@ export interface StudioEditorHandle {
  * step, and a load of the file clears the history. JSON that does not parse is an unsaved change, and a click on Save opens the JSON view at the first problem and sends
  * nothing. While it has an error the Form and Design tabs are read-only and the editor ignores every edit from them. Discard
  * asks first and puts back the loaded resource. A removed row asks nothing and shows a notice with Undo.
- * A form's Design tab shows a Used on list above its canvas, with the pages and process steps that use the form, and an entry calls `onOpen`.
+ * A form's Design tab shows a Used on list above its canvas, with the pages and process steps that use the form, and an entry links to the address `addressOf` gives.
  * Every resource but the application has a Used by tab, which lists the resources that use it and loads only when it opens.
  * Beside the canvas it has a palette of the entity's fields that no section lists and an outline of the draft's steps, sections and fields.
  * Its code loads when the tab first opens.
@@ -230,7 +231,7 @@ export function StudioEditor({
   onSaved,
   onTextsWritten,
   onDeleted,
-  onOpen,
+  addressOf,
   publisher = false,
   ref,
 }: {
@@ -239,7 +240,7 @@ export function StudioEditor({
   resources: StudioResourceItem[]
   path: string | null
   diagnosticPaths: readonly string[]
-  onOpen: OpenResource
+  addressOf: ResourceAddressOf
   onSaved: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem[]) => void
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
@@ -1243,7 +1244,7 @@ export function StudioEditor({
                                           onSelect={setFormPath}
                                           onChange={onChange}
                                           usedOn={usedOn}
-                                          onOpen={onOpen}
+                                          addressOf={addressOf}
                                           resources={resources}
                                         />
                                       </Suspense>,

@@ -3,6 +3,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router'
 import { useSelectedItemTint } from '../platform/antTheme'
 import { AxisField } from '../platform/AxisField'
 import { StatusTag } from '../platform/StatusTag'
@@ -62,7 +63,7 @@ interface Selection {
 /**
  * The policy matrix. Roles are rows and the matrix's targets are columns, and each cell lists the role's combined
  * actions there. Selecting a cell opens its grants under the table: the policy, the actions, the record filter and
- * the fields. A shared grant is tagged Shared and its Open policy link calls `onOpenPolicy` with the policy's id. A
+ * the fields. A shared grant is tagged Shared and its Open policy is a real link to the address `policyAddressOf` gives for the policy's id, Proposed in #4902. A
  * data source cell that lacks the root entity's `read` warns and names that entity. A row that cannot be edited shows
  * why. In an editable row the cell's own grants, the ones in the role's `<Role>Access` policy, can be edited and
  * saved, which calls `onWritten` with the folder's diagnostics and, when the save created the policy, its item. The
@@ -73,13 +74,13 @@ export function StudioPolicyMatrixTable({
   application,
   matrix,
   names,
-  onOpenPolicy,
+  policyAddressOf,
   onWritten,
 }: {
   application: string
   matrix: PolicyMatrix
   names: StudioNames | null
-  onOpenPolicy: (policyId: string) => void
+  policyAddressOf: (policyId: string) => string
   onWritten: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem) => void
 }) {
   const t = useText()
@@ -153,7 +154,7 @@ export function StudioPolicyMatrixTable({
           cell={cell}
           names={names}
           saved={saved}
-          onOpenPolicy={onOpenPolicy}
+          policyAddressOf={policyAddressOf}
           onWritten={(diagnostics, created) => {
             setSaved(true)
             onWritten(diagnostics, created)
@@ -235,7 +236,7 @@ function GrantPanel({
   cell,
   names,
   saved,
-  onOpenPolicy,
+  policyAddressOf,
   onWritten,
 }: {
   application: string
@@ -244,7 +245,7 @@ function GrantPanel({
   cell: StudioMatrixCell
   names: StudioNames | null
   saved: boolean
-  onOpenPolicy: (policyId: string) => void
+  policyAddressOf: (policyId: string) => string
   onWritten: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem) => void
 }) {
   const t = useText()
@@ -259,7 +260,7 @@ function GrantPanel({
           {!role.editable && cell.grants.length === 0 && <EmptyState text={t('shell.studio.matrix.noGrants')} />}
           <Flex vertical gap="small">
             {readOnlyGrants.map((grant) => (
-              <ReadOnlyGrant key={`${grant.policyId}/${grant.index}`} grant={grant} onOpenPolicy={onOpenPolicy} />
+              <ReadOnlyGrant key={`${grant.policyId}/${grant.index}`} grant={grant} policyAddressOf={policyAddressOf} />
             ))}
             {role.editable && (
               <OwnGrants
@@ -282,10 +283,10 @@ function GrantPanel({
 
 function ReadOnlyGrant({
   grant,
-  onOpenPolicy,
+  policyAddressOf,
 }: {
   grant: StudioMatrixGrant
-  onOpenPolicy: (policyId: string) => void
+  policyAddressOf: (policyId: string) => string
 }) {
   const t = useText()
   return (
@@ -300,9 +301,7 @@ function ReadOnlyGrant({
         {grant.shared && <StatusTag tone="neutral">{t('shell.studio.matrix.shared')}</StatusTag>}
         {grant.module !== null && <StatusTag tone="neutral">{grant.module}</StatusTag>}
         {grant.shared && grant.module === null && (
-          <AxisButton role="link" size="small" onClick={() => onOpenPolicy(grant.policyId)}>
-            {t('shell.studio.matrix.openPolicy')}
-          </AxisButton>
+          <Link to={policyAddressOf(grant.policyId)}>{t('shell.studio.matrix.openPolicy')}</Link>
         )}
       </Flex>
       <div>
@@ -639,13 +638,13 @@ export function StudioPolicyMatrix({
   application,
   folderRevision,
   names,
-  onOpenPolicy,
+  policyAddressOf,
   onWritten,
 }: {
   application: string
   folderRevision: number
   names: StudioNames | null
-  onOpenPolicy: (policyId: string) => void
+  policyAddressOf: (policyId: string) => string
   onWritten: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem) => void
 }) {
   const t = useText()
@@ -684,7 +683,7 @@ export function StudioPolicyMatrix({
       application={application}
       matrix={state.matrix}
       names={names}
-      onOpenPolicy={onOpenPolicy}
+      policyAddressOf={policyAddressOf}
       onWritten={onWritten}
     />
   )

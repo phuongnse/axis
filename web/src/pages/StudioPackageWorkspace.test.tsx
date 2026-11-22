@@ -953,7 +953,7 @@ describe('StudioPackageWorkspace', () => {
       ])
       await screen.findByTestId('studio-package-tree')
 
-      await userEvent.click(screen.getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' }))
 
       const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
       await waitFor(() =>
@@ -962,9 +962,9 @@ describe('StudioPackageWorkspace', () => {
       expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(3)
 
       // A file that is already open jumps again.
-      await userEvent.click(screen.getByRole('button', { name: 'packages/tools/adapter.py' }))
+      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/adapter.py' }))
       await screen.findByRole('textbox', { name: 'adapter.py' })
-      await userEvent.click(screen.getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
+      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' }))
       await waitFor(() =>
         expect(within(screen.getByTestId('studio-package-status')).getByText('Line 3, column 1')).toBeInTheDocument(),
       )

@@ -136,7 +136,7 @@ function EntryList({
         >
           <Flex vertical>
             <Flex gap={spacing.xs} align="center">
-              <AxisButton role="link" onClick={() => onPick(entry.insert, entry.cursorInside)}>
+              <AxisButton role="subtle" onClick={() => onPick(entry.insert, entry.cursorInside)}>
                 <code style={{ fontFamily: type.codeFontFamily }}>{entry.name}</code>
               </AxisButton>
               {tagged && <StatusTag tone="neutral">{t(kindTexts[entry.kind])}</StatusTag>}

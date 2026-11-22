@@ -108,7 +108,7 @@ export function StudioAuthoringRequestResult({
           </StatusTag>
           <Flex wrap gap="small" align="center" style={whole}>
             <Typography.Text>{fillText(t(checks.summaryKey), checks.values)}</Typography.Text>
-            <AxisButton role="link" aria-expanded={checksOpen} onClick={() => setChecksOpen((open) => !open)}>
+            <AxisButton role="subtle" aria-expanded={checksOpen} onClick={() => setChecksOpen((open) => !open)}>
               {t(checksOpen ? 'shell.studio.aiRequest.checks.hide' : 'shell.studio.aiRequest.checks.show')}
             </AxisButton>
           </Flex>

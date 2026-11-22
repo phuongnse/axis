@@ -274,8 +274,8 @@ export function AxisActionRow({
  * `secondary` and `subtle`: `dangerText` for an action that removes. Inside an `AxisActionRow` beside a finish button,
  * `main` and `secondary` are borderless in the text colour, or in `dangerText` when destructive, so the finish button is
  * the only filled shape and no button looks like a link. `caret` adds a down caret after the text of any text role.
- * `link` is a button drawn as a link, in `primaryText`, for an action that goes to no address. The role is not passed on
- * to the DOM.
+ * Proposed, #4902: there is no `link` role, as no button looks like a link: what goes to an address is a real link, and
+ * an action with none is a button. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
@@ -289,7 +289,6 @@ export function AxisButton(props: AxisButtonProps) {
     children: caret ? [children, <Chevron key="caret" />] : children,
   }
   const outline = (text: string): CSSProperties => (disabled ? {} : { color: text, borderColor: text })
-  const tinted = (text: string): CSSProperties => (disabled ? {} : { color: text })
   const danger = destructive === true
   // Borderless beside a finish button, and always for a tool: the text colour, or `dangerText` for the destructive tone.
   const borderless = (
@@ -322,15 +321,6 @@ export function AxisButton(props: AxisButtonProps) {
       )
     case 'subtle':
       return borderless
-    case 'link':
-      return (
-        <Button
-          {...body}
-          type="link"
-          disabled={disabled}
-          style={{ ...tinted(colour.primaryText), paddingInline: 0, ...style }}
-        />
-      )
   }
 }
 

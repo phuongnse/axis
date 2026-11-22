@@ -17,7 +17,7 @@ import { loadKindSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioEditor } from './StudioEditor'
-import type { OpenResource } from './StudioFormUsedOn'
+import type { ResourceAddressOf } from '../platform/studioAddress'
 
 const folder = '/api/studio/apps/Desk'
 const formId = '1db765b0-483d-456b-9939-17e2a36de3b6'
@@ -227,7 +227,7 @@ function stub(
   return fetchMock
 }
 
-function renderEditor(onOpen: OpenResource = vi.fn()) {
+function renderEditor(addressOf: ResourceAddressOf = vi.fn(() => '/studio')) {
   render(
     <MemoryRouter initialEntries={['/studio?app=Desk&resource=ticket-edit']}>
       <ThemeModeProvider>
@@ -239,7 +239,7 @@ function renderEditor(onOpen: OpenResource = vi.fn()) {
               resources={[item]}
               path={null}
               diagnosticPaths={[]}
-              onOpen={onOpen}
+              addressOf={addressOf}
               onSaved={vi.fn()}
               onTextsWritten={vi.fn()}
               onDeleted={vi.fn()}
@@ -249,7 +249,7 @@ function renderEditor(onOpen: OpenResource = vi.fn()) {
       </ThemeModeProvider>
     </MemoryRouter>,
   )
-  return onOpen
+  return addressOf
 }
 
 const slow = { timeout: 5000 }
@@ -685,12 +685,12 @@ describe('the Used on list of a form', () => {
 
   it('opens the process at the path of its entry when the entry is clicked', async () => {
     stub(undefined, undefined, { uses: [], usedBy: [processUse] })
-    const onOpen = renderEditor()
+    const addressOf = renderEditor()
 
     await openDesign()
     const section = await screen.findByTestId('studio-form-used-on', {}, slow)
     await userEvent.click(await within(section).findByRole('button', { name: 'Triage' }))
-    expect(onOpen).toHaveBeenCalledWith('triage-process', '/steps/1/form')
+    expect(addressOf).toHaveBeenCalledWith('triage-process', '/steps/1/form')
   })
 
   it('says that no page or process uses the form when no entry is a widget or task form', async () => {

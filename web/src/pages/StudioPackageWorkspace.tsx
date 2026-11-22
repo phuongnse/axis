@@ -1,6 +1,7 @@
 import { CloseOutlined } from '@ant-design/icons'
 import { Flex, Modal, Tabs } from 'antd'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { useLocation, useSearchParams } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, AxisButtonGroup } from '../platform/AxisButton'
 import { CodeBlock } from '../platform/CodeBlock'
@@ -21,6 +22,7 @@ import {
   type StudioRequest,
   testStudioPackage,
 } from '../platform/studio'
+import { studioPackageFileAddress } from '../platform/studioAddress'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -220,6 +222,21 @@ function Workspace({
     openFile(path)
     setJump((count) => count + 1)
   }
+
+  // Proposed, #4902: a file's place is a real link, `&file=<path>&line=<n>`, so the workspace opens the file the address
+  // names, and opens it again on each visit to that address, as a click on the same link does.
+  const fileAddressOf = (file: string, line?: number) =>
+    studioPackageFileAddress(application, row.id, file.slice(prefix.length), line)
+  const [searchParams] = useSearchParams()
+  const { key: visit } = useLocation()
+  const addressedFile = searchParams.get('file')
+  const addressedLine = searchParams.get('line')
+  useEffect(() => {
+    if (addressedFile !== null) {
+      openAt(prefix + addressedFile, addressedLine === null ? undefined : Number(addressedLine))
+    }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Opens once per visit to the address, not when openAt changes.
+  }, [visit, addressedFile, addressedLine])
 
   // Moves the cursor of the file that openAt asked for once its editor is there. The editor builds its view in an effect
   // that runs before this one, so a file that loads later is reached through the editor's ref below, which bumps `jump`.
@@ -664,7 +681,7 @@ function Workspace({
                       {problems.length === 0 ? (
                         <EmptyState text={t('shell.studio.problems.none')} />
                       ) : (
-                        <StudioProblemList diagnostics={problems} onOpenFile={openAt} />
+                        <StudioProblemList diagnostics={problems} fileAddressOf={fileAddressOf} />
                       )}
                     </div>
                   ),
@@ -723,7 +740,7 @@ function Workspace({
                       {testRun === null ? (
                         <EmptyState text={t('shell.studio.packages.noTests')} />
                       ) : (
-                        <StudioTestResults request={testRun} onOpenFile={openAt} titled={false} />
+                        <StudioTestResults request={testRun} fileAddressOf={fileAddressOf} titled={false} />
                       )}
                     </div>
                   ),
