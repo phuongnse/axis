@@ -30,10 +30,13 @@ export function LabelTexts({
   value,
   onChange,
   multiline = false,
+  invalid = false,
 }: {
   pointer: string
   value: unknown
   onChange: ChangeHandler
+  /** Proposed, #3264: draws the box in its error look and marks it invalid, while its group shows an error. */
+  invalid?: boolean
   /**
    * Proposed, #3264: a text of a sentence or more, such as a description or a message's body, is typed in a box of
    * several lines that grows with its text, here and in the Translations dialog, see
@@ -70,6 +73,7 @@ export function LabelTexts({
       names={names}
       resource={resource}
       multiline={multiline}
+      invalid={invalid}
     />
   )
 }
@@ -84,6 +88,7 @@ function LabelEditor({
   names,
   resource,
   multiline,
+  invalid,
 }: {
   pointer: string
   value: unknown
@@ -91,6 +96,7 @@ function LabelEditor({
   names: StudioNames
   resource: Resource
   multiline: boolean
+  invalid: boolean
 }) {
   const t = useText()
   const { colour, size, spacing } = useDesignTokens()
@@ -140,6 +146,7 @@ function LabelEditor({
   }
 
   const box = {
+    ...(invalid ? { status: 'error' as const, 'aria-invalid': true } : {}),
     'aria-label': shown === undefined ? undefined : languageName(shown, author),
     value: shown === undefined ? '' : (texts[shown] ?? ''),
     onChange: (event: { target: { value: string } }) =>

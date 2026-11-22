@@ -868,6 +868,11 @@ function nameFromLabel(label: string): string {
   return joined.replace(/^[0-9]+/, '')
 }
 
+/** Moves focus to the first box in error of the panel's content, as a form does when it refuses to submit. */
+function focusFirstError(root: HTMLElement | null) {
+  root?.querySelector<HTMLElement>('input[aria-invalid="true"], textarea[aria-invalid="true"]')?.focus()
+}
+
 /**
  * Proposed, #3264: what is wrong with a field's name, as the text key of its error, or `undefined` when nothing is: it
  * is empty, it does not start with a letter or has more than letters and digits, or another field has it, ignoring case.
@@ -1128,6 +1133,8 @@ const FieldDrawer = memo(function FieldDrawer({
   // A new field takes its name from its label until the name is changed by hand, as Dataverse and ServiceNow make a
   // column's name from its display name.
   const [nameTouched, setNameTouched] = useState(false)
+  // The drawer's root, set once its content has drawn, so the focus effect below runs after the drawer has opened.
+  const [root, setRoot] = useState<HTMLElement | null>(null)
   const labelTexts = useContext(LabelTextsContext)
   const labelPointer = `${pointer}/label`
   const labelKey = isContent(content.label) ? text(content.label.textKey) : ''
@@ -1178,18 +1185,26 @@ const FieldDrawer = memo(function FieldDrawer({
     setTyped((current) => ({ ...(current.index === index ? current : { index }), name: undefined }))
     onChange(`${pointer}/name`, next)
   }
-  // Done closes only a field whose label and name are valid. Close puts back the last valid ones, which the draft holds.
+  const labelErrorText = errors?.label ?? (labelError ? t('shell.studio.entity.fieldPanel.labelRequired') : undefined)
+  // Done closes only a field whose label and name are valid, and otherwise takes the person to the first box in error.
+  // Close puts back the last valid ones, which the draft holds.
   const done = () => {
     if (nameError === undefined && !labelError) {
       onClose()
+    } else {
+      focusFirstError(root)
     }
   }
+  // Add field's errors take the person to the first box in error as they show.
+  useEffect(() => {
+    if (errors?.label !== undefined || errors?.name !== undefined) {
+      focusFirstError(root)
+    }
+  }, [errors, root])
   const close = () => {
     setTyped({ index })
     onClose()
   }
-  // The drawer's root, set once its content has drawn, so the focus effect below runs after the drawer has opened.
-  const [root, setRoot] = useState<HTMLElement | null>(null)
   const wasOpen = useRef(false)
   const wantFocus = useRef(false)
 
@@ -1258,15 +1273,14 @@ const FieldDrawer = memo(function FieldDrawer({
                   {/* Proposed, #3264: the label first, typed in words with its translations as the entity's label
                       is, then the name, which a new field takes from its label until the name is changed by hand. */}
                   <div data-testid={`studio-field-${pointer}/label`}>
-                    <AxisFieldGroup
-                      {...groupTexts(t, 'fields.label')}
-                      required
-                      error={
-                        errors?.label ?? (labelError ? t('shell.studio.entity.fieldPanel.labelRequired') : undefined)
-                      }
-                    >
+                    <AxisFieldGroup {...groupTexts(t, 'fields.label')} required error={labelErrorText}>
                       <LabelTextsContext.Provider value={namingTexts}>
-                        <LabelTexts pointer={`${pointer}/label`} value={content.label} onChange={onChange} />
+                        <LabelTexts
+                          pointer={`${pointer}/label`}
+                          value={content.label}
+                          onChange={onChange}
+                          invalid={labelErrorText !== undefined}
+                        />
                       </LabelTextsContext.Provider>
                     </AxisFieldGroup>
                   </div>
