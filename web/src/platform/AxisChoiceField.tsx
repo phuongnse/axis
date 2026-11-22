@@ -1,7 +1,8 @@
 import { Flex, Radio, Typography, type FormItemProps } from 'antd'
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { AxisField, type AxisFieldStatus } from './AxisField'
 import { StatusTag } from './StatusTag'
+import { useDesignTokens } from './themeMode'
 
 /** An option of a choice: its value, its label, its help and an optional mark such as "Built in". */
 export interface AxisChoiceOption {
@@ -10,6 +11,12 @@ export interface AxisChoiceOption {
   /** The line under the option's label. The radio's description. An empty help draws nothing. */
   help: string
   mark?: string
+  /**
+   * Proposed, #3264: the settings that belong to this option, shown under it while it is chosen, set in from the radios
+   * behind a `borderSubtle` rule that runs down from the radio, so they read as the chosen option's and not as more
+   * options. Only a choice the screen holds shows it.
+   */
+  detail?: ReactNode
 }
 
 type Shared = {
@@ -64,22 +71,41 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
   const { label, help, options } = props
   const optionId = useId()
   const groupName = useId()
-  const radios = (
+  const { colour, spacing, type } = useDesignTokens()
+  const radios = (chosen?: string) => (
     <Flex vertical>
       {options.map((option, index) => {
         const helpId = `${optionId}-${index}-help`
         return (
-          <Radio key={option.value} value={option.value} aria-describedby={option.help === '' ? undefined : helpId}>
-            <Flex gap="small" align="center" wrap>
-              <span>{option.label}</span>
-              {option.mark && <StatusTag tone="neutral">{option.mark}</StatusTag>}
-            </Flex>
-            {option.help !== '' && (
-              <Typography.Text type="secondary" id={helpId} style={{ display: 'block' }}>
-                {option.help}
-              </Typography.Text>
+          <div key={option.value}>
+            <Radio value={option.value} aria-describedby={option.help === '' ? undefined : helpId}>
+              <Flex gap="small" align="center" wrap>
+                <span>{option.label}</span>
+                {option.mark && <StatusTag tone="neutral">{option.mark}</StatusTag>}
+              </Flex>
+              {option.help !== '' && (
+                <Typography.Text type="secondary" id={helpId} style={{ display: 'block' }}>
+                  {option.help}
+                </Typography.Text>
+              )}
+            </Radio>
+            {option.detail !== undefined && option.value === chosen && (
+              // The rule runs down from the middle of the 16px radio, and the settings start where the option's text does.
+              <div
+                style={{
+                  marginInlineStart: 7,
+                  paddingInlineStart: 16,
+                  borderInlineStart: `1px solid ${colour.borderSubtle}`,
+                  paddingBlock: spacing.xs,
+                  marginBlock: spacing.xs,
+                  // Ant Design's radio group sets its font size to 0, so the settings take the body size back.
+                  fontSize: type.fontSize,
+                }}
+              >
+                {option.detail}
+              </div>
             )}
-          </Radio>
+          </div>
         )
       })}
     </Flex>
@@ -94,7 +120,7 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
           value={value}
           onChange={(event) => onChange(event.target.value)}
         >
-          {radios}
+          {radios(value)}
         </Radio.Group>
       </AxisField>
     )
@@ -109,7 +135,7 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
       initialValue={initialValue}
       status={status}
     >
-      <Radio.Group aria-label={label}>{radios}</Radio.Group>
+      <Radio.Group aria-label={label}>{radios()}</Radio.Group>
     </AxisField>
   )
 }

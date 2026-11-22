@@ -1620,14 +1620,21 @@ function Settings({
                   // The group's title, Value, names the choice to the eye.
                   hideLabel
                   value={valueSourceOf(field)}
+                  // Proposed, #3264: the chosen way's settings sit under it, so they read as its own.
                   options={sources.map((source) => ({
                     value: source,
                     ...fieldTexts(t, `fields.valueSource.${source}`),
+                    detail:
+                      source === valueSourceOf(field) && drawnSettings.length > 0 ? (
+                        <Flex vertical gap="small">
+                          {drawnSettings}
+                        </Flex>
+                      ) : undefined,
                   }))}
                   onChange={(next) => onChange(pointer, withValueSource(field, next as ValueSource))}
                 />
               )}
-              {drawnSettings}
+              {choice ? null : drawnSettings}
               {group === 'validation' && (
                 <>
                   {atField.map(({ validation, position }) => (
