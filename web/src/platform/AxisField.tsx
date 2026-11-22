@@ -29,6 +29,7 @@ type FormFieldProps = {
   initialValue?: FormItemProps['initialValue']
   /** What the screen found about the field, such as whether a name is free. It takes the place of the field's own errors while shown. */
   status?: AxisFieldStatus
+  error?: never
   /** A field in a form is marked required by its `requiredMessage`, the one way to mark it. */
   required?: never
   hideLabel?: never
@@ -51,6 +52,11 @@ type OwnFieldProps = {
   required?: boolean
   /** Hides the label from the eye while it still names the input, for a control in a table cell whose row and column name it. */
   hideLabel?: boolean
+  /**
+   * Proposed, #3264: what the screen found wrong with the value, such as "Enter a name.", under the input in
+   * `dangerText`, as a form field's error is, and the input marked invalid. A screen reader hears it.
+   */
+  error?: string
   /** The input, such as an `Input` or a `Select`. The caller gives it its `value` and its change handler. */
   children: FieldInput
 }
@@ -123,10 +129,11 @@ function statusItemProps(
 }
 
 /** A field the caller holds the value of: a label tied to the input, then the help and the input. */
-function OwnField({ label, help, required, hideLabel, children }: OwnFieldProps) {
+function OwnField({ label, help, required, hideLabel, error, children }: OwnFieldProps) {
   const { colour } = useDesignTokens()
   const ownId = useId()
   const id = children.props.id ?? ownId
+  const errorId = `${ownId}-error`
   return (
     <div className={fieldClass}>
       <label
@@ -139,7 +146,14 @@ function OwnField({ label, help, required, hideLabel, children }: OwnFieldProps)
       >
         {requiredMark(label, { required: required === true })}
       </label>
-      <HelpedInput help={help} input={children} id={id} {...(required === true ? { 'aria-required': true } : {})} />
+      <HelpedInput
+        help={help}
+        input={children}
+        id={id}
+        {...(required === true ? { 'aria-required': true } : {})}
+        {...(error === undefined ? {} : { 'aria-invalid': true, 'aria-describedby': errorId, status: 'error' })}
+      />
+      {error !== undefined && <FieldError id={errorId}>{error}</FieldError>}
     </div>
   )
 }
@@ -198,7 +212,8 @@ function FormField({
 type HelpedInputProps = {
   help: string
   input: FieldInput
-  status?: AxisFieldStatus
+  status?: AxisFieldStatus | 'error'
+  'aria-invalid'?: boolean
   id?: string
   'aria-describedby'?: string
   'aria-required'?: boolean
@@ -238,8 +253,23 @@ const HelpedInput = forwardRef(function HelpedInput(
         ...control,
         ref,
         'aria-describedby': describedBy,
-        'aria-busy': status?.state === 'running' ? true : undefined,
+        'aria-busy': typeof status === 'object' && status.state === 'running' ? true : undefined,
+        // An Ant Design input draws its error look from `status`.
+        ...(status === 'error' ? { status: 'error' } : {}),
       } as object)}
     </>
   )
 })
+
+/**
+ * Proposed, #3264: the error under a field the screen holds, in `dangerText` at the size of a form field's error,
+ * announced as it shows. `AxisField` and `AxisFieldGroup` draw it.
+ */
+export function FieldError({ id, children }: { id: string; children: string }) {
+  const { colour } = useDesignTokens()
+  return (
+    <div id={id} role="alert" style={{ marginTop: 4, lineHeight: '20px', color: colour.dangerText }}>
+      {children}
+    </div>
+  )
+}

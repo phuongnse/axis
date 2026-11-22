@@ -1,6 +1,8 @@
 import { useId, type ReactNode } from 'react'
 import { AxisActionRow, AxisButton } from './AxisButton'
+import { FieldError } from './AxisField'
 import { Chevron } from './Chevron'
+import { requiredMark } from './requiredMark'
 import { useDesignTokens } from './themeMode'
 
 /**
@@ -15,6 +17,8 @@ export function AxisFieldGroup({
   action,
   fold,
   heading = false,
+  required = false,
+  error,
   children,
 }: {
   title: string
@@ -31,11 +35,16 @@ export function AxisFieldGroup({
    * look of a heading, in the text colour and heavier than a field's label, so a part is told from the fields in it.
    */
   heading?: boolean
+  /** Proposed, #3264: marks the group required with the shared `requiredMark` after its title. The screen checks it. */
+  required?: boolean
+  /** Proposed, #3264: what the screen found wrong with the group's value, under its fields, as `AxisField`'s error. */
+  error?: string
   children: ReactNode
 }) {
   const { spacing, colour } = useDesignTokens()
   const helpId = `${useId()}-help`
   const titleId = useId()
+  const errorId = `${titleId}-error`
   const hasAction = action !== null && action !== undefined
   // Proposed, #3264: a legend sits where a field's label sits and as far above the help, so a group's title and a
   // field's label line up, see docs/reference/actions-and-controls.md#fields. A browser pads a legend by 2px on each side.
@@ -48,7 +57,11 @@ export function AxisFieldGroup({
   return (
     <fieldset
       aria-labelledby={hasAction ? titleId : undefined}
-      aria-describedby={help === '' ? undefined : helpId}
+      aria-describedby={
+        [help === '' ? undefined : helpId, error === undefined ? undefined : errorId].filter(Boolean).join(' ') ||
+        undefined
+      }
+      aria-invalid={error === undefined ? undefined : true}
       style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }}
     >
       {hasAction ? (
@@ -80,7 +93,7 @@ export function AxisFieldGroup({
           {!fold.open && <span style={{ fontWeight: 400 }}>· {fold.state}</span>}
         </legend>
       ) : (
-        <legend style={legendStyle}>{title}</legend>
+        <legend style={legendStyle}>{requiredMark(title, { required })}</legend>
       )}
       {fold && !fold.open
         ? null
@@ -93,6 +106,7 @@ export function AxisFieldGroup({
             </div>
           )}
       {fold && !fold.open ? null : children}
+      {error !== undefined && <FieldError id={errorId}>{error}</FieldError>}
     </fieldset>
   )
 }

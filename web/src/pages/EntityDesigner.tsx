@@ -621,6 +621,7 @@ const Fields = memo(function Fields({
 
   /** A change in the new field's panel, at a pointer under `/fields/<its row>`, goes to the field the panel holds. */
   function changeStaged(pointer: string, value: unknown) {
+    setStagedErrors({})
     const prefix = `/fields/${fields!.length}`
     if (pointer === prefix) {
       setStaged(isContent(value) ? value : {})
@@ -629,10 +630,36 @@ const Fields = memo(function Fields({
     }
   }
 
+  const labelDrafts = useContext(LabelTextsContext)
+  const [stagedErrors, setStagedErrors] = useState<{ label?: string; name?: string }>({})
+
+  /**
+   * Proposed, #3264: Add field puts the new field into the draft only with a label, in words in any language, and a
+   * name that starts with a letter, has only letters and digits, and no other field has. Otherwise the panel stays open
+   * with the errors under the label and the name.
+   */
   function commitStaged() {
+    const key = isContent(staged?.label) ? text(staged.label.textKey) : ''
+    const labelled = Object.values(labelDrafts?.texts[key] ?? {}).some((value) => value.trim() !== '')
+    const name = text(staged?.name)
+    const errors = {
+      ...(labelled ? {} : { label: t('shell.studio.entity.fieldPanel.labelRequired') }),
+      ...(name === ''
+        ? { name: t('shell.studio.entity.fieldPanel.nameRequired') }
+        : !/^[A-Za-z][A-Za-z0-9]*$/.test(name)
+          ? { name: t('shell.studio.entity.fieldPanel.nameInvalid') }
+          : fields!.some((field) => fieldName(field)?.toLowerCase() === name.toLowerCase())
+            ? { name: t('shell.studio.entity.fieldPanel.nameTaken') }
+            : {}),
+    }
+    if (errors.label !== undefined || errors.name !== undefined) {
+      setStagedErrors(errors)
+      return
+    }
     onChange('/fields', [...fields!, staged])
     onOriginsChange?.([...rowOrigins(fields!, origins), null])
     setStaged(null)
+    setStagedErrors({})
   }
 
   if (fields === undefined) {
@@ -786,8 +813,12 @@ const Fields = memo(function Fields({
           validations={undefined}
           layer={layer}
           onChange={changeStaged}
-          onClose={() => setStaged(null)}
+          onClose={() => {
+            setStaged(null)
+            setStagedErrors({})
+          }}
           onAdd={commitStaged}
+          errors={stagedErrors}
         />
       )}
     </SectionPart>
@@ -1032,6 +1063,7 @@ function focusInDrawer(root: HTMLElement, path: string | null, pointer: string, 
  */
 const FieldDrawer = memo(function FieldDrawer({
   onAdd,
+  errors,
   index,
   open,
   focusPath,
@@ -1060,6 +1092,8 @@ const FieldDrawer = memo(function FieldDrawer({
   onChange: ChangeHandler
   onClose: () => void
   onAdd?: () => void
+  /** Proposed, #3264: what Add field found wrong with a new field, under its label and its name. */
+  errors?: { label?: string; name?: string }
 }) {
   const t = useText()
   const content = isContent(field) ? field : {}
@@ -1154,14 +1188,14 @@ const FieldDrawer = memo(function FieldDrawer({
                   {/* Proposed, #3264: the label first, typed in words with its translations as the entity's label
                       is, then the name, which a new field takes from its label until the name is changed by hand. */}
                   <div data-testid={`studio-field-${pointer}/label`}>
-                    <AxisFieldGroup {...groupTexts(t, 'fields.label')}>
+                    <AxisFieldGroup {...groupTexts(t, 'fields.label')} required error={errors?.label}>
                       <LabelTextsContext.Provider value={namingTexts}>
                         <LabelTexts pointer={`${pointer}/label`} value={content.label} onChange={onChange} />
                       </LabelTextsContext.Provider>
                     </AxisFieldGroup>
                   </div>
                   <div data-testid={`studio-field-${pointer}/name`}>
-                    <AxisField {...fieldTexts(t, 'fields.name')} required>
+                    <AxisField {...fieldTexts(t, 'fields.name')} required error={errors?.name}>
                       <Input
                         value={name}
                         onChange={(event) => {
