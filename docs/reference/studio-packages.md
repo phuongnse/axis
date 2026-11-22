@@ -59,17 +59,17 @@ them there.
   a chevron on a folder's left and a folder icon, and a file has a file icon. A file with unsaved changes has a dot. A
   chosen or hovered row is marked across its whole width, a chosen one in the tint of the [navigation's](shell.md#layout)
   current entry, and each level steps in by 12 px. Files is its title row.
-- **The explorer's actions.** Files has New, which offers New file… and New folder…, and Refresh, as light icon
-  buttons with their names as tooltips. A file's or folder's menu opens on a right click, Shift+F10 or the menu key. It
-  offers New file…, New folder…, Rename… (also F2), Delete… and Copy path, and the first two take the node's folder, or
-  the package's root for a file at the root. New file… creates an empty file without replacing one that exists, and opens
-  it. The folder holds only files, so New folder… adds an empty folder that lives in the explorer until a file is in
-  it, as git keeps folders, and it is gone after the page loads again. Rename… of a file or a folder sends one
-  [move](#the-authoring-api) that lists each file it holds with its version, so a rename is one revision. Open tabs
-  follow their files to the new paths and keep any unsaved text. When a file changed since, or the new name is taken, the
-  dialog says so and the tree is read again. Delete… asks first, then deletes each file of the node, one after another,
-  each its own revision, and the tabs of those files close. Copy path copies `packages/<id>/<path>`, the name that
-  problems and history use for a package file.
+- **The explorer's actions.** Files has New, which offers New file… and New folder…, and Refresh, as light icon buttons
+  with their names as tooltips. A file's or folder's menu opens on a right click, Shift+F10 or the menu key. It offers
+  New file…, New folder…, Rename… (also F2) and Copy path, then Delete… after a divider. The first two take the node's
+  folder, or the package's root for a file at the root. New file… creates an empty file without replacing one that
+  exists, and opens it. The folder holds only files, so New folder… adds an empty folder that lives in the explorer
+  until a file is in it, as git keeps folders, and it is gone after the page loads again. Rename… of a file or a folder
+  sends one [move](#the-authoring-api) that lists each file it holds with its version, so a rename is one revision. Open
+  tabs follow their files to the new paths and keep any unsaved text. When a file changed since, or the new name is
+  taken, the dialog says so and the tree is read again. Delete… asks first, then deletes each file of the node, one
+  after another, each its own revision, and the tabs of those files close. Copy path copies `packages/<id>/<path>`, the
+  name that problems and history use for a package file.
 - **Dragging.** With the developer role, a file or folder dragged onto a folder moves into it, and onto the explorer's
   free space moves to the package's root. A drop where the node already is, or a folder into itself, does nothing. It
   sends one [move](#the-authoring-api) that lists each file the node holds with its version, as Rename… does, so a drag

@@ -508,7 +508,7 @@ describe('AxisTable', () => {
       expect(within(row).queryByRole('button')).not.toBeInTheDocument()
     })
 
-    it('folds three actions into one Actions menu', async () => {
+    it('folds three actions into one Actions menu, with Delete last after a divider', async () => {
       renderTable({ rowActions: actionsFor(deleteAction, openAction, closeAction) })
 
       const row = screen.getByRole('row', { name: /Buy paper/ })
@@ -518,6 +518,10 @@ describe('AxisTable', () => {
 
       await userEvent.click(buttons[0])
       expect(await screen.findByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
+      const entries = screen.getByRole('menu').querySelectorAll('[role="menuitem"], [role="separator"]')
+      expect(
+        Array.from(entries, (entry) => (entry.getAttribute('role') === 'separator' ? '---' : entry.textContent)),
+      ).toEqual(['Open', 'Close', '---', 'Delete'])
       await userEvent.click(screen.getByRole('menuitem', { name: 'Close' }))
       expect(closeAction.onClick).toHaveBeenCalled()
     })
