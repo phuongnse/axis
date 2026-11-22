@@ -20,7 +20,7 @@ with no heading. A property that no section names goes to a last section with no
 - **One field in a section.** A section that holds one field names it in its heading, so the field has
   no label of its own. A section that holds one object shows the object's fields itself.
 - **One list in a section.** In the generic form's sections, a section that holds one list puts the list's Add…
-  on the right of its heading as a light text button, and the table has no toolbar row.
+  on the right of its heading, and the table has no toolbar row.
 - **One rhythm.** There is `spacing-md` on each side of the rule.
 - **One shared part.** The section is `SectionPart`, in `SectionParts`, one shared part that the generic form
   draws and the typed editors draw too.
@@ -75,33 +75,29 @@ away instead.
 
 A list of objects is a table with one column per property, named by its field text. A list of plain
 values and a map with marked keys are rows of inputs, with no box round a row, and spacing sets the
-rows apart. Add, or Add row in a dialog, is a light text button on the list's title row. Each row's
-Remove is in its "…" menu, the table's row actions. A field in `readOnlyNames` shows none of them.
+rows apart. Add, or Add row in a dialog, sits on the list's title row. Each row's Remove is its row action, see
+[tables](actions-and-controls.md#tables). A field in `readOnlyNames` shows none of them.
 
 - **A cell shows content, never a bare count.** A cell shows the value, Yes or No, a label's text, a
   nested list's items one to a line, or a map's entries as `key: value`. A label shows its text in the
   author's language, else in `en`, as [one language rule](studio.md#label-texts) says.
 - **Columns.** A column that would be empty on every row, such as Connectors when no module has any, is
-  left out, while the dialog keeps every field. A column of a boolean, a number or a choice is as wide as
+  left out, while the opened item shows every field. A column of a boolean, a number or a choice is as wide as
   its content.
-- **Add… and the row.** Add…, such as Add module…, is the list's main action. The first column is the
-  link that opens the item's dialog, a [button drawn as a link](actions-and-controls.md#buttons) because it goes to no address. Each row
-  keeps Remove alone, as an icon, see
-  [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
-- **The dialog edits a copy.** It is `medium` for plain values and `large` for an item that holds a list
-  or a map. It is titled by the verb that opened it: "Add module", because it adds an installed module
-  and creates none, or "Edit module". The item's name comes from the text `shell.studio.item.<kind>.<path>`,
-  which every list of objects in a kind with field texts has. A list without one reads "item", as in
-  Add item…. The dialog's fields are the item's fields at their real pointers. Done writes the copy to the
-  list as one step to undo. Done stays on, and a click on it with a required field empty marks each such field in error,
-  shows what to fill in under it and focuses the first, as [fields](actions-and-controls.md#fields) says. The dialog
-  stays open.
-  Cancel leaves the list as it was, so
-  Add… adds no row until Done. Inside the dialog a nested list is rows of inputs with Add row on its title
-  row, because a dialog never opens another.
-- **Labels in the dialog.** The texts typed in a label's boxes in the dialog are held with the copy. Done
-  writes them with the item, in the same step to undo, and Cancel drops them, so the label's texts stay as
-  they were.
+- **Add… and the row** _(planned)_. Add…, such as Add module…, is the list's main action. The first cell is a link to
+  `&item=<pointer>`, such as `&item=/modules/0`, which opens the item in the side panel. Each row keeps Remove alone,
+  as an icon, see [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
+- **The panel edits a copy** _(planned)_. The item opens in the side panel, titled by the verb that opened it: "Add
+  module", because it adds an installed module and creates none, or "Edit module". The item's name comes from the text
+  `shell.studio.item.<kind>.<path>`, which every list of objects in a kind with field texts has. A list without one
+  reads "item", as in Add item…. The panel's fields are the item's fields at their real pointers. Done, or Add for a
+  new item, writes the copy to the list as one step to undo, and Cancel sits beside it in the panel's bar. A click on
+  Done with a required field empty marks each such field in error, shows what to fill in under it and focuses the
+  first, as [fields](actions-and-controls.md#fields) says, and the panel stays open. Cancel leaves the list as it was,
+  so Add… adds no row until Done. Inside the panel a nested list is rows of inputs with Add row on its title row,
+  because the panel never opens another.
+- **Labels in the panel** _(planned)_. The texts typed in a label's boxes in the panel are held with the copy. Done
+  writes them with the item, in the same step to undo, and Cancel drops them, so the label's texts stay as they were.
 - **Layer marks.** In a module's resource, a row that the [customization layer](customization-layers.md#in-studio)
   added or changed shows its tag in the first cell, and the rows the layer removed show below the table.
 - **A known kind's label.** A value of a known kind shows its label, such as a module

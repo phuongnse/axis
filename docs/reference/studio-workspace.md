@@ -126,7 +126,7 @@ the entry's name on another sidebar entry, such as Settings or Policy matrix, th
 An optional line under the heading, in `textMuted`, says more: the application's description on the
 Overview. It never names a file or a path. The page's own actions, such as a
 scenario's Run scenario and a kind's New entity…, sit on the heading's right through `PageActions`, and so does a
-resource's "…" menu with [Delete…](studio.md#delete).
+resource's [Delete…](studio.md#delete).
 
 **A page that shows one thing**. A release and a revision are headed as
 [a page that shows one thing](shell.md#page-header) says. Their line is the kind alone, such as Release or Revision, and a

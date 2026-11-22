@@ -22,17 +22,31 @@ widget names a role, never an Ant Design button type.
 | Link        | Text in `primaryText` with no border        | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects)                                   |
 | Destructive | `dangerText` at any level                   | Actions that remove, such as Delete row and Delete                                                                                                                               |
 
-- **An inline link** _(planned)_. An `AxisButton` link with `inline` takes the height of a line of text and no padding,
-  for a link inside a value, such as a reference in a table cell.
+- **Four roles, by weight** _(planned)_. Finish is a solid fill, the one action that finishes a task, one a screen.
+  Main is outlined in `primaryText`, the main action of a region, one a region. Secondary is the default grey outline,
+  for most actions. Subtle is borderless in the text colour, with a light fill on hover and focus, for tools such as
+  Refresh, Format and Undo. An icon-only button is a subtle button with only its icon. The `icon` and `plain` roles
+  become subtle, and the `link` role ends, see [opening things](#opening-things).
+- **A tone apart from the role** _(planned)_. The role says how much an action weighs. The destructive tone says it
+  removes or throws something away, such as Delete, Discard, Revoke or Drop, and any role takes it. A main, secondary,
+  subtle or menu entry takes it in `dangerText`. A finish button takes it as a fill in `danger` with white text. A
+  dialog that confirms a removal ends in a solid red Delete with a light Cancel beside it. An open resource's Delete…
+  is a secondary button in the destructive tone. Save or Next removes nothing, so it is never red.
+- **No button looks like a link** _(planned)_. A borderless button is in the text colour, or in `dangerText` in the
+  tone, even beside a finish button. Borderless text in `primaryText` is a link's look alone.
+- **A region's main action keeps its border** _(planned)_. It keeps its border wherever it sits, a title row included.
+  A section's Add, such as Add field, Add validation or Add index, is a secondary button in the title row, and a
+  title row's tools stay subtle.
+- **One size to a group** _(planned)_. The usual size is the default, and the small size is for tables and dense rows.
+  A group has one size.
+- **An inline link** _(planned)_. A link inside a value, such as a reference in a table cell, takes the height of a
+  line of text and no padding.
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
   in the fill colours `primary` and `danger`, which fail contrast on a dark surface, so Axis writes
   them in `primaryText` and `dangerText`.
-- **Beside a solid button every other action is a text button.** In a dialog, a form's footer and a
-  band, Cancel and every secondary, main or destructive action next to the finish button is a text
-  button in its own colour, so the finish button is the one filled shape. The theme draws every Ant
-  Design dialog's Cancel this way, and `AxisActionRow`, the action row of `AxisButton`, draws the
-  other rows. A main action with no solid button beside it, such as a table's first toolbar action,
-  stays outlined.
+- **Beside a solid button every other action is a subtle button** _(planned)_. Cancel and every secondary action next
+  to the finish button is a subtle button, so the finish button is the one filled shape. A region's main action keeps
+  its border beside it, as the rule above says.
 - **An action row folds into a menu.** An `AxisActionRow` with `fold` keeps one line. When its content does not
   fit, the actions named in `fold` become the entries of one "…" icon menu, More actions, in their order, each
   keeping its disabled state. They are buttons again when the room comes back. A row without `fold` wraps.
@@ -50,8 +64,9 @@ widget names a role, never an Ant Design button type.
   thing. If not, they are tools, which stay side by side.
 - **Actions that manage one thing fold into a split button** _(planned)_. From three on, the one used most stays the
   button and the others are the entries of a menu on its joined caret, in their order, a destructive one in
-  `dangerText`. It is one button in one shape, as Ant Design joins one with Space.Compact: its text does the action
-  and its caret opens the menu. `AxisSplitButton` draws it.
+  `dangerText`. Its menu holds at least two entries and never repeats the button, and a destructive entry comes last,
+  after a divider. It is one button in one shape, as Ant Design joins one with Space.Compact: its text does the action and
+  its caret opens the menu. `AxisSplitButton` draws it.
 - **Tools stay side by side** _(planned)_. Find, Format, Copy, Zoom in, Zoom out, Move up, Move down, Undo and Redo
   stay as buttons, because a menu would cost a click each time. They fold into "…" only when their row runs out of
   room.
@@ -104,6 +119,10 @@ choices.
   apart by their heading, with no divider between them.
 - **A menu's minimum width** _(planned for M35)_. Every dropdown menu is at least as wide as the `menu`
   size token, and wider when an item needs the room.
+- **One threshold everywhere** _(planned)_. One or two actions show as buttons on a page's heading, a section's title
+  row, a table's row or a list's item. From three on, or when the row runs out of room, they fold into one "…" menu.
+- **A menu never holds one entry** _(planned)_. A menu has at least two entries, and a destructive one comes last,
+  after a divider.
 
 ## Fields
 
@@ -134,8 +153,8 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   while a field inside a form is marked by its `requiredMessage` alone.
   It makes its select, number, date or text input, or a select joined with its action, as wide as the field.
   `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
-  group that its title names and its help describes. It takes an `action` on its title row, drawn as a light text
-  button, and the group is still named by its title alone. A field that holds one input uses `AxisField`, and a
+  group that its title names and its help describes. It takes an `action` on its title row, drawn as [buttons](#buttons) says for a
+  title row, and the group is still named by its title alone. A field that holds one input uses `AxisField`, and a
   field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
   `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` are built on `AxisField` and `AxisFieldGroup`.
   `AxisCheckboxField` and `AxisChoiceField` take the same two modes: with a `name` inside a form, or with the
@@ -213,6 +232,8 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   is turned on, and no other.
 - **A pair's help** _(planned)_. A pair of fields in `AxisFieldRow` takes one title and one help, and its fields take no
   help of their own, so their boxes line up.
+- **A radio group is a value of a form** _(planned)_. A radio group holds one value of a form. It is kept with the form
+  and saves with it, as the form's other values do.
 
 ## Tab bars
 
@@ -225,6 +246,13 @@ Design's padding above the label reads as a gap too wide.
 - **A page's tab row.** A tab row on a page, such as a Studio resource's Design, Form, JSON and Used by, has the
   same look. Its rule reaches the page's edges, past the content area's padding. The row sits `spacing-sm` into the
   gap above it, and its content starts `spacing-md` under its rule.
+- **Tabs** _(planned)_. Tabs switch between areas or views of one content, such as Form, JSON and Used by.
+- **A segmented control** _(planned)_. It is one choice of two to five options that changes what shows in place, at
+  once, such as a chart's period. It never holds an action.
+- **A group of buttons never shows a selection** _(planned)_. A chosen item of choices drawn as buttons is on the
+  selected tint in `primaryText`, through `AxisButton`'s `selected`, never by a heavier role.
+- **A form's steps on the steps bar** _(planned)_. A form's steps are picked on the form widget's own steps bar, on the
+  canvas, not in a switch above it, see [step switch](form-designer.md#step-switch). The steps show once.
 
 ## Text
 
@@ -262,8 +290,7 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   and only the pointer is. Its message and any other words are text, and no whole row is a button. The link
   names the thing as people read it: its title in the reader's language, with its kind muted after it, such
   as "Purchase requests" then "Entity". It never names a file or a path. It opens the thing at its path. A
-  pointer to nothing a person can open is its file, in muted text. The link is an `AxisButton` with the `link`
-  role, see [buttons](#buttons).
+  pointer to nothing a person can open is its file, in muted text. See [opening things](#opening-things).
 - **A status is a `StatusTag` with five tones, and any other enum value is text** _(planned for M35)_. A
   status shows as a tag in one of five tones. Any other value of an enum shows as plain text.
 - **Every tag is a `StatusTag`**. Any tag on any screen is a `StatusTag`: a status, a mark or a value's
@@ -413,7 +440,13 @@ be kept right.
   [text](#text).
 - **Row actions.** An action on one row sits on the row. One whose meaning the platform knows, such as
   open, delete or activate a release, is an icon button, and one an author configured keeps its text.
-  From three actions on, or at narrow width, they fold into one "…" menu of text entries.
+  From three actions on, or at narrow width, they fold into one "…" menu of text entries. See [menus](#menus).
+- **A known action is its icon wherever its row is** _(planned)_. A row's Remove or Delete that is a button is the
+  trash icon in `dangerText`, named by a tooltip, in a list's row as in a table's.
+- **A column of row controls has no header text** _(planned)_. The column of a row's "…" or icon buttons, and the
+  column of drag handles, show no header words, as their icons say what they are. Each header still has a name for
+  screen readers alone, such as Actions or Drag to reorder, because a header with no name fails the accessibility
+  check. The controls show on every row, never only on hover, and each has its name as a tooltip.
 - **Opening a row.** A row opens from its identifying cell, a real link, so a row
   has no Edit icon, see [opening things](#opening-things).
 - **An empty table keeps its header**, with the
@@ -484,18 +517,31 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   link, as a page with its own address. So a link can be shared, reloaded, gone back to and opened in a
   new tab, and the page has room to grow.
 - **A side panel goes with a page and never opens a record.** It is for what accompanies the page: the
-  problems panel, filters or help, and an item of a draft, as the rule below says.
-- **An item of a draft opens in the side panel** _(planned)_. A field, validation or index of a draft, such as an
-  entity's, opens in the side panel. Its name is a real link to the panel's address, which opens the panel in place on
-  a plain click and a new tab on Ctrl+click, and its address can be copied. One platform part draws every such link.
-  An item with no address is a subtle button that opens the panel.
+  problems panel, filters or help, and a part of what the page edits, as the rule below says.
+- **A part of what the page edits opens in the side panel** _(planned)_. A part is a field, validation or index of an
+  entity, an application's module or package, or any item of a [list of objects](studio-resource-form.md#lists-of-objects).
+  Its name is a real link to the panel's address, which opens the panel in place on a plain click and a new tab on
+  Ctrl+click, and its address can be copied. The panel holds its edits until Done, or Add for a new part, with Cancel
+  beside it in the panel's bar. One platform part draws every such link.
 - **A modal dialog is for a short task that must end before going on:** confirming, such as Activate…
   or Delete…, asking for a little, such as a reason, a name or an invitation, or choosing one thing. It
   never holds a record's detail or a long form, and never opens a dialog of its own. What needs much
   scrolling, or to be come back to, is a page.
+- **A dialog never edits a part of the page** _(planned)_. A part opens in the side panel instead, so a dialog never
+  edits a field, a validation, an index or a list's item.
 - **A reference opens what it names**. A record's label, shown read-only, is a real link to its record page,
   with an `href` so Ctrl+click opens a new tab. The link passes the page it leaves as `from`, see
   [shell layout](shell.md#layout). It never opens a dialog. A record the person cannot open is plain text.
+- **A link goes to an address** _(planned)_. A link is a real `<a href>` or the router's link, so it opens in a new
+  tab and its address can be copied. It is in `primaryText`, underlined in running text and on hover when it stands
+  alone. An action with no address is a button, never a link.
+- **What opens a view gets an address** _(planned)_. A resource named in Problems, test results or a form's Used on
+  links to the resource at its path. A shared grant's Open policy links to the policy. A field's name links to
+  `&field=<name>`. A package file's place, such as `lib/x.py, line 3`, links to
+  `&view=packages&package=<id>&file=<path>&line=<n>`, which opens the file at that line. A list of objects' first cell
+  links to `&item=<pointer>`, which opens the item. See [Studio's route and address](studio.md#route-and-address).
+- **A reference reads as words** _(planned)_. A resource's name and its muted kind are inline text, so a reference
+  follows the words before it on their line and wraps as words do.
 - **A link in a value opens in the same site** _(planned)_. A reference in a value is an inline link only when the
   thing it names opens in the same site, such as a record, an instance, a sub-process or a step's run. A thing in
   another site, such as Studio, opens only from a button named for it, such as Open in Studio. So a call's connector
