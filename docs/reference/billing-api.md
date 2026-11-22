@@ -77,8 +77,6 @@ Each call names its own `409` and `422` cases below.
 
 ## Setting the plan and add-ons
 
-_(planned for M34)_
-
 This call sets the tenant's plan and its user packs at once. The packs are add-ons, and the plan and
 packs decide the tenant's quotas, see [from a plan to the quotas](plans.md#from-a-plan-to-the-quotas).
 
@@ -95,11 +93,17 @@ Content-Type: application/json
 - **The answer.** `200` with the tenant, as [the shared answers](#answers-every-call-shares) say.
 - **The move.** The call pins the plan version and the packs. It queues `writeQuotas` in the same
   transaction, through the one helper that every move uses.
+- **At once, in any state.** The plan applies at once in every state except `deleting` and `deleted`, a
+  `trialing` subscription included. The call leaves the state, the dates and the period alone.
+- **The same values again.** A call with the plan and packs the tenant already has is a new instruction. It
+  writes the audit record and queues `writeQuotas` again.
 - **`422`** for a plan code and version, or an add-on code, that `ControlPlane:Plans` does not list. It
-  also answers `422` for a trial plan, and for a quantity below 1.
+  also answers `422` for a trial plan, for a quantity below 1 and for a repeated add-on code. The check
+  comes after the replay check, so a retry still gets the first answer.
 - **`409`** for a subscription that is `deleting` or `deleted`.
-- **`409`** for a smaller plan, or fewer packs, that the tenant's use does not fit. The answer names each
-  quota and the amount over, see [changing a plan](plans.md#changing-a-plan).
+- **A plan the use does not fit** _(planned for M34)_. The call answers `409` for a smaller plan, or fewer
+  packs, that the tenant's use does not fit. The answer names each quota and the amount over, see
+  [changing a plan](plans.md#changing-a-plan).
 - **The audit record.** `subscription.planSet`, see [audit records](#audit-records).
 
 ## Setting the paid-through date

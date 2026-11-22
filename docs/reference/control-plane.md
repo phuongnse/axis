@@ -24,10 +24,10 @@ through a cell's API.
   [image and chart](#image-and-chart).
 - **The operator's billing system** _(planned for M34)_. The operator's own billing system holds the
   prices, invoices and payments, and calls the control plane's billing API.
-- **A billing API.** The operator's billing system sets a tenant's paid-through date through the
-  [billing API](billing-api.md#setting-the-paid-through-date), with a client and a scope of its own.
-- **The rest of the billing API** _(planned for M34)_. The operator's billing system also sets a tenant's
-  plan and add-ons, ends a subscription and reads a tenant's state and usage through the same API.
+- **A billing API.** The operator's billing system sets a tenant's paid-through date and its plan and
+  add-ons through the [billing API](billing-api.md), with a client and a scope of its own.
+- **The rest of the billing API** _(planned for M34)_. The operator's billing system also ends a
+  subscription and reads a tenant's state and usage through the same API.
 
 ## Two parts
 
