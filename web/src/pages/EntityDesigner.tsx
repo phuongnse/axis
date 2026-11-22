@@ -434,10 +434,9 @@ function yesNoColumn(setting: 'required' | 'unique', title: string, t: (key: str
   }
 }
 
-/** Where a field's value comes from, or `null` for a value people enter. */
-function comesFrom(field: unknown): Exclude<ValueSource, 'entered'> | null {
-  const source = isContent(field) ? valueSourceOf(field) : 'entered'
-  return source === 'entered' ? null : source
+/** Where a field's value comes from: entered by people, unless the field takes it another way. */
+function comesFrom(field: unknown): ValueSource {
+  return isContent(field) ? valueSourceOf(field) : 'entered'
 }
 
 /** The Fields table keeps no data source parameter in the address, only its view. */
@@ -797,8 +796,8 @@ const Fields = memo(function Fields({
     },
     yesNoColumn('required', t('shell.studio.entity.required'), t),
     yesNoColumn('unique', t('shell.studio.entity.unique'), t),
-    // Proposed, #3264: where the value comes from, in the panel's words, with the dash for a value people enter; the
-    // panel keeps search and privacy, which no longer share the column under a name that said nothing.
+    // Proposed, #3264: where the value comes from, in the panel's words; the panel keeps search and privacy, which no
+    // longer share the column under a name that said nothing.
     {
       key: 'comesFrom',
       kind: 'fixed',
@@ -806,15 +805,13 @@ const Fields = memo(function Fields({
       filter: {
         kind: 'enum',
         value: ({ field }) => comesFrom(field),
-        options: (['computed', 'sequence', 'creator', 'matched'] as const).map((source) => ({
+        options: (['entered', 'computed', 'sequence', 'creator', 'matched'] as const).map((source) => ({
           value: source,
           label: t(`shell.studio.field.entity.fields.valueSource.${source}`),
         })),
       },
-      render: (_, { field }) => {
-        const source = comesFrom(field)
-        return source === null ? <EmptyDash /> : t(`shell.studio.field.entity.fields.valueSource.${source}`)
-      },
+      // Every field's value comes from somewhere, so the cell always says where; the dash would read as not set.
+      render: (_, { field }) => t(`shell.studio.field.entity.fields.valueSource.${comesFrom(field)}`),
     },
   ]
 
