@@ -1,10 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { designTokensFor } from '../platform/designTokens'
-import { studioFileAddress } from '../platform/studioAddress'
+import { studioFileAddress, studioResourceAddress } from '../platform/studioAddress'
 import { Shell } from '../platform/Shell'
 import { ShellAsideContext } from '../platform/shellAsideContext'
 import { TextProvider } from '../platform/TextProvider'
@@ -38,7 +37,7 @@ function renderProblems(
           <ShellAsideContext.Provider value={{ target: aside, claim: () => () => {} }}>
             <StudioProblems
               diagnostics={diagnostics}
-              onSelect={vi.fn()}
+              addressOf={(id, path) => studioResourceAddress('Shop', id, path)}
               fileAddressOf={fileAddressOf}
               onClose={vi.fn()}
             />
@@ -132,7 +131,7 @@ describe('StudioProblems in the shell', () => {
             development={false}
           >
             <Shell titleKey="site.title" navigation={[]} locales={['en']} locale="en" onLocaleChange={() => {}}>
-              <StudioProblems diagnostics={[error]} onSelect={vi.fn()} onClose={vi.fn()} />
+              <StudioProblems diagnostics={[error]} onClose={vi.fn()} />
             </Shell>
           </TextProvider>
         </ThemeModeProvider>
@@ -160,7 +159,7 @@ describe('StudioProblemList', () => {
     },
   ]
 
-  it('lists errors before warnings, and a resource with no onSelect is plain text, not a button', () => {
+  it('lists errors before warnings, and a resource with no addressOf is plain text, not a link', () => {
     const warning: StudioDiagnostic = { ...error, code: 'AXIS-W201', severity: 'warning', resourceId: 'w1' }
     render(
       <ThemeModeProvider>
@@ -174,34 +173,69 @@ describe('StudioProblemList', () => {
     expect(codes).toEqual(['AXIS-E102', 'AXIS-W201'])
     expect(screen.getByText('PurchaseRequest')).toBeInTheDocument()
     expect(screen.getByText('Entity')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('makes the resource of a problem a link named by its title when onSelect is given', async () => {
-    const onSelect = vi.fn()
+  it("links the resource of a problem to its address at the problem's path, named by its title", async () => {
     render(
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioProblemList diagnostics={[resourceError]} resources={resources} onSelect={onSelect} />
-        </TextProvider>
-      </ThemeModeProvider>,
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioProblemList
+              diagnostics={[resourceError]}
+              resources={resources}
+              addressOf={(id, path) => studioResourceAddress('Shop', id, path)}
+            />
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
     )
 
-    await userEvent.click(screen.getByRole('button', { name: 'PurchaseRequest' }))
-    expect(onSelect).toHaveBeenCalledWith('e1', '/fields/0')
+    expect(screen.getByRole('link', { name: 'PurchaseRequest' })).toHaveAttribute(
+      'href',
+      '/studio?app=Shop&resource=e1&path=%2Ffields%2F0',
+    )
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('shows the file of a problem with no resource in muted text, and no button', () => {
+  it("draws a problem's severity tag outside its text column, which holds the code, the message and the link", () => {
+    render(
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioProblemList
+              diagnostics={[resourceError]}
+              resources={resources}
+              addressOf={(id, path) => studioResourceAddress('Shop', id, path)}
+            />
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
+    )
+
+    const item = screen.getByRole('listitem')
+    const tag = within(item).getByText('Error').closest<HTMLElement>('[data-tone]')!
+    const text = within(item).getByTestId('studio-problem-text')
+    expect(text).not.toContainElement(tag)
+    expect(tag.nextElementSibling).toBe(text)
+    expect(within(text).getByText('AXIS-E102')).toBeInTheDocument()
+    expect(within(text).getByText('The field has no type.')).toBeInTheDocument()
+    expect(within(text).getByRole('link', { name: 'PurchaseRequest' })).toBeInTheDocument()
+  })
+
+  it('shows the file of a problem with no resource in muted text, and no link', () => {
     render(
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioProblemList diagnostics={[error]} resources={resources} onSelect={vi.fn()} />
+          <StudioProblemList diagnostics={[error]} resources={resources} />
         </TextProvider>
       </ThemeModeProvider>,
     )
 
     const item = screen.getByRole('listitem')
     expect(within(item).getByText('entities/purchase-request.json')).toBeInTheDocument()
+    expect(within(item).queryByRole('link')).not.toBeInTheDocument()
     expect(within(item).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByText(/Path:/)).not.toBeInTheDocument()
   })

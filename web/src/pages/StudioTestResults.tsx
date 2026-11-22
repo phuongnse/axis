@@ -18,11 +18,11 @@ import { ResourceReference } from './ResourceReference'
 /**
  * The results of a test request, or the contract scenarios of a publish or validate: each scenario with passed or
  * failed, its time and, for a failure, its step and message. A scenario's name is its only link, with "Test scenario"
- * muted after it, see docs/reference/actions-and-controls.md#buttons. Selecting it calls `onSelect` with the scenario's
- * resource and the path of its failing step, or an empty path for a pass, so a pass opens at its top. Without `onSelect`
- * the name is plain text. A skipped contract scenario shows the relaxed point it covers and opens nothing. While the
- * request is queued or running it shows a note instead of rows, so an empty list never reads as a pass. An ended request
- * with no scenario results says that no scenario ran.
+ * muted after it. The link goes to the scenario at the path of its failing step, built by `scenarioAddressOf` from the
+ * scenario's resource, or to its top for a pass, see docs/reference/actions-and-controls.md#opening-things. Without
+ * `scenarioAddressOf` the name is plain text. A skipped contract scenario shows the relaxed point it covers and opens
+ * nothing. While the request is queued or running it shows a note instead of rows, so an empty list never reads as a pass.
+ * An ended request with no scenario results says that no scenario ran.
  *
  * A package's `test` request, which holds `packageTests`, shows one row a test instead: passed or failed, the name, the
  * duration when the host sent it, and for a failure its message with its place after it, `packages/<id>/<file>, line N`.
@@ -32,12 +32,12 @@ import { ResourceReference } from './ResourceReference'
  */
 export function StudioTestResults({
   request,
-  onSelect,
+  scenarioAddressOf,
   fileAddressOf,
   titled = true,
 }: {
   request: Pick<StudioRequest, 'kind' | 'status' | 'scenarios' | 'package' | 'packageTests'>
-  onSelect?: (resourceId: string, path: string) => void
+  scenarioAddressOf?: (resourceId: string, path: string) => string
   fileAddressOf?: (file: string, line?: number) => string | undefined
   titled?: boolean
 }) {
@@ -72,7 +72,7 @@ export function StudioTestResults({
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {scenarios.map((scenario) => (
             <li key={scenario.file} data-testid="studio-test-result" data-outcome={scenario.outcome}>
-              <ScenarioRow scenario={scenario} onSelect={onSelect} />
+              <ScenarioRow scenario={scenario} scenarioAddressOf={scenarioAddressOf} />
             </li>
           ))}
         </ul>
@@ -83,10 +83,10 @@ export function StudioTestResults({
 
 function ScenarioRow({
   scenario,
-  onSelect,
+  scenarioAddressOf,
 }: {
   scenario: StudioScenarioResult | StudioSkippedScenarioResult
-  onSelect?: (resourceId: string, path: string) => void
+  scenarioAddressOf?: (resourceId: string, path: string) => string
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -116,7 +116,7 @@ function ScenarioRow({
           <ResourceReference
             resource={{ kind: 'scenario', name: scenario.name }}
             file={scenario.file}
-            onOpen={onSelect && (() => onSelect(scenario.resourceId, scenario.path ?? ''))}
+            href={scenarioAddressOf?.(scenario.resourceId, scenario.path ?? '')}
           />
           <Typography.Text type="secondary">{formatDuration(scenario.durationMs, locale, t)}</Typography.Text>
         </Flex>

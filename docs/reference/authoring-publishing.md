@@ -162,8 +162,8 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
 - **The outcome.** The request ends `failed` when any scenario fails. Scenario failures go only in
   `scenarios`, one item for each scenario that ran, and the other failures, `AXC0217` to `AXC0220`
   and compile diagnostics, go in `diagnostics`. A scenario that fails has the failing `step`, its
-  `path` and its `message`. Selecting it in Studio opens the scenario at that step, as a diagnostic
-  opens a resource. A module's scenario opens nothing.
+  `path` and its `message`. Its name in Studio is a link to the scenario at that step, as a diagnostic's
+  resource is. A module's scenario opens nothing.
 - **Limits.** The scenarios of a request run one after another, and the work item limit of a
   [test scenario](test-scenarios.md) applies to each. A request stops after 10 minutes: the scenario
   that runs fails, its database is dropped and the request ends `failed` with `AXC0219`. A stop of the

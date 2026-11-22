@@ -429,7 +429,7 @@ test.describe('Studio on a copy of its own', () => {
     }
   })
 
-  test('an author selects a diagnostic and the editor shows the field at its path', async ({ page }) => {
+  test("an author follows a diagnostic's link to the field at its path, in place and in a new tab", async ({ page }) => {
     await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
@@ -453,8 +453,19 @@ test.describe('Studio on a copy of its own', () => {
         .getByRole('listitem')
         .filter({ hasText: 'AXC0012' })
       await expect(diagnostic).toContainText('AXC0012')
-      await diagnostic.getByRole('button', { name: 'SubmitPurchaseRequest', exact: true }).click()
+      const link = diagnostic.getByRole('link', { name: 'SubmitPurchaseRequest', exact: true })
+      await expect(link).toHaveAttribute('href', /path=%2Finput%2F2%2Ftarget/)
 
+      // Ctrl+click opens the same address in a new tab, and the panel stays open here.
+      const [tab] = await Promise.all([
+        page.context().waitForEvent('page'),
+        link.click({ modifiers: ['ControlOrMeta'] }),
+      ])
+      await tab.waitForLoadState()
+      await expect(tab).toHaveURL(/path=%2Finput%2F2%2Ftarget/)
+      await tab.close()
+
+      await link.click()
       await expect(page).toHaveURL(/path=%2Finput%2F2%2Ftarget/)
       // A path inside an item of a list lands on the list that holds the item.
       await expect(page.getByTestId('studio-field-/input')).toBeInViewport()
