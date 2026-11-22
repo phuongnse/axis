@@ -153,6 +153,18 @@ describe('the cells of a child collection', () => {
     })
   })
 
+  it('marks the input of a cell in error and no other cell', () => {
+    const rows = [
+      { description: 'Paper', quantity: '1' },
+      { description: 'Pen', quantity: '2' },
+    ]
+    renderIn('light', <Harness initial={rows} errors={{ '1/quantity': ['Bad'] }} />)
+
+    expect(screen.getByRole('textbox', { name: 'Quantity 2' })).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('textbox', { name: 'Quantity 1' })).not.toHaveAttribute('aria-invalid')
+    expect(screen.getByRole('textbox', { name: 'Description 2' })).not.toHaveAttribute('aria-invalid')
+  })
+
   it('lines up the cells of a row at the top', () => {
     renderIn('light', <Harness initial={oneRow} />)
 

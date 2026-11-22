@@ -225,7 +225,14 @@ test('an empty form shows the server error under the title', async ({ page }) =>
   await page.getByLabel(fieldLabel('Priority')).fill('3')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
+  // The first field in error takes the focus and is marked, and the message goes once the person types.
+  const title = page.getByRole('textbox', { name: 'Title', exact: true })
   await expect(page.getByTestId('field-error-title')).toHaveText('Required.')
+  await expect(title).toBeFocused()
+  await expect(title).toHaveAttribute('aria-invalid', 'true')
+  await title.fill('Pen')
+  await expect(page.getByTestId('field-error-title')).toHaveCount(0)
+  await expect(title).not.toHaveAttribute('aria-invalid')
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
 })
 

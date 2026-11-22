@@ -14,6 +14,8 @@ interface UserIdInputProps {
   /** Marks the picker required: the live state of the form, or `field.required` when left out. */
   ariaRequired?: boolean
   ariaDescribedBy?: string
+  /** Marks the picker `aria-invalid`, for a value the server refused. */
+  ariaInvalid?: boolean
   style?: CSSProperties
 }
 
@@ -32,6 +34,7 @@ export function UserIdInput({
   ariaLabel,
   ariaRequired,
   ariaDescribedBy,
+  ariaInvalid,
   style,
 }: UserIdInputProps) {
   const path = field.usersPath!
@@ -92,6 +95,7 @@ export function UserIdInput({
     <Select
       id={id}
       aria-label={ariaLabel}
+      aria-invalid={ariaInvalid || undefined}
       aria-required={required || undefined}
       aria-describedby={ariaDescribedBy}
       style={style}

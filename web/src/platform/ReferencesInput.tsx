@@ -20,6 +20,8 @@ interface ReferencesInputProps {
   onChange: (ids: string[], labels: (string | null)[]) => void
   /** The id of the element that describes the Add button, such as the field's help text. */
   ariaDescribedBy?: string
+  /** Marks the Add button `aria-invalid`, for a value the server refused. */
+  ariaInvalid?: boolean
 }
 
 /**
@@ -28,7 +30,15 @@ interface ReferencesInputProps {
  * appends the record and closes the lookup, and a record that is in the set already is left out. A
  * polite live region announces each addition and removal. A label that is missing shows the id.
  */
-export function ReferencesInput({ field, title, ids, labels, onChange, ariaDescribedBy }: ReferencesInputProps) {
+export function ReferencesInput({
+  field,
+  title,
+  ids,
+  labels,
+  onChange,
+  ariaDescribedBy,
+  ariaInvalid,
+}: ReferencesInputProps) {
   const t = useText()
   const [open, setOpen] = useState(false)
   const [announcement, setAnnouncement] = useState('')
@@ -84,6 +94,7 @@ export function ReferencesInput({ field, title, ids, labels, onChange, ariaDescr
         ref={add}
         aria-label={`${t('shell.form.add')} ${title}`}
         aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid || undefined}
         onClick={() => setOpen(true)}
       >
         {t('shell.form.add')}

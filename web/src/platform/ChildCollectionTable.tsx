@@ -140,6 +140,7 @@ export function ChildCollectionTable({
         align: isNumeric(child.type) ? ('right' as const) : undefined,
         render: (_value: unknown, row: RecordRow, index: number) => {
           const cellErrors = errors[`${index}/${child.name}`]
+          const invalid = cellErrors !== undefined
           const shown = formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t }, row)
           return (
             <Form.Item
@@ -180,7 +181,12 @@ export function ChildCollectionTable({
               ) : child.type === 'reference' ? (
                 // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
                 <Space.Compact block data-testid={`reference-${field.name}-${index}-${child.name}`}>
-                  <Input readOnly aria-label={`${label} ${index + 1}`} value={aligned[index]?.[child.name] ?? ''} />
+                  <Input
+                    readOnly
+                    aria-label={`${label} ${index + 1}`}
+                    aria-invalid={invalid || undefined}
+                    value={aligned[index]?.[child.name] ?? ''}
+                  />
                   <AxisButton
                     role="icon"
                     joined
@@ -214,6 +220,7 @@ export function ChildCollectionTable({
                   ariaLabel={`${label} ${index + 1}`}
                   locale={locale}
                   alignEnd={isNumeric(child.type)}
+                  ariaInvalid={invalid}
                 />
               )}
             </Form.Item>
