@@ -9,8 +9,8 @@ apart from the cells. How its rows are found, rated and checked is in
 
 ## The control plane
 
-The control plane has five trust boundaries. Each has its own diagram and table below: the sign-up
-page and API, the calls to the cells, the directory's DNS writes, the payment webhooks, and the billing API.
+The control plane has four trust boundaries. Each has its own diagram and table below: the sign-up
+page and API, the calls to the cells, the directory's DNS writes, and the billing API.
 
 ```mermaid
 flowchart LR
@@ -20,7 +20,6 @@ flowchart LR
     subgraph control [Regional control plane]
         SignUp[Sign-up page and API]
         Directory[Region directory, DNS jobs and cell client]
-        Webhooks[Payment webhook routes, inbox and ledger jobs]
         Billing[Billing API]
     end
     subgraph dns [DNS provider]
@@ -29,10 +28,6 @@ flowchart LR
     subgraph cell [Cell]
         Internal[Internal listener with mutual TLS]
     end
-    subgraph providers [External payment providers]
-        PayOS[PayOS]
-        Paddle[Paddle]
-    end
     subgraph operator [Operator]
         BillingSystem[Billing system]
     end
@@ -40,8 +35,6 @@ flowchart LR
     SignUp -->|creates tenants through| Directory
     Directory -->|signed DNS updates| Records
     Directory -->|calls over mutual TLS| Internal
-    PayOS -->|signed webhooks to| Webhooks
-    Paddle -->|signed webhooks to| Webhooks
     BillingSystem -->|bearer token to| Billing
 ```
 
@@ -144,52 +137,6 @@ flowchart LR
 
 Information disclosure and elevation of privilege do not apply to a `CNAME` record, which holds only a
 name and a target.
-
-### Payment webhooks
-
-_(planned for M34)_
-
-PayOS and Paddle tell the control plane about each payment with a signed webhook. The control plane
-checks each one, keeps it once and applies it in order, see [webhooks](payments.md#webhooks).
-
-```mermaid
-flowchart LR
-    subgraph providers [Payment providers]
-        PayOS[PayOS]
-        Paddle[Paddle]
-    end
-    subgraph attacker [Attacker]
-        Forger[Forger or replayer of a captured webhook]
-    end
-    subgraph cp [Regional control plane]
-        Route[POST /api/payments/payos/webhook and POST /api/payments/paddle/webhook]
-        Check[Signature check over the raw body]
-        Inbox[(billing.webhook_inbox)]
-        Apply[Ordered apply job]
-        Ledger[(billing.ledger_entries)]
-        Recon[Nightly reconciliation]
-    end
-    PayOS -->|signed webhook| Route
-    Paddle -->|signed webhook| Route
-    Forger -->|forged or replayed webhook| Route
-    Route -->|checked by| Check
-    Check -->|stores the event in| Inbox
-    Inbox -->|read in order by| Apply
-    Apply -->|writes payment entries to| Ledger
-    Recon -->|reads the day's transactions from| PayOS
-    Recon -->|reads the day's transactions from| Paddle
-    Recon -->|records missed payments in| Ledger
-```
-
-| Id | Threat | Boundary | Category | Rating | Status | Evidence |
-| --- | --- | --- | --- | --- | --- | --- |
-| C12 | A forged webhook marks an invoice as paid. | Payment webhooks | Spoofing | Critical | **Gap** | `PaymentWebhookTests` shows that a PayOS webhook with a wrong checksum answers `401`, stores nothing and logs no part of its body. [#2487](https://github.com/phuongnse/axis/issues/2487) checks Paddle's signature the same way. |
-| C13 | A replayed webhook applies a payment or a state change twice. | Payment webhooks | Tampering | High | **Gap** | `PaymentWebhookTests` shows that a PayOS event posted three times leaves one inbox row and one payment, and [#2487](https://github.com/phuongnse/axis/issues/2487) refuses a Paddle timestamp older than 5 minutes. `LedgerTests` shows that a second entry with the same idempotency key adds nothing. |
-| C14 | A lost webhook leaves a paid invoice due and makes the tenant read-only. | Payment webhooks | Denial of service | Medium | **Gap** | [#2488](https://github.com/phuongnse/axis/issues/2488) reads each provider's transactions every night and records a missed payment as if its webhook had come. |
-| C15 | A leaked PayOS checksum key or Paddle secret lets someone forge webhooks or act on Axis's provider account. | Payment webhooks | Spoofing | High | **Gap** | [#2480](https://github.com/phuongnse/axis/issues/2480) keeps PayOS's keys in Kubernetes Secrets and out of logs: the control plane chart mounts them from one Secret as files, and `PayOsClientTests` shows that no key reaches a log or an error message. [#2487](https://github.com/phuongnse/axis/issues/2487) adds the Paddle adapter but does not say where Paddle's secret is kept. |
-
-There is no repudiation row for the webhooks: each event is kept in the inbox, and an event that does not
-fit the state alerts the operator, see [webhooks](payments.md#webhooks).
 
 ### Billing API
 

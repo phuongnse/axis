@@ -1,5 +1,4 @@
 using Axis.ControlPlane;
-using Axis.ControlPlane.Billing;
 using Axis.ControlPlane.BillingApi;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Dns;
@@ -82,35 +81,6 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
 // The expiry of the pending sign-ups, queued every 5 minutes. It needs only the control plane's database.
 builder.Services.AddSingleton(new RecurringJob(SignUpExpiry.JobKind, TimeSpan.FromMinutes(5)));
 
-// The period invoices, queued every hour. It needs only the control plane's database.
-builder.Services.AddSingleton<IJobHandler, PeriodInvoicing>();
-builder.Services.AddSingleton(new RecurringJob(PeriodInvoicing.JobKind, TimeSpan.FromHours(1)));
-
-// The payment links of the open VND invoices, queued every 5 minutes, only when a PayOS provider is named. It needs the control plane's database and the adapter.
-// The settings guarantee the keys and the base URL of the real one.
-var payOsProvider = options.PayOs.Provider;
-if (string.Equals(payOsProvider, PayOsProviders.Fake, StringComparison.OrdinalIgnoreCase))
-{
-    builder.Services.AddSingleton<FakePayOs>();
-    builder.Services.AddSingleton<IPayOs>(services => services.GetRequiredService<FakePayOs>());
-}
-else if (string.Equals(payOsProvider, PayOsProviders.PayOs, StringComparison.OrdinalIgnoreCase))
-{
-    // The job handler is a singleton, so it keeps one client for the life of the process. Its connections are recycled, so a changed PayOS address is followed.
-    builder.Services.AddHttpClient<IPayOs, PayOsClient>(client => client.Timeout = TimeSpan.FromSeconds(30))
-        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
-}
-
-if (!string.IsNullOrWhiteSpace(payOsProvider))
-{
-    builder.Services.AddSingleton<IJobHandler, PaymentLinks>();
-    builder.Services.AddSingleton(new RecurringJob(PaymentLinks.JobKind, TimeSpan.FromMinutes(5)));
-
-    // The application of the PayOS webhook events kept in the inbox, queued every minute.
-    builder.Services.AddSingleton<IJobHandler, PaymentWebhookEvents>();
-    builder.Services.AddSingleton(new RecurringJob(PaymentWebhookEvents.JobKind, TimeSpan.FromMinutes(1)));
-}
-
 // The weekly refresh of the disposable mailbox domains, queued only when the list and its hash are both set. The options guarantee both.
 if (options.SignUp.DisposableDomains.IsComplete)
 {
@@ -135,7 +105,7 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cel
     builder.Services.AddSingleton<IJobHandler, SubscriptionClock>();
     builder.Services.AddSingleton(new RecurringJob(SubscriptionClock.JobKind, TimeSpan.FromHours(1)));
 
-    // The write of a subscription's quotas to its cell, the resume of a tenant that a payment made active, and the quotas sync over every subscription, queued every 24 hours. Each finds the tenant's cell in the directory and calls it.
+    // The write of a subscription's quotas to its cell, the resume of a tenant that the billing API made active, and the quotas sync over every subscription, queued every 24 hours. Each finds the tenant's cell in the directory and calls it.
     builder.Services.AddSingleton<IJobHandler, SubscriptionQuotas>();
     builder.Services.AddSingleton<IJobHandler, SubscriptionResume>();
     builder.Services.AddSingleton<IJobHandler, QuotaSync>();
@@ -185,12 +155,6 @@ app.UseStaticFiles();
 app.MapHealthEndpoints();
 app.MapSignUpEndpoints();
 app.MapBillingApiEndpoints(options.Billing);
-
-// The PayOS webhook, see docs/reference/payments.md#webhooks. Mapped only when a PayOS provider is named.
-if (!string.IsNullOrWhiteSpace(payOsProvider))
-{
-    app.MapPaymentWebhookEndpoints();
-}
 
 // The sign-up page, its verify page and its progress page, built by web/vite.sign-up.config.ts into the web root. The bundle picks the page by its path.
 app.MapFallbackToFile("/sign-up", "sign-up.html");

@@ -390,35 +390,6 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
     }
 
     [Fact]
-    public async Task An_unpaid_invoice_makes_an_active_subscription_pastDue_the_day_after_its_due_date_and_readOnly_14_days_later_with_one_read_only_call()
-    {
-        _cell.Administrators["acme"] = [];
-        var id = await SeedAsync("acme", "active", _start.AddDays(31), periodEndsAt: _start.AddDays(31));
-        await InsertOpenInvoiceAsync(id, _start.AddDays(31), _start.AddDays(31).AddMonths(-1));
-
-        // The invoice is due on day 31, so it is not a day past its due date yet and the period moves forward.
-        await RunAtAsync(31);
-        Assert.Equal("active", await StateAsync(id));
-        Assert.Equal(_start.AddDays(59), await NextAtAsync(id));
-
-        await RunAtAsync(32);
-        Assert.Equal("pastDue", await StateAsync(id));
-        Assert.Equal(_start.AddDays(46), await NextAtAsync(id));
-        Assert.Empty(_cell.Calls);
-        Assert.Equal(["subscription.pastDue"], await ColumnAsync($"SELECT action FROM control_plane.audit_records WHERE subject = '{id}' ORDER BY occurred_at, id"));
-
-        await RunAtAsync(45);
-        Assert.Equal("pastDue", await StateAsync(id));
-        Assert.Empty(_cell.Calls);
-
-        await RunAtAsync(46);
-        Assert.Equal("readOnly", await StateAsync(id));
-        Assert.Equal(_start.AddDays(136), await NextAtAsync(id));
-        Assert.Equal(["POST /api/cell/tenants/acme/read-only"], _cell.Calls.Select(call => call.Call));
-        Assert.Equal(0L, await ScalarAsync<long>($"SELECT count(*) FROM control_plane.subscription_emails WHERE subscription_id = '{id}' AND kind = 'tenantReadOnly'"));
-    }
-
-    [Fact]
     public async Task A_paid_readOnly_subscription_becomes_deleting_after_90_days_and_a_cancelled_one_becomes_readOnly_at_its_periods_end()
     {
         var paid = await SeedAsync("acme", "pastDue", _start, periodEndsAt: _start.AddDays(-14));
@@ -525,11 +496,10 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
         await using var insert = _dataSource.CreateCommand(
             """
             INSERT INTO control_plane.subscriptions
-                (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id, plan_code, plan_version, currency, period, period_ends_at)
+                (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id, plan_code, plan_version, period, period_ends_at)
             VALUES (@id, @tenant, @signUp, @state, @nextAt, @nextAt, @step,
                     CASE WHEN @periodEnds::timestamptz IS NULL THEN NULL ELSE 'team' END,
                     CASE WHEN @periodEnds::timestamptz IS NULL THEN NULL ELSE 1 END,
-                    CASE WHEN @periodEnds::timestamptz IS NULL THEN NULL ELSE 'VND' END,
                     CASE WHEN @periodEnds::timestamptz IS NULL THEN NULL ELSE 'month' END,
                     @periodEnds)
             """);
@@ -542,21 +512,6 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
         insert.Parameters.Add(new NpgsqlParameter("periodEnds", NpgsqlTypes.NpgsqlDbType.TimestampTz) { Value = (object?)periodEndsAt ?? DBNull.Value });
         await insert.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         return id;
-    }
-
-    // An open period invoice of a paid subscription, which the clock reads for its due date only.
-    private async Task InsertOpenInvoiceAsync(Guid subscriptionId, DateTimeOffset dueAt, DateTimeOffset periodStart)
-    {
-        await using var insert = _dataSource.CreateCommand(
-            """
-            INSERT INTO billing.invoices (id, subscription_id, kind, status, currency, plan_code, plan_version, period, period_start, due_at)
-            VALUES (@id, @subscription, 'period', 'open', 'VND', 'team', 1, 'month', @start, @due)
-            """);
-        insert.Parameters.AddWithValue("id", Guid.CreateVersion7());
-        insert.Parameters.AddWithValue("subscription", subscriptionId);
-        insert.Parameters.AddWithValue("start", periodStart);
-        insert.Parameters.AddWithValue("due", dueAt);
-        await insert.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     private Task<string> StateAsync(Guid id) => ScalarAsync<string>($"SELECT state FROM control_plane.subscriptions WHERE id = '{id}'");

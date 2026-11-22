@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Subscriptions;
 /// Sets the date a subscription is paid through, see <c>docs/reference/billing-api.md#setting-the-paid-through-date</c>. A <c>trialing</c>, <c>pastDue</c>,
 /// <c>readOnly</c> or <c>cancelled</c> subscription becomes <c>active</c> with a new step id, and <see cref="SubscriptionActivation"/> writes its records and
 /// queues its jobs. An <c>active</c> subscription keeps its state and step id and takes the new date. The tenant is paid through the end of the day, so the
-/// next date is the start of the following day in UTC, and the end of the paid period that the PayOS payments keep is cleared, so the subscription's
+/// next date is the start of the following day in UTC, and the end of the paid period is cleared, so the subscription's
 /// period is no longer rolled forward. The caller has locked the subscription's row and has checked its state.
 /// </summary>
 internal static class SubscriptionPaidThrough

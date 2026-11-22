@@ -114,7 +114,7 @@ describe('the Axis control plane Helm chart', () => {
   }
 
   test('rejects a secret value in the values, and never prints it', () => {
-    for (const setting of ['secrets.connectionString.value=leak', 'controlPlane.connectionString=leak', 'secrets.certificate.value=leak', 'secrets.mailPassword.value=leak', 'secrets.challengeKey.value=leak', 'secrets.payOs.value=leak', 'controlPlane.cells[0].clientSecret.value=leak', 'secrets.cellClientCertificate.value=leak', 'secrets.cellCertificateAuthority.value=leak']) {
+    for (const setting of ['secrets.connectionString.value=leak', 'controlPlane.connectionString=leak', 'secrets.certificate.value=leak', 'secrets.mailPassword.value=leak', 'secrets.challengeKey.value=leak', 'controlPlane.cells[0].clientSecret.value=leak', 'secrets.cellClientCertificate.value=leak', 'secrets.cellCertificateAuthority.value=leak']) {
       const result = render('--set', setting)
       assert.notEqual(result.status, 0, setting)
       assert.doesNotMatch(result.stdout, /leak/, setting)
@@ -240,33 +240,6 @@ describe('the Axis control plane Helm chart', () => {
   test('mounts no challenge key when the values name no Secret', () => {
     const deployment = find(renderOk('--set', 'secrets.challengeKey.name='), 'Deployment', 'axis-controlplane')
     assert.doesNotMatch(deployment, /ControlPlane__SignUp__ChallengeKey/)
-  })
-
-  test('sets the PayOS provider and base URL and mounts the three PayOS keys of the Secret as files', () => {
-    const deployment = find(renderOk(), 'Deployment', 'axis-controlplane')
-    assert.match(deployment, /- name: ControlPlane__PayOs__Provider\n\s+value: "PayOs"\n/)
-    assert.match(deployment, /- name: ControlPlane__PayOs__BaseUrl\n\s+value: "https:\/\/api-merchant\.payos\.vn"\n/)
-    assert.doesNotMatch(deployment, /- name: ControlPlane__PayOs__(ClientId|ApiKey|ChecksumKey)\n/)
-    assert.match(
-      deployment,
-      /- secret:\n\s+name: "axis-controlplane-payos"\n\s+items:\n\s+- key: ControlPlane__PayOs__ClientId\n\s+path: ControlPlane__PayOs__ClientId\n\s+- key: ControlPlane__PayOs__ApiKey\n\s+path: ControlPlane__PayOs__ApiKey\n\s+- key: ControlPlane__PayOs__ChecksumKey\n\s+path: ControlPlane__PayOs__ChecksumKey\n/,
-    )
-  })
-
-  test('fails to render with the PayOS provider and no Secret, and names secrets.payOs.name', () => {
-    const result = render('--set', 'secrets.payOs.name=')
-    assert.notEqual(result.status, 0)
-    assert.ok(result.stderr.includes('secrets.payOs.name is required'), result.stderr)
-  })
-
-  test('sets no PayOS setting and mounts no PayOS Secret when the provider is empty', () => {
-    const deployment = find(renderOk('--set', 'controlPlane.payOs.provider=', '--set', 'secrets.payOs.name='), 'Deployment', 'axis-controlplane')
-    assert.doesNotMatch(deployment, /ControlPlane__PayOs__|axis-controlplane-payos/)
-  })
-
-  test('rejects the fake PayOS provider, which Production refuses', () => {
-    const result = render('--set', 'controlPlane.payOs.provider=Fake')
-    assert.notEqual(result.status, 0)
   })
 
   test('applies the image registry, tag and pull Secrets', () => {

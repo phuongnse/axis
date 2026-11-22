@@ -4,8 +4,8 @@ using Npgsql;
 namespace Axis.ControlPlane.Subscriptions;
 
 /// <summary>
-/// What follows a move to <c>active</c>, see <c>docs/reference/subscriptions.md#states</c>. Both ways to make a subscription <c>active</c>, a payment and
-/// the billing API's paid-through date, call it in the transaction of the move, so the records and the jobs commit with it or not at all.
+/// What follows a move to <c>active</c>, see <c>docs/reference/subscriptions.md#states</c>. The billing API's paid-through date calls it in the
+/// transaction of the move, so the records and the jobs commit with it or not at all.
 /// </summary>
 internal static class SubscriptionActivation
 {

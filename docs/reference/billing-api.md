@@ -122,8 +122,7 @@ Content-Type: application/json
   `resumeTenant`, as [states](subscriptions.md#states) says. An `active` subscription keeps its state and
   takes the new date.
 - **The move.** The call sets the next date to the start of the day after the paid-through date in UTC,
-  and clears the end of the paid period that a payment keeps, so the period roll-forward leaves the
-  subscription alone.
+  and clears the end of the paid period, so the period roll-forward leaves the subscription alone.
 - **`422`** for a date before today in UTC. The check comes after the replay check, so a retry on the next day
   still gets the first answer.
 - **`409`** for a subscription that pins no plan. The plan is set first, see [the plan call](#setting-the-plan-and-add-ons).

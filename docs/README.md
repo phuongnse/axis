@@ -212,7 +212,6 @@ Read by people who run or change the hosted service: cells, tenants, sign-up, pl
 | [Subscriptions](reference/subscriptions.md)                 | A tenant's trial and paid-through states, the read-only tenant, the timeline and the control plane's emails | You change trial, paid-through or read-only states or their emails       |
 | [Plans](reference/plans.md)                                 | The plan catalogue, versions, quotas from a plan, user packs and changing a plan                            | You change the plan catalogue or a plan's quotas                         |
 | [Billing API](reference/billing-api.md)                     | The API the operator's billing system calls: sign-in, the paid-through date, plan, ending, usage                           | You change the billing API or write a connector to it                    |
-| [Payments](reference/payments.md)                           | Billing invoices, PayOS and VietQR, Paddle, webhooks, the daily reconciliation and the ledger               | You change invoices, payment providers, webhooks or the ledger           |
 
 ### Security
 
@@ -239,7 +238,7 @@ Read by people who change sign-in, authorization, keys, headers or the threat mo
 | [Threat model: collaboration](reference/threat-model-product-collaboration.md)                            | The threats to tasks handed between people, absences, deciding several tasks, comments, live pages and notification preferences _(planned for M43)_                                               | You assess a threat to a task, an absence or deciding several tasks |
 | [Threat model: the installation](reference/threat-model-installation.md)                                  | The images, hosts, databases, backups, secrets and the cell console threats of an install                                                         | You assess a threat to an installation                              |
 | [Threat model: the way Axis is built](reference/threat-model-build.md)                                    | The NexKit, CI and AI agent threats of how Axis is built                                                                                          | You assess a threat to how Axis is built                            |
-| [Threat model: the control plane](reference/threat-model-control-plane.md)                                | The sign-up, cell call, DNS and payment webhook threats of Axis SaaS                                                                              | You assess a threat to the control plane of Axis SaaS               |
+| [Threat model: the control plane](reference/threat-model-control-plane.md)                                | The sign-up, cell call and DNS threats of Axis SaaS                                                                                               | You assess a threat to the control plane of Axis SaaS               |
 | [Threat model method](reference/threat-model-method.md)                                                   | How the threat model is filled: the methods, the rows, the ratings and the statuses                                                               | You fill in or rate a threat model row                              |
 
 ### Platform internals

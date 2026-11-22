@@ -10,7 +10,7 @@ namespace Axis.ControlPlane.Storage.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // A subscription's currency is fixed once it has a ledger entry, see docs/reference/payments.md#invoices.
+            // A subscription's currency was fixed once it had a ledger entry. D168 drops both, and DropBilling removes this trigger.
             migrationBuilder.Sql(
                 """
                 CREATE FUNCTION control_plane.reject_subscription_currency_change() RETURNS trigger LANGUAGE plpgsql AS $$
