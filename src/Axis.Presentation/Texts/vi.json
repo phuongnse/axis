@@ -1226,6 +1226,7 @@
   "shell.studio.design.desktop": "Máy tính",
   "shell.studio.design.phone": "Điện thoại",
   "shell.studio.design.step": "Bước",
+  "shell.studio.design.stepHasProblems": "Bước này có vấn đề",
   "shell.studio.design.visibleWhen": "Hiển thị khi",
   "shell.studio.design.conditionMark": "{condition}: {text}",
   "shell.studio.design.requiredWhen": "Bắt buộc khi",

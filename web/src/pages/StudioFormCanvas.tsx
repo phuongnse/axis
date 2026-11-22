@@ -1,10 +1,12 @@
 import { useDndContext, useDroppable } from '@dnd-kit/core'
-import { Flex, Tabs } from 'antd'
+import { Flex } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
 import { fillText } from '../platform/fillText'
 import { StatusTag } from '../platform/StatusTag'
 import { FormCanvasContext, type FormCanvas } from '../platform/formCanvas'
+import { ExclamationCircleOutlined } from '@ant-design/icons'
+import { AxisButton } from '../platform/AxisButton'
 import { FormWidget } from '../platform/FormWidget'
 import { getAt } from '../platform/jsonPatch'
 import { placeholderApi, placeholderId } from '../platform/placeholderApi'
@@ -162,6 +164,20 @@ export function StudioFormCanvas({
           </FormElementFrame>
         )
       },
+      // Proposed, #4902: the wizard's own steps bar picks the step shown, so the steps show once, as on the site.
+      stepEntry: (index, content) => {
+        const path = form.steps[index]?.path
+        return (
+          <CanvasStep
+            index={index}
+            path={path}
+            marked={diagnosticsAt(diagnostics, path).length > 0}
+            selected={selected}
+          >
+            {content}
+          </CanvasStep>
+        )
+      },
       field: (name, content) => {
         const path = fields.find((field) => field.name === name)?.path
         return (
@@ -185,6 +201,17 @@ export function StudioFormCanvas({
   // The innermost frame under the click, so a click in a field selects the field and one on a section's title the section.
   function click(event: SyntheticEvent) {
     cancel(event)
+    // Proposed, #4902: a step of the wizard's steps bar shows that step and selects it.
+    const stepEntry = (event.target as HTMLElement).closest<HTMLElement>('[data-step-index]')
+    if (stepEntry !== null) {
+      const index = Number(stepEntry.dataset.stepIndex)
+      setStep(index)
+      const path = widget?.form?.steps[index]?.path
+      if (path !== undefined) {
+        onSelect(path)
+      }
+      return
+    }
     const frame = (event.target as HTMLElement).closest<HTMLElement>('[data-form-frame]')
     const path = frame?.dataset.path
     if (path !== undefined) {
@@ -201,24 +228,6 @@ export function StudioFormCanvas({
           </div>
         )}
         <TextProvider catalogs={catalogs} development={outer.development}>
-          {steps.length > 0 && (
-            <StepSwitch
-              value={shownStep}
-              selected={selected}
-              onChange={(index) => {
-                setStep(index)
-                const path = steps[index]?.path
-                if (path !== undefined) {
-                  onSelect(path)
-                }
-              }}
-              steps={steps.map((entry) => ({
-                titleKey: entry.titleKey,
-                path: entry.path,
-                marked: diagnosticsAt(diagnostics, entry.path).length > 0,
-              }))}
-            />
-          )}
           <div data-testid="studio-form-canvas" onClickCapture={click} onSubmitCapture={cancel}>
             {drawn?.widget === null && (
               <CanvasAlert testId="studio-canvas-cannot-draw" textKey="shell.studio.design.formCannotDraw" />
@@ -256,49 +265,28 @@ export function StudioFormCanvas({
   )
 }
 
-function StepSwitch({
-  value,
-  selected,
-  onChange,
-  steps,
-}: {
-  value: number
-  selected: string | null
-  onChange: (step: number) => void
-  steps: { titleKey: string; path: string | undefined; marked: boolean }[]
-}) {
-  const t = useText()
-  // Proposed, #4902: a form's steps are areas of one form, so they are tabs, as a resource's Form, JSON and Used by are;
-  // a segmented control holds two to five options of one choice. A click on the step already shown selects it again.
-  return (
-    <Tabs
-      data-testid="studio-form-steps"
-      aria-label={t('shell.studio.design.step')}
-      activeKey={String(value)}
-      onTabClick={(key) => onChange(Number(key))}
-      items={steps.map((step, index) => ({
-        key: String(index),
-        label: <StepSwitchEntry index={index} step={step} selected={selected} />,
-      }))}
-    />
-  )
-}
-
-/** A step's entry in the switch. While a section moves, it is a drop target that appends the section to the step. */
-function StepSwitchEntry({
+/**
+ * A step of the wizard's steps bar on the canvas: a button that the canvas's click shows and selects, marked when the step
+ * has a problem. While a section moves, it is a drop target that appends the section to the step.
+ */
+function CanvasStep({
   index,
-  step,
+  path,
+  marked,
   selected,
+  children,
 }: {
   index: number
-  step: { titleKey: string; path: string | undefined; marked: boolean }
+  path: string | undefined
+  marked: boolean
   selected: string | null
+  children: ReactNode
 }) {
   const t = useText()
   const { colour, radius } = useDesignTokens()
   const { active } = useDndContext()
   const sectionMoving = typeof (active?.data.current as { section?: unknown } | undefined)?.section === 'number'
-  const pointer = step.path ?? `/steps/${index}`
+  const pointer = path ?? `/steps/${index}`
   const { setNodeRef, isOver } = useDroppable({
     id: `switch:${pointer}`,
     data: { pointer },
@@ -308,12 +296,25 @@ function StepSwitchEntry({
     <span
       ref={setNodeRef}
       data-testid="studio-form-step"
-      data-path={step.path}
-      data-marked={step.marked ? 'true' : undefined}
-      aria-current={step.path !== undefined && step.path === selected ? 'true' : undefined}
+      data-step-index={index}
+      data-path={path}
+      data-marked={marked ? 'true' : undefined}
       style={{ outline: isOver ? `2px solid ${colour.primary}` : undefined, borderRadius: radius.base }}
     >
-      {step.marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name: t(step.titleKey) }) : t(step.titleKey)}
+      <AxisButton
+        role="subtle"
+        selected={path !== undefined && path === selected}
+        aria-current={path !== undefined && path === selected ? 'true' : undefined}
+        style={{ height: 'auto', paddingInline: 4 }}
+      >
+        {children}
+        {marked && (
+          <ExclamationCircleOutlined
+            aria-label={t('shell.studio.design.stepHasProblems')}
+            style={{ color: colour.dangerText }}
+          />
+        )}
+      </AxisButton>
     </span>
   )
 }

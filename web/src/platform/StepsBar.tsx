@@ -1,6 +1,6 @@
 import { CheckOutlined } from '@ant-design/icons'
 import { Tooltip, Typography } from 'antd'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
 
@@ -19,10 +19,13 @@ export function StepsBar({
   titles,
   current,
   vertical = false,
+  entry,
 }: {
   titles: string[]
   current: number
   vertical?: boolean
+  /** Proposed, #4902: wraps a step's circle and title, as Studio's form canvas does to make each step pickable. */
+  entry?: (index: number, content: ReactNode) => ReactNode
 }) {
   const { colour, spacing } = useDesignTokens()
   const numbered = titles.length >= numbersFrom
@@ -78,6 +81,35 @@ export function StepsBar({
           fontSize: 12,
           lineHeight: 1,
         }
+        const step = (
+          <span style={{ display: 'flex', alignItems: 'center' }}>
+            {numbered && !isCurrent ? (
+              <Tooltip title={title} trigger={['hover', 'focus']}>
+                <span tabIndex={0} style={circle}>
+                  <span aria-hidden>{mark}</span>
+                  <span style={visuallyHidden}>{title}</span>
+                </span>
+              </Tooltip>
+            ) : (
+              <span aria-hidden style={circle}>
+                {mark}
+              </span>
+            )}
+            {(!numbered || isCurrent) && (
+              <Typography.Text
+                ellipsis={{ tooltip: title }}
+                style={{
+                  maxWidth: titleWidth,
+                  marginInlineStart: spacing.xs,
+                  color: isCurrent ? colour.primaryText : colour.textMuted,
+                  fontWeight: isCurrent ? 500 : 400,
+                }}
+              >
+                {title}
+              </Typography.Text>
+            )}
+          </span>
+        )
         return (
           <li
             key={index}
@@ -89,33 +121,7 @@ export function StepsBar({
               flex: 'none',
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center' }}>
-              {numbered && !isCurrent ? (
-                <Tooltip title={title} trigger={['hover', 'focus']}>
-                  <span tabIndex={0} style={circle}>
-                    <span aria-hidden>{mark}</span>
-                    <span style={visuallyHidden}>{title}</span>
-                  </span>
-                </Tooltip>
-              ) : (
-                <span aria-hidden style={circle}>
-                  {mark}
-                </span>
-              )}
-              {(!numbered || isCurrent) && (
-                <Typography.Text
-                  ellipsis={{ tooltip: title }}
-                  style={{
-                    maxWidth: titleWidth,
-                    marginInlineStart: spacing.xs,
-                    color: isCurrent ? colour.primaryText : colour.textMuted,
-                    fontWeight: isCurrent ? 500 : 400,
-                  }}
-                >
-                  {title}
-                </Typography.Text>
-              )}
-            </span>
+            {entry ? entry(index, step) : step}
             {index < titles.length - 1 && <span aria-hidden style={connector} />}
           </li>
         )

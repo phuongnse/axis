@@ -89,7 +89,11 @@ export function useFormSteps(
   }
 
   const progress: ReactNode = active && (
-    <StepsBar titles={visible.map((step) => t(steps[step].titleKey))} current={Math.max(position, 0)} />
+    <StepsBar
+      titles={visible.map((step) => t(steps[step].titleKey))}
+      current={Math.max(position, 0)}
+      entry={canvas?.stepEntry}
+    />
   )
 
   const fields: ReactNode = active ? (
