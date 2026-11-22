@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { designTokensFor } from './designTokens'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
@@ -154,6 +155,17 @@ describe('SaveBar', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     expect(onDiscard).not.toHaveBeenCalled()
+  })
+
+  it('finishes the Discard dialog in a solid red Discard', async () => {
+    renderBar()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByRole('button', { name: 'Discard' })).toHaveStyle({
+      background: designTokensFor('light').colour.danger,
+    })
   })
 
   it('discards once the dialog is confirmed with Discard', async () => {

@@ -2,6 +2,7 @@ import { FileOutlined, FolderOutlined, PlusOutlined, ReloadOutlined } from '@ant
 import { Dropdown, Flex, Modal, Tree, type TreeDataNode } from 'antd'
 import { useContext, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { AxisButton } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { Chevron } from '../platform/Chevron'
 import { fillText } from '../platform/fillText'
 import type { CommandResult } from '../platform/inspection'
@@ -607,11 +608,16 @@ export function StudioPackageExplorer({
                 })
               : fillText(t('shell.studio.packages.deleteFile'), { file: deleting.path })
         }
-        okText={t('shell.studio.packages.deleteOk')}
-        okButtonProps={{ danger: true }}
-        confirmLoading={deleteBusy}
-        cancelText={t('shell.studio.cancel')}
-        onOk={() => deleting !== null && void deleteNode(deleting)}
+        footer={
+          <DialogFooter
+            destructive
+            finishText={t('shell.studio.packages.deleteOk')}
+            cancelText={t('shell.studio.cancel')}
+            finishing={deleteBusy}
+            onFinish={() => deleting !== null && void deleteNode(deleting)}
+            onCancel={() => setDeleting(null)}
+          />
+        }
         onCancel={() => setDeleting(null)}
       />
     </section>

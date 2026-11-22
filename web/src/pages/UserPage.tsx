@@ -3,6 +3,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { NotSet } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
@@ -177,10 +178,16 @@ export function UserPage() {
         open={pending !== null}
         width={size.dialog.small}
         title={pending && t(pending.give ? 'shell.users.roles.confirmGive' : 'shell.users.roles.confirmRemove')}
-        okText={pending && t(pending.give ? 'shell.users.roles.give' : 'shell.users.roles.remove')}
-        cancelText={t('shell.users.roles.cancel')}
-        confirmLoading={busy}
-        onOk={() => void confirm()}
+        footer={
+          <DialogFooter
+            destructive={pending !== null && !pending.give}
+            finishText={pending && t(pending.give ? 'shell.users.roles.give' : 'shell.users.roles.remove')}
+            cancelText={t('shell.users.roles.cancel')}
+            finishing={busy}
+            onFinish={() => void confirm()}
+            onCancel={() => setPending(null)}
+          />
+        }
         onCancel={() => setPending(null)}
       >
         {pending && (

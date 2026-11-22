@@ -3,6 +3,7 @@ import { Modal } from 'antd'
 import { useState, type ReactNode } from 'react'
 import { ActionBar } from './ActionBar'
 import { AxisButton } from './AxisButton'
+import { DialogFooter } from './DialogFooter'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { ShellBarSlot } from './shellBarSlot'
@@ -105,13 +106,18 @@ export function SaveBar({
         open={discardOpen}
         width={size.dialog.small}
         title={t('shell.studio.discardConfirm')}
-        okText={t('shell.studio.discard')}
-        okButtonProps={{ danger: true }}
-        cancelText={t('shell.studio.cancel')}
-        onOk={() => {
-          setDiscardOpen(false)
-          onDiscard()
-        }}
+        footer={
+          <DialogFooter
+            destructive
+            finishText={t('shell.studio.discard')}
+            cancelText={t('shell.studio.cancel')}
+            onFinish={() => {
+              setDiscardOpen(false)
+              onDiscard()
+            }}
+            onCancel={() => setDiscardOpen(false)}
+          />
+        }
         onCancel={() => setDiscardOpen(false)}
       />
     </>

@@ -30,8 +30,10 @@ widget names a role, never an Ant Design button type.
   throws something away, such as Delete, Discard, Revoke or Drop, and any role takes it. A main, secondary or subtle
   button takes it in `dangerText`, and a menu entry too. A finish button takes it as a fill in `danger` with white text.
   Save or Next removes nothing, so it is never red.
-- **A removal finishes in solid red** _(planned)_. A dialog that confirms a removal ends in a solid red Delete with a
-  light Cancel beside it. An open resource's Delete… is a secondary button in the destructive tone.
+- **A removal finishes in solid red.** A dialog that confirms a removal ends in a solid red Delete, drawn through
+  `DialogFooter`, with a light Cancel beside it.
+- **An open resource's Delete… is secondary** _(planned)_. An open resource's Delete… is a secondary button in the
+  destructive tone.
 - **A chosen subtle button is marked through `selected`.** `AxisButton`'s `selected` draws a subtle button on the
   selected tint in `primaryText` and sets the one `aria-pressed` itself, or `aria-current` for a page or a step, in place
   of any the caller passes.
