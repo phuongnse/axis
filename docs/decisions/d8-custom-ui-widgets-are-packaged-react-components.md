@@ -1,6 +1,6 @@
 # D8. Custom UI widgets are packaged React components
 
-Status: **Agreed, deferred**
+Status: **Agreed**
 
 ## Context
 
