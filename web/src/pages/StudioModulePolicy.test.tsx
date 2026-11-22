@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { emptyDescription } from '../test/antd'
 import { StudioModulePolicy } from './StudioModulePolicy'
 
 const policy = {
@@ -72,6 +73,12 @@ describe('StudioModulePolicy', () => {
     renderPolicy({ ...policy, grants: [policy.grants[0]] })
 
     expect(screen.getByRole('button', { name: 'Delete grant' })).toBeDisabled()
+  })
+
+  it('says "No grants yet." where the grants would be, when the policy has none', () => {
+    renderPolicy({ ...policy, grants: [] })
+
+    expect(emptyDescription('No grants yet.', screen.getByTestId('studio-module-policy-grants'))).toBeVisible()
   })
 
   it('joins the roles of the policy with the list format of the language', () => {

@@ -240,13 +240,16 @@ if affected playwright; then
     -p 127.0.0.1::9000 "$minio_image" >/dev/null
   minio_port="$(docker port "$minio_container" 9000/tcp | head -n1 | sed 's/.*://')"
   minio_url="http://127.0.0.1:$minio_port"
+  # The breached-password list is a Bloom filter that refuses one random password in 10,000 by default. The specs make
+  # many random passwords, so this run asks for one in ten million.
   docker run -d --name "$keycloak_container" --network "$network" \
     -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
     -e KC_BOOTSTRAP_ADMIN_CLIENT_ID=axis-admin -e KC_BOOTSTRAP_ADMIN_CLIENT_SECRET="$identity_admin_secret" \
     -v "$PWD/deploy/keycloak/password-blacklists:/opt/keycloak/data/password-blacklists:ro" \
     -v "$PWD/samples/keycloak:/opt/keycloak/data/import:ro" \
     -v "$PWD/artifacts/keycloak-theme:/opt/keycloak/themes:ro" -p "127.0.0.1:$keycloak_port:$keycloak_port" \
-    "$keycloak_image" start-dev --import-realm --http-port="$keycloak_port" >/dev/null
+    "$keycloak_image" start-dev --import-realm --http-port="$keycloak_port" \
+    --spi-password-policy-password-blacklist-false-positive-probability=0.0000001 >/dev/null
 
   # Check over TCP: the image's initialization server listens only on the Unix socket, so the check
   # succeeds only after the init scripts have run.

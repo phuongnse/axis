@@ -1106,6 +1106,7 @@ function ChartPanel({
           <JsonOnly />
         ) : (
           <Flex vertical gap="small">
+            {measures.length === 0 && <EmptyState text={t('shell.studio.page.noMeasures')} />}
             {measures.map((measure, index) => (
               <Flex key={index} gap="small" align="flex-start" data-testid={`studio-measure-${index}`}>
                 <Flex vertical gap="small" style={{ flex: 1, minWidth: 0 }}>
@@ -1633,6 +1634,7 @@ function Actions({
         <JsonOnly />
       ) : (
         <Flex vertical gap="small">
+          {list.length === 0 && <EmptyState text={t('shell.studio.page.noActions')} />}
           {list.map((action, position) => {
             const actionPointer = `${pointer}/${position}`
             if (!isContent(action)) {

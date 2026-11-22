@@ -2,6 +2,7 @@ import { Checkbox, Descriptions, Flex, Typography } from 'antd'
 import { useContext } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { StatusTag } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
@@ -55,6 +56,7 @@ export function StudioModulePolicy({
         ]}
       />
       <Flex vertical gap="small" data-testid="studio-module-policy-grants">
+        {grants.length === 0 && <EmptyState text={t('shell.studio.moduleGrants.noGrants')} />}
         {grants.map((item, index) => {
           const grant = asGrant(item)
           const kind = targetKinds.find((candidate) => typeof grant[candidate] === 'string')

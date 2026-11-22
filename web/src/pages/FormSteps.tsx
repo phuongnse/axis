@@ -4,6 +4,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions, type AxisRowAction } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { unusedStepName } from '../platform/formLayout'
 import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
@@ -129,6 +130,7 @@ export function FormSteps({
     >
       <div data-testid="studio-field-/steps">
         <Flex vertical gap="middle">
+          {list.length === 0 && <EmptyState text={t('shell.studio.formSteps.empty')} />}
           {list.map((step, index) => {
             const pointer = `/steps/${index}`
             const chosen = isContent(step) && Array.isArray(step.sections) ? step.sections : []

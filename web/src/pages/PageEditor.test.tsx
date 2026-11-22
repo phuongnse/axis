@@ -10,7 +10,16 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, clearButton, clearSelect, optionTexts, selectRoot, shownDropdown, shownMenu } from '../test/antd'
+import {
+  chooseOption,
+  clearButton,
+  clearSelect,
+  emptyDescription,
+  optionTexts,
+  selectRoot,
+  shownDropdown,
+  shownMenu,
+} from '../test/antd'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 
@@ -1191,6 +1200,12 @@ describe('PageEditor detail panel', () => {
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/record', 'request')
   })
 
+  it('says "No actions yet." under the actions of a detail that has none', () => {
+    renderEditor(page({ type: 'detail', entity: 'PurchaseRequest', record: 'request', actions: [] }))
+
+    expect(emptyDescription('No actions yet.', screen.getByTestId('studio-field-/widgets/0/actions'))).toBeVisible()
+  })
+
   it('offers Add action and Add navigate action', () => {
     renderEditor(page({ type: 'detail', entity: 'PurchaseRequest', record: 'request', actions: [] }))
 
@@ -1628,6 +1643,12 @@ describe('PageEditor kpi and chart panels', () => {
     expect(await listed('studio-field-/widgets/0/measures/0/name')).toEqual(['openCount', 'total'])
     await chooseOption('total')
     expect(saved()).toMatchObject({ widgets: [{ category: 'category', measures: [{ name: 'total' }] }] })
+  })
+
+  it('says "No measures yet." under the measures of a chart that has none', () => {
+    renderEditor(page({ ...chart, measures: [] }))
+
+    expect(emptyDescription('No measures yet.', screen.getByTestId('studio-field-/widgets/0/measures'))).toBeVisible()
   })
 
   it('adds and removes chart measures but keeps one', async () => {

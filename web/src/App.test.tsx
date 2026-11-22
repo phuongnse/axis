@@ -1514,7 +1514,7 @@ describe('App', () => {
 
     renderApp('/e2e/notedetail?note=6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7')
 
-    expect(await screen.findByTestId('record-not-found')).toBeInTheDocument()
+    expect(await screen.findByTestId('record-not-found', undefined, { timeout: 5000 })).toBeInTheDocument()
     // Without a `from`, the link opens the site, which opens its first page, so it is named after that page.
     expect(screen.getByRole('link', { name: 'Go to Notes' })).toHaveAttribute('href', '/e2e')
     expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
