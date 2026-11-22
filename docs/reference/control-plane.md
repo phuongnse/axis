@@ -1,10 +1,9 @@
 # Control plane
 
 The control plane is the service that runs the operator's side of Axis SaaS around the [cells](cells.md):
-sign-up, trials, subscriptions and plans. The operator's own billing system holds prices, invoices and
-payments. This page covers what the service is, how it reaches
-the cells, the work it runs, its operators and settings, its image and chart, and its health. The
-work it runs is on the pages of [sign-up](sign-up.md), [subscriptions](subscriptions.md) and
+sign-up, trials, subscriptions and plans. This page covers what the service is, how it reaches the
+cells, the work it runs, its operators and settings, its image and chart, and its health. The work it
+runs is on the pages of [sign-up](sign-up.md), [subscriptions](subscriptions.md) and
 [plans](plans.md).
 
 ## What it is
@@ -23,6 +22,8 @@ through a cell's API.
 - **Its own Helm chart and image.** `deploy/helm/axis-controlplane` and the image
   `axis-controlplane`, built, scanned and versioned with the platform's images, see
   [image and chart](#image-and-chart).
+- **The operator's billing system** _(planned for M34)_. The operator's own billing system holds the
+  prices, invoices and payments, and calls the control plane's billing API.
 - **A billing API** _(planned for M34)_. The operator's billing system sets a tenant's plan, add-ons and
   paid-through date and reads its state through the [billing API](billing-api.md), with a client and a
   scope of its own.
