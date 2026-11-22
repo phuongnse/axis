@@ -45,6 +45,33 @@ describe('AxisFieldGroup', () => {
     expect(screen.getByRole('group', { name: 'Rows' })).toHaveAccessibleDescription('')
   })
 
+  it('draws its error under the fields and starts its description with the error', () => {
+    renderGroup(
+      <AxisFieldGroup title="Address" help="Where to send it." error="Enter a street.">
+        <Input aria-label="Street" aria-invalid />
+      </AxisFieldGroup>,
+    )
+
+    const group = screen.getByRole('group', { name: 'Address' })
+    const message = within(group).getByText('Enter a street.')
+    expect(message).toBeVisible()
+    expect(within(group).getByRole('textbox', { name: 'Street' }).compareDocumentPosition(message)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    expect(group).toHaveAccessibleDescription('Enter a street. Where to send it.')
+  })
+
+  it('draws no error and leaves the error out of its description while it has none', () => {
+    renderGroup(
+      <AxisFieldGroup title="Address" help="Where to send it.">
+        <Input aria-label="Street" />
+      </AxisFieldGroup>,
+    )
+
+    expect(screen.getByRole('group', { name: 'Address' })).toHaveAccessibleDescription('Where to send it.')
+    expect(screen.queryByText('Enter a street.')).toBeNull()
+  })
+
   it('draws its action as a light text button on the title row, and names the group by its title alone', () => {
     renderGroup(
       <AxisFieldGroup title="Rows" help="" action={<AxisButton role="secondary">Add row</AxisButton>}>

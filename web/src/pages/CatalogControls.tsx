@@ -28,6 +28,8 @@ export function CatalogChoice({
   name,
   id,
   'aria-describedby': describedBy,
+  'aria-invalid': ariaInvalid,
+  status,
   installed,
   value,
   item,
@@ -35,9 +37,11 @@ export function CatalogChoice({
   onChange,
 }: {
   name: string
-  /** The id and description that `AxisField` gives its input. */
+  /** The id, description and error that `AxisField` gives its input. */
   id?: string
   'aria-describedby'?: string
+  'aria-invalid'?: boolean
+  status?: 'error'
   installed: Installed[]
   value: string | undefined
   item: Record<string, unknown>
@@ -56,6 +60,8 @@ export function CatalogChoice({
       aria-label={name}
       id={id}
       aria-describedby={describedBy}
+      aria-invalid={ariaInvalid}
+      status={status}
       showSearch
       optionFilterProp="label"
       virtual={false}
@@ -189,14 +195,18 @@ export function TimeZoneSelect({
   name,
   id,
   'aria-describedby': describedBy,
+  'aria-invalid': ariaInvalid,
+  status,
   zones,
   value,
   onChange,
 }: {
   name: string
-  /** The id and description that `AxisField` gives its input. */
+  /** The id, description and error that `AxisField` gives its input. */
   id?: string
   'aria-describedby'?: string
+  'aria-invalid'?: boolean
+  status?: 'error'
   zones: { id: string; offset: number }[]
   value: string | undefined
   onChange: (next: string | undefined) => void
@@ -213,6 +223,8 @@ export function TimeZoneSelect({
       aria-label={name}
       id={id}
       aria-describedby={describedBy}
+      aria-invalid={ariaInvalid}
+      status={status}
       showSearch
       allowClear
       optionFilterProp="label"
@@ -237,16 +249,20 @@ export function BindingSelect({
   id,
   'aria-describedby': describedBy,
   'aria-required': required,
+  'aria-invalid': ariaInvalid,
+  status,
   names,
   value,
   noBinding = false,
   onChange,
 }: {
   name: string
-  /** The id and description that `AxisField` gives its input. */
+  /** The id, description, required state and error that `AxisField` gives its input. */
   id?: string
   'aria-describedby'?: string
   'aria-required'?: boolean
+  'aria-invalid'?: boolean
+  status?: 'error'
   names: string[]
   /** The saved name, `''` for an entry without a name, and `undefined` when the entry is absent. */
   value: string | undefined
@@ -270,6 +286,8 @@ export function BindingSelect({
         id={id}
         aria-describedby={describedBy}
         aria-required={required}
+        aria-invalid={ariaInvalid}
+        status={status}
         showSearch
         optionFilterProp="label"
         virtual={false}

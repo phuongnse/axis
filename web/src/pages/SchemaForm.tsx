@@ -44,7 +44,7 @@ import { sectionsByKind } from './schemaFormSections'
 
 /** Whether the node is drawn inside an item's dialog, where a nested list is rows of inputs and never a table. */
 const ItemDialogContext = createContext(false)
-const ItemProblemContext = createContext<(pointer: string) => ReactNode>(() => null)
+const ItemProblemContext = createContext<(pointer: string) => string | null>(() => null)
 
 /** Called with the JSON Pointer of the value that changed. `undefined` removes the value. */
 export type ChangeHandler = (pointer: string, next: unknown) => void
@@ -302,7 +302,8 @@ function SchemaNode({
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const inDialog = useContext(ItemDialogContext)
-  const problemAt = useContext(ItemProblemContext)
+  // The message of a required property that is empty after a click on Done, in the item dialog.
+  const problem = useContext(ItemProblemContext)(pointer) ?? undefined
   const names = useContext(StudioNamesContext)
   const catalog = useContext(StudioCatalogContext)
   const bindings = useContext(StudioBindingsContext)
@@ -448,7 +449,7 @@ function SchemaNode({
     grouped = true
     input = (
       <div data-testid={`studio-group-${pointer}`} style={groupStyle}>
-        <LabelTexts pointer={pointer} value={value} onChange={onChange} />
+        <LabelTexts pointer={pointer} value={value} onChange={onChange} invalid={problem !== undefined} />
       </div>
     )
   } else if (isObject && named) {
@@ -549,26 +550,25 @@ function SchemaNode({
     )
   }
 
-  // A group or a field draws the label and the help, so the heading of a section that names this field leaves them out.
-  // A yes-or-no input is a field already.
+  // A group or a field draws the label, the help and the error, so the heading of a section that names this field leaves
+  // them out. A yes-or-no input and a map draw their own label, so their message is a line under them, which takes no
+  // error look, see docs/reference/actions-and-controls.md#fields.
   const drawn =
     named || input === undefined || drawsField ? (
-      input
+      <>
+        {input}
+        {problem !== undefined && <div style={{ color: colour.dangerText }}>{problem}</div>}
+      </>
     ) : grouped ? (
-      <AxisFieldGroup title={name} help={help ?? ''} action={groupAction}>
+      <AxisFieldGroup title={name} help={help ?? ''} action={groupAction} error={problem}>
         {input}
       </AxisFieldGroup>
     ) : (
-      <AxisField label={name} help={help ?? ''}>
+      <AxisField label={name} help={help ?? ''} error={problem}>
         {input}
       </AxisField>
     )
-  return (
-    <div data-testid={`studio-field-${pointer}`}>
-      {drawn}
-      {problemAt(pointer)}
-    </div>
-  )
+  return <div data-testid={`studio-field-${pointer}`}>{drawn}</div>
 }
 
 /**

@@ -792,7 +792,49 @@ describe('SchemaForm controls that know what they hold', () => {
 
     expect(within(screen.getByTestId('studio-field-/modules/0/id')).getByText('Fill in this field.')).toBeVisible()
     expect(within(screen.getByTestId('studio-field-/modules/0/version')).getByText('Fill in this field.')).toBeVisible()
+    expect(within(dialog).getByRole('combobox', { name: 'Module' })).toHaveAttribute('aria-invalid', 'true')
     expect(within(dialog).getByRole('combobox', { name: 'Module' })).toHaveFocus()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('takes the error and its mark off a required module once a module is chosen', async () => {
+    const dialog = await openAddModule({ name: 'Shop' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Module' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Sales' }))
+
+    expect(within(screen.getByTestId('studio-field-/modules/0/id')).queryByText('Fill in this field.')).toBeNull()
+    expect(within(dialog).getByRole('combobox', { name: 'Module' })).not.toHaveAttribute('aria-invalid')
+  })
+
+  it('marks a required text in error on Done, focuses it, and takes the mark off once it is typed in', async () => {
+    const onChange = vi.fn()
+    const requiredName: JsonSchema = {
+      type: 'object',
+      properties: {
+        kind: { const: 'example' },
+        rows: {
+          type: 'array',
+          items: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
+        },
+      },
+    }
+    renderForm(requiredName, { kind: 'example', rows: [{ name: 'budget' }] }, onChange)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add item…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Add item' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    const field = within(screen.getByTestId('studio-field-/rows/1/name'))
+    expect(field.getByText('Fill in this field.')).toBeVisible()
+    expect(field.getByRole('textbox')).toHaveAttribute('aria-invalid', 'true')
+    expect(field.getByRole('textbox')).toHaveFocus()
+
+    await userEvent.type(field.getByRole('textbox'), 'ledger')
+
+    expect(field.queryByText('Fill in this field.')).toBeNull()
+    expect(field.getByRole('textbox')).not.toHaveAttribute('aria-invalid')
     expect(onChange).not.toHaveBeenCalled()
   })
 

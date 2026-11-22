@@ -1,9 +1,10 @@
 import { render, screen, within } from '@testing-library/react'
-import { useContext, useDeferredValue, type ComponentProps, type ReactNode } from 'react'
+import { useContext, useDeferredValue, type ComponentProps } from 'react'
 import userEvent from '@testing-library/user-event'
 import { Input } from 'antd'
 import { describe, expect, it, vi } from 'vitest'
 import english from '../../../src/Axis.Presentation/Texts/en.json'
+import { AxisField } from '../platform/AxisField'
 import { ContentInsetContext } from '../platform/contentInsetContext'
 import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
@@ -43,14 +44,12 @@ function renderList(
             fields={(copy, change, _index, problem) => (
               <>
                 {columns.map((column) => (
-                  <div key={column.key}>
+                  <AxisField key={column.key} label={column.title} help="" error={problem(column.key) ?? undefined}>
                     <Input
-                      aria-label={column.title}
                       value={String(copy[column.key] ?? '')}
                       onChange={(event) => change(`/${column.key}`, event.target.value)}
                     />
-                    {problem(column.key)}
-                  </div>
+                  </AxisField>
                 ))}
               </>
             )}
@@ -131,29 +130,40 @@ describe('the list of objects', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
 
     expect(within(dialog).getByText('Fill in this field.')).toBeVisible()
+    expect(within(dialog).getByRole('textbox', { name: 'Module' })).toHaveAttribute('aria-invalid', 'true')
     expect(within(dialog).getByRole('textbox', { name: 'Module' })).toHaveFocus()
     expect(dialog).toBeVisible()
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('focuses the first empty field when its message is drawn after the render of Done', async () => {
-    // The deferred value draws the message one render after the one that Done causes, as a dialog may draw late.
-    function LateProblem({ problem }: { problem: ReactNode }) {
-      return useDeferredValue(problem)
+  it('focuses the first empty field when its error is drawn after the render of Done', async () => {
+    // The deferred value draws the error one render after the one that Done causes, as a dialog may draw late.
+    function LateField({
+      title,
+      error,
+      children,
+    }: {
+      title: string
+      error: string | null
+      children: ComponentProps<typeof AxisField>['children']
+    }) {
+      return (
+        <AxisField label={title} help="" error={useDeferredValue(error) ?? undefined}>
+          {children}
+        </AxisField>
+      )
     }
     renderList(vi.fn(), false, {
       required: ['name', 'version'],
       fields: (copy, change, _index, problem) => (
         <>
           {columns.slice(0, 2).map((column) => (
-            <div key={column.key}>
+            <LateField key={column.key} title={column.title} error={problem(column.key)}>
               <Input
-                aria-label={column.title}
                 value={String(copy[column.key] ?? '')}
                 onChange={(event) => change(`/${column.key}`, event.target.value)}
               />
-              <LateProblem problem={problem(column.key)} />
-            </div>
+            </LateField>
           ))}
         </>
       ),
@@ -164,10 +174,11 @@ describe('the list of objects', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
 
     expect(within(dialog).getAllByText('Fill in this field.')).toHaveLength(2)
+    expect(within(dialog).getByRole('textbox', { name: 'Module' })).toHaveAttribute('aria-invalid', 'true')
     expect(within(dialog).getByRole('textbox', { name: 'Module' })).toHaveFocus()
   })
 
-  it('removes the message once the field is filled, then Done writes the item with one change', async () => {
+  it('removes the message and the mark once the field is filled, then Done writes the item with one change', async () => {
     const onChange = renderList()
 
     await userEvent.click(screen.getByRole('button', { name: 'budget' }))
@@ -175,9 +186,11 @@ describe('the list of objects', () => {
     const name = within(dialog).getByRole('textbox', { name: 'Module' })
     await userEvent.clear(name)
     await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    expect(name).toHaveAttribute('aria-invalid', 'true')
     await userEvent.type(name, 'budget2')
 
     expect(within(dialog).queryByText('Fill in this field.')).toBeNull()
+    expect(name).not.toHaveAttribute('aria-invalid')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
 
     expect(onChange).toHaveBeenCalledTimes(1)

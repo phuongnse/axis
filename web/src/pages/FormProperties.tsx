@@ -304,23 +304,22 @@ function SectionNameBox({
     }
   }
   return (
-    <div>
-      <AxisField {...fieldTexts(t, 'sections.name')}>
-        <Input
-          data-testid="studio-design-section-name"
-          status={refused === null ? undefined : 'error'}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onPressEnter={commit}
-          onBlur={commit}
-        />
-      </AxisField>
-      {refused !== null && (
-        <Typography.Text type="danger">
-          {t(refused === 'taken' ? 'shell.studio.design.nameTaken' : 'shell.studio.design.nameEmpty')}
-        </Typography.Text>
-      )}
-    </div>
+    <AxisField
+      {...fieldTexts(t, 'sections.name')}
+      error={
+        refused === null
+          ? undefined
+          : t(refused === 'taken' ? 'shell.studio.design.nameTaken' : 'shell.studio.design.nameEmpty')
+      }
+    >
+      <Input
+        data-testid="studio-design-section-name"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onPressEnter={commit}
+        onBlur={commit}
+      />
+    </AxisField>
   )
 }
 

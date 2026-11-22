@@ -25,6 +25,8 @@ export function ReferencePicker({
   id,
   'aria-describedby': describedBy,
   'aria-required': ariaRequired,
+  'aria-invalid': ariaInvalid,
+  status,
   value,
   required,
   options,
@@ -33,10 +35,12 @@ export function ReferencePicker({
   placeholder,
 }: {
   name: string
-  /** The id, description, and required mark and state that `AxisField` gives its input. */
+  /** The id, description, required mark and state, and error that `AxisField` gives its input. */
   id?: string
   'aria-describedby'?: string
   'aria-required'?: boolean
+  'aria-invalid'?: boolean
+  status?: 'error'
   value: string | undefined
   required: boolean
   options: readonly (string | ReferenceOption)[]
@@ -113,6 +117,8 @@ export function ReferencePicker({
       id={id}
       aria-describedby={describedBy}
       aria-required={ariaRequired}
+      aria-invalid={ariaInvalid}
+      status={status}
       showSearch
       virtual={false}
       allowClear={!required}

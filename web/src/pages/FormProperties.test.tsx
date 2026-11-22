@@ -136,17 +136,20 @@ describe('FormProperties section', () => {
 
     expect(screen.getByTestId('draft').textContent).toBe(before)
     expect(screen.getByText('Another section already has this name.')).toBeInTheDocument()
+    expect(box).toHaveAttribute('aria-invalid', 'true')
   })
 
   it('refuses an empty name and says why', async () => {
     renderHarness(stepped, '/sections/0')
     const before = screen.getByTestId('draft').textContent
 
-    await userEvent.clear(screen.getByRole('textbox', { name: 'Name' }))
+    const box = screen.getByRole('textbox', { name: 'Name' })
+    await userEvent.clear(box)
     await userEvent.tab()
 
     expect(screen.getByTestId('draft').textContent).toBe(before)
     expect(screen.getByText('Enter a name for the section.')).toBeInTheDocument()
+    expect(box).toHaveAttribute('aria-invalid', 'true')
   })
 })
 

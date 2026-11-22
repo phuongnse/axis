@@ -30,6 +30,7 @@ function renderLabel({
   withNames = true,
   withResource = true,
   locale,
+  invalid,
   onChange = vi.fn<ChangeHandler>(),
   onTextsChange = vi.fn<TextsChange>(),
 }: {
@@ -37,6 +38,7 @@ function renderLabel({
   withNames?: boolean
   withResource?: boolean
   locale?: string
+  invalid?: boolean
   onChange?: ReturnType<typeof vi.fn<ChangeHandler>>
   onTextsChange?: ReturnType<typeof vi.fn<TextsChange>>
 }) {
@@ -53,7 +55,12 @@ function renderLabel({
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <StudioNamesContext.Provider value={withNames ? names : undefined}>
           <LabelTextsContext.Provider value={withResource ? resource : null}>
-            <LabelTexts pointer="/title" value={textKey === undefined ? undefined : { textKey }} onChange={onChange} />
+            <LabelTexts
+              pointer="/title"
+              value={textKey === undefined ? undefined : { textKey }}
+              onChange={onChange}
+              invalid={invalid}
+            />
           </LabelTextsContext.Provider>
         </StudioNamesContext.Provider>
       </TextProvider>
@@ -85,6 +92,29 @@ describe('LabelTexts', () => {
     expect(screen.getByRole('textbox', { name: 'English' })).toHaveValue('Shop')
     expect(screen.queryByRole('textbox', { name: 'Vietnamese' })).toBeNull()
     expect(screen.queryByRole('textbox', { name: 'Text key' })).toBeNull()
+  })
+
+  it('marks its box in error, in the error look, when the screen refuses the label', () => {
+    renderLabel({ textKey: 'shop.title', invalid: true })
+
+    const box = screen.getByRole('textbox', { name: 'English' })
+    expect(box).toHaveAttribute('aria-invalid', 'true')
+    // The box has a Translations… button, so Ant Design draws its error look on the box's wrapper.
+    expect(box.closest('.ant-input-affix-wrapper')).toHaveClass('ant-input-status-error')
+  })
+
+  it('marks no box in error while the label is not refused', () => {
+    renderLabel({ textKey: 'shop.title' })
+
+    expect(screen.getByRole('textbox', { name: 'English' })).not.toHaveAttribute('aria-invalid')
+  })
+
+  it('marks the plain key box in error when the label has no resource to show its texts', () => {
+    renderLabel({ textKey: 'shop.title', withResource: false, invalid: true })
+
+    const box = screen.getByRole('textbox', { name: 'Text key' })
+    expect(box).toHaveAttribute('aria-invalid', 'true')
+    expect(box).toHaveClass('ant-input-status-error')
   })
 
   it('shows the box in the language of the author when the application has it', () => {
