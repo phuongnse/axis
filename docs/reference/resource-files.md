@@ -32,11 +32,17 @@ depend on its kind. An entity looks like this:
 - **`name`** is the stable technical name used in references and storage. It starts with a letter,
   contains only ASCII letters and digits, and is at most 60 characters long (`AXC0004`). The same
   rule applies to field names.
+- **Names follow a convention** _(planned)_. An entity's name is in Pascal case, such as `PurchaseRequest`, and a field's
+  name is in camel case, such as `amountWithTax`, as the record API and the expressions read them. This is a convention
+  and not a check: any name that matches `^[A-Za-z][A-Za-z0-9]*$` is taken with no warning.
 - **`formatVersion`** is `1`. Until the first production release, each resource kind has one format,
   and a format change updates the built-in modules in the same change. From the first production
   release on, each resource kind has a format version, and Axis ships converters that rewrite older
   module, application and layer files, so the engines hold no compatibility code.
 - **Labels** always come from text resources.
+- **A field with no label** _(planned)_. Validate warns at the field, "This field has no label, so people see its name",
+  because a form shows the name in place of a label. It is a warning and not an error, so an application that runs today
+  keeps running. The designer asks for a label on a field it adds or opens.
 - **A process's `title`.** A `process` has a required `title`, a text resource like a site's
   and a page's, which names the process to people everywhere. Its key joins the `AXC0028` check, and a
   missing `title` is `AXC0004`.

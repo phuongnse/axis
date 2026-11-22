@@ -186,6 +186,26 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   [Studio's reconnect](studio.md#reconnect). This holds for every form and dialog, as it does for the form widget's Save. A confirmation
   that asks the user to type a name before a destructive action keeps its button off until the name
   matches, as [the cell console's Delete](cell-console.md#actions) does.
+- **A group's title lines up with its fields** _(planned)_. A group's title, such as Entity label, starts at the inset
+  of a field's label, so the fields of a section line up whether they are one field or a group. The group's help sits
+  under its title, and its action, such as Add validation, sits to the right of the title and the help together, so
+  the action does not push the help away.
+- **Help sits close to its label** _(planned)_. A field's help sits just under the label's line and `spacing-xs` above
+  the input. The gap is judged in IBM Plex Sans, the app's font, as the space between lines differs from font to font.
+  Every help line is one size, in `textMuted`, and a choice's option help is one too.
+- **A box in error looks it** _(planned)_. A field whose value the screen refuses is drawn in its error look, with its
+  error in `dangerText` under it and `aria-invalid` on the input, whether a form holds the field or the screen does.
+  `AxisField` and `AxisFieldGroup` take `error` for a field the screen holds, `AxisFieldGroup` takes `required` and
+  `fold`, and `LabelTexts` takes `invalid`. An error shows from the refused action on, and while the value stays wrong.
+  It goes as soon as the value is right.
+- **One way to the first error** _(planned)_. A refused action that submits what a person typed, such as Save, Add, Done
+  or Next, moves the focus to the first box in error and scrolls it into view. A screen that holds its fields calls
+  `focusFirstError`, and an Ant Design form sets `scrollToFirstError={{ focus: true }}`.
+- **One look for yes or no** _(planned)_. A yes-or-no setting is a checkbox with its label on its right and its help under
+  the label, the same in a form as on a screen that holds its fields. A switch is for a setting that takes effect as it
+  is turned on, and no other.
+- **A pair's help** _(planned)_. A pair of fields in `AxisFieldRow` takes one title and one help, and its fields take no
+  help of their own, so their boxes line up.
 
 ## Tab bars
 
@@ -436,6 +456,13 @@ be kept right.
 - **A row's details**. A row with more to show than its columns, such as a call's attempt, folds open to
   its details from a fold in its first cell, drawn as a group row's fold, named "Show the details" or "Hide the details"
   while open, with no column of its own. `AxisTable`'s `details` and its group rows open a row one way.
+- **Reordering by dragging** _(planned)_. A table whose rows have an order that means something takes `reorder` in
+  `AxisTable`, on `@dnd-kit/sortable`. Each row starts with a handle named Drag to reorder, and the rows between make
+  room while a row is dragged. The keyboard uses the same handle: Space picks the row up, the arrow keys move it, Space
+  drops it and Escape cancels. Move up and Move down stay in the row's menu, as the way to move a row without a drag.
+  While a search or a filter hides rows, the handles are off, with the tooltip "Clear the search and the filter to
+  reorder", as the rows shown are then not the list's order. What a screen reader hears names the item and its new
+  place, in the page's language. A form's child collection rows take the same.
 
 The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md),
 and the reasons for each person's columns and saved views are in [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md),
@@ -450,7 +477,11 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   link, as a page with its own address. So a link can be shared, reloaded, gone back to and opened in a
   new tab, and the page has room to grow.
 - **A side panel goes with a page and never opens a record.** It is for what accompanies the page: the
-  problems panel, filters or help.
+  problems panel, filters or help, and an item of a draft, as the rule below says.
+- **An item of a draft opens in the side panel** _(planned)_. A field, validation or index of a draft, such as an
+  entity's, opens in the side panel. Its name is a real link to the panel's address, which opens the panel in place on
+  a plain click and a new tab on Ctrl+click, and its address can be copied. One platform part draws every such link.
+  An item with no address is a subtle button that opens the panel.
 - **A modal dialog is for a short task that must end before going on:** confirming, such as Activate…
   or Delete…, asking for a little, such as a reason, a name or an invitation, or choosing one thing. It
   never holds a record's detail or a long form, and never opens a dialog of its own. What needs much
