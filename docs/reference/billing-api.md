@@ -107,7 +107,7 @@ Content-Type: application/json
 This call sets the date that the tenant is paid through. The tenant is paid through the end of that day
 in UTC.
 
-- **The clock follows the date** _(planned for M34)_. Past the date, the clock moves the subscription on, as
+- **The clock follows the date.** Past the date, the clock moves the subscription on, as
   [the clock](subscriptions.md#one-clock) says.
 
 ```http
@@ -124,8 +124,8 @@ Content-Type: application/json
   becomes `active`. The move queues `writeQuotas`, and from `pastDue` or `readOnly` it also queues
   `resumeTenant`, as [states](subscriptions.md#states) says. An `active` subscription keeps its state and
   takes the new date.
-- **The move.** The call sets the next date to the start of the day after the paid-through date in UTC,
-  and clears the end of the paid period, so the period roll-forward leaves the subscription alone.
+- **The move.** The call sets the next date to the start of the day after the paid-through date in UTC.
+  That is when the clock moves an `active` subscription to `pastDue`.
 - **`422`** for a date before today in UTC. The check comes after the replay check, so a retry on the next day
   still gets the first answer.
 - **`409`** for a subscription that pins no plan. The plan is set first, see [the plan call](#setting-the-plan-and-add-ons).

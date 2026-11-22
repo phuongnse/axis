@@ -7,8 +7,8 @@ namespace Axis.ControlPlane.Subscriptions;
 /// Sets the date a subscription is paid through, see <c>docs/reference/billing-api.md#setting-the-paid-through-date</c>. A <c>trialing</c>, <c>pastDue</c>,
 /// <c>readOnly</c> or <c>cancelled</c> subscription becomes <c>active</c> with a new step id, and <see cref="SubscriptionActivation"/> writes its records and
 /// queues its jobs. An <c>active</c> subscription keeps its state and step id and takes the new date. The tenant is paid through the end of the day, so the
-/// next date is the start of the following day in UTC, and the end of the paid period is cleared, so the subscription's
-/// period is no longer rolled forward. The caller has locked the subscription's row and has checked its state.
+/// next date is the start of the following day in UTC, which is when the clock moves an <c>active</c> subscription to <c>pastDue</c>.
+/// The caller has locked the subscription's row and has checked its state.
 /// </summary>
 internal static class SubscriptionPaidThrough
 {
@@ -37,7 +37,7 @@ internal static class SubscriptionPaidThrough
         if (state == "active")
         {
             await using var keep = new NpgsqlCommand(
-                "UPDATE control_plane.subscriptions SET paid_through = @date, next_at = @next, period_ends_at = NULL WHERE id = @id AND state = 'active'",
+                "UPDATE control_plane.subscriptions SET paid_through = @date, next_at = @next WHERE id = @id AND state = 'active'",
                 connection,
                 transaction);
             keep.Parameters.AddWithValue("date", paidThrough);
@@ -61,7 +61,7 @@ internal static class SubscriptionPaidThrough
         await using (var update = new NpgsqlCommand(
             """
             UPDATE control_plane.subscriptions
-            SET state = 'active', step_id = @newStep, paid_through = @date, next_at = @next, period_ends_at = NULL
+            SET state = 'active', step_id = @newStep, paid_through = @date, next_at = @next
             WHERE id = @id AND state = @from
             """,
             connection,

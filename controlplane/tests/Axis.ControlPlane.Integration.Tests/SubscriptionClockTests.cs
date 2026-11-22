@@ -390,10 +390,10 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
     }
 
     [Fact]
-    public async Task A_paid_readOnly_subscription_becomes_deleting_after_90_days_and_a_cancelled_one_becomes_readOnly_at_its_periods_end()
+    public async Task A_paid_readOnly_subscription_becomes_deleting_after_90_days_and_a_cancelled_one_becomes_readOnly_at_its_next_date()
     {
-        var paid = await SeedAsync("acme", "pastDue", _start, periodEndsAt: _start.AddDays(-14));
-        var cancelled = await SeedAsync("beta", "cancelled", _start.AddDays(10), periodEndsAt: _start.AddDays(10));
+        var paid = await SeedAsync("acme", "pastDue", _start, paidThrough: DateOnly.FromDateTime(_start.AddDays(-15).UtcDateTime));
+        var cancelled = await SeedAsync("beta", "cancelled", _start.AddDays(10), paidThrough: DateOnly.FromDateTime(_start.AddDays(9).UtcDateTime));
 
         await RunAtAsync(0);
         Assert.Equal("readOnly", await StateAsync(paid));
@@ -421,21 +421,60 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
     }
 
     [Fact]
-    public async Task An_active_monthly_subscriptions_period_moves_forward_one_month_at_its_end_once_even_when_the_job_runs_again()
+    public async Task An_active_subscription_whose_paid_through_date_has_passed_becomes_pastDue_with_no_cell_call_then_readOnly_after_14_days()
     {
-        var end = new DateTimeOffset(2026, 1, 31, 0, 0, 0, TimeSpan.Zero);
-        var id = await SeedAsync("acme", "active", end, periodEndsAt: end);
-        _clock.Now = end;
+        var id = await SeedAsync("acme", "active", _start, paidThrough: DateOnly.FromDateTime(_start.AddDays(-1).UtcDateTime));
 
-        await Run();
-        await Run();
-
-        var expected = new DateTimeOffset(2026, 2, 28, 0, 0, 0, TimeSpan.Zero);
+        await RunAtAsync(-1);
         Assert.Equal("active", await StateAsync(id));
-        Assert.Equal(expected, await NextAtAsync(id));
-        Assert.Equal(expected, new DateTimeOffset(await ScalarAsync<DateTime>($"SELECT period_ends_at FROM control_plane.subscriptions WHERE id = '{id}'"), TimeSpan.Zero));
+
+        await RunAtAsync(0);
+        Assert.Equal("pastDue", await StateAsync(id));
+        Assert.Equal(_start.AddDays(14), await NextAtAsync(id));
+        Assert.Empty(_cell.Calls);
+        Assert.Equal(["subscription.pastDue"], await ColumnAsync($"SELECT action FROM control_plane.audit_records WHERE subject = '{id}'"));
+        Assert.Equal("job", await ScalarAsync<string>($"SELECT actor_kind FROM control_plane.audit_records WHERE subject = '{id}'"));
+
+        await Run();
+        Assert.Equal(1L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.audit_records"));
+
+        await RunAtAsync(13);
+        Assert.Equal("pastDue", await StateAsync(id));
+        Assert.Empty(_cell.Calls);
+
+        await RunAtAsync(14);
+        Assert.Equal("readOnly", await StateAsync(id));
+        Assert.Equal(_start.AddDays(104), await NextAtAsync(id));
+        Assert.Equal(["POST /api/cell/tenants/acme/read-only"], _cell.Calls.Select(call => call.Call));
+
+        await RunAtAsync(15);
+        Assert.Equal(0L, await ScalarAsync<long>($"SELECT count(*) FROM control_plane.subscription_emails WHERE subscription_id = '{id}' AND kind = 'tenantReadOnly'"));
+    }
+
+    [Fact]
+    public async Task An_active_subscription_whose_next_date_is_later_stays_active()
+    {
+        var id = await SeedAsync("acme", "active", _start.AddDays(1), paidThrough: DateOnly.FromDateTime(_start.UtcDateTime));
+
+        await Run();
+
+        Assert.Equal("active", await StateAsync(id));
         Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.audit_records"));
         Assert.Empty(_cell.Calls);
+    }
+
+    // A race between a run and the billing API cannot be forced from outside. The condition `next_at <= now` of the commit is the guard,
+    // and this checks the plain path: a date set after the run read nothing stops the move.
+    [Fact]
+    public async Task An_active_subscription_that_got_a_later_next_date_before_the_run_stays_active()
+    {
+        var id = await SeedAsync("acme", "active", _start.AddDays(-1), paidThrough: DateOnly.FromDateTime(_start.AddDays(-2).UtcDateTime));
+        await Execute($"UPDATE control_plane.subscriptions SET next_at = '{_start.AddDays(30):O}' WHERE id = '{id}'");
+
+        await Run();
+
+        Assert.Equal("active", await StateAsync(id));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.audit_records"));
     }
 
     private sealed record People(string Owner, string OwnerTwin, string Vi, string Other, string Part);
@@ -483,8 +522,8 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
     }
 
     // A subscription of a verified sign-up that is due at nextAt. The clock of the test starts at the same time as the trial. With a
-    // periodEndsAt it is a paid tenant: it pins a plan and has a period that ends then.
-    private async Task<Guid> SeedAsync(string tenant, string state, DateTimeOffset nextAt, string? owner = null, DateTimeOffset? periodEndsAt = null)
+    // paidThrough it is a paid tenant: it pins a plan and has that paid-through date.
+    private async Task<Guid> SeedAsync(string tenant, string state, DateTimeOffset nextAt, string? owner = null, DateOnly? paidThrough = null)
     {
         var signUp = Guid.CreateVersion7();
         var id = Guid.CreateVersion7();
@@ -496,12 +535,12 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
         await using var insert = _dataSource.CreateCommand(
             """
             INSERT INTO control_plane.subscriptions
-                (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id, plan_code, plan_version, period, period_ends_at)
+                (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id, plan_code, plan_version, period, paid_through)
             VALUES (@id, @tenant, @signUp, @state, @nextAt, @nextAt, @step,
-                    CASE WHEN @periodEnds::timestamptz IS NULL THEN NULL ELSE 'team' END,
-                    CASE WHEN @periodEnds::timestamptz IS NULL THEN NULL ELSE 1 END,
-                    CASE WHEN @periodEnds::timestamptz IS NULL THEN NULL ELSE 'month' END,
-                    @periodEnds)
+                    CASE WHEN @paidThrough::date IS NULL THEN NULL ELSE 'team' END,
+                    CASE WHEN @paidThrough::date IS NULL THEN NULL ELSE 1 END,
+                    CASE WHEN @paidThrough::date IS NULL THEN NULL ELSE 'month' END,
+                    @paidThrough)
             """);
         insert.Parameters.AddWithValue("id", id);
         insert.Parameters.AddWithValue("tenant", tenant);
@@ -509,7 +548,7 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
         insert.Parameters.AddWithValue("state", state);
         insert.Parameters.AddWithValue("nextAt", nextAt);
         insert.Parameters.AddWithValue("step", Guid.CreateVersion7());
-        insert.Parameters.Add(new NpgsqlParameter("periodEnds", NpgsqlTypes.NpgsqlDbType.TimestampTz) { Value = (object?)periodEndsAt ?? DBNull.Value });
+        insert.Parameters.Add(new NpgsqlParameter("paidThrough", NpgsqlTypes.NpgsqlDbType.Date) { Value = (object?)paidThrough ?? DBNull.Value });
         await insert.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         return id;
     }

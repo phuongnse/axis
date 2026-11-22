@@ -158,7 +158,6 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             subscription.Property(s => s.PlanCode).HasColumnName("plan_code");
             subscription.Property(s => s.PlanVersion).HasColumnName("plan_version");
             subscription.Property(s => s.Period).HasColumnName("period");
-            subscription.Property(s => s.PeriodEndsAt).HasColumnName("period_ends_at");
             subscription.Property(s => s.PaidThrough).HasColumnName("paid_through").HasColumnType("date");
             subscription.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             subscription.HasOne<SignUpRow>().WithMany().HasForeignKey(s => s.SignUpId).HasConstraintName("fk_subscriptions_sign_up_id").OnDelete(DeleteBehavior.Restrict);
