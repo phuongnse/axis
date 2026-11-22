@@ -1,7 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { studioFileAddress } from '../platform/studioAddress'
 import { TextProvider } from '../platform/TextProvider'
 import type {
   StudioPackageTestResult,
@@ -54,14 +56,16 @@ function request(overrides: Partial<StudioRequest>): StudioRequest {
 function renderResults(
   value: StudioRequest,
   onSelect = vi.fn(),
-  extra: { onOpenFile?: (file: string, line?: number) => void; titled?: boolean } = {},
+  extra: { fileAddressOf?: (file: string, line?: number) => string | undefined; titled?: boolean } = {},
 ) {
   render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioTestResults request={value} onSelect={onSelect} {...extra} />
-      </TextProvider>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioTestResults request={value} onSelect={onSelect} {...extra} />
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
   return { section: screen.getByTestId('studio-test-results'), onSelect }
 }
@@ -164,9 +168,8 @@ describe('StudioTestResults of a package test', () => {
   const packageTest = (overrides: Partial<StudioRequest> = {}) =>
     request({ status: 'failed', package: 'tools', packageTests: [passingTest, failingTest], ...overrides })
 
-  it('shows a row a test with its result, name, duration and message, and the failed place opens its line', async () => {
-    const onOpenFile = vi.fn()
-    renderResults(packageTest(), vi.fn(), { onOpenFile })
+  it('shows a row a test with its result, name, duration and message, and the failed place links to its line', () => {
+    renderResults(packageTest(), vi.fn(), { fileAddressOf: (file, line) => studioFileAddress('Shop', file, line) })
 
     const [passed, failed] = screen.getAllByTestId('studio-test-result')
     expect(passed).toHaveAttribute('data-outcome', 'passed')
@@ -180,11 +183,13 @@ describe('StudioTestResults of a package test', () => {
     expect(failed).toHaveTextContent('AssertionError: Hello Ada != Hi Ada')
     expect(within(failed).getByText('failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
 
-    await userEvent.click(within(failed).getByRole('button', { name: 'packages/tools/lib/x.py, line 3' }))
-    expect(onOpenFile).toHaveBeenCalledWith('packages/tools/lib/x.py', 3)
+    expect(within(failed).getByRole('link', { name: 'packages/tools/lib/x.py, line 3' })).toHaveAttribute(
+      'href',
+      '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3',
+    )
   })
 
-  it('shows the place as plain text without onOpenFile, and no duration or place that the host did not send', () => {
+  it('shows the place as plain text without fileAddressOf, and no duration or place that the host did not send', () => {
     renderResults(
       packageTest({
         packageTests: [{ name: 'test_old', outcome: 'failed', message: 'Boom', file: 'lib/x.py' }],

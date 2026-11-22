@@ -38,8 +38,10 @@ opens the same view.
   `&field`.
 - **A list's item** _(planned)_. `&item=<pointer>`, such as `&item=/modules/0`, opens that item of a
   [list of objects](studio-resource-form.md#lists-of-objects) in the side panel, and follows the rules of `&field`.
-- **A package file at its line** _(planned)_. `&view=packages&package=<id>&file=<path>&line=<n>` opens the file at that
-  line in the [Packages entry](studio-packages.md#the-packages-entry).
+- **A package file at its line.** `&view=packages&package=<id>&file=<path>&line=<n>` opens the file, with `<path>` its
+  path in the package, in the [Packages entry](studio-packages.md#the-packages-entry). Its cursor sits at the start of
+  that line, or on line 1 without `&line=`. It opens on load, reload, Back and a shared link, and following the same
+  link again jumps to the line again.
 - **Back is the browser's.** Studio has no Back or Next of its own and no breadcrumb.
   Every view has its own address and each move is a history entry, except that a search replaces its
   entry, so the browser's Back and Forward step through it. A second Back would be one concern with two

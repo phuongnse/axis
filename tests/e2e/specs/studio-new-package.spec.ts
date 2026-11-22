@@ -239,6 +239,25 @@ test('a developer creates a package in Studio, opens its workspace, saves a file
       await expect(passed).toHaveCount(1, { timeout: 180_000 })
       await expect(failed).toHaveCount(1)
       await expect(passed).toContainText('test_checks.ChecksCase.test_passes')
+
+      // A syntax error on line 2 fails the build with a problem that has a line, so the Problems tab has a place to link.
+      const broken = await developerPage.evaluate(
+        ({ application, id, content }) =>
+          fetch(`/api/studio/apps/${application}/packages/${id}/files/broken.py`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'If-None-Match': '*', 'X-Axis-Csrf': '1' },
+            body: JSON.stringify({ content }),
+          }).then((response) => response.status),
+        { application, id: checksId, content: ['x = 1', 'def broken(:', ''].join('\n') },
+      )
+      expect(broken).toBe(200)
+
+      await developerPage.getByRole('button', { name: 'Build', exact: true }).click()
+      await expect(developerPage.getByTestId('studio-package-build-state')).toHaveText('Failed', { timeout: 180_000 })
+      await output.getByRole('tab', { name: 'Problems', exact: true }).click()
+      await output.getByRole('link', { name: 'packages/checks/broken.py, line 2', exact: true }).click()
+      await expect(developerPage).toHaveURL(/[?&]file=broken\.py&line=2(&|$)/)
+      await expect(developerPage.getByTestId('studio-package-status')).toContainText('Line 2, column 1')
     } catch (error) {
       await test.info().attach('publisher-output', { body: publisher?.output() ?? '', contentType: 'text/plain' })
       await test.info().attach('package-host-output', { body: packageHost.output(), contentType: 'text/plain' })
@@ -248,10 +267,20 @@ test('a developer creates a package in Studio, opens its workspace, saves a file
       await packageHost.stop()
     }
 
-    // The failed test's place opens its file at that line, with the cursor at the start of the line. The place is a button,
-    // drawn as a link, so its role is button.
-    await failed.getByRole('button', { name: 'packages/checks/test_checks.py, line 10', exact: true }).click()
+    // The failed test's place is a link to its file at that line. The Tests tab holds the last test run, so the build's
+    // Output tab is left first.
+    await output.getByRole('tab', { name: 'Tests', exact: true }).click()
+    await failed.getByRole('link', { name: 'packages/checks/test_checks.py, line 10', exact: true }).click()
+    await expect(developerPage).toHaveURL(/[?&]file=test_checks\.py&line=10(&|$)/)
     await expect(developerPage.getByTestId('studio-package-status')).toContainText('Line 10, column 1')
+
+    // A reload opens the same file at the same line, and Back returns to the broken file at its line.
+    await developerPage.reload()
+    await expect(developerPage.getByRole('textbox', { name: 'test_checks.py', exact: true })).toBeVisible()
+    await expect(developerPage.getByTestId('studio-package-status')).toContainText('Line 10, column 1')
+    await developerPage.goBack()
+    await expect(developerPage).toHaveURL(/[?&]file=broken\.py&line=2(&|$)/)
+    await expect(developerPage.getByTestId('studio-package-status')).toContainText('Line 2, column 1')
   } finally {
     await browser?.close()
     await server.stop()

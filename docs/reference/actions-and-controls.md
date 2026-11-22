@@ -538,9 +538,11 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   alone. An action with no address is a button, never a link.
 - **What opens a view gets an address** _(planned)_. A resource named in Problems, test results or a form's Used on
   links to the resource at its path. A shared grant's Open policy links to the policy. A field's name links to
-  `&field=<name>`. A package file's place, such as `lib/x.py, line 3`, links to
-  `&view=packages&package=<id>&file=<path>&line=<n>`, which opens the file at that line. A list of objects' first cell
-  links to `&item=<pointer>`, which opens the item. See [Studio's route and address](studio.md#route-and-address).
+  `&field=<name>`. A list of objects' first cell links to `&item=<pointer>`, which opens the item. See
+  [Studio's route and address](studio.md#route-and-address).
+- **A package file's place is a link.** A package file's place, such as `lib/x.py, line 3`, links to
+  `&view=packages&package=<id>&file=<path>&line=<n>`, which opens the file at that line. See
+  [Studio's route and address](studio.md#route-and-address).
 - **A reference reads as words** _(planned)_. A resource's name and its muted kind are inline text, so a reference
   follows the words before it on their line and wraps as words do.
 - **A link in a value opens in the same site** _(planned)_. A reference in a value is an inline link only when the

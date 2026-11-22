@@ -30,3 +30,20 @@ export function studioApplicationAddress(application: string): string {
 export function studioReleaseAddress(application: string, number: number): string {
   return `/studio?${new URLSearchParams({ app: application, view: 'release', release: String(number) })}`
 }
+
+/** The address of a package's workspace, `&view=packages&package=<id>`, with `&file=<path>&line=<n>` to open a file at a line. */
+export function studioPackageAddress(application: string, packageId: string, file?: string, line?: number): string {
+  return `/studio?${new URLSearchParams({
+    app: application,
+    view: 'packages',
+    package: packageId,
+    ...(file !== undefined ? { file } : {}),
+    ...(line !== undefined ? { line: String(line) } : {}),
+  })}`
+}
+
+/** The address of a folder file at its line when it is a package's file, `packages/<id>/<path>`, and undefined otherwise. */
+export function studioFileAddress(application: string, file: string, line?: number): string | undefined {
+  const match = /^packages\/([^/]+)\/(.+)$/.exec(file)
+  return match ? studioPackageAddress(application, match[1], match[2], line) : undefined
+}
