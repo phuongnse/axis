@@ -211,7 +211,7 @@ Read by people who run or change the hosted service: cells, tenants, sign-up, pl
 | [Sign-up](reference/sign-up.md)                             | The public sign-up page, the subdomain, bot checks, email verification, provisioning and terms acceptance   | You change the public sign-up page or its checks                         |
 | [Subscriptions](reference/subscriptions.md)                 | A tenant's trial and paid-through states, the read-only tenant, the timeline and the control plane's emails | You change trial, paid-through or read-only states or their emails       |
 | [Plans](reference/plans.md)                                 | The plan catalogue, versions, quotas from a plan, user packs and changing a plan                            | You change the plan catalogue or a plan's quotas                         |
-| [Billing API](reference/billing-api.md)                     | The API the operator's billing system calls: sign-in, plan, dates, ending, usage _(planned for M34)_        | You change the billing API or write a connector to it                    |
+| [Billing API](reference/billing-api.md)                     | The API the operator's billing system calls: sign-in, the paid-through date, plan, ending, usage                           | You change the billing API or write a connector to it                    |
 
 ### Security
 
