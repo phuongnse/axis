@@ -86,7 +86,15 @@ export function AxisFieldGroup({
             {help !== '' && (
               <span
                 id={helpId}
-                style={{ display: 'block', fontSize: 12, lineHeight: '20px', fontWeight: 400, color: colour.textMuted }}
+                // As far under the title as a group without an action sets its help or its first field.
+                style={{
+                  display: 'block',
+                  marginTop: legendStyle.paddingBottom,
+                  fontSize: 12,
+                  lineHeight: '20px',
+                  fontWeight: 400,
+                  color: colour.textMuted,
+                }}
               >
                 {help}
               </span>
