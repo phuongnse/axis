@@ -148,6 +148,7 @@ const isSmallCard = (node) => {
 const noAntdButton = noAntdComponent('Button', 'Use AxisButton with a role, not the Button of antd.')
 const noAntdAlert = noAntdComponent('Alert', 'Use AxisAlert with a kind, not the Alert of antd.')
 const noAntdTag = noAntdComponent('Tag', 'Use StatusTag with a tone, not the Tag of antd.')
+const noAntdEmpty = noAntdComponent('Empty', 'Use EmptyState, not the Empty of antd.')
 // A page's parts sit a rule apart, so a page draws its panels through SectionParts, see docs/reference/shell.md#layout.
 const noCardPanel = noAntdComponent(
   'Card',
@@ -399,6 +400,7 @@ export default {
     'no-antd-button': noAntdButton,
     'no-antd-alert': noAntdAlert,
     'no-antd-tag': noAntdTag,
+    'no-antd-empty': noAntdEmpty,
     'no-card-panel': noCardPanel,
     'field-label-through-axis-field': fieldLabelThroughAxisField,
     'exact-locators': exactLocators,
