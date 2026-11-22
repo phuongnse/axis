@@ -1,7 +1,10 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { designTokensFor } from '../platform/designTokens'
+import { Shell } from '../platform/Shell'
 import { ShellAsideContext } from '../platform/shellAsideContext'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
@@ -75,6 +78,46 @@ describe('StudioProblems', () => {
 
     const body = screen.getByText('AXIS-E101').closest('ul')!.parentElement!
     expect(body).toHaveStyle({ overflowY: 'auto', overscrollBehavior: 'contain' })
+  })
+})
+
+describe('StudioProblems in the shell', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    localStorage.removeItem('axis.themeMode')
+  })
+
+  it("draws a problem's code and message in the dark text token of the shell", async () => {
+    localStorage.setItem('axis.themeMode', 'dark')
+    // The shell asks for the version and the account, and nobody is signed in.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input === '/api/about'
+          ? new Response(null, { status: 401 })
+          : new Response(JSON.stringify({ title: 'Not found', status: 404 }), { status: 404 }),
+      ),
+    )
+    render(
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider
+            catalogs={[{ texts: { ...platformEnglish, 'site.title': 'Workspace' }, fallbackTexts: platformEnglish }]}
+            development={false}
+          >
+            <Shell titleKey="site.title" navigation={[]} locales={['en']} locale="en" onLocaleChange={() => {}}>
+              <StudioProblems diagnostics={[error]} onSelect={vi.fn()} onClose={vi.fn()} />
+            </Shell>
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
+    )
+
+    // The panel draws in the shell's right column once the shell has mounted its target.
+    await screen.findByRole('complementary', { name: 'Problems' })
+    const line = screen.getByText('AXIS-E101').parentElement!
+    expect(screen.getByText('AXIS-E101')).toHaveStyle({ color: designTokensFor('dark').colour.text })
+    expect(line).toHaveStyle({ color: designTokensFor('dark').colour.text })
   })
 })
 

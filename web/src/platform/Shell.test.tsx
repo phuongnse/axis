@@ -817,6 +817,13 @@ describe('Shell scrolling', () => {
       expect(document.documentElement.style.colorScheme).toBe(mode)
       expect(container.querySelector('[data-theme-mode]')).toHaveStyle({ colorScheme: mode })
     })
+
+    it('draws text with no colour of its own in the text token of the mode', () => {
+      localStorage.setItem('axis.themeMode', mode)
+      renderShell('en', ['/'], [], <span>Plain</span>)
+
+      expect(screen.getByText('Plain')).toHaveStyle({ color: designTokensFor(mode).colour.text })
+    })
   })
 })
 

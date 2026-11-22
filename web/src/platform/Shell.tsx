@@ -97,7 +97,8 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * A page draws a bar at the foot of the content column with `ShellBarSlot`, which sticks to the window's foot and rests above the footer.
  * A footer runs under the page, with the copyright at the start and the legal links at the end. Without a sidebar it
  * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
- * The page area draws on `surface`, flush with the frame, see docs/reference/shell.md#layout.
+ * The page area draws on `surface`, flush with the frame, and text with no colour of its own takes `text` of the mode,
+ * see docs/reference/shell.md#layout.
  * Ant Design components and dayjs follow the locale. At narrow width, below
  * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
  * there is no sidebar. The app switcher stays in the header. A shell given `account` shows it in place of the app switcher
@@ -188,8 +189,9 @@ export function Shell({
 
   // This provider sets the locale, and the tighter menu items while a page claims the sidebar, as the page draws its
   // own navigation there. It inherits the rest of the theme from the provider in theme.tsx.
+  // The text colour is set here, once, so text with no colour of its own in any page follows the mode.
   return (
-    <div data-theme-mode={mode} style={{ colorScheme: mode }}>
+    <div data-theme-mode={mode} style={{ colorScheme: mode, color: colour.text }}>
       <ConfigProvider locale={antLocaleFor(locale)} theme={claimed ? claimedTheme : siteTheme}>
         {/* A design-system frame sets --shell-min-height to its own height, so its states fit their card. */}
         <Layout style={{ minHeight: 'var(--shell-min-height, 100vh)' }}>
