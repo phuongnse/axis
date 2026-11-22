@@ -464,11 +464,14 @@ const Fields = memo(function Fields({
    * field puts it in, so Cancel adds nothing. `null` while no new field is open.
    */
   const [staged, setStaged] = useState<Record<string, unknown> | null>(null)
+  // What Add field found wrong with the new field, dropped whenever its panel goes.
+  const [stagedErrors, setStagedErrors] = useState<{ label?: string; name?: string }>({})
 
   const openDrawer = useCallback(
     (index: number) => {
       // One side panel shows at a time, so a field opened from the table takes the place of a new field's panel.
       setStaged(null)
+      setStagedErrors({})
       setDrawer({ index, open: true })
       writeField(fieldName(latest.current.fields?.[index]), false)
     },
@@ -618,6 +621,7 @@ const Fields = memo(function Fields({
       writeField(null, false)
     }
     setStaged({ name: '', type: 'text' })
+    setStagedErrors({})
   }
 
   /** A change in the new field's panel, at a pointer under `/fields/<its row>`, goes to the field the panel holds. */
@@ -632,7 +636,6 @@ const Fields = memo(function Fields({
   }
 
   const labelDrafts = useContext(LabelTextsContext)
-  const [stagedErrors, setStagedErrors] = useState<{ label?: string; name?: string }>({})
 
   /**
    * Proposed, #3264: Add field puts the new field into the draft only with a label, in words in any language, and a
@@ -1139,7 +1142,13 @@ const FieldDrawer = memo(function FieldDrawer({
   const [typed, setTyped] = useState<{ index: number | null; name?: string; label?: Record<string, string> }>({
     index,
   })
-  const mine = typed.index === index ? typed : { index }
+  // Another field, or the panel opened anew, starts with what the draft holds, dropping what was typed for the last one:
+  // what was typed belongs to the open panel's field, and a closed panel has none.
+  const typedFor = open ? index : null
+  if (typed.index !== typedFor) {
+    setTyped({ index: typedFor })
+  }
+  const mine = typed.index === typedFor ? typed : { index: typedFor }
   const shownName = mine.name ?? name
   const editing = onAdd === undefined
   const nameError = editing && mine.name !== undefined ? nameProblem(mine.name, otherNames) : undefined
