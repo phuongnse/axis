@@ -15,7 +15,7 @@ namespace Axis.ControlPlane.Cells;
 /// <see cref="CellOperation"/>, and so does a <c>DELETE</c>. A failure throws <see cref="CellCallException"/> with a fixed text: it never holds a
 /// response body, a token, the client secret or a request body, and none of them is logged. A <c>409</c> titled
 /// <see cref="FullTitle"/> sets <see cref="CellCallException.CellFull"/>, and any other <c>409</c> is an ordinary failure.
-/// <see cref="ListTenantsAsync"/> reads the cell's whole tenant list, page by page, <see cref="GetTenantStatusAsync"/> one tenant's status and
+/// <see cref="ListTenantsAsync"/> reads the cell's whole tenant list, page by page, <see cref="GetTenantAsync"/> one tenant's status and usage, <see cref="GetTenantStatusAsync"/> only its status and
 /// <see cref="ListAdministratorsAsync"/> its administrators, with the same token and the same failures. <see cref="PutQuotasAsync"/> sets a
 /// tenant's quotas with a <c>PUT</c> that carries no idempotency key: it sets every key it names, so a repeat gives the same rows.
 /// </summary>
@@ -153,13 +153,17 @@ internal sealed class CellClient : IDisposable
 
     /// <summary>
     /// Reads one tenant, <c>GET /api/cell/tenants/{id}</c>, and returns its <c>status</c>, <c>deleting</c> while a deletion is
-    /// scheduled. A cell that does not know the tenant answers <c>404</c>, and the result is null.
+    /// scheduled, and its <c>usage</c>. A cell that does not know the tenant answers <c>404</c>, and the result is null.
     /// </summary>
-    public Task<string?> GetTenantStatusAsync(string tenantId, CancellationToken cancellationToken)
+    public Task<CellTenantRead?> GetTenantAsync(string tenantId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
-        return CallAsync(HttpMethod.Get, $"/api/cell/tenants/{Uri.EscapeDataString(tenantId)}", null, null, ReadTenantStatusAsync, cancellationToken);
+        return CallAsync(HttpMethod.Get, $"/api/cell/tenants/{Uri.EscapeDataString(tenantId)}", null, null, ReadTenantAsync, cancellationToken);
     }
+
+    /// <summary>The <c>status</c> of <see cref="GetTenantAsync"/>, or null for a tenant that the cell does not know.</summary>
+    public async Task<string?> GetTenantStatusAsync(string tenantId, CancellationToken cancellationToken) =>
+        (await GetTenantAsync(tenantId, cancellationToken))?.Status;
 
     /// <summary>
     /// Reads the administrators of one tenant, <c>GET /api/cell/tenants/{id}/administrators</c>, as each one's email, display name and
@@ -363,7 +367,7 @@ internal sealed class CellClient : IDisposable
         throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not an administrator list.", status);
     }
 
-    private async Task<string?> ReadTenantStatusAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)
+    private async Task<CellTenantRead?> ReadTenantAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)
     {
         var status = (int)response.StatusCode;
         if (response.StatusCode == HttpStatusCode.NotFound)
@@ -385,7 +389,10 @@ internal sealed class CellClient : IDisposable
                 && value.ValueKind == JsonValueKind.String
                 && value.GetString() is { Length: > 0 } text)
             {
-                return text;
+                var usage = root.TryGetProperty("usage", out var usageValue) && usageValue.ValueKind == JsonValueKind.Object
+                    ? usageValue.Deserialize<CellTenantUsage>(JsonSerializerOptions.Web)
+                    : null;
+                return new CellTenantRead(text, usage);
             }
         }
         catch (JsonException)

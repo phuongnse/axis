@@ -91,9 +91,11 @@ A subscription is in one of these states, and each state says how the tenant wor
 - **The clock follows the paid-through date.** Once the date has passed, the clock moves an `active`
   subscription to `pastDue`, then to `readOnly` after the grace and to `deleting` after 90 days, as for an ended
   trial but with the longer wait.
-- **Cancelling** _(planned for M34)_. The operator's billing system ends the subscription at its
-  paid-through date through the [billing API](billing-api.md#ending-a-subscription). The tenant keeps
-  working to that date, then follows the same path as an unpaid one.
+- **Cancelling.** The operator's billing system ends the subscription at its paid-through date through the
+  [billing API](billing-api.md#ending-a-subscription). The call makes an `active` subscription `cancelled` in
+  its transaction, with a new step id and the audit record `subscription.cancelled` by the billing client. The
+  move keeps `paid_through` and `next_at`, so the tenant works until the day after its paid-through date. Then
+  the clock moves it to `readOnly` with one read-only call to the cell, and to `deleting` after 90 days.
 
 ## The timeline
 

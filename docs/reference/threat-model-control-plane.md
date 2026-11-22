@@ -155,12 +155,15 @@ flowchart LR
         Replayer[Retrying or replaying caller]
     end
     subgraph cp [Regional control plane]
-        Route[PUT /api/billing/v1/tenants/id/subscription/paid-through]
+        Route[Billing routes: PUT paid-through and plan, POST end, GET subscription, under /api/billing/v1/tenants/id]
         Check[Token and scope check]
         Keys[(control_plane.billing_requests)]
         Subs[(Subscriptions)]
         Audit[(Audit records)]
         Queue[(Job queue)]
+    end
+    subgraph cellRead [Cell]
+        Cell[Tenant read]
     end
     BillingSystem -->|gets a token from| Provider
     BillingSystem -->|bearer token and Idempotency-Key| Route
@@ -171,12 +174,14 @@ flowchart LR
     Route -->|changes| Subs
     Route -->|appends to| Audit
     Route -->|queues writeQuotas and resumeTenant in| Queue
+    Route -->|reads usage from| Cell
 ```
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| C21 | A token of another client, or without the billing scope, changes a subscription. | Billing API | Spoofing | Critical | **Mitigated** | `BillingApiTests` shows that a call with no token, another client's token, a wrong audience or a key of another signer answers `401`, a billing client's token without `axis-billing` answers `403`, and each leaves the subscription, the audit records and the jobs unchanged. `ControlPlaneOptionsTests` shows that without the billing settings every route answers `401`. |
-| C22 | A retried call makes a change twice. | Billing API | Tampering | High | **Mitigated** | `BillingApiTests` shows that the same `Idempotency-Key` with the same body answers the first answer again and leaves one audit record and one `writeQuotas` job, five parallel retries act once, and the same key with another body answers `422`. |
+| C21 | A token of another client, or without the billing scope, changes a subscription. | Billing API | Spoofing | Critical | **Mitigated** | `BillingApiTests` shows that a call with no token, another client's token, a wrong audience or a key of another signer answers `401`, a billing client's token without `axis-billing` answers `403`, and each leaves the subscription, the audit records and the jobs unchanged. `BillingApiTests` shows the same for the end call and the read. `ControlPlaneOptionsTests` shows that without the billing settings every route answers `401`. |
+| C22 | A retried call makes a change twice. | Billing API | Tampering | High | **Mitigated** | `BillingApiTests` shows that the same `Idempotency-Key` with the same body answers the first answer again and leaves one audit record and one `writeQuotas` job, five parallel retries act once, and the same key with another body answers `422`. It also shows that the same key sent twice to the end call answers the same text and leaves one audit record, and that a key first used on the paid-through call answers `422` on the end call. |
+| C23 | A read shows which tenants exist in another region. | Billing API | Information disclosure | Medium | **Mitigated** | `BillingApiTests` shows that a read, and an end call, for a tenant that another region holds or that no region holds answer `404` alike, and that the cell is not called. |
 
 Repudiation does not need a row: each change writes an audit record with the billing client as actor, see
 [audit records](billing-api.md#audit-records).

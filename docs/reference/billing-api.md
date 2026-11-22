@@ -138,8 +138,6 @@ Content-Type: application/json
 
 ## Ending a subscription
 
-_(planned for M34)_
-
 This call ends a subscription at its paid-through date. The tenant keeps working until that date, then
 follows the path of an unpaid tenant, as [states](subscriptions.md#states) says.
 
@@ -151,15 +149,16 @@ Idempotency-Key: <key>
 
 The call has no body.
 
-- **The move.** An `active` subscription becomes `cancelled`.
+- **The move.** An `active` subscription becomes `cancelled`, with a new step id. It keeps its paid-through
+  date and its next date, so the tenant works until the day after its paid-through date. Then the clock
+  moves it to `readOnly`, as [the clock](subscriptions.md#one-clock) says.
 - **The answer.** `200` with the tenant, as [the shared answers](#answers-every-call-shares) say.
-- **Already cancelled.** A `cancelled` subscription answers `200` with the tenant and writes nothing.
+- **Already cancelled.** A `cancelled` subscription answers `200` with the tenant and writes nothing. It
+  keeps nothing under the key either, and a retry gets the same answer because the state does not change.
 - **`409`** for any other state: `trialing`, `pastDue`, `readOnly`, `deleting` or `deleted`.
 - **The audit record.** `subscription.cancelled`, once, when the move is made.
 
 ## Reading a tenant
-
-_(planned for M34)_
 
 This call reads the tenant's subscription and its usage. It changes nothing and writes no audit record.
 
@@ -193,7 +192,12 @@ The answer is `200` with the subscription, shaped like this example:
 - **Usage.** `usage` is the `usage` of the cell's tenant read, which [the tenant routes](tenant-lifecycle.md#routes)
   describe and [usage](tenant-quotas.md#usage) explains. It holds `storage`, `users`, `applications` and
   `emailsPerDay`, each with its `limit` and its `used`. It is `null` for a `deleted` subscription.
-- **`502`** when the cell cannot be read.
+- **Where the usage comes from.** The control plane finds the tenant's cell in the
+  [region directory](region-directory.md#routing-a-host) and reads `GET /api/cell/tenants/{id}` on each call. It
+  caches nothing. A `deleted` subscription makes no cell call.
+- **`502`** with the title "The tenant's cell could not be read." when the cell gives no usage: the tenant has
+  no row in the directory, the cell is not one of the region's, the cell does not know the tenant or sends no
+  usage, or the call fails. A tenant that is not yet provisioned answers `502` until it is.
 
 ## Audit records
 
