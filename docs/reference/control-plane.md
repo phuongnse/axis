@@ -23,6 +23,9 @@ through a cell's API.
 - **Its own Helm chart and image.** `deploy/helm/axis-controlplane` and the image
   `axis-controlplane`, built, scanned and versioned with the platform's images, see
   [image and chart](#image-and-chart).
+- **A billing API** _(planned for M34)_. The operator's billing system sets a tenant's plan, add-ons and
+  paid-through date and reads its state through the [billing API](billing-api.md), with a client and a
+  scope of its own.
 
 ## Two parts
 
@@ -176,6 +179,8 @@ every business change.
     actor. An operator command's record has the actor kind `operator` and the `--operator` name as
     the actor. The job runner writes none itself, because claiming and retrying are bookkeeping and not a
     business change.
+  - **The billing client** _(planned for M34)_. A call of the billing API writes its record with the actor
+    kind `billing` and the client id as actor, see [audit records](billing-api.md#audit-records).
 
 ## Operators
 

@@ -95,8 +95,8 @@ A subscription is in one of these states, and each state says how the tenant wor
   once a later move has changed the step id. A part payment changes no state: the subscription moves
   when a later payment completes the invoice.
 - **Cancelling** _(planned for M34)_. The operator's billing system ends the subscription at its
-  paid-through date. The tenant keeps working to that date, then follows the same path as an unpaid
-  one.
+  paid-through date through the [billing API](billing-api.md#ending-a-subscription). The tenant keeps
+  working to that date, then follows the same path as an unpaid one.
 
 ## The timeline
 
