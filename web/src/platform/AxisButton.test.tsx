@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PlusOutlined } from '@ant-design/icons'
-import { ConfigProvider } from 'antd'
+import { ConfigProvider, theme } from 'antd'
 import { useState } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AxisActionRow, AxisButton, AxisButtonGroup, AxisSplitButton } from './AxisButton'
+import { antThemeFor } from './antTheme'
 import { buttonRoles } from './buttonRoles'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
@@ -44,7 +45,7 @@ function renderIn(mode: ThemeMode, ui: React.ReactNode) {
 
 describe('the icon-only button', () => {
   it('has its accessible name and shows it as a tooltip on keyboard focus', async () => {
-    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+    renderIn('light', <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" />)
 
     expect(screen.getByRole('button', { name: 'Add a row' })).toBeInTheDocument()
     await userEvent.tab()
@@ -57,8 +58,8 @@ describe('the icon-only button', () => {
     renderIn(
       'light',
       <>
-        <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />
-        <AxisButton role="plain">Next</AxisButton>
+        <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" />
+        <AxisButton role="subtle">Next</AxisButton>
       </>,
     )
     const button = screen.getByRole('button', { name: 'Add a row' })
@@ -74,7 +75,7 @@ describe('the icon-only button', () => {
   })
 
   it('shows its tooltip on hover', async () => {
-    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+    renderIn('light', <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" />)
 
     await userEvent.hover(screen.getByRole('button', { name: 'Add a row' }))
 
@@ -82,7 +83,7 @@ describe('the icon-only button', () => {
   })
 
   it('shows its tooltip on hover when disabled, which takes no focus', async () => {
-    renderIn('light', <AxisButton role="icon" disabled icon={<PlusOutlined />} nameKey="test.add" />)
+    renderIn('light', <AxisButton role="subtle" disabled icon={<PlusOutlined />} nameKey="test.add" />)
 
     await userEvent.hover(screen.getByRole('button', { name: 'Add a row' }))
 
@@ -93,7 +94,7 @@ describe('the icon-only button', () => {
     withAntdStyles()
 
     it('closes its tooltip on click and keeps it closed while the pointer stays on it', async () => {
-      renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+      renderIn('light', <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" />)
       const button = screen.getByRole('button', { name: 'Add a row' })
       await userEvent.hover(button)
       await screen.findByRole('tooltip')
@@ -106,7 +107,7 @@ describe('the icon-only button', () => {
   })
 
   it('opens no tooltip on focus that a script gives', async () => {
-    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+    renderIn('light', <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" />)
 
     act(() => screen.getByRole('button', { name: 'Add a row' }).focus())
     await pause(150)
@@ -115,7 +116,7 @@ describe('the icon-only button', () => {
   })
 
   it('shows its tooltip again when the pointer leaves after a click and comes back', async () => {
-    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+    renderIn('light', <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" />)
     const button = screen.getByRole('button', { name: 'Add a row' })
     await userEvent.click(button)
 
@@ -130,7 +131,7 @@ describe('the icon-only button', () => {
       const [done, setDone] = useState(false)
       return (
         <AxisButton
-          role="icon"
+          role="subtle"
           icon={<PlusOutlined />}
           nameKey="test.add"
           doneKey={done ? 'test.added' : undefined}
@@ -150,7 +151,7 @@ describe('the icon-only button', () => {
   })
 
   it('appends its suffix to the accessible name but shows the name alone as a tooltip', async () => {
-    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" nameSuffix="Category 2" />)
+    renderIn('light', <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" nameSuffix="Category 2" />)
 
     await userEvent.tab()
 
@@ -162,8 +163,8 @@ describe('the icon-only button', () => {
     renderIn(
       'light',
       <>
-        <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />
-        <AxisButton role="icon" joined icon={<PlusOutlined />} nameKey="test.add" />
+        <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" />
+        <AxisButton role="subtle" joined icon={<PlusOutlined />} nameKey="test.add" />
       </>,
     )
 
@@ -173,7 +174,7 @@ describe('the icon-only button', () => {
   })
 
   it('draws a destructive icon in dangerText', () => {
-    renderIn('dark', <AxisButton role="icon" destructive icon={<PlusOutlined />} nameKey="test.add" />)
+    renderIn('dark', <AxisButton role="subtle" destructive icon={<PlusOutlined />} nameKey="test.add" />)
 
     expect(screen.getByRole('button', { name: 'Add a row' })).toHaveStyle({
       color: designTokensFor('dark').colour.dangerText,
@@ -183,6 +184,7 @@ describe('the icon-only button', () => {
 
 describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', (mode) => {
   const { colour } = designTokensFor(mode)
+  const tint = theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
 
   function renderRoles() {
     renderIn(
@@ -191,32 +193,93 @@ describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', 
         <AxisButton role="finish">Finish</AxisButton>
         <AxisButton role="main">Main</AxisButton>
         <AxisButton role="secondary">Secondary</AxisButton>
-        <AxisButton role="destructive">Destructive</AxisButton>
+        <AxisButton role="subtle">Subtle</AxisButton>
+        <AxisButton role="finish" destructive>
+          Finish destructive
+        </AxisButton>
+        <AxisButton role="main" destructive>
+          Main destructive
+        </AxisButton>
+        <AxisButton role="secondary" destructive>
+          Secondary destructive
+        </AxisButton>
+        <AxisButton role="subtle" destructive>
+          Subtle destructive
+        </AxisButton>
       </>,
     )
   }
 
-  it('draws main text in primaryText and destructive text in dangerText', () => {
+  it('draws main in primaryText with a border in primaryText', () => {
     renderRoles()
 
-    expect(screen.getByRole('button', { name: 'Main' })).toHaveStyle({
-      color: colour.primaryText,
-      borderColor: colour.primaryText,
-    })
-    expect(screen.getByRole('button', { name: 'Destructive' })).toHaveStyle({
-      color: colour.dangerText,
-      borderColor: colour.dangerText,
-    })
+    const main = screen.getByRole('button', { name: 'Main' })
+    expect(main).toHaveClass('ant-btn-variant-outlined')
+    expect(main).toHaveStyle({ color: colour.primaryText, borderColor: colour.primaryText })
   })
 
-  it('draws finish as solid primary and secondary as the default outline', () => {
+  it('draws finish as solid primary, secondary as the default outline and subtle as borderless text', () => {
     renderRoles()
 
     const finish = screen.getByRole('button', { name: 'Finish' })
     expect(finish).toHaveClass('ant-btn-color-primary', 'ant-btn-variant-solid')
+    expect(finish.style.background).toBe('')
     const secondary = screen.getByRole('button', { name: 'Secondary' })
     expect(secondary).toHaveClass('ant-btn-color-default', 'ant-btn-variant-outlined')
     expect(secondary.style.color).toBe('')
+    const subtle = screen.getByRole('button', { name: 'Subtle' })
+    expect(subtle).toHaveClass('ant-btn-variant-text')
+    expect(subtle.style.color).toBe('')
+    expect(subtle.style.borderColor).toBe('')
+  })
+
+  it('draws a main or secondary button in the destructive tone in dangerText with a border in dangerText', () => {
+    renderRoles()
+
+    for (const name of ['Main destructive', 'Secondary destructive']) {
+      const button = screen.getByRole('button', { name })
+      expect(button).toHaveClass('ant-btn-variant-outlined')
+      expect(button).toHaveStyle({ color: colour.dangerText, borderColor: colour.dangerText })
+    }
+  })
+
+  it('draws a subtle button in the destructive tone as borderless text in dangerText', () => {
+    renderRoles()
+
+    const button = screen.getByRole('button', { name: 'Subtle destructive' })
+    expect(button).toHaveClass('ant-btn-variant-text')
+    expect(button).toHaveStyle({ color: colour.dangerText })
+    expect(button.style.borderColor).toBe('')
+  })
+
+  it('draws a finish button in the destructive tone as a solid danger fill with white text', () => {
+    renderRoles()
+
+    const button = screen.getByRole('button', { name: 'Finish destructive' })
+    expect(button).toHaveClass('ant-btn-variant-solid')
+    expect(button).toHaveStyle({
+      background: colour.danger,
+      borderColor: colour.danger,
+      color: colour.onPrimary,
+    })
+    expect(colour.onPrimary).toBe('#ffffff')
+  })
+
+  it('keeps no inline colour on a disabled button in the destructive tone', () => {
+    renderIn(
+      mode,
+      <>
+        <AxisButton role="finish" destructive disabled>
+          Finish
+        </AxisButton>
+        <AxisButton role="secondary" destructive disabled>
+          Secondary
+        </AxisButton>
+      </>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Finish' }).style.background).toBe('')
+    expect(screen.getByRole('button', { name: 'Secondary' }).style.color).toBe('')
   })
 
   it('does not set the role on the DOM', () => {
@@ -233,6 +296,100 @@ describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', 
     expect(link).toHaveStyle({ color: colour.primaryText })
     expect(link).not.toHaveAttribute('role')
   })
+
+  describe('with selected', () => {
+    it('draws a subtle button on the selected tint in primaryText with one aria-pressed', () => {
+      renderIn(
+        mode,
+        <AxisButton role="subtle" selected>
+          Cell
+        </AxisButton>,
+      )
+
+      const button = screen.getByRole('button', { name: 'Cell' })
+      expect(button).toHaveStyle({ background: tint, color: colour.primaryText })
+      expect(button).toHaveAttribute('aria-pressed', 'true')
+      expect(button).not.toHaveAttribute('aria-current')
+    })
+
+    it('draws a subtle button that is not selected with no tint and aria-pressed false', () => {
+      renderIn(
+        mode,
+        <AxisButton role="subtle" selected={false}>
+          Cell
+        </AxisButton>,
+      )
+
+      const button = screen.getByRole('button', { name: 'Cell' })
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+      expect(button.style.background).toBe('')
+      expect(button.style.color).toBe('')
+    })
+
+    it('sets aria-current for a page or a step, and no aria-pressed', () => {
+      renderIn(
+        mode,
+        <>
+          <AxisButton role="subtle" selected="page">
+            Page
+          </AxisButton>
+          <AxisButton role="subtle" selected="step">
+            Step
+          </AxisButton>
+        </>,
+      )
+
+      const page = screen.getByRole('button', { name: 'Page' })
+      expect(page).toHaveAttribute('aria-current', 'page')
+      expect(page).not.toHaveAttribute('aria-pressed')
+      expect(page).toHaveStyle({ background: tint, color: colour.primaryText })
+      expect(screen.getByRole('button', { name: 'Step' })).toHaveAttribute('aria-current', 'step')
+    })
+
+    it('drops the attributes the caller passes, so there is exactly one', () => {
+      renderIn(
+        mode,
+        <>
+          <AxisButton role="subtle" selected="page" aria-current="true" aria-pressed>
+            Page
+          </AxisButton>
+          <AxisButton role="subtle" selected aria-current="true" aria-pressed="false">
+            Chosen
+          </AxisButton>
+        </>,
+      )
+
+      const page = screen.getByRole('button', { name: 'Page' })
+      expect(page).toHaveAttribute('aria-current', 'page')
+      expect(page).not.toHaveAttribute('aria-pressed')
+      const chosen = screen.getByRole('button', { name: 'Chosen' })
+      expect(chosen).toHaveAttribute('aria-pressed', 'true')
+      expect(chosen).not.toHaveAttribute('aria-current')
+    })
+
+    it('keeps the attributes of the caller without selected', () => {
+      renderIn(
+        mode,
+        <AxisButton role="subtle" aria-pressed>
+          Cell
+        </AxisButton>,
+      )
+
+      expect(screen.getByRole('button', { name: 'Cell' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('draws an icon-only subtle button on the selected tint with its one attribute', () => {
+      renderIn(
+        mode,
+        <AxisButton role="subtle" selected aria-current="true" icon={<PlusOutlined />} nameKey="test.add" />,
+      )
+
+      const button = screen.getByRole('button', { name: 'Add a row' })
+      expect(button).toHaveStyle({ background: tint, color: colour.primaryText })
+      expect(button).toHaveAttribute('aria-pressed', 'true')
+      expect(button).not.toHaveAttribute('aria-current')
+    })
+  })
 })
 
 describe('the roles of the button in the docs', () => {
@@ -248,8 +405,7 @@ describe('the roles of the button in the docs', () => {
       .slice(2)
       .map((line) => line.split('|')[1].trim().toLowerCase())
 
-    expect(new Set(documented)).toEqual(new Set(buttonRoles))
-    expect(documented).toHaveLength(buttonRoles.length)
+    expect(documented).toEqual([...buttonRoles])
   })
 })
 
@@ -257,7 +413,7 @@ describe('the text button with a caret', () => {
   it('ends in an aria-hidden down caret and keeps its name', () => {
     renderIn(
       'light',
-      <AxisButton role="plain" caret>
+      <AxisButton role="subtle" caret>
         Account
       </AxisButton>,
     )
@@ -280,7 +436,9 @@ describe.each(['light', 'dark'] as const)('the roles of the button inside an act
         <AxisButton role="finish">Finish</AxisButton>
         <AxisButton role="main">Main</AxisButton>
         <AxisButton role="secondary">Secondary</AxisButton>
-        <AxisButton role="destructive">Destructive</AxisButton>
+        <AxisButton role="secondary" destructive>
+          Destructive
+        </AxisButton>
       </AxisActionRow>,
     )
   }

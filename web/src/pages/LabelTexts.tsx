@@ -145,7 +145,7 @@ function LabelEditor({
           onChange={(event) => shown !== undefined && changeTexts({ ...texts, [shown]: event.target.value })}
           suffix={
             <AxisButton
-              role="icon"
+              role="subtle"
               nameKey="shell.studio.label.translations"
               icon={<TranslationOutlined />}
               onClick={() => {

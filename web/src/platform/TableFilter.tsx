@@ -65,7 +65,7 @@ export function TableFilterButton({
     <>
       <Badge count={count} size="small">
         <AxisButton
-          role="icon"
+          role="subtle"
           nameKey="shell.table.filter"
           icon={<FilterOutlined />}
           nameSuffix={count > 0 ? String(count) : undefined}
@@ -135,7 +135,7 @@ function GroupEditor({
           ]}
         />
         {onRemove && (
-          <AxisButton role="icon" nameKey="shell.table.filterRemove" icon={<CloseOutlined />} onClick={onRemove} />
+          <AxisButton role="subtle" nameKey="shell.table.filterRemove" icon={<CloseOutlined />} onClick={onRemove} />
         )}
       </Flex>
       <Flex vertical gap="small" style={{ paddingInlineStart: 16 }}>
@@ -212,7 +212,7 @@ function ConditionEditor({
       {!isUnary(condition.op) && (
         <ValueInput column={column} value={condition.value} onChange={(value) => onChange({ ...condition, value })} />
       )}
-      <AxisButton role="icon" nameKey="shell.table.filterRemove" icon={<CloseOutlined />} onClick={onRemove} />
+      <AxisButton role="subtle" nameKey="shell.table.filterRemove" icon={<CloseOutlined />} onClick={onRemove} />
     </Flex>
   )
 }

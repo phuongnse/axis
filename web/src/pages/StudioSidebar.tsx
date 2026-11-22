@@ -80,7 +80,7 @@ export function StudioSidebar({
           }}
         >
           <AxisButton
-            role="plain"
+            role="subtle"
             block
             data-testid="studio-application-row"
             aria-label={collapsed ? title : undefined}

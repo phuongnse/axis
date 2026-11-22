@@ -680,7 +680,7 @@ export function AxisTable<T extends object>({
           <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
             {toolbar.onRefresh && (
               <AxisButton
-                role="icon"
+                role="subtle"
                 nameKey="shell.table.refresh"
                 icon={<ReloadOutlined />}
                 onClick={toolbar.onRefresh}
@@ -703,7 +703,8 @@ export function AxisTable<T extends object>({
               {bulkActions?.map((action) => (
                 <AxisButton
                   key={action.key}
-                  role={action.destructive ? 'destructive' : 'secondary'}
+                  role="secondary"
+                  destructive={action.destructive}
                   size="small"
                   onClick={() => {
                     action.onClick(selected)
@@ -776,7 +777,7 @@ export function AxisTable<T extends object>({
 }
 
 /**
- * The fold of a row, an `AxisButton` of the role `icon` with `Chevron`: named "Show the rows in it" or "Hide the rows in it"
+ * The fold of a row, a subtle `AxisButton` with `Chevron`: named "Show the rows in it" or "Hide the rows in it"
  * for a row with group rows, and "Show the details" or "Hide the details" for a row with details, see
  * docs/reference/actions-and-controls.md#tables.
  */
@@ -786,7 +787,7 @@ function RowFold({ group, open, onToggle }: { group: boolean; open: boolean; onT
     : { show: 'shell.table.showDetails', hide: 'shell.table.hideDetails' }
   return (
     <AxisButton
-      role="icon"
+      role="subtle"
       size="small"
       icon={<Chevron point={open ? 'down' : 'right'} />}
       nameKey={open ? names.hide : names.show}
@@ -927,7 +928,7 @@ export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null;
           'aria-label': t('shell.table.rowActions'),
         }}
       >
-        <AxisButton role="icon" size="small" nameKey="shell.table.rowActions" icon={<EllipsisOutlined />} />
+        <AxisButton role="subtle" size="small" nameKey="shell.table.rowActions" icon={<EllipsisOutlined />} />
       </Dropdown>
     )
   }
@@ -937,7 +938,7 @@ export function RowActions({ actions, fold }: { actions: AxisRowAction[] | null;
         action.icon ? (
           <AxisButton
             key={action.key}
-            role="icon"
+            role="subtle"
             size="small"
             nameKey={action.labelKey}
             destructive={action.destructive}

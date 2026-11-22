@@ -219,6 +219,13 @@ describe.each(['light', 'dark'] as const)('the shared field rules in %s mode', (
     expect(rules).toContain('.ant-form-item-margin-offset { display: none; }')
   })
 
+  it('gives a subtle button the light fill of its hover on keyboard focus', () => {
+    const hoverFill = theme.getDesignToken(antThemeFor(mode)).colorBgTextHover
+    expect(fieldRules(mode)).toContain(
+      `.ant-btn-variant-text:not(:disabled):focus-visible { background: ${hoverFill}; }`,
+    )
+  })
+
   it('draws the icon of each kind of message in that kind text colour', () => {
     const rules = fieldRules(mode)
     expect(rules).toContain(`.ant-alert.ant-alert-info .ant-alert-icon { color: ${colour.infoText}; }`)

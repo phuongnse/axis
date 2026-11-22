@@ -169,7 +169,8 @@ function FieldProperties({
         />
       ))}
       <AxisButton
-        role="destructive"
+        role="secondary"
+        destructive
         data-testid="studio-design-remove-field"
         onClick={() => {
           const match = fieldPointer.exec(pointer)
@@ -257,7 +258,8 @@ function SectionProperties({
         onChange={onChange}
       />
       <AxisButton
-        role="destructive"
+        role="secondary"
+        destructive
         data-testid="studio-design-remove-section"
         onClick={() =>
           removeSectionAt(t, draft, Number(pointer.slice('/sections/'.length)), onChange, onSelect, onAnnounce)
@@ -343,7 +345,8 @@ function StepProperties({
     <Flex vertical gap="small" data-testid="studio-design-step">
       <TitleEditor pointer={pointer} element={step} textPath="steps" onChange={onChange} />
       <AxisButton
-        role="destructive"
+        role="secondary"
+        destructive
         data-testid="studio-design-remove-step"
         onClick={() => removeStepAt(t, draft, Number(pointer.slice('/steps/'.length)), onChange, onSelect, onAnnounce)}
       >

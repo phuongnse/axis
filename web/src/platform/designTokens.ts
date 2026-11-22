@@ -13,8 +13,8 @@ export interface ColourValue {
  * dark value is the shade that results, which components read through useDesignTokens. The tokens that end in Text
  * colour text in that state colour, and focusRing colours every control's keyboard focus. fillSubtle is a shade off
  * surface, under a process graph and a step's icon tile. Each text colour, and focusRing, reaches WCAG contrast on
- * surface and canvas in both modes. onPrimary colours text and icons on a `primary` fill and reaches 4.5:1 on it in
- * both modes.
+ * surface and canvas in both modes. onPrimary colours text and icons on a `primary` or `danger` fill and reaches 4.5:1
+ * on each in both modes.
  */
 export const colourTokens = {
   primary: { light: '#5b3fd9', dark: '#5039bb' },

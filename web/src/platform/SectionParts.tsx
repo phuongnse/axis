@@ -53,7 +53,7 @@ type SectionPartName = { testName: string; testId?: undefined } | { testId: stri
  * A part of a page or a Studio section, see docs/reference/shell.md#layout and docs/reference/studio-resource-form.md#sections:
  * an optional heading, its optional line and a slot for an action on the right of the heading, with no panel. A part with no
  * heading is its fields alone. It draws the `borderSubtle` rule above itself when `SectionParts` says a part comes before it.
- * Its action is drawn through `AxisActionRow`, so a `main`, `secondary` or `destructive` button is a text button, see
+ * Its action is drawn through `AxisActionRow`, so a `main` or `secondary` button, in the destructive tone or not, is a text button, see
  * docs/reference/shell.md#layout ('A title row's actions are light'). Its rule reaches past the shell's content inset to the
  * page area's edges, and stays inside where the inset is 0, see docs/reference/shell.md#layout ('Parts a rule apart').
  */
@@ -131,7 +131,7 @@ export function SectionPart({
             <Flex align="center" gap="small">
               {/* Outside the heading, so the region's name from the heading holds no button name. */}
               <AxisButton
-                role="icon"
+                role="subtle"
                 icon={<Chevron point={fold.open ? 'down' : 'right'} />}
                 nameKey={fold.open ? 'shell.section.hide' : 'shell.section.show'}
                 nameValues={{ title: fold.title }}

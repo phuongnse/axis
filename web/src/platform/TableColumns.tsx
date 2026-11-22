@@ -49,7 +49,7 @@ export function TableColumnsButton({
   return (
     <>
       <AxisButton
-        role="icon"
+        role="subtle"
         nameKey="shell.table.columns"
         icon={<TableOutlined />}
         onClick={() => {
@@ -101,7 +101,7 @@ export function TableColumnsButton({
               {index > 0 && (
                 <Flex gap="small">
                   <AxisButton
-                    role="icon"
+                    role="subtle"
                     nameKey="shell.table.columnsMoveUp"
                     nameSuffix={titles.get(line.key)}
                     icon={<ArrowUpOutlined />}
@@ -109,7 +109,7 @@ export function TableColumnsButton({
                     onClick={() => swap(index, index - 1)}
                   />
                   <AxisButton
-                    role="icon"
+                    role="subtle"
                     nameKey="shell.table.columnsMoveDown"
                     nameSuffix={titles.get(line.key)}
                     icon={<ArrowDownOutlined />}

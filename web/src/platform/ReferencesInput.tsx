@@ -75,7 +75,8 @@ export function ReferencesInput({
               <Flex align="center" gap="small">
                 <RecordLink entity={field.target?.entity ?? ''} id={id} label={labels[index] ?? null} />
                 <AxisButton
-                  role="destructive"
+                  role="secondary"
+                  destructive
                   size="small"
                   aria-label={`${t('shell.form.removeReference')} ${labelAt(index)}`}
                   onClick={() => remove(index)}

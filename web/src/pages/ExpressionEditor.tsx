@@ -266,7 +266,7 @@ export default function ExpressionEditor({
         frame &&
         createPortal(
           <AxisButton
-            role="icon"
+            role="subtle"
             size="small"
             nameKey="shell.studio.expression.expand"
             icon={<ExpandAltOutlined />}

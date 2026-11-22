@@ -15,7 +15,7 @@ export function CopyableId({ id }: { id: string }) {
     <Flex component="span" align="center" gap="small" style={{ display: 'inline-flex' }}>
       <Typography.Text code>{id.slice(0, shownLength)}</Typography.Text>
       <AxisButton
-        role="icon"
+        role="subtle"
         nameKey="shell.copy.copy"
         doneKey={copied ? 'shell.copy.copied' : undefined}
         icon={copied ? <CheckOutlined /> : <CopyOutlined />}

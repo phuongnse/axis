@@ -57,7 +57,7 @@ const onChange = vi.fn()
 
 const widgets: Record<string, ReactElement> = {
   'AxisButton with a text role': <AxisButton role="secondary">Save</AxisButton>,
-  'AxisButton with the icon role': <AxisButton role="icon" icon={<DeleteOutlined />} nameKey="row.open" />,
+  'AxisButton with the icon role': <AxisButton role="subtle" icon={<DeleteOutlined />} nameKey="row.open" />,
   AxisAlert: <AxisAlert kind="info" message="Saved" />,
   'a paged AxisTable with rows': (
     <AxisTable

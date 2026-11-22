@@ -12,26 +12,29 @@ A button's style follows its role, so the same kind of action always looks the s
 decides the rest. One shared button, `AxisButton` in `web/src/platform/`, takes the role, and each
 widget names a role, never an Ant Design button type.
 
-| Role        | Look                                        | Used for                                                                                                                                                                         |
-| ----------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Finish      | Solid primary                               | The one action that finishes a task, such as Save or Next, one per screen                                                                                                        |
-| Main        | Outlined in `primaryText`                   | The main action of a region: a table's first toolbar action that is shown, such as New request, Add row of a child collection, and a `startProcess` action on a form or a detail |
-| Secondary   | The default grey outline                    | Other actions, such as Cancel and Import                                                                                                                                         |
-| Icon        | A text button with only an icon             | Small actions such as Refresh. Choose and Clear of a `reference` field are bordered and joined                                                                                   |
-| Plain       | A borderless text button in the text colour | Header controls, such as the account button                                                                                                                                      |
-| Link        | Text in `primaryText` with no border        | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects)                                   |
-| Destructive | `dangerText` at any level                   | Actions that remove, such as Delete row and Delete                                                                                                                               |
+| Role      | Look                                                                            | Used for                                                                                                                                                                         |
+| --------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Finish    | Solid primary, or in the destructive tone a solid `danger` fill with white text | The one action that finishes a task, such as Save or Next, one per screen                                                                                                        |
+| Main      | Outlined in `primaryText`                                                       | The main action of a region: a table's first toolbar action that is shown, such as New request, Add row of a child collection, and a `startProcess` action on a form or a detail |
+| Secondary | The default grey outline                                                        | Other actions, such as Cancel and Import                                                                                                                                         |
+| Subtle    | Borderless in the text colour, with a light fill on hover and focus             | Tools such as Refresh, Format and Undo, header controls such as the account button, and icon-only buttons. Choose and Clear of a `reference` field are bordered and joined       |
+| Link      | Text in `primaryText` with no border                                            | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects)                                   |
 
-- **Four roles, by weight** _(planned)_. Finish is a solid fill, the one action that finishes a task, one a screen.
+- **Four roles, by weight.** Finish is a solid fill, the one action that finishes a task, one a screen.
   Main is outlined in `primaryText`, the main action of a region, one a region. Secondary is the default grey outline,
   for most actions. Subtle is borderless in the text colour, with a light fill on hover and focus, for tools such as
-  Refresh, Format and Undo. An icon-only button is a subtle button with only its icon. The `icon` and `plain` roles
-  become subtle, and the `link` role ends, see [opening things](#opening-things).
-- **A tone apart from the role** _(planned)_. The role says how much an action weighs. The destructive tone says it
-  removes or throws something away, such as Delete, Discard, Revoke or Drop, and any role takes it. A main, secondary,
-  subtle or menu entry takes it in `dangerText`. A finish button takes it as a fill in `danger` with white text. A
-  dialog that confirms a removal ends in a solid red Delete with a light Cancel beside it. An open resource's Delete…
-  is a secondary button in the destructive tone. Save or Next removes nothing, so it is never red.
+  Refresh, Format and Undo. An icon-only button is a subtle button with only its icon.
+- **The `link` role ends** _(planned)_. Each use of the `link` role becomes a link with an address or a button with a
+  visible shape, see [opening things](#opening-things).
+- **A tone apart from the role**. The role says how much an action weighs. The destructive tone says it removes or
+  throws something away, such as Delete, Discard, Revoke or Drop, and any role takes it. A main, secondary or subtle
+  button takes it in `dangerText`, and a menu entry too. A finish button takes it as a fill in `danger` with white text.
+  Save or Next removes nothing, so it is never red.
+- **A removal finishes in solid red** _(planned)_. A dialog that confirms a removal ends in a solid red Delete with a
+  light Cancel beside it. An open resource's Delete… is a secondary button in the destructive tone.
+- **A chosen subtle button is marked through `selected`.** `AxisButton`'s `selected` draws a subtle button on the
+  selected tint in `primaryText` and sets the one `aria-pressed` itself, or `aria-current` for a page or a step, in place
+  of any the caller passes.
 - **No button looks like a link** _(planned)_. A borderless button is in the text colour, or in `dangerText` in the
   tone, even beside a finish button. Borderless text in `primaryText` is a link's look alone.
 - **A region's main action keeps its border** _(planned)_. It keeps its border wherever it sits, a title row included.
@@ -490,8 +493,8 @@ be kept right.
   which keeps its own width.
 - **Group rows.** A row that heads a group shows its heading and leaves its other cells blank, with no dash,
   as `AxisTable`'s `blankRow` draws them.
-- **Folding group rows**. A row with children folds, closed at first, behind an `AxisButton`
-  of the role `icon` with `Chevron`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
+- **Folding group rows**. A row with children folds, closed at first, behind a subtle `AxisButton`
+  with `Chevron`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
   first column's padding, every row's words start where the heading does, and each level of rows starts one fold
   further in. A table that groups rows uses this, and never a list inside a cell.
 - **A row's details**. A row with more to show than its columns, such as a call's attempt, folds open to

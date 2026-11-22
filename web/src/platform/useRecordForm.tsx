@@ -545,7 +545,7 @@ export function useRecordForm(
               value={typeof label === 'string' ? label : ''}
             />
             <AxisButton
-              role="icon"
+              role="subtle"
               joined
               nameKey="shell.form.choose"
               icon={<SearchOutlined />}
@@ -558,7 +558,7 @@ export function useRecordForm(
             />
             {!field.required && value !== null && (
               <AxisButton
-                role="icon"
+                role="subtle"
                 joined
                 nameKey="shell.form.clear"
                 icon={<CloseOutlined />}

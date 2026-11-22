@@ -18,7 +18,7 @@ export function StudioResourceMenu({ disabled, onDelete }: { disabled: boolean; 
         'aria-label': t('shell.studio.resourceActions'),
       }}
     >
-      <AxisButton role="icon" nameKey="shell.studio.resourceActions" icon={<EllipsisOutlined />} />
+      <AxisButton role="subtle" nameKey="shell.studio.resourceActions" icon={<EllipsisOutlined />} />
     </Dropdown>
   )
 }

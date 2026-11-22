@@ -468,11 +468,11 @@ export function StudioPackageExplorer({
                 destroyOnHidden
                 menu={{ items: menuOf(newActions), 'aria-label': t('shell.studio.packages.new') }}
               >
-                <AxisButton role="icon" nameKey="shell.studio.packages.new" icon={<PlusOutlined />} />
+                <AxisButton role="subtle" nameKey="shell.studio.packages.new" icon={<PlusOutlined />} />
               </Dropdown>
             )}
             <AxisButton
-              role="icon"
+              role="subtle"
               nameKey="shell.studio.packages.refresh"
               icon={<ReloadOutlined />}
               onClick={onRefresh}
