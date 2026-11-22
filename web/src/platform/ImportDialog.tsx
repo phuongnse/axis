@@ -228,6 +228,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
           form={form}
           layout="vertical"
           requiredMark={requiredMark}
+          scrollToFirstError={{ focus: true }}
           onFinish={() => void upload()}
           onFinishFailed={() => chooseRef.current?.focus()}
         >

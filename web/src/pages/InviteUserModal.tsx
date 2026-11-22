@@ -125,12 +125,7 @@ export function InviteUserModal({
         title={t('shell.users.invite.title')}
         okText={t('shell.users.invite.send')}
         cancelText={t('shell.users.roles.cancel')}
-        onOk={() =>
-          void form.validateFields().then(
-            (values) => setPending({ email: values.email.trim(), displayName: values.displayName.trim() }),
-            () => {},
-          )
-        }
+        onOk={() => form.submit()}
         onCancel={onClose}
       >
         <Flex vertical gap="middle">
@@ -144,7 +139,14 @@ export function InviteUserModal({
               message={t('shell.users.invite.rolesFailed')}
             />
           )}
-          <Form form={form} layout="vertical" name="invite" requiredMark={requiredMark}>
+          <Form
+            form={form}
+            layout="vertical"
+            name="invite"
+            requiredMark={requiredMark}
+            scrollToFirstError={{ focus: true }}
+            onFinish={(values) => setPending({ email: values.email.trim(), displayName: values.displayName.trim() })}
+          >
             <Flex vertical gap={spacing.lg}>
               <AxisField
                 name="email"

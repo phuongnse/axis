@@ -1256,6 +1256,18 @@ describe('AxisTable', () => {
         expect(mutations(fetchMock)).toHaveLength(0)
       })
 
+      it('puts the focus on the empty name and sends nothing', async () => {
+        const { fetchMock } = serveViews([{ id: 'a', name: 'Old', search: null, filter: null, sort: null }])
+        open()
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Save view' }))
+
+        expect(await within(dialog).findByText('Enter a name.')).toBeInTheDocument()
+        expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveFocus()
+        expect(mutations(fetchMock)).toHaveLength(0)
+      })
+
       it('renames a view in its own line', async () => {
         const { fetchMock } = serveViews([{ id: 'a b', name: 'Old', search: 'pen', filter: null, sort: '-amount' }])
         open()

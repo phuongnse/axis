@@ -42,7 +42,7 @@ export function FieldPreview({
   }, [problem, record.version, showProblem, version])
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
-      <Form layout="vertical" requiredMark={requiredMark}>
+      <Form layout="vertical" requiredMark={requiredMark} scrollToFirstError={{ focus: true }}>
         {form.fields}
       </Form>
     </ConfigProvider>

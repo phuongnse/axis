@@ -576,7 +576,13 @@ function OpenTaskForm({
         {form.formError}
         {steps.progress}
         {/* Enter acts as Next on a step before the last, and does nothing on the last. */}
-        <Form id={formId} layout="vertical" requiredMark={requiredMark} onFinish={() => void steps.next()}>
+        <Form
+          id={formId}
+          layout="vertical"
+          requiredMark={requiredMark}
+          scrollToFirstError={{ focus: true }}
+          onFinish={() => void steps.next()}
+        >
           {steps.fields}
         </Form>
         {steps.last ? (

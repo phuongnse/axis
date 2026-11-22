@@ -386,7 +386,12 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
           {form.formError}
           {steps.progress}
           {/* Enter acts as Next on a step before the last, and saves on the last. The form saves through its save bar. */}
-          <Form layout="vertical" requiredMark={requiredMark} onFinish={steps.last ? save : steps.next}>
+          <Form
+            layout="vertical"
+            requiredMark={requiredMark}
+            scrollToFirstError={{ focus: true }}
+            onFinish={steps.last ? save : steps.next}
+          >
             {/* The form's layout gives the gap below the fields, see docs/reference/form-widget.md#fields-in-columns. */}
             <Flex vertical gap={spacing.lg}>
               {steps.fields}

@@ -66,7 +66,7 @@ export function FilterBar({ parameters, values, errors, onChange, locale }: Filt
   const t = useText()
   const { spacing } = useDesignTokens()
   return (
-    <Form layout="vertical" requiredMark={requiredMark} data-testid="filter-bar">
+    <Form layout="vertical" requiredMark={requiredMark} scrollToFirstError={{ focus: true }} data-testid="filter-bar">
       <Flex wrap gap={spacing.lg}>
         {parameters.map((parameter) => {
           const { name } = parameter

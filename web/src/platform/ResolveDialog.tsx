@@ -62,8 +62,7 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
     setError([problem.title, ...placed.form].join(' '))
   }
 
-  const send = async () => {
-    const values = await form.validateFields()
+  const send = async (values: ResolveValues) => {
     setSending(true)
     setError(undefined)
     try {
@@ -91,12 +90,18 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
       okText={t('shell.inspector.commands.send')}
       cancelText={t('shell.inspector.commands.close')}
       confirmLoading={sending}
-      onOk={() => void send().catch(() => undefined)}
+      onOk={() => form.submit()}
       onCancel={onClose}
       destroyOnHidden
     >
       <Flex vertical gap="middle">
-        <Form form={form} layout="vertical" requiredMark={requiredMark}>
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={requiredMark}
+          scrollToFirstError={{ focus: true }}
+          onFinish={(values) => void send(values)}
+        >
           <Flex vertical gap={spacing.lg}>
             <AxisField
               name="reason"
