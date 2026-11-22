@@ -3013,7 +3013,6 @@
   "shell.studio.entity.validationColumn.name": "Tên",
   "shell.studio.entity.validationColumn.message": "Thông báo",
   "shell.studio.entity.validationColumn.field": "Trường",
-  "shell.studio.entity.validationTopOfForm": "Đầu biểu mẫu",
   "shell.studio.entity.validationPanel.close": "Đóng ràng buộc",
   "shell.studio.entity.validationPanel.nameTaken": "Đã có ràng buộc khác dùng tên này.",
   "shell.studio.entity.validationPanel.messageRequired": "Nhập thông báo.",

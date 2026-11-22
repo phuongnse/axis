@@ -2260,18 +2260,15 @@ function MessageCell({ message }: { message: unknown }) {
   return text === '' ? <EmptyDash /> : text
 }
 
-/** A validation's field by its label, else by its name, or "Top of the form" in `textMuted` when it names none. */
+/**
+ * A validation's field by its label, else by its name, or the dash of an empty cell when it names none, as a validation
+ * of the whole record does, see docs/reference/actions-and-controls.md#showing-what-is-empty.
+ */
 function FieldCell({ name, fields }: { name: unknown; fields: unknown[] }) {
   const field = fields.find((candidate) => isContent(candidate) && candidate.name === name)
   const label = useMessageText(isContent(field) ? field.label : undefined)
-  const t = useText()
-  const { colour } = useDesignTokens()
   const own = text(name)
-  return own === '' ? (
-    <span style={{ color: colour.textMuted }}>{t('shell.studio.entity.validationTopOfForm')}</span>
-  ) : (
-    label || own
-  )
+  return own === '' ? <EmptyDash /> : label || own
 }
 
 /**

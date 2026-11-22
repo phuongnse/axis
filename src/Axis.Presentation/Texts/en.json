@@ -3013,7 +3013,6 @@
   "shell.studio.entity.validationColumn.name": "Name",
   "shell.studio.entity.validationColumn.message": "Message",
   "shell.studio.entity.validationColumn.field": "Field",
-  "shell.studio.entity.validationTopOfForm": "Top of the form",
   "shell.studio.entity.validationPanel.close": "Close the validation",
   "shell.studio.entity.validationPanel.nameTaken": "Another validation has this name.",
   "shell.studio.entity.validationPanel.messageRequired": "Enter a message.",
