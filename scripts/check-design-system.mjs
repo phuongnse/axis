@@ -5,7 +5,7 @@
 // FOLDER defaults to artifacts/design-system. The Design System artifact loads the bundle as a classic
 // script and inlines it in a page, so the folder must hold exactly one file, axis-design-system.js, and
 // that file must
-// - be at most 6 MB, the cap of the Design System type,
+// - be at most 6 MB, the cap of the Design System type, and warn within 256 KB of it,
 // - start with the line `/* @ds-bundle: {...} */` that scripts/design-system-header.mjs writes: JSON with `format` 4,
 //   the `namespace` Axis, and the `components`, each with the name of one card, every card of the previews once,
 // - parse as a classic script, so it has no `import` declaration and no `import.meta`,
@@ -13,7 +13,8 @@
 // - have no literal `</script` or `<!--`, which would end or hide an inlined script, and
 // - have no font, which means no `@font-face` rule and no `data:font/` URL, see
 //   docs/reference/frontend.md#design-tokens-and-previews.
-// Prints the size and exits 1 with the problems on stderr when a check fails.
+// Prints the size and exits 1 with the problems on stderr when a check fails. A warning goes to stderr and leaves the
+// exit code alone.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,6 +24,7 @@ import { cardGroups, cardName } from '../web/src/designSystem/cardOrder.ts'
 const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const bundleFile = 'axis-design-system.js'
 export const maxBytes = 6 * 1024 * 1024
+export const warnBytes = maxBytes - 256 * 1024
 export const headerPattern = /^\/\* @ds-bundle: (\{.*\}) \*\/$/
 
 const megabytes = (bytes) => `${(bytes / 1024 / 1024).toFixed(2)} MB`
@@ -79,9 +81,13 @@ function checkHeader(source) {
   return problems
 }
 
-/** Checks the folder and returns the size of the bundle in bytes, or 0 when there is none, and the problems found. */
+/**
+ * Checks the folder and returns the size of the bundle in bytes, or 0 when there is none, the problems found and the
+ * warnings, such as a bundle within 256 KB of the cap.
+ */
 export function checkDesignSystemBundle(folder) {
   const problems = []
+  const warnings = []
   const files = readdirSync(folder, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => path.relative(folder, path.join(entry.parentPath, entry.name)))
@@ -89,7 +95,7 @@ export function checkDesignSystemBundle(folder) {
     problems.push(`The folder must hold only ${bundleFile}, but it holds: ${files.join(', ') || 'no files'}.`)
   }
   if (!files.includes(bundleFile)) {
-    return { bytes: 0, problems }
+    return { bytes: 0, problems, warnings: [] }
   }
 
   const file = path.join(folder, bundleFile)
@@ -97,6 +103,10 @@ export function checkDesignSystemBundle(folder) {
   const source = readFileSync(file, 'utf8')
   if (bytes > maxBytes) {
     problems.push(`${bundleFile} is ${megabytes(bytes)}, over the ${megabytes(maxBytes)} cap.`)
+  } else if (bytes >= warnBytes) {
+    warnings.push(
+      `${bundleFile} is ${megabytes(bytes)}, within 256 KB of the ${megabytes(maxBytes)} cap. Find what grew, see docs/reference/widget-previews.md#the-bundle.`,
+    )
   }
   problems.push(...checkHeader(source))
   try {
@@ -118,13 +128,14 @@ export function checkDesignSystemBundle(folder) {
       `${bundleFile} holds a font. The bundle carries no fonts, see docs/reference/frontend.md#design-tokens-and-previews.`,
     )
   }
-  return { bytes, problems }
+  return { bytes, problems, warnings }
 }
 
 function main(args) {
   const folder = path.resolve(args[0] ?? path.join(scriptRoot, 'artifacts', 'design-system'))
-  const { bytes, problems } = checkDesignSystemBundle(folder)
+  const { bytes, problems, warnings } = checkDesignSystemBundle(folder)
   console.log(`Design-system bundle: ${megabytes(bytes)}, cap ${megabytes(maxBytes)}.`)
+  for (const warning of warnings) process.stderr.write(`Warning: ${warning}\n`)
   for (const problem of problems) process.stderr.write(`${problem}\n`)
   return problems.length > 0 ? 1 : 0
 }
