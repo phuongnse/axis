@@ -196,10 +196,11 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **A box in error looks it**. A field a screen holds, whose value the screen refuses, is drawn in its error look, with
   its error in `dangerText` under it and `aria-invalid` on the input. `AxisField` takes `error` for it, `AxisFieldGroup`
   takes `error` and `LabelTexts` takes `invalid`. An error shows from the refused action on, and while the value stays
-  wrong. It goes as soon as the value is right.
-- **A box in error looks it in a form** _(planned)_. A form's field whose value the form refuses gets the same error look
-  and `aria-invalid`. That covers the record form's fields and the forms that draw their own error line. `AxisFieldGroup`
-  also takes `required` and `fold`, for #3264's build.
+  wrong. It goes as soon as the value is right. A record form marks each field the server refuses the same way, and a
+  cell of a child collection too, see [saving](form-widget.md#saving).
+- **A box in error looks it in the forms that draw their own error line** _(planned)_. A form that draws its own error
+  line, such as the text table, gives its boxes the same error look and `aria-invalid` too.
+- **AxisFieldGroup's required and fold** _(planned)_. `AxisFieldGroup` also takes `required` and `fold`, for #3264's build.
 - **One way to the first error**. A refused action that submits what a person typed, such as Save, Add, Done or Next,
   moves the focus to the first box in error and scrolls it into view. An Ant Design form sets
   `scrollToFirstError={{ focus: true }}`, and a Vitest check refuses a form in `web/src` that does not, the sign-in
@@ -207,7 +208,7 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   picker cannot take the focus, so its dialog focuses its Choose button.
 - **A screen that holds its fields focuses its first error**. Such a screen calls `focusFirstError` after a refused
   action, such as Done, so the focus moves to the first box in error and scrolls it into view. The resource form's
-  item dialog does this.
+  item dialog does this, and so does the record form after a refused save or Next, see [saving](form-widget.md#saving).
 - **One look for yes or no** _(planned)_. A yes-or-no setting is a checkbox with its label on its right and its help under
   the label, the same in a form as on a screen that holds its fields. A switch is for a setting that takes effect as it
   is turned on, and no other.

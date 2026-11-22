@@ -33,8 +33,9 @@ person edits, and shows its answer.
   read-only field is not sent, in the save and in the `values` of the next call. A section whose fields
   are all hidden loses its title.
 - **Messages.** The messages in `errors` show under the touched fields, inside a `role="alert"`
-  element, and a message from a save wins over the one from the answer. Only messages that name a
-  top-level field show while the user types. A message for a row cell, such as
+  element, and a message from a save wins over the one from the answer. A message from a save goes when
+  the person changes its field, and the answer's message shows again while the value is still wrong.
+  Only messages that name a top-level field show while the user types. A message for a row cell, such as
   `/values/lines/1/quantity`, shows after a save, as it does without the answer.
 - **Touched.** A field becomes touched when it loses focus or changes.
 - **Defaults.** For a new record the widget fills each empty field that the user has not touched from
@@ -62,12 +63,14 @@ the changes of every step.
   all steps.
 - **Failed check.** When the call for Next fails, by a network error or any answer but `200`, the form
   logs a warning and moves on to the next step, because the server checks the save again.
-- **Focus.** After Next or Back, focus moves to the first input of the new step, so a keyboard user
-  types on at once. Nothing is focused when the form first opens. Enter on a step before the last acts
-  as Next.
+- **Focus.** After Next or Back, focus moves to the step's first field in error when it has one, or else
+  to its first input, so a keyboard user types on at once. A refused Next moves the focus to its first
+  field in error, unless an error above the form shows. Nothing is focused when the form first opens. Enter on a step before the last acts as
+  Next.
 - **Last step.** The save bar and the `startProcess` actions are on the last step. The `navigate`
   actions are on every step, because a navigate action uses the record as loaded and not the draft.
-  After a failed save, the form opens the first step that has an error. The current step stays out of
+  After a failed save, the form opens the first step that has an error and focuses its first field in
+  error, unless an error above the form takes the focus. The current step stays out of
   the URL, because a draft does not survive a reload.
 - **The last step's bar.** The save bar and the `startProcess` actions on the page heading show on the
   last step, and the `navigate` actions on every step, as the [saving](form-widget.md#saving) and

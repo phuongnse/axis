@@ -9,6 +9,7 @@ import { NotSet } from './EmptyValue'
 import { FieldInput } from './FieldInput'
 import { FileInput, FileLink } from './FileInput'
 import { FormCanvasContext } from './formCanvas'
+import { focusFirstError } from './focusFirstError'
 import { fetchFormState, type FormStateAnswer } from './formState'
 import { formatValue, moneyCurrency } from './formatValue'
 import { placeProblemErrors } from './problemErrors'
@@ -168,7 +169,9 @@ function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValu
  * The inputs of a record form, shared by the form widget and the task page. It holds the values
  * the form started from and the edited ones, renders the sections with their inputs and reference
  * lookups, tells which editable fields changed, and puts a problem's messages on the shown fields
- * their JSON Pointer names, on child collection cells, or above the form.
+ * their JSON Pointer names, on child collection cells, or above the form. A shown input with a message is
+ * marked `aria-invalid`. A refused save or Next focuses the first field in error among the fields it draws,
+ * unless an error above the form takes the focus. See docs/reference/form-widget.md#saving.
  *
  * With `conditions`, it also asks the server's form state endpoint which fields to show, require
  * and lock, and which messages to show. It asks once when a record is started, at once after a
@@ -200,6 +203,10 @@ export function useRecordForm(
   const [cellErrors, setCellErrors] = useState<Record<string, Record<string, string[]>>>({})
   const [formErrors, setFormErrors] = useState<string[]>([])
   const formErrorRef = useRef<HTMLDivElement>(null)
+  // The element around the fields the form draws, which a refused action focuses its first error in.
+  const fieldsRoot = useRef<HTMLDivElement>(null)
+  // Counts the refusals that ask for the focus, so each one focuses again, even when the errors are the same.
+  const [refusals, setRefusals] = useState(0)
   const asking = conditions !== undefined
   // The fields the user has changed or left.
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
@@ -306,8 +313,9 @@ export function useRecordForm(
   }
 
   // Returns the names of the fields and collections that got a message, so a wizard can open the
-  // step that has them.
-  const showProblem = (problem: RecordProblem): string[] => {
+  // step that has them. Unless `focus` is `false`, the refusal moves the focus, see
+  // docs/reference/form-widget.md#saving.
+  const showProblem = (problem: RecordProblem, { focus = true }: { focus?: boolean } = {}): string[] => {
     const placed = placeProblemErrors<Target>(problem.errors, ([root, name, index, child, ...rest]) => {
       if (root !== 'values' || name === undefined || rest.length > 0) {
         return null
@@ -334,6 +342,9 @@ export function useRecordForm(
     setFieldErrors(onFields)
     setCellErrors(onCells)
     setFormErrors(placed.form.map((message) => t(message)))
+    if (focus) {
+      setRefusals((count) => count + 1)
+    }
     return [...named]
   }
 
@@ -371,8 +382,17 @@ export function useRecordForm(
     }
   }
 
+  // A save's message under the field goes as the person changes it. The answer may show it again.
   const set = (name: string, value: FieldValue) => {
     setValues((previous) => ({ ...previous, [name]: value }))
+    setFieldErrors((previous) => {
+      if (!Object.hasOwn(previous, name)) {
+        return previous
+      }
+      const next = { ...previous }
+      delete next[name]
+      return next
+    })
     touch(name, delayOf(entity.fields.find((field) => field.name === name)?.type))
   }
 
@@ -403,7 +423,11 @@ export function useRecordForm(
       if (mine === sequence.current) {
         receive(next)
       }
-      return !names.some((name) => `${fieldPointer}${name}` in next.errors)
+      const accepted = !names.some((name) => `${fieldPointer}${name}` in next.errors)
+      if (!accepted) {
+        setRefusals((count) => count + 1)
+      }
+      return accepted
     } catch (error) {
       console.warn(`Loading the form state from '${conditions.statePath}' failed`, error)
       return true
@@ -443,7 +467,13 @@ export function useRecordForm(
     })
   }
 
-  const input = (field: FieldMetadata, readOnly: boolean, required: boolean, helpId: string | undefined): ReactNode => {
+  const input = (
+    field: FieldMetadata,
+    readOnly: boolean,
+    required: boolean,
+    helpId: string | undefined,
+    invalid: boolean,
+  ): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
     if (asText(field, readOnly)) {
@@ -511,6 +541,7 @@ export function useRecordForm(
               readOnly
               aria-required={required || undefined}
               aria-describedby={helpId}
+              aria-invalid={invalid || undefined}
               value={typeof label === 'string' ? label : ''}
             />
             <AxisButton
@@ -545,6 +576,7 @@ export function useRecordForm(
             ids={Array.isArray(value) ? (value as string[]) : []}
             labels={Array.isArray(labels[field.name]) ? (labels[field.name] as (string | null)[]) : []}
             ariaDescribedBy={helpId}
+            ariaInvalid={invalid}
             onChange={(ids, idLabels) => {
               set(field.name, ids)
               setLabels((previous) => ({ ...previous, [field.name]: idLabels }))
@@ -558,6 +590,7 @@ export function useRecordForm(
             id={id}
             value={isFileValue(value) ? value : null}
             label={labelOf(field)}
+            ariaInvalid={invalid}
             onChange={(next) => set(field.name, next)}
           />
         )
@@ -583,6 +616,7 @@ export function useRecordForm(
             locale={locale}
             ariaRequired={required}
             ariaDescribedBy={helpId}
+            ariaInvalid={invalid}
             onChange={(next) => set(field.name, next)}
           />
         )
@@ -621,7 +655,7 @@ export function useRecordForm(
               const errors = errorsOf(field.name)
               const required = stateOf(field.name)?.required ?? field.required
               const helpId = field.helpKey ? `${field.name}-help` : undefined
-              const control = input(field, lockedOf(entry), required, helpId)
+              const control = input(field, lockedOf(entry), required, helpId, errors !== undefined)
               const item = (
                 <Form.Item
                   key={field.name}
@@ -668,7 +702,7 @@ export function useRecordForm(
       return canvas ? <Fragment key={index}>{canvas.section(index, content)}</Fragment> : content
     })
     return (
-      <>
+      <div ref={fieldsRoot}>
         {nodes.some((node) => node !== null) && (
           // The boundary keeps a rule off the first group, whatever comes before the form, see docs/reference/form-widget.md#form-widget.
           <PartBoundary>
@@ -690,7 +724,7 @@ export function useRecordForm(
               onClose={() => setLookup(null)}
             />
           ))}
-      </>
+      </div>
     )
   }
 
@@ -712,6 +746,15 @@ export function useRecordForm(
     formErrorRef.current?.scrollIntoView?.({ block: 'center' })
     formErrorRef.current?.focus({ preventScroll: true })
   }, [formErrors])
+
+  // A refused save or Next focuses the first field in error, unless an error above the form took the focus.
+  // See docs/reference/form-widget.md#saving.
+  useEffect(() => {
+    if (refusals === 0 || formErrorRef.current !== null) {
+      return
+    }
+    focusFirstError(fieldsRoot.current)
+  }, [refusals])
 
   // The newest body is read when the timer fires. A write in an effect keeps the render pure.
   useEffect(() => {

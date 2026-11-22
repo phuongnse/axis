@@ -36,6 +36,8 @@ interface FileInputProps {
   label: string
   /** Shows the file as a link only, with no button. */
   readOnly?: boolean
+  /** Marks the upload button `aria-invalid`, for a value the server refused. */
+  ariaInvalid?: boolean
 }
 
 // The text key of the message that fits the status the server refused an upload with.
@@ -58,7 +60,7 @@ function errorKey(status: number): string {
  * A polite live region announces each upload and removal. A field without an upload path, such as a
  * module entity's, shows no Upload button.
  */
-export function FileInput({ field, value, onChange, id, label, readOnly = false }: FileInputProps) {
+export function FileInput({ field, value, onChange, id, label, readOnly = false, ariaInvalid }: FileInputProps) {
   const t = useText()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -127,6 +129,7 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false 
               ref={upload}
               loading={uploading}
               aria-label={`${t('shell.form.upload')} ${label}`}
+              aria-invalid={ariaInvalid || undefined}
               onClick={() => picker.current?.click()}
             >
               {t('shell.form.upload')}

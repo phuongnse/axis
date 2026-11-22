@@ -29,6 +29,8 @@ interface FieldInputProps {
   ariaRequired?: boolean
   /** The id of the element that describes the input, such as its help text. */
   ariaDescribedBy?: string
+  /** Marks the input `aria-invalid`, for a value the server refused. */
+  ariaInvalid?: boolean
 }
 
 // Enter in a picker only confirms the picked value. The picker handles it first, so stopping the
@@ -74,6 +76,7 @@ export function FieldInput({
   alignEnd = false,
   ariaRequired,
   ariaDescribedBy,
+  ariaInvalid,
 }: FieldInputProps) {
   const t = useText()
   const text = (event: { target: { value: string } }) => onChange(event.target.value || null)
@@ -89,6 +92,7 @@ export function FieldInput({
             ariaLabel={ariaLabel}
             ariaRequired={ariaRequired}
             ariaDescribedBy={ariaDescribedBy}
+            ariaInvalid={ariaInvalid}
             style={style}
           />
         )
@@ -97,6 +101,7 @@ export function FieldInput({
         <Input
           id={id}
           aria-label={ariaLabel}
+          aria-invalid={ariaInvalid || undefined}
           aria-required={ariaRequired || undefined}
           aria-describedby={ariaDescribedBy}
           style={style}
@@ -124,7 +129,7 @@ export function FieldInput({
         <Input
           id={id}
           aria-label={ariaLabel}
-          aria-invalid={invalid || undefined}
+          aria-invalid={invalid || ariaInvalid || undefined}
           aria-required={ariaRequired || undefined}
           aria-describedby={ariaDescribedBy}
           status={invalid ? 'error' : undefined}
@@ -150,6 +155,7 @@ export function FieldInput({
         <Checkbox
           id={id}
           aria-label={ariaLabel}
+          aria-invalid={ariaInvalid || undefined}
           aria-required={ariaRequired || undefined}
           aria-describedby={ariaDescribedBy}
           style={style}
@@ -163,6 +169,7 @@ export function FieldInput({
           {...datePickerChevrons}
           id={id}
           aria-label={ariaLabel}
+          aria-invalid={ariaInvalid || undefined}
           aria-required={ariaRequired || undefined}
           aria-describedby={ariaDescribedBy}
           style={{ width: '100%', ...style }}
@@ -181,6 +188,7 @@ export function FieldInput({
           {...datePickerChevrons}
           id={id}
           aria-label={ariaLabel}
+          aria-invalid={ariaInvalid || undefined}
           aria-required={ariaRequired || undefined}
           aria-describedby={ariaDescribedBy}
           style={{ width: '100%', ...style }}
@@ -203,6 +211,7 @@ export function FieldInput({
         <Select
           id={id}
           aria-label={ariaLabel}
+          aria-invalid={ariaInvalid || undefined}
           aria-required={ariaRequired || undefined}
           aria-describedby={ariaDescribedBy}
           style={style}
@@ -221,6 +230,7 @@ export function FieldInput({
           id={id}
           value={isFileValue(value) ? value : null}
           label={ariaLabel ?? field.name}
+          ariaInvalid={ariaInvalid}
           onChange={onChange}
         />
       )

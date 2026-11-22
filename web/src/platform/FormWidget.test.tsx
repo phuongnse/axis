@@ -846,7 +846,65 @@ describe('FormWidget', () => {
 
     expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Required.')
     expect(screen.getByTestId('form-error')).toHaveTextContent('Must be a JSON object.')
+    expect(screen.getByTestId('form-error')).toHaveFocus()
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/noteform/new')
+  })
+
+  it('marks each field in error, focuses the first and takes the mark off when the person types', async () => {
+    stubFetch({
+      status: 400,
+      body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."],"/values/code":["Already used."]}}',
+    })
+    renderForm()
+
+    submitForm()
+
+    expect(await screen.findByTestId('field-error-code')).toHaveTextContent('Already used.')
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    expect(title).toHaveFocus()
+    expect(title).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('textbox', { name: 'Code' })).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Priority')).not.toHaveAttribute('aria-invalid')
+
+    await userEvent.setup().type(title, 'Pen')
+
+    expect(screen.queryByTestId('field-error-title')).not.toBeInTheDocument()
+    expect(title).not.toHaveAttribute('aria-invalid')
+    expect(screen.getByRole('textbox', { name: 'Code' })).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('marks a reference, references and file field in error on the element that takes the focus', async () => {
+    stubFetch({
+      status: 400,
+      body: '{"title":"Invalid","status":400,"errors":{"/values/software":["Required."],"/values/attachment":["Too large."],"/values/category":["Required."]}}',
+    })
+    renderForm(null, {
+      ...helpWidget,
+      entity: {
+        ...helpWidget.entity,
+        fields: [
+          ...helpWidget.entity.fields,
+          {
+            ...field('category', 'reference', 'note.category'),
+            target: {
+              entity: 'Category',
+              displayField: 'name',
+              recordsPath: '/api/apps/E2eApp/entities/Category/records',
+            },
+          },
+        ],
+      },
+    })
+
+    submitForm()
+
+    expect(await screen.findByTestId('field-error-category')).toHaveTextContent('Required.')
+    // The Add button takes the mark and the focus for references, and the Upload button for a file.
+    expect(document.getElementById('software')).toHaveAttribute('aria-invalid', 'true')
+    expect(document.getElementById('software')).toHaveFocus()
+    expect(document.getElementById('attachment')).toHaveAttribute('aria-invalid', 'true')
+    expect(document.getElementById('category')).toHaveAttribute('aria-invalid', 'true')
+    expect(document.getElementById('priority')).not.toHaveAttribute('aria-invalid')
   })
 
   it('scrolls an error above the form into view and focuses it', async () => {
@@ -2384,6 +2442,7 @@ describe('FormWidget', () => {
 
       await user.click(screen.getByRole('button', { name: 'Next' }))
       expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Required.')
+      expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus()
       expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
 
       await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Pen')
@@ -2458,6 +2517,27 @@ describe('FormWidget', () => {
       expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Too long.')
       expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
       expect(screen.getByTestId('steps-bar').querySelector('[aria-current="step"]')).toHaveTextContent('Step one')
+      const title = screen.getByRole('textbox', { name: 'Title' })
+      expect(title).toHaveFocus()
+      expect(title).toHaveAttribute('aria-invalid', 'true')
+    })
+
+    it('replaces the message of a refused save with the answer message while the typed value is still wrong', async () => {
+      stateAnswers = [emptyStateJson, emptyStateJson, titleRequired]
+      stubFetch({
+        status: 400,
+        body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Too long."]}}',
+      })
+      const user = await renderSteps()
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      await user.type(await screen.findByLabelText('Priority'), '5')
+      await user.click(await screen.findByRole('button', { name: 'Save' }))
+      expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Too long.')
+
+      await user.type(screen.getByRole('textbox', { name: 'Title' }), 'x')
+
+      await waitFor(() => expect(screen.getByTestId('field-error-title')).toHaveTextContent('Required.'))
+      expect(screen.queryByText('Too long.')).not.toBeInTheDocument()
     })
 
     it('skips a step whose fields the answer hides', async () => {

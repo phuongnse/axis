@@ -37,7 +37,7 @@ export function FieldPreview({
   useEffect(() => {
     if (problem && !showed.current && version === record.version) {
       showed.current = true
-      showProblem({ status: 400, title: '', errors: problem })
+      showProblem({ status: 400, title: '', errors: problem }, { focus: false })
     }
   }, [problem, record.version, showProblem, version])
   return (

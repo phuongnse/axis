@@ -205,6 +205,54 @@ describe('FieldInput description', () => {
   })
 })
 
+describe('FieldInput refused value', () => {
+  // A user picker is a text field with a users path, and a checkbox has no text box.
+  const inputs: [string, FieldType, Partial<FieldMetadata>, string][] = [
+    ['text', 'text', {}, 'textbox'],
+    ['integer', 'integer', {}, 'textbox'],
+    ['boolean', 'boolean', {}, 'checkbox'],
+    ['date', 'date', {}, 'textbox'],
+    ['enum', 'enum', { values: ['open', 'closed'] }, 'combobox'],
+    ['user id', 'text', { usersPath: '/api/u' }, 'combobox'],
+  ]
+
+  function renderInput(type: FieldType, limits: Partial<FieldMetadata>, ariaInvalid?: boolean) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response('{"items":[]}', { status: 200 }))),
+    )
+    render(
+      <TextProvider catalogs={catalogs} development={false}>
+        <FieldInput
+          field={field(type, limits)}
+          value={null}
+          onChange={() => undefined}
+          ariaLabel="limited"
+          locale="en"
+          ariaInvalid={ariaInvalid}
+        />
+      </TextProvider>,
+    )
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it.each(inputs)('marks a %s input aria-invalid when the server refused its value', (_name, type, limits, role) => {
+    renderInput(type, limits, true)
+
+    expect(screen.getByRole(role, { name: 'limited' })).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it.each(inputs)('leaves aria-invalid off a %s input with no refused value', (_name, type, limits, role) => {
+    renderInput(type, limits)
+
+    // A date picker sets `aria-invalid="false"` itself, so only a mark of `true` counts.
+    expect(screen.getByRole(role, { name: 'limited' })).not.toHaveAttribute('aria-invalid', 'true')
+  })
+})
+
 describe('FieldInput user picker', () => {
   const people = [
     { id: 'u1', displayName: 'Ann Lee' },

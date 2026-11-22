@@ -301,10 +301,12 @@ The form sends only what changed, and shows the server's answer where it belongs
   string, and the server refuses it on its field. The form never turns number text into a JavaScript
   number.
 - **Errors.** A `400` or `409` problem is mapped by its JSON Pointer keys. A key `/values/<field>` for
-  a field of the form shows its messages under that field. Every other key, such as `""`, `/values` or
-  `/version`, shows above the form, and so does a shared error for a save that fails in any other way.
-  The page scrolls to an error above the form and focuses it, so a user at the foot of a long form sees
-  it. A screen reader reads it as an alert.
+  a field of the form shows its messages under that field, and marks its input `aria-invalid`. A cell
+  of a child collection is marked the same way. Every other key, such as `""`, `/values` or `/version`,
+  shows above the form, and so does a shared error for a save that fails in any other way. A refused
+  save focuses the first field in error. An error above the form takes the focus instead, so a user at
+  the foot of a long form sees it. A screen reader reads it as an alert. A save's message under a field
+  goes when the person changes that field.
   Every message is looked up in the site texts first, so a failed validation, whose message is a text
   key, shows its text in the user's locale. A fixed message such as "Required." is no text key, so it
   shows unchanged.

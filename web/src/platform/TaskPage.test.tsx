@@ -1255,6 +1255,8 @@ describe('TaskPage', () => {
 
       await userEvent.click(screen.getByRole('button', { name: 'Next' }))
       expect(await screen.findByTestId('field-error-decisionComments')).toHaveTextContent('Required.')
+      expect(screen.getByLabelText('Comments')).toHaveFocus()
+      expect(screen.getByLabelText('Comments')).toHaveAttribute('aria-invalid', 'true')
       expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument()
       expect(api.stateRequests()[1].body).toEqual({ values: {}, touched: ['decisionComments'] })
 
