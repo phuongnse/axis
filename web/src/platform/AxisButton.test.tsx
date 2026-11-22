@@ -443,15 +443,23 @@ describe.each(['light', 'dark'] as const)('the roles of the button inside an act
     )
   }
 
-  it('keeps finish solid and draws every other role as a text button', () => {
+  it('keeps finish solid and draws secondary and destructive as text buttons', () => {
     renderRow()
 
     expect(screen.getByRole('button', { name: 'Finish' })).toHaveClass('ant-btn-variant-solid')
-    for (const name of ['Main', 'Secondary', 'Destructive']) {
+    for (const name of ['Secondary', 'Destructive']) {
       const button = screen.getByRole('button', { name })
       expect(button).toHaveClass('ant-btn-variant-text')
       expect(button.style.borderColor).toBe('')
     }
+  })
+
+  it('keeps main outlined with its border in primaryText beside a finish button', () => {
+    renderRow()
+
+    const main = screen.getByRole('button', { name: 'Main' })
+    expect(main).toHaveClass('ant-btn-variant-outlined')
+    expect(main).toHaveStyle({ color: colour.primaryText, borderColor: colour.primaryText })
   })
 
   it('draws main in primaryText, destructive in dangerText and secondary in the default colour', () => {
@@ -522,6 +530,21 @@ describe('an action row that folds', () => {
         <AxisButton role="main">New resource…</AxisButton>
       </AxisActionRow>,
     )
+
+  it('wraps a row whose fold names one action, with no More actions menu, at narrow width', () => {
+    fakeWidths(300, 400)
+    renderIn(
+      'light',
+      <AxisActionRow fold={actions().slice(0, 1)} end={<AxisButton role="finish">Publish…</AxisButton>}>
+        <AxisButton role="main">New resource…</AxisButton>
+      </AxisActionRow>,
+    )
+
+    const validate = screen.getByRole('button', { name: 'Validate' })
+    expect(validate.parentElement).toHaveClass('ant-flex-wrap-wrap')
+    expect(validate.parentElement).not.toHaveAttribute('data-fold-row')
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+  })
 
   it('keeps one line, and a row without fold still wraps', () => {
     fakeWidths(500, 400)

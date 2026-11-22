@@ -44,7 +44,7 @@ The field is picked from the fields of the endpoint's entity, found by name amon
 names, and is typed while those are unknown. Add mapping lists the fields that have no row. Renaming a
 row's field keeps its place in the file, and a value that is not an object is left to the JSON view.
 
-- **Where the actions sit.** Add mapping is a light action on the part's title row. Each row's "…" menu holds Remove.
+- **Where the actions sit.** Add mapping is a secondary button on the part's title row. Each row's "…" menu holds Remove.
   The `event`'s fields use the same rows.
 - **Read-only.** While the tab is read-only, such as while the JSON has an error, the part shows neither Add mapping nor
   any row's menu.
@@ -57,7 +57,7 @@ shows its `steps` as rows. The [form designer](form-designer.md) edits the same 
 
 The rows sit in a part headed Steps, with no box round them: spacing sets each row apart. Each row has a title and a
 section picker, as wide as its field, and a "…" menu at its top right, the table's
-[row actions](actions-and-controls.md#tables). Add step is a light text button in the part's title row, and it appends
+[row actions](actions-and-controls.md#tables). Add step is a secondary button in the part's title row, and it appends
 a row. The picker lists the sections that have a `name`, so an unnamed section is not offered. Removing the last step
 removes `steps`, and the form goes back to one page. A condition offers the fields that the form lists, because a
 condition reads only those. A `steps` value that is not a list is left to the JSON view.

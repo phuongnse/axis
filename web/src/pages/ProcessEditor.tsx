@@ -1089,7 +1089,7 @@ function SubProcess({
 
 /**
  * A decision's branches, each a row of a `when` expression, a label and a target. Add branch sits on the title row as a
- * light text button, and each row's Remove is in its "…" menu. A read-only editor shows neither, see
+ * secondary button, and each row's Remove is in its "…" menu. A read-only editor shows neither, see
  * docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Decision({
@@ -1196,7 +1196,7 @@ function Decision({
 
 /**
  * The outcomes of a task as rows of name, label and target step. Each value is edited through its own pointer. Add
- * outcome sits on the title row as a light text button, and each row's Remove is in its "…" menu. A read-only editor
+ * outcome sits on the title row as a secondary button, and each row's Remove is in its "…" menu. A read-only editor
  * shows neither, see docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Outcomes({

@@ -37,9 +37,9 @@ widget names a role, never an Ant Design button type.
   of any the caller passes.
 - **No button looks like a link** _(planned)_. A borderless button is in the text colour, or in `dangerText` in the
   tone, even beside a finish button. Borderless text in `primaryText` is a link's look alone.
-- **A region's main action keeps its border** _(planned)_. It keeps its border wherever it sits, a title row included.
+- **A region's main action keeps its border.** It keeps its border wherever it sits, a title row included.
   A section's Add, such as Add field, Add validation or Add index, is a secondary button in the title row, and a
-  title row's tools stay subtle.
+  title row's tools stay subtle. `TitleRowActions` draws a title row's actions in their own roles.
 - **One size to a group** _(planned)_. The usual size is the default, and the small size is for tables and dense rows.
   A group has one size.
 - **An inline link** _(planned)_. A link inside a value, such as a reference in a table cell, takes the height of a
@@ -47,12 +47,13 @@ widget names a role, never an Ant Design button type.
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
   in the fill colours `primary` and `danger`, which fail contrast on a dark surface, so Axis writes
   them in `primaryText` and `dangerText`.
-- **Beside a solid button every other action is a subtle button** _(planned)_. Cancel and every secondary action next
+- **Beside a solid button every other action is a subtle button.** Cancel and every secondary action next
   to the finish button is a subtle button, so the finish button is the one filled shape. A region's main action keeps
-  its border beside it, as the rule above says.
+  its border beside it, as the rule above says. `AxisActionRow` draws them so.
 - **An action row folds into a menu.** An `AxisActionRow` with `fold` keeps one line. When its content does not
   fit, the actions named in `fold` become the entries of one "…" icon menu, More actions, in their order, each
-  keeping its disabled state. They are buttons again when the room comes back. A row without `fold` wraps.
+  keeping its disabled state. They are buttons again when the room comes back. A row without `fold` wraps, and so does
+  a row whose `fold` names one action, as a menu of one entry is never drawn.
 - **An action bar folds into More.** An `ActionBar`, a bar of actions at the foot of a page on `surface`
   with a `borderSubtle` rule above it, folds the actions it names into one More actions menu through
   `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width. A bar that stays in view as the page
@@ -323,7 +324,7 @@ Every screen says where things stand in a few plain words, and has at most one m
 - **Where things stand.** A screen names its state in a short sentence, such as "Release 7 is live.", so a
   person reads it before any control.
 - **One main action.** A screen has at most one solid Finish action, as [buttons](#buttons) says. Every
-  other action beside it is a text button.
+  other action beside it is a subtle button, except a region's main action, which keeps its border.
 
 The reasons are in [D152](../decisions/d152-every-screen-says-where-things-stand-with-at-most-one-main-action.md).
 

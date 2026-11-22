@@ -362,8 +362,8 @@ describe('SchemaForm sections', () => {
     const section = screen.getByTestId('studio-section-modules')
     const add = within(section).getAllByRole('button', { name: 'Add module…' })
     expect(add).toHaveLength(1)
-    expect(add[0]).toHaveClass('ant-btn-variant-text')
-    expect(add[0]).not.toHaveClass('ant-btn-variant-outlined')
+    expect(add[0]).toHaveClass('ant-btn-variant-outlined')
+    expect(add[0]).not.toHaveClass('ant-btn-variant-text')
     expect(
       within(screen.getByTestId('studio-field-/modules')).queryByRole('button', { name: 'Add module…' }),
     ).toBeNull()
@@ -584,7 +584,7 @@ describe('SchemaForm lists of objects', () => {
     expect(within(rowOf(1)).queryByText('Nghỉ phép')).toBeNull()
   })
 
-  it('keeps a list of plain values as inline rows of inputs, with Add as a text button on its title row', () => {
+  it('keeps a list of plain values as inline rows of inputs, with Add as a secondary button on its title row', () => {
     renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] })
 
     const plain = screen.getByTestId('studio-field-/plain')
@@ -592,7 +592,7 @@ describe('SchemaForm lists of objects', () => {
     expect(within(plain).queryByRole('table')).toBeNull()
     const add = within(screen.getByRole('group', { name: 'plain' })).getByRole('button', { name: 'Add' })
     expect(add.closest('legend')).not.toBeNull()
-    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add).toHaveClass('ant-btn-variant-outlined')
     expect(within(plain).queryByRole('button', { name: 'Remove' })).toBeNull()
     expect(within(plain).getAllByRole('button', { name: 'Actions' })).toHaveLength(2)
   })

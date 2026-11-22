@@ -157,8 +157,9 @@ says so.
 ## Save bar
 
 The save bar holds what acts on the whole draft. While there is something to save, it stays in view in the shell's
-[bar slot](shell.md#layout): "Unsaved changes" on the left, Undo and Redo as icons, then Discard and Save on the right. With nothing to save it is not drawn. At narrow width Discard
-folds into the More actions menu, as an [action bar](actions-and-controls.md#buttons) does.
+[bar slot](shell.md#layout): "Unsaved changes" on the left, Undo and Redo as icons, then Discard and Save on the right.
+With nothing to save it is not drawn. At narrow width the bar's actions wrap, as an
+[action row](actions-and-controls.md#buttons) with one action to fold does, so Discard stays a button beside Save.
 
 - **While a step can be redone.** The bar stays, reading "No unsaved changes", with Redo on and no
   Discard, as nothing is left to discard. Save is off.

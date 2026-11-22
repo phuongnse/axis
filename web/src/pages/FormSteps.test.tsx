@@ -123,11 +123,11 @@ describe('FormSteps', () => {
     ).toBeTruthy()
   })
 
-  it('draws Add step as a text button in the title row', () => {
+  it('draws Add step as a secondary button in the title row', () => {
     renderSteps(steps)
 
     const part = screen.getByTestId('studio-section-steps')
-    expect(within(part).getByRole('button', { name: 'Add step' })).toHaveClass('ant-btn-variant-text')
+    expect(within(part).getByRole('button', { name: 'Add step' })).toHaveClass('ant-btn-variant-outlined')
   })
 
   it('keeps no step button of its own in a row: each step moves and deletes from its menu', () => {

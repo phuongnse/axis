@@ -814,14 +814,14 @@ describe('PageEditor navigate actions', () => {
     expect(screen.queryByRole('button', { name: 'Add action' })).not.toBeInTheDocument()
   })
 
-  it('draws the Adds of the row actions as one group of text buttons on the title row', () => {
+  it('draws the Adds of the row actions as one group of secondary buttons on the title row', () => {
     renderEditor(page(table))
 
     const group = within(screen.getByTestId(rows)).getByRole('group', { name: 'Add an action' })
     for (const name of ['Add navigate action', 'Add delete action']) {
       const add = within(group).getByRole('button', { name })
       expect(add.closest('legend')).not.toBeNull()
-      expect(add).toHaveClass('ant-btn-variant-text')
+      expect(add).toHaveClass('ant-btn-variant-outlined')
     }
   })
 
@@ -1080,11 +1080,11 @@ describe('PageEditor parameters', () => {
     expect(onChange).toHaveBeenLastCalledWith('/parameters/0/values', undefined)
   })
 
-  it('draws Add parameter as a text button in the title row, and keeps no Remove button in a parameter row', () => {
+  it('draws Add parameter as a secondary button in the title row, and keeps no Remove button in a parameter row', () => {
     renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
 
     const section = screen.getByTestId('studio-section-parameters')
-    expect(within(section).getByRole('button', { name: 'Add parameter' })).toHaveClass('ant-btn-variant-text')
+    expect(within(section).getByRole('button', { name: 'Add parameter' })).toHaveClass('ant-btn-variant-outlined')
     expect(within(screen.getByTestId(`${parameters}/0`)).queryByRole('button', { name: 'Remove parameter' })).toBeNull()
   })
 
@@ -1665,12 +1665,12 @@ describe('PageEditor kpi and chart panels', () => {
     expect(saved()).toMatchObject({ widgets: [{ measures: [{ name: '' }] }] })
   })
 
-  it('draws Add measure as a text button on the Measures title row, with no Remove button in a measure', () => {
+  it('draws Add measure as a secondary button on the Measures title row, with no Remove button in a measure', () => {
     renderEditor(page(chart))
 
     const add = screen.getByRole('button', { name: 'Add measure' })
     expect(add.closest('legend')).not.toBeNull()
-    expect(add).toHaveClass('ant-btn-variant-text')
+    expect(add).toHaveClass('ant-btn-variant-outlined')
     expect(within(screen.getByTestId('studio-measure-0')).queryByRole('button', { name: 'Remove measure' })).toBeNull()
   })
 
@@ -1844,19 +1844,19 @@ describe('PageEditor container panels', () => {
     )
   })
 
-  it('draws Add column and Add tab as text buttons on their title rows, with no Remove button in an item', async () => {
+  it('draws Add column and Add tab as secondary buttons on their title rows, with no Remove button in an item', async () => {
     await open(columns)
 
     const addColumn = screen.getByRole('button', { name: 'Add column' })
     expect(addColumn.closest('legend')).not.toBeNull()
-    expect(addColumn).toHaveClass('ant-btn-variant-text')
+    expect(addColumn).toHaveClass('ant-btn-variant-outlined')
     expect(within(screen.getByTestId('studio-column-0')).queryByRole('button', { name: 'Remove column' })).toBeNull()
     cleanup()
 
     await open(tabs)
     const addTab = screen.getByRole('button', { name: 'Add tab' })
     expect(addTab.closest('legend')).not.toBeNull()
-    expect(addTab).toHaveClass('ant-btn-variant-text')
+    expect(addTab).toHaveClass('ant-btn-variant-outlined')
     expect(within(screen.getByTestId('studio-tab-0')).queryByRole('button', { name: 'Remove tab' })).toBeNull()
   })
 

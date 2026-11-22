@@ -241,7 +241,7 @@ interface ContractFilter<T> {
 /**
  * A table of the contract with a Filter on each column that gives `filter`, kept in the address under `prefix`. It
  * shows every row on one page. A row that `keep` names stays shown under any filter. Its `action`, such as Add state,
- * is a light action on the table's title row, see docs/reference/shell.md#layout. The table shows with its empty message
+ * is a secondary button on the table's title row, see docs/reference/shell.md#layout. The table shows with its empty message
  * while it has an `action` and no rows, so the action stays reachable.
  */
 function ContractTable<T extends object>({
