@@ -7,6 +7,7 @@ import english from '../../../src/Axis.Presentation/Texts/en.json'
 import { ContentInsetContext } from '../platform/contentInsetContext'
 import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
+import { MemoryRouter } from 'react-router'
 import { ThemeModeProvider } from '../platform/theme'
 import { ObjectListTable, type ObjectListColumn } from './ObjectListTable'
 
@@ -28,37 +29,39 @@ function renderList(
   inset = 0,
 ) {
   render(
-    <ContentInsetContext.Provider value={inset}>
-      <ThemeModeProvider initialMode="light">
-        <TextProvider catalogs={[{ texts: english, fallbackTexts: english }]} development={false}>
-          <ObjectListTable
-            pointer="/modules"
-            items={items}
-            columns={columns}
-            itemName="module"
-            required={['name']}
-            large={large}
-            newItem={() => ({ name: '', version: '' })}
-            onChange={onChange}
-            fields={(copy, change, _index, problem) => (
-              <>
-                {columns.map((column) => (
-                  <div key={column.key}>
-                    <Input
-                      aria-label={column.title}
-                      value={String(copy[column.key] ?? '')}
-                      onChange={(event) => change(`/${column.key}`, event.target.value)}
-                    />
-                    {problem(column.key)}
-                  </div>
-                ))}
-              </>
-            )}
-            {...extra}
-          />
-        </TextProvider>
-      </ThemeModeProvider>
-    </ContentInsetContext.Provider>,
+    <MemoryRouter>
+      <ContentInsetContext.Provider value={inset}>
+        <ThemeModeProvider initialMode="light">
+          <TextProvider catalogs={[{ texts: english, fallbackTexts: english }]} development={false}>
+            <ObjectListTable
+              pointer="/modules"
+              items={items}
+              columns={columns}
+              itemName="module"
+              required={['name']}
+              large={large}
+              newItem={() => ({ name: '', version: '' })}
+              onChange={onChange}
+              fields={(copy, change, _index, problem) => (
+                <>
+                  {columns.map((column) => (
+                    <div key={column.key}>
+                      <Input
+                        aria-label={column.title}
+                        value={String(copy[column.key] ?? '')}
+                        onChange={(event) => change(`/${column.key}`, event.target.value)}
+                      />
+                      {problem(column.key)}
+                    </div>
+                  ))}
+                </>
+              )}
+              {...extra}
+            />
+          </TextProvider>
+        </ThemeModeProvider>
+      </ContentInsetContext.Provider>
+    </MemoryRouter>,
   )
   return onChange
 }
@@ -101,7 +104,7 @@ describe('the list of objects', () => {
   it('edits a copy and writes the whole item with one change on Done of Edit', async () => {
     const onChange = renderList()
 
-    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    await userEvent.click(screen.getByRole('link', { name: 'budget' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit module' })
     await userEvent.type(within(dialog).getByRole('textbox', { name: 'Version' }), '.1')
 
@@ -115,7 +118,7 @@ describe('the list of objects', () => {
   it('keeps Done on while a required field of the copy is empty', async () => {
     renderList()
 
-    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    await userEvent.click(screen.getByRole('link', { name: 'budget' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit module' })
     await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Module' }))
 
@@ -125,7 +128,7 @@ describe('the list of objects', () => {
   it('shows what to fill in under an empty required field, focuses it and keeps the dialog open on Done', async () => {
     const onChange = renderList()
 
-    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    await userEvent.click(screen.getByRole('link', { name: 'budget' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit module' })
     await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Module' }))
     await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
@@ -170,7 +173,7 @@ describe('the list of objects', () => {
   it('removes the message once the field is filled, then Done writes the item with one change', async () => {
     const onChange = renderList()
 
-    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    await userEvent.click(screen.getByRole('link', { name: 'budget' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit module' })
     const name = within(dialog).getByRole('textbox', { name: 'Module' })
     await userEvent.clear(name)
@@ -190,7 +193,7 @@ describe('the list of objects', () => {
     expect(screen.getByRole('columnheader', { name: 'Version' })).toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Connectors' })).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    await userEvent.click(screen.getByRole('link', { name: 'budget' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit module' })
 
     expect(within(dialog).getByRole('textbox', { name: 'Connectors' })).toBeInTheDocument()
@@ -218,11 +221,11 @@ describe('the list of objects', () => {
     const onChange = vi.fn(() => calls.push('change'))
     renderList(onChange, false, { onDone: () => calls.push('done'), onCancel: () => calls.push('cancel') })
 
-    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    await userEvent.click(screen.getByRole('link', { name: 'budget' }))
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }))
     expect(calls).toEqual(['cancel'])
 
-    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    await userEvent.click(screen.getByRole('link', { name: 'budget' }))
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Done' }))
     expect(calls).toEqual(['cancel', 'change', 'done'])
   })
@@ -280,7 +283,7 @@ describe('the list of objects', () => {
       },
     })
 
-    await userEvent.click(screen.getByRole('button', { name: 'leave' }))
+    await userEvent.click(screen.getByRole('link', { name: 'leave' }))
     await screen.findByRole('dialog', { name: 'Edit module' })
     expect(indexes.at(-1)).toBe(1)
   })

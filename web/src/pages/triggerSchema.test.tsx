@@ -8,6 +8,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
+import { MemoryRouter } from 'react-router'
 import { ThemeModeProvider } from '../platform/theme'
 import { openDropdown, optionTexts } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -93,13 +94,15 @@ function renderTrigger(value: Record<string, unknown>) {
     )
   }
   render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioNamesContext.Provider value={names}>
-          <Harness />
-        </StudioNamesContext.Provider>
-      </TextProvider>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioNamesContext.Provider value={names}>
+            <Harness />
+          </StudioNamesContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
   return latest
 }

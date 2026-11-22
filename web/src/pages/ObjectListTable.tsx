@@ -1,7 +1,8 @@
 import { DeleteOutlined } from '@ant-design/icons'
 import { Flex, Modal } from 'antd'
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { Link, useSearchParams } from 'react-router'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn, type ColumnKind } from '../platform/AxisTable'
 import { setAt } from '../platform/jsonPatch'
@@ -61,6 +62,11 @@ function hasValue(value: unknown): boolean {
  * keeps the dialog open, see docs/reference/actions-and-controls.md#fields. The focus moves when the message is drawn,
  * not after Done's render, so it does not depend on the order in which the dialog draws its content.
  * With `addIn`, Add… is drawn into that element and the table has no toolbar row.
+ *
+ * Proposed, #4902: an item's dialog has an address, `item=<pointer of the item>`, such as `item=/modules/0`, so the first
+ * cell is a real link, as the first cell of every table that opens its row is. Following the address opens the dialog on a
+ * copy of the item, and Done or Cancel takes `item` out of the address again as a new history entry, as the field
+ * drawer's `field` does. An `item` that names no item of this list opens nothing; one of this list past its end is dropped.
  */
 export function ObjectListTable({
   pointer,
@@ -109,6 +115,24 @@ export function ObjectListTable({
   const t = useText()
   const { colour, size } = useDesignTokens()
   const [editing, setEditing] = useState<Editing | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const addressed = searchParams.get('item')
+  const prefix = `${pointer}/`
+  const addressedIndex =
+    addressed !== null && addressed.startsWith(prefix) && /^\d+$/.test(addressed.slice(prefix.length))
+      ? Number(addressed.slice(prefix.length))
+      : null
+  const itemSearch = (index: number) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('item', `${prefix}${index}`)
+    return `?${next.toString()}`
+  }
+  const leaveAddress = (replace: boolean) => {
+    if (searchParams.get('item') === null) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('item')
+    setSearchParams(next, { replace, preventScrollReset: true })
+  }
   // Set by Done while a required field is empty, until the first message is drawn and takes the focus to its field.
   const focusPending = useRef(false)
   const named = (text: string) => text.replace('{name}', itemName)
@@ -140,6 +164,17 @@ export function ObjectListTable({
     focusPending.current = false
     setEditing({ index, copy: structuredClone(items[index]), checked: false })
   }
+  // Follows the address: an item of this list opens its dialog, and one past the end of the list is dropped.
+  useEffect(() => {
+    if (addressedIndex === null) return
+    if (addressedIndex >= items.length) {
+      leaveAddress(true)
+    } else if (editing?.index !== addressedIndex) {
+      openEdit(addressedIndex)
+    }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- Follows the address alone, not each draw of the list.
+  }, [addressedIndex])
+
   const done = () => {
     if (editing === null) return
     if (emptyRequired(editing.copy).length > 0) {
@@ -154,11 +189,13 @@ export function ObjectListTable({
       onChange(`${pointer}/${editing.index}`, editing.copy)
     }
     setEditing(null)
+    leaveAddress(false)
     onDone?.()
   }
   const cancel = () => {
     focusPending.current = false
     setEditing(null)
+    leaveAddress(false)
     onCancel?.()
   }
 
@@ -179,9 +216,9 @@ export function ObjectListTable({
       if (at > 0) return shownText
       const mark = firstCellMark?.(row.index)
       const link = (
-        <AxisButton role="subtle" size="small" onClick={() => openEdit(row.index)}>
+        <Link to={{ search: itemSearch(row.index) }} preventScrollReset>
           {shownText ?? named(t('shell.studio.list.editTitle'))}
-        </AxisButton>
+        </Link>
       )
       return mark ? (
         <Flex gap="small" align="center" wrap>

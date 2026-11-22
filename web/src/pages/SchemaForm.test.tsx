@@ -462,17 +462,19 @@ describe('SchemaForm sections', () => {
       )
     }
     render(
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioNamesContext.Provider value={names}>
-            <StudioBindingsContext.Provider value={{ url: [], secret: [], storage: ['Files', 'Archive'] }}>
-              <LabelTextsContext.Provider value={labelContext}>
-                <Harness />
-              </LabelTextsContext.Provider>
-            </StudioBindingsContext.Provider>
-          </StudioNamesContext.Provider>
-        </TextProvider>
-      </ThemeModeProvider>,
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioNamesContext.Provider value={names}>
+              <StudioBindingsContext.Provider value={{ url: [], secret: [], storage: ['Files', 'Archive'] }}>
+                <LabelTextsContext.Provider value={labelContext}>
+                  <Harness />
+                </LabelTextsContext.Provider>
+              </StudioBindingsContext.Provider>
+            </StudioNamesContext.Provider>
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
     )
     const field = screen.getByTestId('studio-field-/fileStorage/binding')
     expect(within(field).getByText('Files')).toBeVisible()

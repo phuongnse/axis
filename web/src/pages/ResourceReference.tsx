@@ -32,9 +32,12 @@ export function ResourceReference({
   }
   const title = resourceTitle(resource, locale, t)
   return (
-    <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', gap: spacing.xs }}>
+    // Proposed, #4902: inline text, so the reference follows the words before it on their line and wraps as words do.
+    <span>
       {href ? <Link to={href}>{title}</Link> : <Typography.Text>{title}</Typography.Text>}
-      <Typography.Text style={{ color: colour.textMuted }}>{kindSingular(resource.kind, t)}</Typography.Text>
+      <Typography.Text style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>
+        {kindSingular(resource.kind, t)}
+      </Typography.Text>
     </span>
   )
 }
