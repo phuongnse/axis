@@ -30,7 +30,7 @@ import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { PartBoundary, SectionPart, SectionParts } from '../platform/SectionParts'
 import { withoutModulePrefix, type StudioNames } from '../platform/studio'
-import { studioResourceAddress } from '../platform/studioAddress'
+import { studioResourceAddress, withStudioField } from '../platform/studioAddress'
 import { labelText, referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
@@ -440,12 +440,7 @@ const Fields = memo(function Fields({
   const writeField = useCallback((name: string | null, replace: boolean) => {
     const { searchParams, setSearchParams } = latest.current
     written.current = name
-    const next = new URLSearchParams(searchParams)
-    if (name === null) {
-      next.delete('field')
-    } else {
-      next.set('field', name)
-    }
+    const next = withStudioField(searchParams, name)
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace, preventScrollReset: true })
     }
@@ -515,7 +510,9 @@ const Fields = memo(function Fields({
     if (drawerOpen || returnFocus.current === null) {
       return
     }
-    document.querySelector<HTMLElement>(`[data-testid="studio-field-/fields/${returnFocus.current}"] button`)?.focus()
+    document
+      .querySelector<HTMLElement>(`[data-testid="studio-field-/fields/${returnFocus.current}"] :is(a, button)`)
+      ?.focus()
     returnFocus.current = null
   }, [drawerOpen])
 
@@ -746,7 +743,12 @@ const Fields = memo(function Fields({
   )
 })
 
-/** The name of a field's row as a link that opens the field drawer, with the mark of a customization layer. */
+/**
+ * The name of a field's row as a real link to the field's drawer, `&field=<name>`, with the mark of a customization layer.
+ * A plain click opens the drawer in place. A Ctrl, Meta, Shift or Alt click goes to the browser, which opens a new tab.
+ * A field with no name has no address, so it is a subtle button. A read-only designer turns its inputs off, but its name
+ * still opens the drawer, see docs/reference/entity-designer.md#fields.
+ */
 const NameCell = memo(function NameCell({
   index,
   field,
@@ -759,13 +761,27 @@ const NameCell = memo(function NameCell({
   onOpen: (index: number) => void
 }) {
   const t = useText()
+  const [searchParams] = useSearchParams()
   const name = text(isContent(field) ? field.name : undefined)
   return (
     <Flex gap="small" align="center" wrap>
-      {/* A read-only designer turns its inputs off, but its name still opens the drawer. */}
-      <AxisButton role="link" size="small" disabled={false} onClick={() => onOpen(index)}>
-        {name || t('shell.studio.entity.unnamedField')}
-      </AxisButton>
+      {name === '' ? (
+        <AxisButton role="subtle" size="small" onClick={() => onOpen(index)}>
+          {t('shell.studio.entity.unnamedField')}
+        </AxisButton>
+      ) : (
+        <Link
+          to={{ search: withStudioField(searchParams, name).toString() }}
+          onClick={(event) => {
+            if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
+              event.preventDefault()
+              onOpen(index)
+            }
+          }}
+        >
+          {name}
+        </Link>
+      )}
       {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
     </Flex>
   )

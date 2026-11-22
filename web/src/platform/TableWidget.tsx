@@ -14,7 +14,7 @@ import { FilterBar } from './FilterBar'
 import { enumLabel, formatValue, isNumeric } from './formatValue'
 import { ImportDialog } from './ImportDialog'
 import { importsPath } from './imports'
-import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
+import { navigatePath, navigateTarget, type NavigateOpen, type NavigateScope } from './navigateAction'
 import { newIdempotencyKey, startProcess } from './processes'
 import {
   deleteRecord,
@@ -31,10 +31,12 @@ import type {
   DataSourceParameter,
   DeleteAction,
   FieldMetadata,
+  NavigateAction,
   StartProcessAction,
   WidgetMetadata,
 } from './site'
 import { useSiteTableKey } from './tableChoices'
+import { siteAddress } from './siteLinks'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -114,45 +116,61 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
 }
 
 /**
- * Shows the records of the widget's entity, or the rows of its data source. A row of a data source
- * carries the id of its root record, so a row action can open a form for it. A row of a grouped
- * data source is a group with no id, so it has no row action buttons. Each `navigate` row action is
- * a link or a button on every row with an id, and each toolbar action a button above the table. Both open
- * the target page with the parameter values in the URL query. Each `startProcess` row action is a
- * button on every row with an id that starts the process with that row's record as subject, with an
- * `Idempotency-Key` kept until the start has a final answer. A `201` loads the current page of rows
- * again, and a failure shows above the table. Each `delete` row action is a button on every row with an
- * id that opens a confirmation dialog, then sends `DELETE` to the record API. A `204` shows a success
- * message above the table and loads the current page of rows again. A `403`, `404` or `409` shows its own
- * message above the table and keeps the rows, and any other answer shows a generic failure. A table
- * over an entity whose access lists `import` has an Import button next to the toolbar actions, which opens the
- * import dialog. When the import is committed the dialog closes, a success message shows above the table and
- * the current page of rows loads again. The canvas draws the button and opens nothing. A table whose access lists
- * `export` has an Export dropdown with CSV and Excel. It fetches the export route with the table's parameter
- * values, search and sort, but no paging, and saves the file under the server's name. A file the server cut
- * at the row limit shows a notice above the table. A `403`, `409` or `503` shows its own message, and any
- * other failure a generic one. The canvas draws the button and exports nothing. A toolbar action to a form page
- * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
- * a button whose expressions the SPA cannot work out is hidden. The identifying column, which is the entity's
- * display field when the table shows it and otherwise the first column, comes first. The first `navigate` row
- * action is the link of its cell, with a real address when the SPA can build it, so Ctrl+click opens a new tab. It
- * is plain text when `visibleWhen` hides the action, and shows the action's label when the cell is empty. A file
- * column keeps its download link, so then no action is the link. The other row actions show in the row, a delete
- * as a trash icon. Three or more configured ones, or any number below 992 px, fold into one "Actions" menu. The
- * toolbar always shows. Its right side has a Refresh button that loads the current page of rows again, then Import,
- * Export and the toolbar actions, with the first toolbar action last. The table is drawn on `AxisTable`, which owns the
- * toolbar order, the column widths, the 40 px rows, the folding of row actions, the paging and the em dash of an empty
- * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at the
- * edge of their column. Every other column, an enum too, fits its content.
- * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
- * and the back button keep them. A table with a column the builder offers has a Filter button, and its filter
- * lives in the URL as `filter` and goes to the rows and export routes as it is. A measure column of a grouped data
- * source has no filter. A data source table also has a filter bar, whose values live in the URL under the parameter
- * names. A data source parameter that the widget binds to a page parameter has no filter input: the table sends the
- * page parameter's value under the data source parameter's name,
- * and leaves that page parameter in the URL as it is. A table whose rows can be searched has a search
- * box, which AxisTable draws and whose text lives in the URL as `search`. The text is sent as typed.
+ * The link of an identifying cell whose address needs a reference path. The path is read once when its row draws, so
+ * the link has its `href` before any click. While the read runs, or when it fails, the cell is plain text, and no
+ * message shows, see docs/reference/table-widget.md#opening-a-row.
  */
+function ResolvedOpenLink({
+  sitePath,
+  action,
+  scope,
+  label,
+  from,
+}: {
+  sitePath: string
+  action: NavigateAction
+  scope: NavigateScope
+  label: ReactNode
+  from: string
+}) {
+  const { id, values } = scope
+  // The address that the read gave for these inputs. A row whose inputs change shows plain text until its own read answers.
+  const [answer, setAnswer] = useState<{
+    sitePath: string
+    action: NavigateAction
+    id: string | null
+    values: NavigateScope['values']
+    href: string
+  } | null>(null)
+  useEffect(() => {
+    let live = true
+    const open = navigateTarget(sitePath, action, { id, values })
+    void open?.().then((address) => {
+      if (live && address !== null) {
+        setAnswer({ sitePath, action, id, values, href: address })
+      }
+    })
+    return () => {
+      live = false
+    }
+  }, [sitePath, action, id, values])
+  const href =
+    answer !== null &&
+    answer.sitePath === sitePath &&
+    answer.action === action &&
+    answer.id === id &&
+    answer.values === values
+      ? answer.href
+      : null
+  return href === null ? (
+    label
+  ) : (
+    <Link to={href} state={{ from }}>
+      {label}
+    </Link>
+  )
+}
+
 export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
   const { size } = useDesignTokens()
@@ -442,19 +460,18 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
         return shown
       }
       const label = text === '' ? t(action.labelKey) : shown
+      const scope = { id: record.id, values: record.values }
       if (canvas.active) {
+        // The canvas has no page to open, so a reference path stands in for the target page's own address.
         return (
-          <a
-            role="link"
-            tabIndex={0}
-            onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.click()}
+          <Link
+            to={navigatePath(sitePath, action, scope) ?? siteAddress(sitePath, action.page.toLowerCase())}
             {...canvas.props(`rowActions/${openIndex}`)}
           >
             {label}
-          </a>
+          </Link>
         )
       }
-      const scope = { id: record.id, values: record.values }
       if (!isVisible(action.visibleWhen, scope)) {
         return shown
       }
@@ -466,21 +483,11 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
           </Link>
         )
       }
-      // A reference path is read on click, so the link has no address.
-      const open = navigateTarget(sitePath, action, scope)
-      if (open === null) {
+      // A reference path is read when the row draws, see ResolvedOpenLink.
+      if (navigateTarget(sitePath, action, scope) === null) {
         return shown
       }
-      return (
-        <a
-          role="link"
-          tabIndex={0}
-          onClick={() => void runNavigate(open)}
-          onKeyDown={(event) => event.key === 'Enter' && void runNavigate(open)}
-        >
-          {label}
-        </a>
-      )
+      return <ResolvedOpenLink sitePath={sitePath} action={action} scope={scope} label={label} from={from} />
     }
     return fields.map((field, column): AxisColumn<TableRow> => ({
       key: field.name,
@@ -507,7 +514,7 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
         return column === 0 ? openLink(text, text, record) : text
       },
     }))
-  }, [fields, locale, rowActions, openIndex, runNavigate, sitePath, from, t, canvas, widget.priorities])
+  }, [fields, locale, rowActions, openIndex, sitePath, from, t, canvas, widget.priorities])
 
   // The row's actions other than the one its identifying cell opens. A start action runs for the row, a delete asks
   // first, a navigate action opens its page or is dropped when its path is unknown, and an action whose visibleWhen

@@ -209,7 +209,7 @@ export async function closeEntityField(page: Page) {
  */
 export async function openEntityField(page: Page, index: number): Promise<Locator> {
   await closeEntityField(page)
-  const link = page.getByTestId(`studio-field-/fields/${index}`).getByRole('cell').first().getByRole('button').first()
+  const link = page.getByTestId(`studio-field-/fields/${index}`).getByRole('cell').first().locator('a, button').first()
   const name = (await link.textContent())!.trim()
   await link.click()
   await waitForDialog(page, name)

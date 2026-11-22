@@ -1,6 +1,11 @@
 import type { ShellNavigationEntry, ShellNavigationGroup } from '../platform/ShellNavigation'
 import type { ModuleResourceGroup, ModuleResourceItem, StudioResourceItem } from '../platform/studio'
-import { studioResourceAddress } from '../platform/studioAddress'
+import {
+  studioApplicationAddress,
+  studioKindAddress,
+  studioResourceAddress,
+  studioViewAddress,
+} from '../platform/studioAddress'
 import { kindGroup, kindGroupNames, kindName, studioKind, studioKinds } from '../platform/studioKinds'
 
 /**
@@ -12,7 +17,6 @@ export function studioNavigation(
   moduleGroups: readonly ModuleResourceGroup[],
   t: (key: string) => string,
 ): (ShellNavigationEntry | ShellNavigationGroup)[] {
-  const path = (extra: Record<string, string> = {}) => `/studio?${new URLSearchParams({ app: application, ...extra })}`
   const manifest = resources.find((item) => item.kind === 'application')
   const kinds = new Set([
     ...resources.map((item) => item.kind),
@@ -20,27 +24,42 @@ export function studioNavigation(
   ])
   const kindEntry = (kind: string): ShellNavigationEntry => ({
     key: `kind:${kind}`,
-    path: path({ kind }),
+    path: studioKindAddress(application, kind),
     icon: studioKind(kind)?.icon ?? null,
     label: kindName(kind, t),
   })
   const policyMatrix: ShellNavigationEntry = {
     key: 'policies',
-    path: path({ view: 'policies' }),
+    path: studioViewAddress(application, 'policies'),
     icon: 'list',
     label: t('shell.studio.view.policies'),
   }
   const packages: ShellNavigationEntry = {
     key: 'packages',
-    path: path({ view: 'packages' }),
+    path: studioViewAddress(application, 'packages'),
     icon: 'tool',
     label: t('shell.studio.nav.packages'),
   }
 
   const entries: (ShellNavigationEntry | ShellNavigationGroup)[] = [
-    { key: 'overview', path: path(), icon: 'dashboard', label: t('shell.studio.nav.overview') },
-    { key: 'releases', path: path({ view: 'releases' }), icon: 'tag', label: t('shell.studio.releases') },
-    { key: 'history', path: path({ view: 'history' }), icon: 'clock', label: t('shell.studio.history') },
+    {
+      key: 'overview',
+      path: studioApplicationAddress(application),
+      icon: 'dashboard',
+      label: t('shell.studio.nav.overview'),
+    },
+    {
+      key: 'releases',
+      path: studioViewAddress(application, 'releases'),
+      icon: 'tag',
+      label: t('shell.studio.releases'),
+    },
+    {
+      key: 'history',
+      path: studioViewAddress(application, 'history'),
+      icon: 'clock',
+      label: t('shell.studio.history'),
+    },
   ]
   if (manifest !== undefined) {
     entries.push({

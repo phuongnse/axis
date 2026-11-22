@@ -10,9 +10,12 @@ function entityFieldRow(index: number): Promise<HTMLElement> {
   return screen.findByTestId(`studio-field-/fields/${index}`, {}, wait)
 }
 
-/** The link of the first cell of field `index`'s row: the field's name, which opens the field drawer. */
+/**
+ * The name of a field's row, the first link or button of its first cell, which opens the field drawer. A field with no
+ * name shows a button, and any other field shows a link to its drawer.
+ */
 function entityFieldLink(row: HTMLElement): HTMLElement {
-  return within(within(row).getAllByRole('cell')[0]).getAllByRole('button')[0]
+  return within(row).getAllByRole('cell')[0].querySelector<HTMLElement>('a, button')!
 }
 
 /** Makes field `index` ready to edit: clicks its name in the Fields table and returns the field drawer's dialog. */

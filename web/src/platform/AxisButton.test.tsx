@@ -288,15 +288,6 @@ describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', 
     expect(screen.getByRole('button', { name: 'Main' })).not.toHaveAttribute('role')
   })
 
-  it('draws link as a link button with its text in primaryText', () => {
-    renderIn(mode, <AxisButton role="link">Open</AxisButton>)
-
-    const link = screen.getByRole('button', { name: 'Open' })
-    expect(link).toHaveClass('ant-btn-variant-link')
-    expect(link).toHaveStyle({ color: colour.primaryText })
-    expect(link).not.toHaveAttribute('role')
-  })
-
   describe('with selected', () => {
     it('draws a subtle button on the selected tint in primaryText with one aria-pressed', () => {
       renderIn(

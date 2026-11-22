@@ -28,12 +28,12 @@ type Base = Omit<ButtonProps, 'type' | 'color' | 'variant' | 'danger' | 'role' |
 type Selected = boolean | 'page' | 'step'
 
 /**
- * `destructive` is the tone any role but `link` takes, and `selected` marks a chosen subtle button, see
+ * `destructive` is the tone any role takes, and `selected` marks a chosen subtle button, see
  * docs/reference/actions-and-controls.md#buttons.
  */
 type TextButton =
   | {
-      role: Exclude<ButtonRole, 'subtle' | 'link'>
+      role: Exclude<ButtonRole, 'subtle'>
       destructive?: boolean
       selected?: never
     }
@@ -41,11 +41,6 @@ type TextButton =
       role: 'subtle'
       destructive?: boolean
       selected?: Selected
-    }
-  | {
-      role: 'link'
-      destructive?: never
-      selected?: never
     }
 
 export type AxisButtonProps =
@@ -337,12 +332,11 @@ export function TitleRowActions({ children }: { children: ReactNode }) {
  * button in the text colour, for tools and header controls. With an `icon` and a `nameKey` it is an icon-only button,
  * which has no text, so it shows the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless
  * `joined` draws it as a bordered default button for a control joined to an input. The `destructive` tone, which any role
- * but `link` takes, says the action removes something: `main`, `secondary` and `subtle` draw in `dangerText`, and
+ * takes, says the action removes something: `main`, `secondary` and `subtle` draw in `dangerText`, and
  * `finish` is a solid `danger` fill with white text. `selected` draws a subtle button on the selected tint in
  * `primaryText`, and sets the one `aria-pressed`, or `aria-current` for `"page"` and `"step"`, in place of any the caller
  * passes. Inside an `AxisActionRow`, `secondary` and `subtle` are text buttons, and a destructive `secondary` is in
- * `dangerText`. `caret` adds a down caret after the text of any text role. `link` is a button drawn
- * as a link, in `primaryText`, for an action that goes to no address. The role is not passed on to the DOM.
+ * `dangerText`. `caret` adds a down caret after the text of any text role. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
@@ -411,15 +405,6 @@ export function AxisButton(props: AxisButtonProps) {
         />
       ) : (
         <Button {...body} type="text" disabled={disabled} style={{ ...chosen.style, ...style }} />
-      )
-    case 'link':
-      return (
-        <Button
-          {...body}
-          type="link"
-          disabled={disabled}
-          style={{ ...tinted(colour.primaryText), paddingInline: 0, ...style }}
-        />
       )
   }
 }
