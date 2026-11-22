@@ -63,16 +63,31 @@ const drawerGroups: {
   name: 'type' | 'value' | 'validation' | 'searchPrivacy'
   settings: (FieldSetting | [FieldSetting, FieldSetting])[]
 }[] = [
-  { name: 'type', settings: ['target', 'values', 'valueLabels', 'currency', ['precision', 'scale'], 'maxLength'] },
+  // Proposed, #3264: a type's group holds every plain limit of a value, its size and its range as much as its kind,
+  // as Strapi and Directus keep a field's limits with its type's settings; Validation keeps the validations.
+  {
+    name: 'type',
+    settings: [
+      'target',
+      'values',
+      'valueLabels',
+      'currency',
+      ['precision', 'scale'],
+      ['minLength', 'maxLength'],
+      ['min', 'max'],
+      'maxSize',
+      'accept',
+    ],
+  },
   // Proposed, #3264: Required and Unique sit in Value, right under the way the value comes from, as they hold for an
   // entered value, so they show near the top as other platforms show them.
   { name: 'value', settings: ['required', 'unique', 'default', 'expression', 'sequence', 'match'] },
-  { name: 'validation', settings: ['minLength', ['min', 'max'], 'maxSize', 'accept'] },
+  { name: 'validation', settings: [] },
   { name: 'searchPrivacy', settings: ['searchable', 'sensitive', 'exactLookup'] },
 ]
 
 /** The titles of a pair's row, by the pair's first setting. */
-const pairTitles = { precision: 'fields.precisionScale', min: 'fields.limits' } as const
+const pairTitles = { precision: 'fields.precisionScale', min: 'fields.limits', minLength: 'fields.length' } as const
 
 /** No field names: a validation drawn at its field has no field picker. */
 const noFieldNames: string[] = []
@@ -1560,18 +1575,20 @@ function Settings({
     }
   }
 
-  function labelled(setting: FieldSetting) {
+  /** A setting with its label and help; one of a pair takes the pair's help alone, so the pair's boxes line up. */
+  function labelled(setting: FieldSetting, paired = false) {
     const control = input(setting)
+    const texts = settingTexts(setting)
     return (
       control && (
-        <AxisField {...settingTexts(setting)} required={setting === 'expression'}>
+        <AxisField label={texts.label} help={paired ? '' : texts.help} required={setting === 'expression'}>
           {control}
         </AxisField>
       )
     )
   }
 
-  function drawn(setting: FieldSetting) {
+  function drawn(setting: FieldSetting, paired = false) {
     return setting === 'currency' ? (
       <CurrencySource
         key={setting}
@@ -1613,7 +1630,7 @@ function Settings({
           ? flag(setting)
           : setting === 'valueLabels'
             ? input(setting)
-            : labelled(setting)}
+            : labelled(setting, paired)}
       </div>
     )
   }
@@ -1622,11 +1639,11 @@ function Settings({
   function drawnEntry(entry: FieldSetting | [FieldSetting, FieldSetting]) {
     const entered = (typeof entry === 'string' ? [entry] : entry).filter((setting) => taken.includes(setting))
     if (typeof entry === 'string' || entered.length < 2) {
-      return entered.map(drawn)
+      return entered.map((setting) => drawn(setting))
     }
     return [
       <AxisFieldRow key={entry[0]} {...groupTexts(t, pairTitles[entry[0] as keyof typeof pairTitles])}>
-        {entered.map(drawn)}
+        {entered.map((setting) => drawn(setting, true))}
       </AxisFieldRow>,
     ]
   }
@@ -1675,7 +1692,8 @@ function Settings({
                   : undefined
               }
             >
-              <Flex vertical gap="small" style={{ minWidth: 240 }}>
+              {/* Fields of a group stand as far apart as General's, see docs/reference/actions-and-controls.md#fields. */}
+              <Flex vertical gap="middle" style={{ minWidth: 240 }}>
                 {choice && (
                   // Proposed, #3264: where the value comes from is one choice in a list, each way with a line that
                   // says what it is, as the Type list has; the chosen way's settings follow it at the panel's width.
