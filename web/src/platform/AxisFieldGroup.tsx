@@ -66,16 +66,32 @@ export function AxisFieldGroup({
     >
       {hasAction ? (
         // The button is not in the legend's text, so the group is named by its title alone.
+        // Proposed, #3264: the title and its help stand together on the left and the action on the right, as a page
+        // part's heading has them, so the action's height does not push the help away from the title. The group is
+        // named by its title alone, so the help in the legend stays its description.
         <legend
           style={{
             ...legendStyle,
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: 'flex-start',
+            gap: spacing.sm,
             width: '100%',
           }}
         >
-          <span id={titleId}>{title}</span>
+          <span style={{ minWidth: 0 }}>
+            <span id={titleId} style={{ display: 'block' }}>
+              {title}
+            </span>
+            {help !== '' && (
+              <span
+                id={helpId}
+                style={{ display: 'block', fontSize: 12, lineHeight: '20px', fontWeight: 400, color: colour.textMuted }}
+              >
+                {help}
+              </span>
+            )}
+          </span>
           <AxisActionRow>{action}</AxisActionRow>
         </legend>
       ) : fold ? (
@@ -95,7 +111,7 @@ export function AxisFieldGroup({
       ) : (
         <legend style={legendStyle}>{requiredMark(title, { required })}</legend>
       )}
-      {fold && !fold.open
+      {(fold && !fold.open) || hasAction
         ? null
         : help !== '' && (
             <div
