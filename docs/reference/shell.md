@@ -61,12 +61,22 @@ their own controls where they expect them.
 - **One side panel frame.** Every page draws its side panel in `SidePanel`, in a column on the right
   from under the header to the footer. One shows at a time, so opening one, such as the problems panel or the Ask AI
   request panel, closes the other. It holds details or tools for what is chosen, while the page stays in use. A task
-  to finish or cancel is a dialog, and what stands alone is a page. A handle on its edge, a `separator` that takes the
+  to finish or cancel is a dialog, unless it is short and its page must stay in sight, as the task rule below says,
+  and what stands alone is a page. A handle on its edge, a `separator` that takes the
   arrow keys, Home and End, sets its width from `sidePanel` to half the shell, and the browser keeps that width, so
   every side panel opens at the width last chosen. Its title can carry a `status`, such as a `StatusTag`, and a line under it. Its head
   stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
   a scrollbar comes. A panel with no close button, such as the process designer's step panel, gives way while a panel
   the person opened is open, and comes back when that one closes. The page keeps the browser's scroll.
+- **A side panel's actions** _(planned)_. `SidePanel` takes `actions`, drawn in an `ActionBar` at the panel's foot that
+  stays in place under the body. The actions are outlined, with the main action last on the right, so Cancel stands
+  before the main action.
+- **A task in a side panel** _(planned)_. A short task whose page must stay in sight, such as adding a field while the
+  other fields show, is done in the side panel rather than a dialog. The panel keeps what is typed until its main action,
+  and Cancel stands beside that action in its bar. Cancel and Close drop what is typed, and the panel asks first when
+  that would drop text.
+- **A side panel's parts** _(planned)_. A side panel's parts are sections, each with its heading and a line under it. A
+  `borderSubtle` rule runs between them from the panel's edge to its scrollbar.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a narrow strip of the entries'
   icons, each centred and named by a tooltip, and opens it again. Collapsed, a group's title gives way
   to a thin rule. The button names what it does, "Collapse navigation" or "Expand navigation", and has
@@ -94,7 +104,7 @@ their own controls where they expect them.
   `borderSubtle` border and `radius-base` corners.
 - **Parts a rule apart.** A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
   drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule. On a page the
-  rule reaches past the page's padding to the page area's edges. In a drawer, a dialog, the side panel, the sidebar, a
+  rule reaches past the page's padding to the page area's edges. In a drawer, a dialog, the sidebar, a
   tile or a column of a grid it stays inside. A runtime page's widget list, a record's detail and a record form also
   keep it inside.
 - **Rules, not boxes** _(planned)_. One `borderSubtle` rule parts a block from the one beside it, and no border, box

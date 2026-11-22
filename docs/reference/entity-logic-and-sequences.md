@@ -79,7 +79,8 @@ compile, given that rule. A module entity's validation calls the rules of its ow
   - `expression`, which must be boolean.
   - `message`, a label that is checked like other labels (`AXC0028`). Its text key is the message of
     a failure.
-  - `field`, which names a field of the same entity.
+  - **`field`** _(planned)_. It is optional. It names a field of the same entity, and with a field the message shows at
+    that field. With none, the validation holds for the whole record, and its failure is reported at `/values`.
 
   The expression reads the entity's own fields by name, and can call named rules. It can also
   aggregate over the entity's child collections, such as `count(lineItems) >= 1`. An aggregate reads

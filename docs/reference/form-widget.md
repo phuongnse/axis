@@ -267,7 +267,8 @@ A child collection field shows its rows as a table under the field's label.
   [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`, and
   focus moves to the row's first input.
 - **Order** _(planned for M42)_. Each editable row has a drag handle, and the keyboard moves a row with Move up and
-  Move down in the row's menu. The form sends the rows in the shown order, because a new order counts as a change.
+  Move down in the row's menu. The rows reorder through the table's `reorder`, see [tables](actions-and-controls.md#tables).
+  The form sends the rows in the shown order, because a new order counts as a change.
   The server keeps the order it is sent, see [child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
   A read-only collection has no handle. As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
 - **Sending.** When rows were added, removed or edited, the form sends the whole row list, as

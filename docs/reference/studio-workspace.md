@@ -124,13 +124,18 @@ the entry's name on another sidebar entry, such as Settings or Policy matrix, th
 [name](#names) on an open resource, and Studio on the list of applications.
 
 An optional line under the heading, in `textMuted`, says more: the application's description on the
-Overview. It never names a file or a path, which only the JSON view shows. The page's own actions, such as a
+Overview. It never names a file or a path. The page's own actions, such as a
 scenario's Run scenario and a kind's New entity…, sit on the heading's right through `PageActions`, and so does a
 resource's "…" menu with [Delete…](studio.md#delete).
 
-**A page that shows one thing**. An open resource, a release and a revision are headed as
-[a page that shows one thing](shell.md#page-header) says. Their line is the kind alone, such as Release or Revision, and a resource's id and file or module, or a
-revision's author, time and client, are the facts of the page's first part, see [facts as the first part](shell.md#page-header).
+**A page that shows one thing**. A release and a revision are headed as
+[a page that shows one thing](shell.md#page-header) says. Their line is the kind alone, such as Release or Revision, and a
+revision's author, time and client are the facts of the page's first part, see [facts as the first part](shell.md#page-header).
+
+**An open resource has no facts part** _(planned)_. Its line is its kind alone, such as Entity, and its view switch, Form,
+JSON and Used by, comes right under its heading. Its id does not show, as Studio never shows an internal code, see
+[names](#names), and its file and path are none of the page's concern. No file or path shows anywhere on the page, the
+JSON view's title row included. A module's resource keeps one fact, the module it comes from, which is why it cannot be changed.
 
 ## Names
 
