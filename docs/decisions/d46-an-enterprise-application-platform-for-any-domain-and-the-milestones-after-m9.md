@@ -25,7 +25,7 @@ platform that suits one shape, or one domain such as ERP, is not general.
   once the model is stable, because their results mean something only then.
 - **Migrating live business data between installations is out of scope.** Hosted operations are in
   scope as [D166](d166-axis-is-designed-for-small-businesses-first-and-the-milestones-in-three-phases.md) and
-  [D167](d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) agree.
+  [D168](d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md) agree.
 - **One format, changed in place, until the first production release.** Each resource kind has one
   format. A change edits it in place, with no second version of the kind, no compatibility code and
   no `formatVersion` bump, and the same pull request updates the schema, the compiler, the samples,

@@ -35,8 +35,6 @@ A billing invoice is Axis's own record of what a subscription owes for a period 
   as actor and the invoice as subject.
 - **Prorated lines** _(planned for M34)_. Any prorated charge or credit, and the invoice that a plan
   change or an add-on makes at once.
-- **Not the e-invoice.** This is Axis's own record of what is owed. The legal invoice of a payment in
-  Vietnam is the [e-invoice](e-invoices.md), issued once it is paid.
 - **Paid.** Recording a payment against an invoice appends one `payment` entry to the
   [ledger](#the-ledger), and a repeated idempotency key adds nothing. Payments settle the
   subscription's open invoices oldest first, by `created_at` and then `id`, from ledger sums: the
@@ -91,8 +89,6 @@ In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
     credit or a part payment after the link is made does not change the link. Each new link writes the
     audit record `paymentLink.created`, with the job as the actor and the invoice as the subject. A rerun
     sends no second request for an invoice that has its link.
-- **Shown to the payer** _(planned for M34)_. The [billing portal](billing-portal.md) and the reminder
-  emails' link show the VietQR code and the transfer details.
 - **No automatic charge** _(planned for M34)_. A bank transfer cannot be pulled, so each period the owner or a billing
   contact pays its invoice. The reminders of [the timeline](subscriptions.md#the-timeline) ask them
   to.
@@ -188,7 +184,7 @@ The ledger is the only source of money: every amount is an entry in it, and noth
   nothing and reports so, even if the amount differs, so a retried webhook or job never counts money
   twice.
 - **Balances are sums.** What a subscription owes is the sum of its entries for each currency, as a
-  whole number, so the ledger is the only source of money. The portal reads it, and an invoice's amount is the
+  whole number, so the ledger is the only source of money. An invoice's amount is the
   sum of its entries without payments and refunds, see [invoices](#invoices).
 - **Refunds** _(planned for M34)_. The operator issues a refund with `Axis.ControlPlane.Admin`. A
   refund through Paddle goes through its API. A refund in Vietnam is a bank transfer the operator

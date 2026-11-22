@@ -30,7 +30,7 @@ installation that ran them.
 Several replicas are [D49](d49-several-server-replicas-behind-a-tls-proxy.md). The fifth production
 image, `axis-controlplane`, is the image of the [control plane](../reference/control-plane.md#image-and-chart),
 which each region runs on a cluster of its own. It is not part of an installation, as
-[D126](d126-sign-up-trials-and-the-control-plane.md) says. The steps and every setting are in
+[D168](d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md) says. The steps and every setting are in
 [installation](../reference/installation.md).
 
 ## Consequences

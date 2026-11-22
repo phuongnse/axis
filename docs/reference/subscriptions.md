@@ -80,7 +80,7 @@ A subscription is in one of these states, and each state says how the tenant wor
   no payment, see [the hourly job](#one-clock). `pastDue` ends in `readOnly` after 14 days, and
   `cancelled` ends in `readOnly` at the period's end. The end of each `active` period moves
   `period_ends_at` forward one period.
-- **A banner to pay** _(planned for M34)_. A `pastDue` tenant sees a banner that asks the owner to pay.
+- **A past-due banner** _(planned for M34)_. A `pastDue` tenant's administrators see a banner that links the operator's billing page.
 - **Paying starts the paid period.** A trial paid early keeps its tenant and its records, and its
   first paid period starts at the trial's end, so the payment sets `period_ends_at` one period
   later. A trial that ended unpaid and is then paid starts its period at the payment.
@@ -94,8 +94,8 @@ A subscription is in one of these states, and each state says how the tenant wor
   `resume:<step id>`. The job queue retries a failed call with the same key. The job does nothing
   once a later move has changed the step id. A part payment changes no state: the subscription moves
   when a later payment completes the invoice.
-- **Cancelling** _(planned for M34)_. The owner cancels in the [billing portal](billing-portal.md).
-  The tenant keeps working to the end of the paid period, then follows the same path as an unpaid
+- **Cancelling** _(planned for M34)_. The operator's billing system ends the subscription at its
+  paid-through date. The tenant keeps working to that date, then follows the same path as an unpaid
   one.
 
 ## The timeline
@@ -145,7 +145,7 @@ and `POST /api/cell/tenants/{id}/read-only` set and `resume` clears.
   up after a resume: the worker skips them when it first sees the tenant active again. No email is sent for the tenant.
 - **A banner.** `GET /api/me` answers `tenantStatus: "readOnly"`, and the shell shows a banner on
   every page: why the workspace is read-only, and, for an administrator in a cell, a link to the
-  [billing portal](billing-portal.md).
+  billing page at `billingUrl`, see [the current user](security.md#roles-and-the-current-user).
 - **Quotas.** Unchanged. Nothing grows, so none is reached.
 
 ## Emails
@@ -154,13 +154,10 @@ The control plane emails the people of a subscription before each step, so nobod
 one.
 
 - **Who gets them.** Every administrator of the tenant, read through
-  `GET /api/cell/tenants/{id}/administrators`, and the person who signed up, the first
-  [owner](billing-portal.md#people), each address once. The deletion's email goes to the owner only,
-  because the cell has purged the tenant and its administrators by then.
-- **Other owners and billing contacts** _(planned for M34)_. The other owners and billing contacts of
-  the billing portal get them too.
+  `GET /api/cell/tenants/{id}/administrators`, and the person who signed up, each address once. The deletion's email goes to the person who signed
+  up only, because the cell has purged the tenant and its administrators by then.
 - **In their language.** An administrator gets the email in the language set in the realm, and the
-  owner in the language chosen at sign-up. An administrator with neither `en` nor `vi` gets the
+  person who signed up in the language chosen at sign-up. An administrator with neither `en` nor `vi` gets the
   language of the sign-up.
 - **From where.** The control plane's own mail domain, see [its own work](control-plane.md#its-own-work).
 - **Which.** Those of [the timeline](#the-timeline), plus: the trial has started, and the deletion is
@@ -179,8 +176,4 @@ one.
   written in the same transaction as the `sendEmail` jobs, so a rerun, a retry or two runs that
   overlap send nothing twice. A deletion that is cancelled sends no second read-only or deletion
   email.
-- **Billing emails** _(planned for M34)_. A payment is received, an e-invoice is issued, a plan or
-  add-on changes, and a subscription is cancelled. Each states the date of the next step and what
-  stops it.
-- **Never a secret.** An email holds no password, token or payment detail. Links go to the billing
-  portal, which asks the person to sign in.
+- **Never a secret.** An email holds no password, token or payment detail.
