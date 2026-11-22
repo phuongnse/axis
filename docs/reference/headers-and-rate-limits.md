@@ -111,8 +111,7 @@ cannot use up a replica.
 - **Open routes.** `GET /api/site`, `GET /api/texts/{locale}`, `GET /.well-known/oauth-protected-resource/mcp`, `/health` and
   the SPA's static files and pages have no limit.
 - **The control plane** _(planned for M33)_. The [control plane](control-plane.md) is another service with limits of
-  its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse), and the
-  [billing portal](billing-portal.md#rules)'s. It counts its refusals in the same metric, with `sign_up` as
+  its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse). It counts its refusals in the same metric, with `sign_up` as
   `axis.partition`, see [the control plane's metrics](control-plane.md).
 - **Live streams.** _(planned for M43)_ Opening a [live stream](frontend.md#live-pages) counts once in Session. The
   `Live:MaxStreamsPerSession` setting closes the oldest stream of a session when one more opens. The `Live:MaxStreams`

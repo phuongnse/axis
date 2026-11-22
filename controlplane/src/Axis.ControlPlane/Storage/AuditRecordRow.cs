@@ -2,7 +2,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// A row of <c>control_plane.audit_records</c>: one change and who made it. <see cref="ActorKind"/> is <c>account</c>,
-/// <c>webhook</c>, <c>job</c> or <c>operator</c>. The table is append-only: the database rejects every update, delete and truncate.
+/// <c>webhook</c>, <c>job</c>, <c>operator</c> or <c>billing</c>. The table is append-only: the database rejects every update, delete and truncate.
 /// </summary>
 public sealed class AuditRecordRow
 {

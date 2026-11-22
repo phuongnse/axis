@@ -214,7 +214,7 @@ cost something.
   page whether a business uses Axis. The control plane stores no sign-up for it and holds no
   subdomain. It sends that address the [trial-used email](#the-emails) instead of the confirm email,
   with a link to sign in to its Axis while the region directory holds its tenant, or to the
-  [billing portal](billing-portal.md) otherwise. A subdomain that is taken is still
+  account page of the region domain otherwise. A subdomain that is taken is still
   told, as it is public in DNS.
 - **Disposable domains.** An email of a domain on a list of disposable mailbox providers is refused.
   The list is the `control_plane.disposable_domains` table, whose domains are lower case. The domain of
@@ -236,8 +236,7 @@ No tenant exists until the person proves the email is theirs.
 2. **Verify.** The link opens `https://account.<region domain>/sign-up/verify#<token>`, which asks the
    person to confirm, so a mail scanner that follows links does not verify anyone. The token works once,
    for 24 hours.
-3. **Then the tenant.** On confirm, the control plane records the terms acceptance, creates the
-   person's [billing portal](billing-portal.md) account as the tenant's owner, starts the trial
+3. **Then the tenant.** On confirm, the control plane records the terms acceptance, starts the trial
    [subscription](subscriptions.md), and starts provisioning.
 
 An unverified sign-up expires after 24 hours with nothing created, and its subdomain is free again.
@@ -344,7 +343,7 @@ Liên kết chỉ dùng được một lần, trong 24 giờ. Nếu bạn không
 The trial-used email goes to an address that already had a trial, instead of the confirm email. It is two
 templates with the same text but one middle paragraph: `signUpTrialUsedSignIn` holds the sign-in one, with
 `{{tenantAddress}}`, while the region directory holds the tenant, and `signUpTrialUsedBillingPortal` holds
-the [billing portal](billing-portal.md) one otherwise, whose link is `{{billingPortalUrl}}`.
+the other one, whose link is `{{billingPortalUrl}}`.
 
 ```
 Subject: This email already had an Axis trial
@@ -467,8 +466,8 @@ changed.
   the version of the Privacy policy that [the terms box](#the-terms-box) showed.
 - **At sign-up.** A confirm that succeeds records one acceptance of each document. A confirm that is
   refused records none.
-- **A new version** _(planned for M33)_. When a new version of either document is published, the
-  [billing portal](billing-portal.md) asks the owner to accept it before any other action.
+- **A new version** _(planned for M34)_. When a new version of either document is published, a tenant
+  administrator accepts it in the shell before any other action, and Axis records the acceptance as at sign-up.
 - **Versions.** Each document's version and its address in each language are settings of the control
   plane, and [the documents' route](#the-documents) serves them. A sign-up that sends a version that is no longer
   current is refused. The operator has a lawyer confirm the texts before sign-up opens.

@@ -46,10 +46,10 @@ public sealed class SubscriptionPlanTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_newer_version_of_the_plan_leaves_the_pinned_quotas_and_price_unchanged()
+    public async Task A_newer_version_of_the_plan_leaves_the_pinned_quotas_unchanged()
     {
         var token = TestContext.Current.CancellationToken;
-        var subscription = await SeedAsync("pinned", "plan_code, plan_version, currency, period", "'team', 1, 'VND', 'year'");
+        var subscription = await SeedAsync("pinned", "plan_code, plan_version, period", "'team', 1, 'year'");
         var catalogue = Catalogue(version1: true);
 
         await using var connection = await _dataSource.OpenConnectionAsync(token);
@@ -60,9 +60,7 @@ public sealed class SubscriptionPlanTests : IAsyncLifetime
         Assert.Equal(1, pinned.Plan.Version);
         Assert.Equal(10_737_418_240, pinned.Plan.Quotas["storage"]);
         Assert.Equal(5, pinned.Plan.Quotas["applications"]);
-        Assert.Equal(PlanCurrencies.Vnd, pinned.Currency);
-        Assert.Equal(PlanPeriods.Year, pinned.Period);
-        Assert.Equal(4_900_000L * 10, pinned.Price);
+        Assert.Equal("year", pinned.Period);
         Assert.Equal(21_474_836_480, catalogue.Find("team", 2)!.Quotas["storage"]);
     }
 
@@ -77,9 +75,9 @@ public sealed class SubscriptionPlanTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_currency_without_a_plan_or_a_period_is_refused_by_the_database()
+    public async Task A_period_without_a_plan_is_refused_by_the_database()
     {
-        var exception = await Assert.ThrowsAsync<PostgresException>(() => SeedAsync("bad-pin", "currency, period", "'VND', 'month'"));
+        var exception = await Assert.ThrowsAsync<PostgresException>(() => SeedAsync("bad-pin", "period", "'month'"));
         var half = await Assert.ThrowsAsync<PostgresException>(() => SeedAsync("half-pin", "plan_code", "'team'"));
 
         Assert.Equal(PostgresErrorCodes.CheckViolation, exception.SqlState);
@@ -90,7 +88,7 @@ public sealed class SubscriptionPlanTests : IAsyncLifetime
     public async Task The_start_stops_when_the_catalogue_lacks_a_pinned_version_and_names_it()
     {
         var token = TestContext.Current.CancellationToken;
-        await SeedAsync("pinned-start", "plan_code, plan_version, currency, period", "'team', 1, 'VND', 'month'");
+        await SeedAsync("pinned-start", "plan_code, plan_version, period", "'team', 1, 'month'");
         var options = new ControlPlaneOptions { ConnectionString = _container.GetConnectionString() };
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -101,13 +99,13 @@ public sealed class SubscriptionPlanTests : IAsyncLifetime
         await new ControlPlaneMigrationStart(options, Catalogue(version1: true)).StartingAsync(token);
     }
 
-    // A catalogue with version 2 of the team plan, and with version 1 when asked. Version 2 has higher quotas and prices.
+    // A catalogue with version 2 of the team plan, and with version 1 when asked. Version 2 has higher quotas.
     private static PlanCatalogue Catalogue(bool version1)
     {
-        var versions = new List<string> { Plan(2, 21_474_836_480, 10, 9_900_000, 3900) };
+        var versions = new List<string> { Plan(2, 21_474_836_480, 10) };
         if (version1)
         {
-            versions.Add(Plan(1, 10_737_418_240, 5, 4_900_000, 1900));
+            versions.Add(Plan(1, 10_737_418_240, 5));
         }
 
         var configuration = new ConfigurationBuilder()
@@ -118,14 +116,13 @@ public sealed class SubscriptionPlanTests : IAsyncLifetime
         return PlanCatalogue.Create(options.Plans);
     }
 
-    private static string Plan(int version, long storage, int applications, long vnd, long usd) => $$"""
+    private static string Plan(int version, long storage, int applications) => $$"""
         {
           "code": "team",
           "version": {{version}},
           "name": { "en": "Team", "vi": "Nhóm" },
           "includedUsers": 25,
           {{Quotas.Replace("{{storage}}", storage.ToString(), StringComparison.Ordinal).Replace("{{applications}}", applications.ToString(), StringComparison.Ordinal)}},
-          "prices": [{ "currency": "VND", "month": {{vnd}} }, { "currency": "USD", "month": {{usd}} }],
           "addOns": []
         }
         """;

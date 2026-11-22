@@ -3,7 +3,7 @@
 A cell is an installation of Axis that an operator runs as a SaaS for many tenants. This page covers the
 regions and cells, the hosts of a cell's tenants and their certificates, how a cell reaches up to
 1,000 tenant databases, and how many tenants a cell holds. The choice of cells and the reasons for
-it are in [D167](../decisions/d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
+it are in [D168](../decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md) and
 [D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
 
 A cell is the same software as a self-hosted installation, and a host runs as a cell when `Cell:Id`

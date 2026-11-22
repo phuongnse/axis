@@ -9,7 +9,7 @@ no licence. Its licence must keep the platform open, also when a changed copy is
 a network. It must also bind nobody who builds on it.
 
 Axis also runs as a SaaS that an operator runs, as
-[D167](d167-an-operator-runs-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) agrees. The licence
+[D168](d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md) agrees. The licence
 keeps such a hosted copy open too, so that another company cannot run a closed copy of it as a
 competing service.
 

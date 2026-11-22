@@ -23,8 +23,8 @@ their own controls where they expect them.
 - **Read-only banner.** While the tenant is [read-only](subscriptions.md#the-read-only-tenant), a
   warning banner with the alert role sits at the top of the content, under the header and beside the
   sidebar, on every page of every site. It says that the workspace is read-only and why. An
-  administrator in a cell also gets a link to the billing portal, the `billingUrl` of
-  `GET /api/me`. The cell console's host has no tenant, so it shows no banner.
+  administrator in a cell also gets a link to the billing page, the `billingUrl` of
+  `GET /api/me`, see [the current user](security.md#roles-and-the-current-user). The cell console's host has no tenant, so it shows no banner.
 - **Mark and title.** The mark is the first letter of the site's title on a `primary` tile with
   `radius-base` corners, and the mark and the title are one link to the site's first navigation page.
   The platform site's title and mark name Axis, because the tenant has no name yet, as the
@@ -104,7 +104,7 @@ their own controls where they expect them.
   where one block ends and the next begins, such as between a run's Output and its Log. Inside a block's content no
   rule is drawn at will: the parts of one task sit together under one title, set apart by spacing. Where a rule is
   needed is judged on the whole page, not by applying a rule everywhere.
-- **A rule runs the whole way** _(planned)_. It runs the length of what it parts, from one rule to the next or to the
+- **A rule runs the whole way**. It runs the length of what it parts, from one rule to the next or to the
   edge, as the rules under the header and beside the sidebar do.
 - **What fills a region fills it to its rules** _(planned)_. A log, a code editor or a table reaches the region's
   rules, with no box of its own.
@@ -115,12 +115,12 @@ their own controls where they expect them.
 - **Fields as wide as each other** _(planned)_. Every field of a region is as wide as the others, and no button stands
   loose beside an input. An action of the whole region, such as Reset or Import, sits in its title row, and an action
   of one control goes with the control.
-- **A title row's actions are light** _(planned)_. They are borderless text buttons or icon buttons with their names as
+- **A title row's actions are light**. They are borderless text buttons or icon buttons with their names as
   tooltips, at the usual button size, such as the explorer's New and Refresh.
 - **A view switch sits above what it switches** _(planned)_. A switch between two views of one content, such as Form
   and JSON, is a row of line tabs right above that content, in the one look every tab row of the workspace has, see
   [tab bars](actions-and-controls.md#tab-bars).
-- **The layout follows the work** _(planned)_. A region puts what to act on first, then the input, the action and the
+- **The layout follows the work**. A region puts what to act on first, then the input, the action and the
   result. An action sits after what it acts on, at the foot of its region when the input can be long, and the result
   comes after it.
 - **A handle on a rule** _(planned)_. Every size handle, the side panel's included, is one handle: a grip of two bars
@@ -212,8 +212,8 @@ theme.
   under the heading "Sites", then the tools of their roles under the heading "Tools": Studio for an
   author, the operator console for an operator and Users for an administrator, which links to the
   users page at `/users`, see [the administrator role](user-administration.md#the-administrator-role).
-  An administrator in a cell also sees Billing after Users, a link to `billingUrl` that opens the
-  [billing portal](billing-portal.md#where) in the same tab. Outside a cell there is no such entry.
+  An administrator in a cell also sees Billing after Users, a link to `billingUrl`, the billing page, that opens in the same tab, see
+  [the current user](security.md#roles-and-the-current-user). Outside a cell there is no such entry.
   The entry of the current page, a site or a tool, is drawn selected, as the language and theme menu
   draws its current choices, and marked `aria-current="page"`. With nobody signed in the app switcher
   is not shown. On a site's own host it lists only that site and no tools.

@@ -30,8 +30,8 @@ internal sealed partial class SubscriptionQuotas(
     public string Kind => JobKind;
 
     /// <summary>
-    /// Queues a <c>writeQuotas</c> job for a subscription and returns its id. The start, a plan change, an add-on change and a payment that makes
-    /// the subscription <c>active</c> queue it in the <paramref name="transaction"/> of their own change, so both commit or neither does.
+    /// Queues a <c>writeQuotas</c> job for a subscription and returns its id. The start, a plan change, an add-on change and a move to
+    /// <c>active</c> queue it in the <paramref name="transaction"/> of their own change, so both commit or neither does.
     /// </summary>
     public static Task<Guid> EnqueueAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, Guid subscriptionId, CancellationToken cancellationToken) =>
         JobQueue.EnqueueAsync(connection, transaction, JobKind, new JsonObject { ["subscriptionId"] = subscriptionId.ToString() }, null, cancellationToken);
