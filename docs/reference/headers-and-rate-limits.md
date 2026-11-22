@@ -113,6 +113,8 @@ cannot use up a replica.
 - **The control plane** _(planned for M33)_. The [control plane](control-plane.md) is another service with limits of
   its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse). It counts its refusals in the same metric, with `sign_up` as
   `axis.partition`, see [the control plane's metrics](control-plane.md).
+- **The billing API** _(planned for M34)_. The control plane's [billing API](billing-api.md#rate-limits) has a `billing`
+  partition, counted by the token's client id.
 - **Live streams.** _(planned for M43)_ Opening a [live stream](frontend.md#live-pages) counts once in Session. The
   `Live:MaxStreamsPerSession` setting closes the oldest stream of a session when one more opens. The `Live:MaxStreams`
   setting caps the streams that one replica holds, and a stream past it answers `503`, see

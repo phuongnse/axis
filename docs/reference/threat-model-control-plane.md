@@ -9,8 +9,8 @@ apart from the cells. How its rows are found, rated and checked is in
 
 ## The control plane
 
-The control plane has four trust boundaries. Each has its own diagram and table below: the sign-up
-page and API, the calls to the cells, the directory's DNS writes, and the billing API.
+The control plane has five trust boundaries. Each has its own diagram and table below: the sign-up
+page and API, the calls to the cells, the directory's DNS writes, the billing API and the billing events.
 
 ```mermaid
 flowchart LR
@@ -21,6 +21,7 @@ flowchart LR
         SignUp[Sign-up page and API]
         Directory[Region directory, DNS jobs and cell client]
         Billing[Billing API]
+        Events[Billing event jobs]
     end
     subgraph dns [DNS provider]
         Records[(Tenant subdomain CNAME records)]
@@ -36,6 +37,7 @@ flowchart LR
     Directory -->|signed DNS updates| Records
     Directory -->|calls over mutual TLS| Internal
     BillingSystem -->|bearer token to| Billing
+    Events -->|signed events over HTTPS| BillingSystem
 ```
 
 ### Sign-up page and API
@@ -185,3 +187,41 @@ flowchart LR
 
 Repudiation does not need a row: each change writes an audit record with the billing client as actor, see
 [audit records](billing-api.md#audit-records).
+
+Open threats, which no issue closes yet, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- C24 (Denial of service, Medium): a billing system in a loop floods the control plane, while no rate limit counts its calls.
+
+### Billing events
+
+_(planned for M34)_
+
+The control plane sends the operator's billing system signed [events](billing-api.md#events) as jobs on its
+queue. They flow outward, the opposite way to the billing API's calls.
+
+```mermaid
+flowchart LR
+    subgraph cp [Regional control plane]
+        Change[Change that queues the event job]
+        Queue[(Job queue)]
+        Job[Event job with the secret file]
+    end
+    subgraph operator [Operator]
+        Receiver[Billing system's receiver]
+    end
+    subgraph attacker [Attacker]
+        Forger[Forger or replayer of an event]
+        Reader[Reader of an event in transit]
+    end
+    Change -->|queues in the same transaction| Queue
+    Queue -->|runs| Job
+    Job -->|signed POST over HTTPS| Receiver
+    Forger -->|sends a forged or replayed event to| Receiver
+    Reader -->|reads the event on| Job
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| C25 | A forged event, or one signed with a leaked secret, tells the billing system something false. | Billing events | Spoofing | High | **Gap** | Closed by [#4977](https://github.com/phuongnse/axis/issues/4977), which signs each event with the secret from its file and the event's timestamp, so a receiver checks the signature. |
+| C26 | An event's personal data is read in transit or sent to the wrong receiver. | Billing events | Information disclosure | Medium | **Gap** | Closed by [#4977](https://github.com/phuongnse/axis/issues/4977), which sends over `https` only, follows no redirect and takes the address from a setting. |
+| C27 | A receiver that is down loses events, and the billing system acts on an old state. | Billing events | Denial of service | Medium | **Gap** | Closed by [#4977](https://github.com/phuongnse/axis/issues/4977), which retries each event with the same id and counts a last failure in the failed job metric. |

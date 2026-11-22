@@ -209,3 +209,134 @@ says. The record is written in the same transaction as the change.
 - **The actions.** Each call names its action in its own section.
 - **No record for a replay, a refusal or a read.** A replay answers the first answer again, a refused call
   changes nothing, and a read writes none.
+
+## Rate limits
+
+_(planned for M34)_
+
+Each billing client has a limit of its own, so a billing system in a loop cannot flood the control plane.
+
+- **The partition.** A `billing` partition counts the calls, by the token's client id. Each replica counts in
+  memory, with the token bucket of [how a limit counts](headers-and-rate-limits.md#how-a-limit-counts).
+- **The limit.** 600 requests a minute for one replica. It is a code default and not a `ControlPlane:` setting,
+  as the control plane's sign-up limits are.
+- **Where it runs.** After the token check. A call with a bad token, or without the scope, still gets its `401`
+  or `403`, never `429`, as [which partition counts a request](headers-and-rate-limits.md#which-partition-counts-a-request)
+  says.
+- **Over the limit.** The call answers `429` problem details titled "Too many requests.", with `Retry-After`, as
+  [a refused request](headers-and-rate-limits.md#a-refused-request) says. It changes nothing, keeps nothing under
+  its `Idempotency-Key` and writes no audit record. A retry after the wait is checked as a new call.
+- **The metric.** `axis.rate_limits.refused` counts the refused calls, with `axis.partition` set to `billing`.
+
+## Events
+
+_(planned for M34)_
+
+The control plane tells the operator's billing system what happens to each tenant, so the billing system can
+start a customer, ask for a payment or charge for usage without polling, as
+[D168](../decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md)
+agrees. There are three events: a tenant is created, a subscription changes state, and a tenant's usage of a day
+is final.
+
+- **The address.** The setting `ControlPlane:BillingEvents:Url` is an absolute `https` URL. Without it, no event
+  is written and the control plane starts normally.
+- **The secret.** The setting `ControlPlane:BillingEvents:Secret` comes only from the file
+  `/run/secrets/ControlPlane__BillingEvents__Secret`. It may hold two secrets, separated by a space, so the
+  operator can rotate it.
+- **The body.** A `POST` with a JSON body `{ type, id, timestamp, apiVersion, data }`, shaped as in
+  [webhook delivery](outbound-webhooks.md#webhook-delivery). `id` is a UUID made when the event is written.
+  `timestamp` is the time of the change, in UTC, and is the same on every attempt. `apiVersion` is `"v1"`.
+- **The signature.** The Standard Webhooks headers `webhook-id`, `webhook-timestamp` and `webhook-signature`,
+  made as [webhook delivery](outbound-webhooks.md#webhook-delivery) says. Here `webhook-id` is the event's `id`
+  alone.
+- **Written with the change.** Each event is a job on the control plane's queue. It is queued in the
+  transaction of the change that causes it, so no change is left without its event and no event without its
+  change.
+- **Delivery.** `https` only, no redirect is followed, and an attempt times out after 10 seconds. A `2xx`
+  delivers. Anything else is retried with the queue's backoff and attempt limit, see
+  [its own work](control-plane.md#its-own-work). The last failure ends the job `failed`, and
+  `axis.controlplane.jobs.failed` counts it. The billing system then catches up by
+  [reading a tenant](#reading-a-tenant).
+- **The same id on every attempt.** Every attempt sends the same `id` and body, so a receiver drops a copy by
+  `webhook-id`. Events arrive in no fixed order, and `timestamp` lets a receiver keep the newest.
+- **Within `v1`.** A new event type or a new field is not breaking, and a receiver ignores what it does not
+  know, as [the version](#the-version) says.
+- **Nothing secret.** An event holds no password, token or secret, and no body is logged.
+
+### Tenant created
+
+`tenant.created` is written when a sign-up is confirmed and its trialing subscription is made.
+
+```json
+{
+  "type": "tenant.created",
+  "id": "5b0e8d52-1c7a-4f3e-9a64-2d8f7e61b0c3",
+  "timestamp": "2026-12-01T09:15:00Z",
+  "apiVersion": "v1",
+  "data": {
+    "tenantId": "3f2a6c1e-7b4d-4e0a-9d2f-5a1b8c9e0f12",
+    "region": "vn",
+    "host": "acme.vn.example.com",
+    "businessName": "Acme Trading",
+    "administrator": { "name": "An Nguyen", "email": "an@acme.example", "language": "vi" },
+    "trialEndsAt": "2026-12-31T09:15:00Z"
+  }
+}
+```
+
+### Subscription state changed
+
+`subscription.stateChanged` is written with every move that writes a `subscription.<state>` audit record,
+see [audit records](#audit-records). A plan call, or a paid-through call that leaves the state as it was,
+writes none.
+
+```json
+{
+  "type": "subscription.stateChanged",
+  "id": "c47a19e0-83d2-4b6f-8e15-0a9d3f2b7c64",
+  "timestamp": "2027-02-01T00:00:00Z",
+  "apiVersion": "v1",
+  "data": {
+    "tenantId": "3f2a6c1e-7b4d-4e0a-9d2f-5a1b8c9e0f12",
+    "state": "pastDue",
+    "previousState": "active",
+    "paidThrough": "2027-01-31",
+    "nextAt": "2027-02-15T00:00:00Z"
+  }
+}
+```
+
+### Daily usage
+
+`usage.daily` is written once for each tenant that is not `deleted` and each finished UTC day, once the day's
+row is final. It reads the row from the cell's [usage days](tenant-lifecycle.md#routes) route, and
+[usage](tenant-quotas.md#usage) explains its columns. A second run for the same tenant and day writes none.
+
+```json
+{
+  "type": "usage.daily",
+  "id": "e91c04b7-5a3d-4d28-b6f0-7c2a8d19e345",
+  "timestamp": "2027-01-16T00:00:00Z",
+  "apiVersion": "v1",
+  "data": {
+    "tenantId": "3f2a6c1e-7b4d-4e0a-9d2f-5a1b8c9e0f12",
+    "day": "2027-01-15",
+    "databaseBytes": 52428800,
+    "fileBytes": 1048576,
+    "users": 12,
+    "applications": 3,
+    "emailsSent": 40,
+    "connectorCalls": 120,
+    "workItemsRun": 310
+  }
+}
+```
+
+## Connectors
+
+_(planned for M34)_
+
+Anyone may write a connector between the billing API and a billing system, as a service of its own and under
+any licence, as
+[D168](../decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md)
+agrees. A connector uses only the calls and events on this page.
