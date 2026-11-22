@@ -36,6 +36,10 @@ opens the same view.
   the rules of `&field`.
 - **An index** _(planned)_. `&index=<name>` opens an index's side panel on an entity's page, and follows the rules of
   `&field`.
+- **A list's item** _(planned)_. `&item=<pointer>`, such as `&item=/modules/0`, opens that item of a
+  [list of objects](studio-resource-form.md#lists-of-objects) in the side panel, and follows the rules of `&field`.
+- **A package file at its line** _(planned)_. `&view=packages&package=<id>&file=<path>&line=<n>` opens the file at that
+  line in the [Packages entry](studio-packages.md#the-packages-entry).
 - **Back is the browser's.** Studio has no Back or Next of its own and no breadcrumb.
   Every view has its own address and each move is a history entry, except that a search replaces its
   entry, so the browser's Back and Forward step through it. A second Back would be one concern with two
@@ -191,7 +195,7 @@ so an author sees what a change or a delete touches. How it shows is in [Used by
 
 Delete removes a resource's file, and asks first, because other resources may use it.
 
-- **In a "…" menu.** Delete… is in a "…" menu at the right of the resource's
+- **On the heading** _(planned)_. Delete… is a secondary button in the destructive tone at the right of the resource's
   [heading](studio-workspace.md#page-heading), so no tab shows it apart from the others.
 - **It asks.** Delete always opens a confirm dialog, which warns and names the count when the
   resource's `usedBy` count is above 0. The author can still confirm. The application manifest has no Delete.

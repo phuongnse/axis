@@ -10,9 +10,9 @@ and the rest of Studio is in [Studio](studio.md).
 ## Canvas
 
 The canvas draws the unsaved draft with the site's form widget, in its sections and steps, so an author
-sees the form as a user will. Above it sit the [Used on](#used-on) list and the [step switch](#step-switch),
-and beside it the field palette, the layout outline and the [property panel](#property-panel). It has no
-width switch.
+sees the form as a user will. Above it sits the [Used on](#used-on) list, and beside it the field palette,
+the layout outline and the [property panel](#property-panel). The form's steps show on the canvas's own
+[steps bar](#step-switch). It has no width switch.
 
 - **Placeholder data.** The canvas opens a placeholder record, so each field shows a placeholder value
   made from its type and a child collection shows placeholder rows, and no request goes to `/api/apps/`.
@@ -28,10 +28,14 @@ width switch.
 
 ## Step switch
 
-The step switch shows one step of a form with `steps` at a time. It is a segmented control above the
-canvas, with the step titles in order, and the canvas shows the sections of the chosen step. A step
-that a diagnostic names is marked on its entry. The form widget's wizard bar and its Next and Back
-buttons still draw, but do nothing. A form without `steps` has no switch.
+_(planned)_
+
+The steps show once, on the form widget's own steps bar on the canvas. Each step is a button that shows its sections
+and selects it. A section dropped on a step moves to that step, as [moves](#moves) says. There is no switch above the
+canvas, and a form without `steps` has no steps bar. A step draws no fill on hover or when selected, and the focus ring
+shows for the keyboard. Next and Back still do nothing. A step that a diagnostic names takes the mark of a section or
+field, as [conditions and marks](#conditions-and-marks) says: the error-coloured border, its text label and
+`data-marked`, with no icon of its own.
 
 ## Conditions and marks
 
@@ -73,7 +77,7 @@ section is named by its `name`, or `Section {number}`, because its title loads o
 
 ## Moves
 
-Every move goes through the layout outline or the step switch, by a pointer drag or by the keyboard, and
+Every move goes through the layout outline or the canvas's [steps bar](#step-switch), by a pointer drag or by the keyboard, and
 a live region says where the element lands. A move is one change of the draft, so one Undo reverses it,
 and the moved element keeps all its keys and stays selected.
 
@@ -84,11 +88,11 @@ and the moved element keeps all its keys and stays selected.
   its section and its position.
 - **Sections.** A section row moves the same way, by a pointer drag from its title line or by the
   keyboard. It takes the place of the section row it is dropped on, and a drop on another step's heading
-  in the outline, or on a step in the step switch, appends it to that step. On a form with steps, the
+  in the outline, or on a step of the steps bar, appends it to that step. On a form with steps, the
   section's property panel also has a Step picker, which appends the section to the chosen step.
   The live region names the section, its step and its position.
 - **Targets.** While a section moves, field rows are not targets, and while a field moves, step headings
-  and the switch's entries are not. While a section moves, the switch's entries show an outline under
+  and the steps bar's steps are not. While a section moves, the steps on the bar show an outline under
   the pointer. A section that no step lists is not a target, and a section without a `name` cannot move
   between steps.
 - **Order.** On a form with steps, `sections` follows the step order after a move: the first step's

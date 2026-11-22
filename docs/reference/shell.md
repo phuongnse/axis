@@ -60,9 +60,9 @@ their own controls where they expect them.
   one-page site.
 - **One side panel frame.** Every page draws its side panel in `SidePanel`, in a column on the right
   from under the header to the footer. One shows at a time, so opening one, such as the problems panel or the Ask AI
-  request panel, closes the other. It holds details or tools for what is chosen, while the page stays in use. A task
-  to finish or cancel is a dialog, unless it is short and its page must stay in sight, as the task rule below says,
-  and what stands alone is a page. A handle on its edge, a `separator` that takes the
+  request panel, closes the other. It holds details or tools for what is chosen, while the page stays in use. A part of
+  what the page edits opens in the panel, and a short task that stands alone is a dialog, as
+  [opening things](actions-and-controls.md#opening-things) says. A handle on its edge, a `separator` that takes the
   arrow keys, Home and End, sets its width from `sidePanel` to half the shell, and the browser keeps that width, so
   every side panel opens at the width last chosen. Its title can carry a `status`, such as a `StatusTag`, and a line under it. Its head
   stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
@@ -71,9 +71,9 @@ their own controls where they expect them.
 - **A side panel's actions** _(planned)_. `SidePanel` takes `actions`, drawn in an `ActionBar` at the panel's foot that
   stays in place under the body. The actions are outlined, with the main action last on the right, so Cancel stands
   before the main action.
-- **A task in a side panel** _(planned)_. A short task whose page must stay in sight, such as adding a field while the
-  other fields show, is done in the side panel rather than a dialog. The panel keeps what is typed until its main action,
-  and Cancel stands beside that action in its bar. Cancel and Close drop what is typed, and the panel asks first when
+- **A part of the page in the side panel** _(planned)_. A part of what the page edits, such as an entity's field while
+  the other fields show, is edited in the side panel rather than a dialog. The panel keeps what is typed until Done, or
+  the main action of a new part, and Cancel stands beside that action in its bar. Cancel and Close drop what is typed, and the panel asks first when
   that would drop text.
 - **A side panel's parts** _(planned)_. A side panel's parts are sections, each with its heading and a line under it. A
   `borderSubtle` rule runs between them from the panel's edge to its scrollbar.
@@ -125,8 +125,9 @@ their own controls where they expect them.
 - **Fields as wide as each other** _(planned)_. Every field of a region is as wide as the others, and no button stands
   loose beside an input. An action of the whole region, such as Reset or Import, sits in its title row, and an action
   of one control goes with the control.
-- **A title row's actions are light**. They are borderless text buttons or icon buttons with their names as
-  tooltips, at the usual button size, such as the explorer's New and Refresh.
+- **A title row's tools are light** _(planned)_. Tools such as the explorer's New and Refresh are subtle buttons, or
+  icon-only ones with their names as tooltips, at the usual button size. A region's main action there keeps its border,
+  as [buttons](actions-and-controls.md#buttons) says.
 - **A view switch sits above what it switches** _(planned)_. A switch between two views of one content, such as Form
   and JSON, is a row of line tabs right above that content, in the one look every tab row of the workspace has, see
   [tab bars](actions-and-controls.md#tab-bars).
