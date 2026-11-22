@@ -1,4 +1,5 @@
 import { Modal } from 'antd'
+import { DialogFooter } from './DialogFooter'
 import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useBlocker } from 'react-router'
 import { useText } from './texts'
@@ -57,16 +58,22 @@ export function LeaveWithoutSaving(): ReactNode {
   const t = useText()
   const { size } = useDesignTokens()
   const blocker = useContext(BlockerContext)
+  const cancel = () => blocker?.state === 'blocked' && blocker.reset()
   return (
     <Modal
       open={blocker?.state === 'blocked'}
       width={size.dialog.small}
       title={t('shell.studio.leave.title')}
-      okText={t('shell.studio.leave.leave')}
-      okButtonProps={{ danger: true }}
-      cancelText={t('shell.studio.leave.stay')}
-      onOk={() => blocker?.state === 'blocked' && blocker.proceed()}
-      onCancel={() => blocker?.state === 'blocked' && blocker.reset()}
+      footer={
+        <DialogFooter
+          destructive
+          finishText={t('shell.studio.leave.leave')}
+          cancelText={t('shell.studio.leave.stay')}
+          onFinish={() => blocker?.state === 'blocked' && blocker.proceed()}
+          onCancel={cancel}
+        />
+      }
+      onCancel={cancel}
     />
   )
 }

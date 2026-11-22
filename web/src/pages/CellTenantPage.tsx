@@ -1,6 +1,7 @@
 import { Flex, Input, Modal, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { AxisField } from '../platform/AxisField'
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router'
@@ -517,16 +518,19 @@ export function CellTenantPage() {
           width={size.dialog.small}
           data-testid="cell-tenant-confirm"
           title={t(actionTexts[confirming].confirm).replace('{tenant}', id)}
-          okText={t(actionTexts[confirming].ok)}
-          okButtonProps={{
-            danger: confirming === 'suspend' || confirming === 'delete',
-            disabled: confirming === 'delete' && typed !== id,
-          }}
-          cancelText={t(
-            confirming === 'cancel-deletion' ? 'shell.cell.tenant.cancelDeletionClose' : 'shell.users.roles.cancel',
-          )}
-          confirmLoading={busy}
-          onOk={() => void runAction(confirming)}
+          footer={
+            <DialogFooter
+              destructive={confirming === 'suspend' || confirming === 'delete'}
+              finishText={t(actionTexts[confirming].ok)}
+              cancelText={t(
+                confirming === 'cancel-deletion' ? 'shell.cell.tenant.cancelDeletionClose' : 'shell.users.roles.cancel',
+              )}
+              finishing={busy}
+              finishDisabled={confirming === 'delete' && typed !== id}
+              onFinish={() => void runAction(confirming)}
+              onCancel={() => setConfirming(null)}
+            />
+          }
           onCancel={() => setConfirming(null)}
         >
           <Flex vertical gap="small">

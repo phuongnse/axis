@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useLocation, useNavigate } from 'react-router'
 import { AxisButton } from './AxisButton'
 import { AxisTable, type AxisColumn, type AxisRowAction } from './AxisTable'
+import { DialogFooter } from './DialogFooter'
 import { useCanvasActions } from './canvasActions'
 import { EmptyDash } from './EmptyValue'
 import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
@@ -674,11 +675,16 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
               open
               width={size.dialog.small}
               title={t('shell.table.deleteConfirm')}
-              okText={t('shell.table.delete')}
-              okButtonProps={{ danger: true }}
-              cancelText={t('shell.form.cancel')}
-              confirmLoading={deleting}
-              onOk={() => void runDelete()}
+              footer={
+                <DialogFooter
+                  destructive
+                  finishText={t('shell.table.delete')}
+                  cancelText={t('shell.form.cancel')}
+                  finishing={deleting}
+                  onFinish={() => void runDelete()}
+                  onCancel={() => setConfirming(null)}
+                />
+              }
               onCancel={() => setConfirming(null)}
             />
           )}

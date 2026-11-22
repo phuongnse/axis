@@ -3,6 +3,7 @@ import { useContext, useState } from 'react'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, type AxisFoldAction } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { FilledText } from '../platform/FilledText'
 import { PersonName } from '../platform/PersonName'
 import { formatValue } from '../platform/formatValue'
@@ -343,13 +344,18 @@ export function StudioAuthoringRequestPage({
           open={dropOpen}
           width={size.dialog.small}
           title={t('shell.studio.aiRequest.drop.title')}
-          okText={t('shell.studio.aiRequest.drop.confirm')}
-          okButtonProps={{ danger: true }}
-          cancelText={t('shell.studio.cancel')}
-          onOk={() => {
-            setDropOpen(false)
-            void act(() => dropAuthoringRequest(application, requestId), adopt)
-          }}
+          footer={
+            <DialogFooter
+              destructive
+              finishText={t('shell.studio.aiRequest.drop.confirm')}
+              cancelText={t('shell.studio.cancel')}
+              onFinish={() => {
+                setDropOpen(false)
+                void act(() => dropAuthoringRequest(application, requestId), adopt)
+              }}
+              onCancel={() => setDropOpen(false)}
+            />
+          }
           onCancel={() => setDropOpen(false)}
         >
           {t('shell.studio.aiRequest.drop.body')}

@@ -2,6 +2,7 @@ import { Flex, Form, Input, Modal, Typography } from 'antd'
 import { useEffect, useState, type ReactNode } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { AxisField } from '../platform/AxisField'
 import { requiredMark } from '../platform/requiredMark'
 import { SectionPart } from '../platform/SectionParts'
@@ -114,10 +115,16 @@ export function TenantModelKeySection() {
             open={dialog === 'remove'}
             width={size.dialog.small}
             title={t('shell.users.modelKey.removeConfirm')}
-            okText={t('shell.users.modelKey.remove.ok')}
-            cancelText={t('shell.users.roles.cancel')}
-            confirmLoading={busy}
-            onOk={() => void change(removeTenantModelKey, 'removeFailed')}
+            footer={
+              <DialogFooter
+                destructive
+                finishText={t('shell.users.modelKey.remove.ok')}
+                cancelText={t('shell.users.roles.cancel')}
+                finishing={busy}
+                onFinish={() => void change(removeTenantModelKey, 'removeFailed')}
+                onCancel={close}
+              />
+            }
             onCancel={close}
           >
             <Typography.Text>{t('shell.users.modelKey.removeEffect')}</Typography.Text>

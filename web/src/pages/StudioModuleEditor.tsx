@@ -3,6 +3,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { StatusTag } from '../platform/StatusTag'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import { dataSourceKeyedLists, keyedListsOf, layerMarks } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
@@ -539,11 +540,16 @@ export function StudioModuleEditor({
         open={resetOpen}
         width={size.dialog.small}
         title={t('shell.studio.module.resetAllConfirm')}
-        okText={t('shell.studio.module.resetAll')}
-        okButtonProps={{ danger: true }}
-        cancelText={t('shell.studio.cancel')}
-        confirmLoading={resetting}
-        onOk={() => void resetAll()}
+        footer={
+          <DialogFooter
+            destructive
+            finishText={t('shell.studio.module.resetAll')}
+            cancelText={t('shell.studio.cancel')}
+            finishing={resetting}
+            onFinish={() => void resetAll()}
+            onCancel={() => setResetOpen(false)}
+          />
+        }
         onCancel={() => setResetOpen(false)}
       />
     </Flex>
