@@ -10,9 +10,9 @@ and the rest of Studio is in [Studio](studio.md).
 ## Canvas
 
 The canvas draws the unsaved draft with the site's form widget, in its sections and steps, so an author
-sees the form as a user will. Above it sit the [Used on](#used-on) list and the canvas's [steps bar](#step-switch),
-and beside it the field palette, the layout outline and the [property panel](#property-panel). It has no
-width switch.
+sees the form as a user will. Above it sits the [Used on](#used-on) list, and beside it the field palette,
+the layout outline and the [property panel](#property-panel). The form's steps show on the canvas's own
+[steps bar](#step-switch). It has no width switch.
 
 - **Placeholder data.** The canvas opens a placeholder record, so each field shows a placeholder value
   made from its type and a child collection shows placeholder rows, and no request goes to `/api/apps/`.
