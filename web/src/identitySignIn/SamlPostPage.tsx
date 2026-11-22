@@ -1,5 +1,6 @@
-import { Button, Typography } from 'antd'
+import { Typography } from 'antd'
 import { useEffect, useRef } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { IdentityFrame } from './IdentityFrame'
 import type { SamlPostContext } from './signInContext'
 
@@ -25,10 +26,9 @@ export function SamlPostPage({ context }: { context: SamlPostContext }) {
         {samlRequest !== undefined && <input type="hidden" name="SAMLRequest" value={samlRequest} />}
         {samlResponse !== undefined && <input type="hidden" name="SAMLResponse" value={samlResponse} />}
         {relayState !== undefined && <input type="hidden" name="RelayState" value={relayState} />}
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" htmlType="submit" block>
+        <AxisButton role="finish" htmlType="submit" block>
           {texts.continue}
-        </Button>
+        </AxisButton>
       </form>
     </IdentityFrame>
   )

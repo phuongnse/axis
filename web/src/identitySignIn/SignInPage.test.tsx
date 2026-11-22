@@ -123,6 +123,15 @@ describe('SignInPage', () => {
     expect(screen.getByRole('button', { name: 'Continue with Contoso ID' })).toHaveClass('ant-btn-default')
   })
 
+  it('draws the Sign in button as the finish button, a solid primary fill', () => {
+    render(<SignInPage context={context} />, { wrapper: ThemeModeProvider })
+
+    expect(screen.getByRole('button', { name: 'Sign in' })).toHaveClass(
+      'ant-btn-color-primary',
+      'ant-btn-variant-solid',
+    )
+  })
+
   it('lists the provider, then "or" and a form that posts to the login address', () => {
     const { container } = render(<SignInPage context={context} />, { wrapper: ThemeModeProvider })
 
