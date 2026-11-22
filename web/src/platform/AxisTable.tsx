@@ -299,7 +299,9 @@ export function AxisTable<T extends object>({
   // Each free-text column takes an equal share of the width. Without one, the last column takes what is left.
   const share = freeTexts > 0 ? `${100 / freeTexts}%` : undefined
   const lastKey = shown.at(-1)?.key
-  const fold = narrow || (rowActions?.configured ?? 0) >= foldFrom
+  // Proposed, #4902: a menu never holds one entry, so a single action stays a button even at narrow width.
+  const configured = rowActions?.configured ?? 0
+  const fold = (narrow && configured >= 2) || configured >= foldFrom
 
   // The table measures its own width after every draw and when it resizes, then moves columns under their row.
   useLayoutEffect(() => {

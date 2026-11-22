@@ -1,5 +1,5 @@
 import { useDndContext, useDroppable } from '@dnd-kit/core'
-import { Flex, Segmented } from 'antd'
+import { Flex, Tabs } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
 import { fillText } from '../platform/fillText'
@@ -268,23 +268,17 @@ function StepSwitch({
   steps: { titleKey: string; path: string | undefined; marked: boolean }[]
 }) {
   const t = useText()
+  // Proposed, #4902: a form's steps are areas of one form, so they are tabs, as a resource's Form, JSON and Used by are;
+  // a segmented control holds two to five options of one choice. A click on the step already shown selects it again.
   return (
-    <Segmented
+    <Tabs
       data-testid="studio-form-steps"
       aria-label={t('shell.studio.design.step')}
-      value={value}
-      onChange={onChange}
-      options={steps.map((step, index) => ({
-        value: index,
-        label: (
-          <StepSwitchEntry
-            index={index}
-            step={step}
-            selected={selected}
-            // The switch fires onChange only when the value changes, so a click on the step already shown needs this.
-            onClick={() => onChange(index)}
-          />
-        ),
+      activeKey={String(value)}
+      onTabClick={(key) => onChange(Number(key))}
+      items={steps.map((step, index) => ({
+        key: String(index),
+        label: <StepSwitchEntry index={index} step={step} selected={selected} />,
       }))}
     />
   )
@@ -295,12 +289,10 @@ function StepSwitchEntry({
   index,
   step,
   selected,
-  onClick,
 }: {
   index: number
   step: { titleKey: string; path: string | undefined; marked: boolean }
   selected: string | null
-  onClick: () => void
 }) {
   const t = useText()
   const { colour, radius } = useDesignTokens()
@@ -319,7 +311,6 @@ function StepSwitchEntry({
       data-path={step.path}
       data-marked={step.marked ? 'true' : undefined}
       aria-current={step.path !== undefined && step.path === selected ? 'true' : undefined}
-      onClick={onClick}
       style={{ outline: isOver ? `2px solid ${colour.primary}` : undefined, borderRadius: radius.base }}
     >
       {step.marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name: t(step.titleKey) }) : t(step.titleKey)}

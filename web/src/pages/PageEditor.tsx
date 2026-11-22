@@ -451,8 +451,11 @@ function WidgetRow({
     <div role="listitem">
       <Flex vertical gap="small">
         <Flex gap="small" wrap align="center" data-testid={`studio-widget-row-${pointer}`}>
+          {/* Proposed, #4902: a widget of the tree is a choice of a list, so the chosen one is marked on the selected
+              tint, as a menu marks its choice, never by a heavier button role. */}
           <AxisButton
-            role={pointer === tree.selected ? 'main' : 'secondary'}
+            role="subtle"
+            selected={pointer === tree.selected}
             aria-current={pointer === tree.selected}
             data-testid={`studio-widget-${pointer}`}
             style={{ textAlign: 'left' }}

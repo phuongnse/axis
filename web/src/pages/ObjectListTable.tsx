@@ -1,4 +1,3 @@
-import { DeleteOutlined } from '@ant-design/icons'
 import { Flex, Modal } from 'antd'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -238,7 +237,6 @@ export function ObjectListTable({
             {
               key: 'remove',
               labelKey: 'shell.studio.list.remove',
-              icon: <DeleteOutlined />,
               destructive: true,
               nameSuffix: String(row.index + 1),
               onClick: () => onChange(`${pointer}/${row.index}`, undefined),

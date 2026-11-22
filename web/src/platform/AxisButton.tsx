@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
+import { useSelectedItemTint } from './antTheme'
 import { Chevron } from './Chevron'
 import type { ButtonRole } from './buttonRoles'
 import { fillText } from './fillText'
@@ -34,6 +35,12 @@ export type AxisButtonProps =
       icon?: never
       /** A text trigger that opens a menu ends in a caret, see docs/reference/actions-and-controls.md#menus. */
       caret?: boolean
+      /**
+       * Proposed, #4902: the chosen item of a list of choices drawn as subtle buttons, such as a page's widget tree or a
+       * policy matrix's cell. It is marked as a menu marks its choice, on the selected tint in `primaryText`, never by a
+       * heavier role, as a group of buttons never shows a selection. See docs/reference/actions-and-controls.md#menus.
+       */
+      selected?: boolean
       /**
        * Proposed, #4902: the destructive tone, for an action that removes or throws away. A role is a weight and a tone
        * an effect, so every role takes it: main, secondary and subtle in `dangerText`, finish as a fill in `danger`, as
@@ -144,6 +151,8 @@ function IconButton(props: IconButtonProps) {
 export interface AxisFoldAction {
   key: string
   labelKey: string
+  /** Proposed, #4902: the destructive tone, so the action is a destructive button, or the last menu entry. */
+  destructive?: boolean
   disabled?: boolean
   onClick: () => void
   attributes?: object
@@ -210,7 +219,8 @@ export function AxisActionRow({
           return
         }
       }
-      if (!folded && row.scrollWidth > row.clientWidth) {
+      // Proposed, #4902: a menu never holds one entry, so a single action stays a button and the row wraps instead.
+      if (!folded && fold.length >= 2 && row.scrollWidth > row.clientWidth) {
         needed.current = row.scrollWidth
         setFolded(true)
       } else if (folded && row.clientWidth >= needed.current) {
@@ -259,6 +269,7 @@ export function AxisActionRow({
               <AxisButton
                 key={action.key}
                 role="secondary"
+                destructive={action.destructive}
                 disabled={action.disabled}
                 onClick={action.onClick}
                 {...action.attributes}
@@ -288,11 +299,12 @@ export function AxisActionRow({
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
+  const selectedTint = useSelectedItemTint()
   const inRow = useContext(ActionRowContext)
 
   if (props.role === 'icon') return <IconButton {...props} />
 
-  const { role, style, disabled, caret, destructive, children, ...rest } = props
+  const { role, style, disabled, caret, destructive, selected, children, ...rest } = props
   const body = {
     ...rest,
     children: caret ? [children, <Chevron key="caret" />] : children,
@@ -301,7 +313,16 @@ export function AxisButton(props: AxisButtonProps) {
   const danger = destructive === true
   // Borderless beside a finish button, and always for a tool: the text colour, or `dangerText` for the destructive tone.
   const borderless = (
-    <Button {...body} type="text" disabled={disabled} style={{ ...dangerTint(colour, danger, disabled), ...style }} />
+    <Button
+      {...body}
+      type="text"
+      disabled={disabled}
+      style={{
+        ...dangerTint(colour, danger, disabled),
+        ...(selected ? { background: selectedTint, color: colour.primaryText } : {}),
+        ...style,
+      }}
+    />
   )
   switch (role) {
     case 'finish':

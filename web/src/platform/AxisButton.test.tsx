@@ -243,6 +243,24 @@ describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', 
     expect(secondary).toHaveStyle({ color: colour.dangerText, borderColor: colour.dangerText })
   })
 
+  it('marks a selected subtle button on the selected tint in primaryText, and leaves another one plain', () => {
+    renderIn(
+      mode,
+      <>
+        <AxisButton role="subtle" selected>
+          Chosen
+        </AxisButton>
+        <AxisButton role="subtle">Other</AxisButton>
+      </>,
+    )
+
+    const chosen = screen.getByRole('button', { name: 'Chosen' })
+    expect(chosen).toHaveClass('ant-btn-variant-text')
+    expect(chosen).toHaveStyle({ color: colour.primaryText })
+    expect(chosen.style.background).not.toBe('')
+    expect(screen.getByRole('button', { name: 'Other' }).style.background).toBe('')
+  })
+
   it('does not set the role on the DOM', () => {
     renderRoles()
 

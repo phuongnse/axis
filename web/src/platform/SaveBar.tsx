@@ -87,6 +87,7 @@ export function SaveBar({
                   {
                     key: 'discard',
                     labelKey: 'shell.studio.discard',
+                    destructive: true,
                     disabled: busy,
                     onClick: () => setDiscardOpen(true),
                   },
