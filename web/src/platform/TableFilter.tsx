@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { useState } from 'react'
 import { datePickerChevrons } from './datePickerChevrons'
 import { AxisButton } from './AxisButton'
+import { DialogFooter } from './DialogFooter'
 import {
   countConditions,
   filterOps,
@@ -79,12 +80,17 @@ export function TableFilterButton({
         open={open}
         width={size.dialog.medium}
         title={t('shell.table.filter')}
-        okText={t('shell.table.filterApply')}
-        cancelText={t('shell.form.cancel')}
-        onOk={() => {
-          onApply(pruneFilter(draft))
-          setOpen(false)
-        }}
+        footer={
+          <DialogFooter
+            finishText={t('shell.table.filterApply')}
+            cancelText={t('shell.form.cancel')}
+            onFinish={() => {
+              onApply(pruneFilter(draft))
+              setOpen(false)
+            }}
+            onCancel={() => setOpen(false)}
+          />
+        }
         onCancel={() => setOpen(false)}
         destroyOnHidden
       >

@@ -16,6 +16,7 @@ import { isApplicationName } from '../platform/studioStarters'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { DialogFooter } from '../platform/DialogFooter'
 
 /** What the server refused, as the text key to show under the name. */
 type Problem = 'exists' | 'invalid' | 'failed'
@@ -120,10 +121,15 @@ export function StudioNewApplication({
         open={open}
         width={size.dialog.medium}
         title={t('shell.studio.newApplication.title')}
-        okText={t('shell.studio.newApplication.create')}
-        cancelText={t('shell.studio.cancel')}
-        confirmLoading={creating}
-        onOk={() => form.submit()}
+        footer={
+          <DialogFooter
+            finishText={t('shell.studio.newApplication.create')}
+            cancelText={t('shell.studio.cancel')}
+            finishing={creating}
+            onFinish={() => form.submit()}
+            onCancel={() => setOpen(false)}
+          />
+        }
         onCancel={() => setOpen(false)}
         // Each opening starts with empty fields and loads the templates again.
         afterClose={() => {

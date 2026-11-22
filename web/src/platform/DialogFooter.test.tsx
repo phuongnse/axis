@@ -2,6 +2,7 @@ import { ConfigProvider } from 'antd'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { AxisButton } from './AxisButton'
 import { DialogFooter } from './DialogFooter'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
@@ -47,6 +48,12 @@ describe('DialogFooter', () => {
     expect(onFinish).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
     expect(onFinish).toHaveBeenCalledOnce()
+  })
+
+  it('draws the other actions before Cancel in the same row', () => {
+    renderFooter({ actions: <AxisButton role="secondary">Reset</AxisButton> })
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Reset', 'Cancel', 'Delete'])
   })
 
   it('disables the finish button with finishDisabled', async () => {

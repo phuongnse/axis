@@ -12,6 +12,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import type { ChangeHandler } from './SchemaForm'
 import { LabelTextsContext } from './labelTextsContext'
+import { DialogFooter } from '../platform/DialogFooter'
 
 type Resource = NonNullable<React.ContextType<typeof LabelTextsContext>>
 
@@ -168,14 +169,19 @@ function LabelEditor({
         open={open}
         width={size.dialog.medium}
         title={t('shell.studio.label.translationsTitle')}
-        okText={t('shell.studio.label.done')}
-        cancelText={t('shell.studio.cancel')}
-        onOk={() => {
-          if (copy !== null) {
-            changeTexts(copy)
-          }
-          setOpen(false)
-        }}
+        footer={
+          <DialogFooter
+            finishText={t('shell.studio.label.done')}
+            cancelText={t('shell.studio.cancel')}
+            onFinish={() => {
+              if (copy !== null) {
+                changeTexts(copy)
+              }
+              setOpen(false)
+            }}
+            onCancel={() => setOpen(false)}
+          />
+        }
         onCancel={() => setOpen(false)}
         destroyOnHidden
       >

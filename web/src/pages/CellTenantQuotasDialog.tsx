@@ -8,6 +8,7 @@ import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { currentChoice, quotaChanges, type QuotaChoice } from './cellQuotaChoices'
+import { DialogFooter } from '../platform/DialogFooter'
 
 interface CellTenantQuotasDialogProps {
   tenant: string
@@ -65,11 +66,16 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
       width={size.dialog.medium}
       data-testid="cell-tenant-quotas-dialog"
       title={t('shell.cell.tenant.setQuotasTitle').replace('{tenant}', tenant)}
-      okText={t('shell.cell.tenant.setQuotasOk')}
-      okButtonProps={{ disabled: !changed }}
-      cancelText={t('shell.users.roles.cancel')}
-      confirmLoading={saving}
-      onOk={() => form.submit()}
+      footer={
+        <DialogFooter
+          finishText={t('shell.cell.tenant.setQuotasOk')}
+          cancelText={t('shell.users.roles.cancel')}
+          finishing={saving}
+          finishDisabled={!changed}
+          onFinish={() => form.submit()}
+          onCancel={onClose}
+        />
+      }
       onCancel={onClose}
     >
       <Form

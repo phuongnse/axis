@@ -1,7 +1,8 @@
 import { ArrowDownOutlined, ArrowUpOutlined, TableOutlined } from '@ant-design/icons'
 import { Checkbox, Flex, Modal } from 'antd'
 import { useState } from 'react'
-import { AxisActionRow, AxisButton } from './AxisButton'
+import { AxisButton } from './AxisButton'
+import { DialogFooter } from './DialogFooter'
 import { columnsChoice } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -61,27 +62,28 @@ export function TableColumnsButton({
         open={open}
         width={size.dialog.medium}
         title={t('shell.table.columns')}
-        okText={t('shell.table.columnsApply')}
-        cancelText={t('shell.form.cancel')}
-        onOk={() => {
-          onApply(
-            columnsChoice(
-              keys,
-              draft.filter((line) => line.shown).map((line) => line.key),
-            ),
-          )
-          setOpen(false)
-        }}
+        footer={
+          <DialogFooter
+            actions={
+              <AxisButton role="secondary" onClick={() => setDraft(keys.map((key) => ({ key, shown: true })))}>
+                {t('shell.table.columnsReset')}
+              </AxisButton>
+            }
+            finishText={t('shell.table.columnsApply')}
+            cancelText={t('shell.form.cancel')}
+            onFinish={() => {
+              onApply(
+                columnsChoice(
+                  keys,
+                  draft.filter((line) => line.shown).map((line) => line.key),
+                ),
+              )
+              setOpen(false)
+            }}
+            onCancel={() => setOpen(false)}
+          />
+        }
         onCancel={() => setOpen(false)}
-        footer={(_origin, { OkBtn, CancelBtn }) => (
-          <AxisActionRow justify="end">
-            <AxisButton role="secondary" onClick={() => setDraft(keys.map((key) => ({ key, shown: true })))}>
-              {t('shell.table.columnsReset')}
-            </AxisButton>
-            <CancelBtn />
-            <OkBtn />
-          </AxisActionRow>
-        )}
         destroyOnHidden
       >
         <Flex vertical gap="small">

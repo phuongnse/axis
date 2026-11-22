@@ -10,6 +10,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { downloadTenantExport, readTenantExport, startTenantExport, type TenantExport } from '../platform/tenantExports'
 import { useFollowJob } from '../platform/useFollowJob'
 import { usePlatform } from './context'
+import { DialogFooter } from '../platform/DialogFooter'
 
 /** The local storage key that holds the id of the last export, so a reload shows it again. */
 const storageKey = 'axis.tenantExport'
@@ -185,10 +186,15 @@ export function TenantExportSection() {
         open={confirming}
         width={size.dialog.small}
         title={t('shell.users.export.confirm')}
-        okText={t('shell.users.export.ok')}
-        cancelText={t('shell.users.roles.cancel')}
-        confirmLoading={busy}
-        onOk={() => void start()}
+        footer={
+          <DialogFooter
+            finishText={t('shell.users.export.ok')}
+            cancelText={t('shell.users.roles.cancel')}
+            finishing={busy}
+            onFinish={() => void start()}
+            onCancel={() => setConfirming(false)}
+          />
+        }
         onCancel={() => setConfirming(false)}
       >
         <Typography.Text>{t('shell.users.export.warning')}</Typography.Text>

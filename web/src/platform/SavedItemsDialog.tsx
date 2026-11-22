@@ -8,6 +8,7 @@ import { nameCompare } from './listOrder'
 import { requiredMark } from './requiredMark'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { DialogFooter } from './DialogFooter'
 
 /** The longest name a saved item has, as the Name field allows. */
 const nameLength = 80
@@ -243,10 +244,15 @@ export function SavedItemsDialog<T>({
       open={open}
       width={size.dialog.medium}
       title={t(texts.title)}
-      okText={t(texts.save)}
-      cancelText={t('shell.form.cancel')}
-      confirmLoading={saving}
-      onOk={() => form.submit()}
+      footer={
+        <DialogFooter
+          finishText={t(texts.save)}
+          cancelText={t('shell.form.cancel')}
+          finishing={saving}
+          onFinish={() => form.submit()}
+          onCancel={onClose}
+        />
+      }
       onCancel={onClose}
       afterClose={() => {
         form.resetFields()

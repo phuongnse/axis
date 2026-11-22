@@ -9,6 +9,7 @@ import { createStudioPackageFile, ServerUnreachableError, type StudioDiagnostic 
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { DialogFooter } from '../platform/DialogFooter'
 
 /** The pattern of a package's id in the manifest schema, see docs/reference/studio-packages.md#the-packages-entry. */
 const idPattern = /^[a-z][a-z0-9-]*$/
@@ -99,10 +100,15 @@ export function StudioNewPackage({
         open={open}
         width={size.dialog.medium}
         title={t('shell.studio.newPackage.title')}
-        okText={t('shell.studio.newResource.create')}
-        cancelText={t('shell.studio.cancel')}
-        confirmLoading={creating}
-        onOk={() => form.submit()}
+        footer={
+          <DialogFooter
+            finishText={t('shell.studio.newResource.create')}
+            cancelText={t('shell.studio.cancel')}
+            finishing={creating}
+            onFinish={() => form.submit()}
+            onCancel={() => setOpen(false)}
+          />
+        }
         onCancel={() => setOpen(false)}
         // Each opening starts with empty fields.
         afterClose={() => form.resetFields()}

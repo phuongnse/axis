@@ -8,6 +8,7 @@ import { AxisActionRow, AxisButton } from './AxisButton'
  * own `onCancel` for Escape and the close icon, and passes the same handler here, so Cancel does what they do.
  */
 export function DialogFooter({
+  actions,
   finishText,
   cancelText,
   onFinish,
@@ -26,9 +27,12 @@ export function DialogFooter({
   finishing?: boolean
   finishDisabled?: boolean
   finishTestId?: string
+  /** Other actions of the dialog, such as a Reset, drawn before Cancel in the same row. */
+  actions?: ReactNode
 }) {
   return (
     <AxisActionRow justify="end">
+      {actions}
       <AxisButton role="secondary" onClick={onCancel}>
         {cancelText}
       </AxisButton>

@@ -161,8 +161,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
 /**
  * The props every Axis `ConfigProvider` gets, see docs/reference/actions-and-controls.md#dialogs: the theme; every
  * dialog centred, no taller or wider than the window less its `spacing-xl` margins, with a scrolling body and its
- * buttons `spacing-lg` below the body; a Cancel of text type for every dialog, so it is a text button beside the solid
- * OK; and checkboxes and radios that sit at the top of their box, level with the first line of a label that wraps.
+ * buttons `spacing-lg` below the body; and checkboxes and radios that sit at the top of their box, level with the first
+ * line of a label that wraps.
  * See docs/reference/actions-and-controls.md#dialogs.
  */
 export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMotion = false): ConfigProviderProps {
@@ -175,7 +175,6 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
   return {
     theme: config,
     modal: {
-      cancelButtonProps: { type: 'text' },
       centered: true,
       style: { maxWidth: `calc(100vw - ${margins}px)` },
       // The padding sits in the header, body and footer, not the frame, so the body's scrollbar runs at the dialog's edge.

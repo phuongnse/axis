@@ -558,10 +558,15 @@ export function CellTenantPage() {
           width={size.dialog.small}
           data-testid="cell-tenant-download-warning"
           title={t('shell.cell.tenant.downloadConfirm').replace('{tenant}', id)}
-          okText={t('shell.cell.tenant.downloadOk')}
-          cancelText={t('shell.users.roles.cancel')}
-          confirmLoading={busy}
-          onOk={() => void runDownload(ready.id)}
+          footer={
+            <DialogFooter
+              finishText={t('shell.cell.tenant.downloadOk')}
+              cancelText={t('shell.users.roles.cancel')}
+              finishing={busy}
+              onFinish={() => void runDownload(ready.id)}
+              onCancel={() => setDownloading(false)}
+            />
+          }
           onCancel={() => setDownloading(false)}
         >
           <Flex vertical gap="small">
