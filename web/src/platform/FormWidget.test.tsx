@@ -2522,6 +2522,25 @@ describe('FormWidget', () => {
       expect(title).toHaveAttribute('aria-invalid', 'true')
     })
 
+    it('keeps the focus on an error above the form when a failed save also opens the step of a field error', async () => {
+      stateAnswers = [emptyStateJson, emptyStateJson]
+      stubFetch({
+        status: 400,
+        body: '{"title":"Invalid","status":400,"errors":{"":["Save refused."],"/values/title":["Too long."]}}',
+      })
+      const user = await renderSteps()
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      await user.type(await screen.findByLabelText('Priority'), '5')
+      await user.click(await screen.findByRole('button', { name: 'Save' }))
+
+      expect(await screen.findByTestId('form-error')).toHaveFocus()
+      expect(within(screen.getByTestId('form-error')).getByRole('alert')).toHaveTextContent('Save refused.')
+      expect(screen.getByTestId('steps-bar').querySelector('[aria-current="step"]')).toHaveTextContent('Step one')
+      const title = screen.getByRole('textbox', { name: 'Title' })
+      expect(title).toHaveAttribute('aria-invalid', 'true')
+      expect(title).not.toHaveFocus()
+    })
+
     it('replaces the message of a refused save with the answer message while the typed value is still wrong', async () => {
       stateAnswers = [emptyStateJson, emptyStateJson, titleRequired]
       stubFetch({

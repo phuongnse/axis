@@ -14,8 +14,8 @@ const focusable = 'input:not([type=hidden]), textarea, [role=combobox], button'
  * moves on, and stays when one has an error. Back never checks. Moving keeps every typed value,
  * because the values live in `recordForm`. A step whose fields the form state answer all hides is
  * skipped and left out of the progress bar. After a move, focus goes to the step's first field in error,
- * or else to its first input. A form without steps is one page: `fields` holds every section and `last`
- * is always true.
+ * or else to its first input, unless an error shows above the form. A form without steps is one page:
+ * `fields` holds every section and `last` is always true.
  *
  * Inside the Studio form canvas, the canvas picks the step. Hidden steps are not skipped and focus does not move.
  */
@@ -57,14 +57,19 @@ export function useFormSteps(
       return
     }
     previous.current = index
-    // A step with a field in error takes the focus there, as after a refused Next or save, see
-    // docs/reference/form-widget-conditions.md#steps. Otherwise its first input does.
+    // An error above the form keeps the focus, as it does after a refused save, see
+    // docs/reference/form-widget.md#saving. Otherwise a step with a field in error takes the focus
+    // there, as after a refused Next or save, see docs/reference/form-widget-conditions.md#steps.
+    // Else its first input does.
+    if (recordForm.formErrorShown) {
+      return
+    }
     if (focusFirstError(container.current)) {
       return
     }
     const inputs = [...(container.current?.querySelectorAll<HTMLElement>(focusable) ?? [])]
     inputs.find((element) => !element.matches(':disabled, [readonly]'))?.focus()
-  }, [index, canvas])
+  }, [index, canvas, recordForm.formErrorShown])
 
   const next = async () => {
     if (last || checking) {

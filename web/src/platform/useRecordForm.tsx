@@ -814,6 +814,9 @@ export function useRecordForm(
     showProblem,
     clearErrors,
     formError,
+    // Whether an error shows above the form. It takes the focus before any field, see
+    // docs/reference/form-widget.md#saving.
+    formErrorShown: formErrors.length > 0,
     setFormErrors,
   }
 }
