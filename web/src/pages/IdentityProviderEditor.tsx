@@ -1,10 +1,11 @@
-import { ConfigProvider, Flex, Input, Select, Typography } from 'antd'
+import { ConfigProvider, Flex, Input, Select } from 'antd'
 import { useContext, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useFieldTexts } from './fieldTexts'
@@ -315,9 +316,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                       </Flex>
                     ))}
                     {Object.keys(roleValues).length === 0 && (
-                      <Typography.Text type="secondary" data-testid="studio-identity-provider-same-name">
-                        {t('shell.studio.identityProvider.sameNameHint')}
-                      </Typography.Text>
+                      <EmptyState text={t('shell.studio.identityProvider.sameNameHint')} />
                     )}
                   </Flex>
                 </AxisFieldGroup>
@@ -355,6 +354,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                   )}
                 </Flex>
               ))}
+              {acr.length === 0 && <EmptyState text={t('shell.studio.identityProvider.noAcr')} />}
             </Flex>
           </div>,
           componentDisabled ? undefined : (

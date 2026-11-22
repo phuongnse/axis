@@ -15,6 +15,7 @@ import { useThemeMode } from '../platform/themeMode'
 import {
   chooseOption,
   clearSelect,
+  emptyDescription,
   openDropdown,
   optionTexts,
   selectRoot,
@@ -673,6 +674,30 @@ describe('ConnectorEditor', () => {
     expect(screen.queryByRole('combobox', { name: texts('operations.input.in').label })).toBeNull()
     await userEvent.clear(field('operations.output.source'))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/output/0/source', undefined)
+  })
+
+  it('says in one line that there are no operations yet', () => {
+    renderEditor({ ...connector, operations: [] })
+
+    expect(emptyDescription('No operations yet.', screen.getByTestId('studio-field-/operations'))).toBeVisible()
+  })
+
+  it('says in one line that an operation has no input or output yet', () => {
+    renderEditor({ ...connector, operations: [{ name: 'a', method: 'POST', path: '/' }] })
+
+    expect(emptyDescription('No input yet.', screen.getByTestId('studio-field-/operations/0/input'))).toBeVisible()
+    expect(emptyDescription('No output yet.', screen.getByTestId('studio-field-/operations/0/output'))).toBeVisible()
+  })
+
+  it('says in one line that a nested field list has no fields yet', () => {
+    renderEditor({
+      ...connector,
+      operations: [{ name: 'a', method: 'POST', path: '/', input: [{ name: 'x', type: 'object', fields: [] }] }],
+    })
+
+    expect(
+      emptyDescription('No nested fields yet.', screen.getByTestId('studio-field-/operations/0/input/0/fields')),
+    ).toBeVisible()
   })
 
   describe('draws every field through AxisField with its label and help', () => {
