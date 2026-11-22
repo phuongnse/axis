@@ -1,4 +1,4 @@
-import { ConfigProvider, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
+import { ConfigProvider, Flex, Input, InputNumber, Select, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { StatusTag } from '../platform/StatusTag'
@@ -13,6 +13,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
@@ -20,7 +21,7 @@ import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisFieldRow } from '../platform/AxisFieldRow'
-import { AxisTable, RowActions, type AxisColumn } from '../platform/AxisTable'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { datePickerChevrons } from '../platform/datePickerChevrons'
 import { EmptyDash } from '../platform/EmptyValue'
 import { FilledText } from '../platform/FilledText'
@@ -56,7 +57,6 @@ import { LabelTextsContext } from './labelTextsContext'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
 import { PlatformContext } from './context'
 import { Expression } from './ProcessFields'
-import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import { fieldElement } from './studioFieldElement'
 import type { ChangeHandler } from './SchemaForm'
@@ -208,13 +208,20 @@ const Picker = memo(function Picker({
  * Validations part also registers how to open a validation or a new one at a field, which a field's panel uses.
  */
 interface DesignerPanels {
-  take: (owner: 'fields' | 'validations') => void
-  register: (owner: 'fields' | 'validations', close: () => void) => () => void
-  /** Opens a validation, or a new one at a field, in the validation's panel. */
-  openValidation: (index: number) => void
-  addValidation: (field: string) => void
-  /** The Validations part says how it opens a validation and a new one. */
-  registerValidations: (opener: { open: (index: number) => void; add: (field: string) => void }) => () => void
+  take: (owner: PanelOwner) => void
+  register: (owner: PanelOwner, close: () => void) => () => void
+  /** Opens an item of a list part, or a new one, in its panel; a new validation may be at a field. */
+  open: (owner: ListOwner, index: number) => void
+  add: (owner: ListOwner, preset: string) => void
+  /** A list part says how it opens an item and a new one. */
+  registerOpener: (owner: ListOwner, opener: ListOpener) => () => void
+}
+
+type ListOwner = 'validations' | 'indexes'
+type PanelOwner = 'fields' | ListOwner
+interface ListOpener {
+  open: (index: number) => void
+  add: (preset: string) => void
 }
 
 const DesignerPanelsContext = createContext<DesignerPanels | null>(null)
@@ -280,7 +287,7 @@ export function EntityDesigner({
   const fieldNames = useMemo(() => (joinedNames === '' ? [] : joinedNames.split(nameSeparator)), [joinedNames])
   const pickDisplayField = useCallback((next: string | undefined) => onChange('/displayField', next), [onChange])
   const closers = useRef(new Map<string, () => void>())
-  const validationsOpener = useRef<{ open: (index: number) => void; add: (field: string) => void } | null>(null)
+  const openers = useRef(new Map<ListOwner, ListOpener>())
   const panels = useMemo<DesignerPanels>(
     () => ({
       take: (owner) => {
@@ -294,13 +301,11 @@ export function EntityDesigner({
         closers.current.set(owner, close)
         return () => closers.current.delete(owner)
       },
-      openValidation: (index) => validationsOpener.current?.open(index),
-      addValidation: (field) => validationsOpener.current?.add(field),
-      registerValidations: (opener) => {
-        validationsOpener.current = opener
-        return () => {
-          validationsOpener.current = null
-        }
+      open: (owner, index) => openers.current.get(owner)?.open(index),
+      add: (owner, preset) => openers.current.get(owner)?.add(preset),
+      registerOpener: (owner, opener) => {
+        openers.current.set(owner, opener)
+        return () => openers.current.delete(owner)
       },
     }),
     [],
@@ -1748,7 +1753,7 @@ function Settings({
               <AxisButton
                 role="secondary"
                 // Proposed, #3264: a new validation at this field opens in the validation's panel, which takes this one's place.
-                onClick={() => panels?.addValidation(name)}
+                onClick={() => panels?.add('validations', name)}
               >
                 {t('shell.studio.entity.addValidation')}
               </AxisButton>
@@ -1813,7 +1818,7 @@ function Settings({
                     <AtFieldValidation
                       key={position}
                       validation={validation}
-                      onOpen={() => panels?.openValidation(position)}
+                      onOpen={() => panels?.open('validations', position)}
                     />
                   ))}
                 </>
@@ -2081,144 +2086,6 @@ function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Con
   )
 }
 
-/**
- * The indexes of the entity as rows of a name, a field picker and a Unique choice. The picker offers the fields that have a
- * column and writes the picked names in order. Every change writes the whole `indexes` array, and an empty list
- * removes the key.
- */
-const Indexes = memo(function Indexes({
-  indexes,
-  fields,
-  readOnly,
-  layer,
-  onChange,
-}: {
-  indexes: unknown
-  fields: unknown[]
-  readOnly: boolean
-  layer: DesignerLayer | undefined
-  onChange: ChangeHandler
-}) {
-  const t = useText()
-
-  if (indexes !== undefined && !Array.isArray(indexes)) {
-    return (
-      <SectionPart testName="indexes" heading={sectionHeading(t, 'indexes')}>
-        <div data-testid="studio-field-/indexes">
-          <JsonOnly />
-        </div>
-      </SectionPart>
-    )
-  }
-  const list: unknown[] = indexes ?? []
-  // A child collection, references and file field has no column of its own, so an index cannot name it.
-  const choices = fields.flatMap((field) =>
-    isContent(field) &&
-    typeof field.name === 'string' &&
-    field.name !== '' &&
-    !['child-collection', 'references', 'file'].includes(text(field.type))
-      ? [field.name]
-      : [],
-  )
-
-  function write(next: unknown[]) {
-    onChange('/indexes', next.length === 0 ? undefined : next)
-  }
-
-  function move(index: number, offset: number) {
-    const next = [...list]
-    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
-    write(next)
-  }
-
-  return (
-    <SectionPart
-      testName="indexes"
-      heading={sectionHeading(t, 'indexes')}
-      action={
-        readOnly ? undefined : (
-          <AxisActionRow outlined>
-            <AxisButton
-              role="secondary"
-              onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}
-            >
-              {t('shell.studio.entity.addIndex')}
-            </AxisButton>
-          </AxisActionRow>
-        )
-      }
-    >
-      <div data-testid="studio-field-/indexes">
-        <Flex vertical gap="large">
-          {list.length === 0 && <EmptyState text={t('shell.studio.entity.noIndexes')} />}
-          {list.map((index, position) => {
-            const pointer = `/indexes/${position}`
-            const content = isContent(index) ? index : {}
-            return (
-              <Flex key={position} vertical gap="small" data-testid={`studio-field-${pointer}`}>
-                <Flex gap="small" align="center" justify="space-between">
-                  <Flex gap="small" align="center">
-                    <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
-                      {text(content.name)}
-                    </Typography.Text>
-                    {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
-                  </Flex>
-                  {readOnly ? null : (
-                    <RowActions
-                      fold
-                      actions={[
-                        {
-                          key: 'moveUp',
-                          labelKey: 'shell.studio.entity.moveUp',
-                          disabled: position === 0,
-                          onClick: () => move(position, -1),
-                        },
-                        {
-                          key: 'moveDown',
-                          labelKey: 'shell.studio.entity.moveDown',
-                          disabled: position === list.length - 1,
-                          onClick: () => move(position, 1),
-                        },
-                        {
-                          key: 'remove',
-                          labelKey: 'shell.studio.entity.removeIndex',
-                          destructive: true,
-                          onClick: () => write(list.filter((_, other) => other !== position)),
-                        },
-                      ]}
-                    />
-                  )}
-                </Flex>
-                <div data-testid={`studio-field-${pointer}/fields`}>
-                  <AxisField {...fieldTexts(t, 'indexes.fields')} required>
-                    <Select
-                      mode="multiple"
-                      virtual={false}
-                      value={
-                        Array.isArray(content.fields) ? content.fields.filter((item) => typeof item === 'string') : []
-                      }
-                      options={choices.map((name) => ({ value: name, label: name }))}
-                      onChange={(next: string[]) => onChange(`${pointer}/fields`, next)}
-                    />
-                  </AxisField>
-                </div>
-                <div data-testid={`studio-field-${pointer}/unique`}>
-                  <AxisCheckboxField
-                    {...fieldTexts(t, 'indexes.unique')}
-                    checked={content.unique === true}
-                    onChange={(checked) => onChange(`${pointer}/unique`, checked ? true : undefined)}
-                  />
-                </div>
-              </Flex>
-            )
-          })}
-          <RemovedRows layer={layer} list="/indexes" />
-        </Flex>
-      </div>
-    </SectionPart>
-  )
-})
-
 /** A validation at a field in the field's panel: its name, a link that opens it, and its message under it. */
 function AtFieldValidation({ validation, onOpen }: { validation: unknown; onOpen: () => void }) {
   const [searchParams] = useSearchParams()
@@ -2248,12 +2115,6 @@ function AtFieldValidation({ validation, onOpen }: { validation: unknown; onOpen
   )
 }
 
-/** A row of the Validations table: the validation and its place in the list. */
-interface ValidationTableRow {
-  index: number
-  validation: unknown
-}
-
 /** A validation's message as words, in the author's language, or the dash when it has none. */
 function MessageCell({ message }: { message: unknown }) {
   const text = useMessageText(message)
@@ -2271,99 +2132,140 @@ function FieldCell({ name, fields }: { name: unknown; fields: unknown[] }) {
   return own === '' ? <EmptyDash /> : label || own
 }
 
+/** A row of a list part's table: the item and its place in the list. */
+interface NamedRow {
+  index: number
+  item: unknown
+}
+
+/** The texts of a list part, by its owner: its section, its Add, its empty state and its panel. */
+const listTexts = {
+  validations: {
+    section: 'validations',
+    add: 'shell.studio.entity.addValidation',
+    empty: 'shell.studio.entity.noValidations',
+    remove: 'shell.studio.entity.removeValidation',
+    newTitle: 'shell.studio.entity.newValidation',
+    close: 'shell.studio.entity.validationPanel.close',
+    nameTaken: 'shell.studio.entity.validationPanel.nameTaken',
+  },
+  indexes: {
+    section: 'indexes',
+    add: 'shell.studio.entity.addIndex',
+    empty: 'shell.studio.entity.noIndexes',
+    remove: 'shell.studio.entity.removeIndex',
+    newTitle: 'shell.studio.entity.newIndex',
+    close: 'shell.studio.entity.indexPanel.close',
+    nameTaken: 'shell.studio.entity.indexPanel.nameTaken',
+  },
+} as const
+
 /**
- * Proposed, #3264: the entity's validations as a table like Fields, Name, Message and Field, ordered by a drag, each
- * opening in the side panel by its name, as Salesforce lists validation rules by name. A validation's name is the
- * author's, checked as a field's name is. Add validation opens a new validation in the panel and adds it only by its Add
- * validation. A field's panel opens its validations here, and adds one at its field, through the designer's panels.
+ * Proposed, #3264: a list part of the entity, its validations or its indexes, as a table like Fields: a Name column of
+ * links, the part's own `columns`, a drag and Move up, Move down and Remove in each row's menu, and the one empty state.
+ * Each item opens in the side panel by its name, with its name and the part's own `body`; an open item's edits go into
+ * the draft at once and Done closes it, and Add opens a new item that the panel holds until its Add, which `problems`
+ * checks. One mechanism draws both lists, so they look and behave alike, as Salesforce lists its rules by name.
  */
-const Validations = memo(function Validations({
-  validations,
-  fields,
+function NamedItems({
+  owner,
+  list,
   readOnly,
   layer,
   onChange,
+  write,
+  columns,
+  newItem,
+  problems,
+  body,
 }: {
-  validations: unknown
-  fields: unknown[]
+  owner: ListOwner
+  list: unknown[] | undefined
   readOnly: boolean
   layer: DesignerLayer | undefined
   onChange: ChangeHandler
+  /** Writes the whole list, as an empty list of indexes is no `indexes` at all. */
+  write: (next: unknown[]) => void
+  columns: AxisColumn<NamedRow>[]
+  newItem: (preset: string) => Content
+  /** What is wrong with a new item beside its name, by the input's name, such as `message` or `fields`. */
+  problems: (item: Content) => Record<string, string>
+  body: (args: {
+    pointer: string
+    content: Content
+    onChange: ChangeHandler
+    readOnly: boolean
+    errors: Record<string, string>
+  }) => ReactNode
 }) {
   const t = useText()
+  const texts = listTexts[owner]
+  const listPointer = `/${owner}`
   const [searchParams] = useSearchParams()
   const panels = useContext(DesignerPanelsContext)
-  const labelDrafts = useContext(LabelTextsContext)
-  const list = validations === undefined ? [] : Array.isArray(validations) ? validations : undefined
   const [open, setOpen] = useState<number | null>(null)
   const [staged, setStaged] = useState<Content | null>(null)
-  const [stagedErrors, setStagedErrors] = useState<{ name?: string; message?: string }>({})
-  const latest = useRef({ list, onChange })
+  const [stagedErrors, setStagedErrors] = useState<Record<string, string>>({})
+  const latest = useRef({ list, write })
   useLayoutEffect(() => {
-    latest.current = { list, onChange }
+    latest.current = { list, write }
   })
   useLayoutEffect(
     () =>
-      panels?.register('validations', () => {
+      panels?.register(owner, () => {
         setOpen(null)
         setStaged(null)
         setStagedErrors({})
       }),
-    [panels],
+    [panels, owner],
   )
-  // How a field's panel opens a validation here: the latest handlers, read when a link is pressed.
-  const opener = useRef({ open: (_index: number) => {}, add: (_field: string) => {} })
+  // How a field's panel opens an item here: the latest handlers, read when a link is pressed.
+  const opener = useRef<ListOpener>({ open: () => {}, add: () => {} })
   useLayoutEffect(() => {
     opener.current = {
       open: (index) => {
-        panels?.take('validations')
+        panels?.take(owner)
         setStaged(null)
         setStagedErrors({})
         setOpen(index)
       },
-      add: (field) => {
-        panels?.take('validations')
+      add: (preset) => {
+        panels?.take(owner)
         setOpen(null)
         setStagedErrors({})
-        setStaged({ name: '', expression: '', message: { textKey: '' }, ...(field === '' ? {} : { field }) })
+        setStaged(newItem(preset))
       },
     }
   })
   useLayoutEffect(
     () =>
-      panels?.registerValidations({
+      panels?.registerOpener(owner, {
         open: (index) => opener.current.open(index),
-        add: (field) => opener.current.add(field),
+        add: (preset) => opener.current.add(preset),
       }),
-    [panels],
+    [panels, owner],
   )
-  const openAt = useCallback((index: number) => panels?.openValidation(index), [panels])
   const move = useCallback((from: number, to: number) => {
-    const { list: current, onChange: change } = latest.current
-    change('/validations', moved(current ?? [], from, to))
+    const { list: current, write: writeList } = latest.current
+    writeList(moved(current ?? [], from, to))
     setOpen((shown) => (shown === null ? null : movedIndex(shown, from, to)))
   }, [])
 
   if (list === undefined) {
     return (
-      <SectionPart testName="validations" heading={sectionHeading(t, 'validations')}>
-        <div data-testid="studio-field-/validations">
+      <SectionPart testName={owner} heading={sectionHeading(t, texts.section)}>
+        <div data-testid={`studio-field-${listPointer}`}>
           <JsonOnly />
         </div>
       </SectionPart>
     )
   }
 
-  const names = list.map((validation) => (isContent(validation) ? text(validation.name) : ''))
-  const fieldOptions = fields.flatMap((field) =>
-    isContent(field) && text(field.name) !== ''
-      ? [{ name: text(field.name), labelKey: isContent(field.label) ? text(field.label.textKey) || null : null }]
-      : [],
-  )
+  const names = list.map((item) => (isContent(item) ? text(item.name) : ''))
 
   function changeStaged(pointer: string, value: unknown) {
     setStagedErrors({})
-    const prefix = `/validations/${list!.length}`
+    const prefix = `${listPointer}/${list!.length}`
     if (pointer === prefix) {
       setStaged(isContent(value) ? value : {})
     } else if (pointer.startsWith(`${prefix}/`)) {
@@ -2372,89 +2274,67 @@ const Validations = memo(function Validations({
   }
 
   function commitStaged() {
-    const key = isContent(staged?.message) ? text(staged.message.textKey) : ''
-    const problem = nameProblem(text(staged?.name), names, 'shell.studio.entity.validationPanel.nameTaken')
-    const errors = {
-      ...(problem === undefined ? {} : { name: t(problem) }),
-      ...(labelled(labelDrafts?.texts[key])
-        ? {}
-        : { message: t('shell.studio.entity.validationPanel.messageRequired') }),
-    }
-    if (errors.name !== undefined || errors.message !== undefined) {
+    const problem = nameProblem(text(staged?.name), names, texts.nameTaken)
+    const errors = { ...(problem === undefined ? {} : { name: t(problem) }), ...problems(staged ?? {}) }
+    if (Object.keys(errors).length > 0) {
       setStagedErrors(errors)
       return
     }
-    onChange('/validations', [...list!, staged])
+    write([...list!, staged])
     setStaged(null)
     setStagedErrors({})
   }
 
-  const columns: AxisColumn<ValidationTableRow>[] = [
-    {
-      key: 'name',
-      kind: 'freeText',
-      title: t('shell.studio.entity.validationColumn.name'),
-      render: (_, { validation, index }) => {
-        const name = isContent(validation) ? text(validation.name) : ''
-        const next = new URLSearchParams(searchParams)
-        next.set('validation', name)
-        return (
-          <Flex gap="small" align="center" wrap>
-            <Link
-              to={{ search: `?${next}` }}
-              onClick={(event) => {
-                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-                  return
-                }
-                event.preventDefault()
-                openAt(index)
-              }}
-            >
-              {name || t('shell.studio.entity.newValidation')}
-            </Link>
-            {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={name} />}
-          </Flex>
-        )
-      },
+  const nameColumn: AxisColumn<NamedRow> = {
+    key: 'name',
+    kind: 'freeText',
+    title: t('shell.studio.entity.listColumn.name'),
+    render: (_, { item, index }) => {
+      const name = isContent(item) ? text(item.name) : ''
+      const next = new URLSearchParams(searchParams)
+      next.set(owner === 'validations' ? 'validation' : 'index', name)
+      return (
+        <Flex gap="small" align="center" wrap>
+          <Link
+            to={{ search: `?${next}` }}
+            onClick={(event) => {
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                return
+              }
+              event.preventDefault()
+              panels?.open(owner, index)
+            }}
+          >
+            {name || t(texts.newTitle)}
+          </Link>
+          {layer && <LayerMarkTag layer={layer} list={listPointer} index={index} name={name} />}
+        </Flex>
+      )
     },
-    {
-      key: 'message',
-      kind: 'freeText',
-      title: t('shell.studio.entity.validationColumn.message'),
-      render: (_, { validation }) => <MessageCell message={isContent(validation) ? validation.message : undefined} />,
-    },
-    {
-      key: 'field',
-      kind: 'freeText',
-      title: t('shell.studio.entity.validationColumn.field'),
-      render: (_, { validation }) => (
-        <FieldCell name={isContent(validation) ? validation.field : undefined} fields={fields} />
-      ),
-    },
-  ]
+  }
 
   return (
     <SectionPart
-      testName="validations"
-      heading={sectionHeading(t, 'validations')}
+      testName={owner}
+      heading={sectionHeading(t, texts.section)}
       action={
         readOnly ? undefined : (
           <AxisActionRow outlined>
-            <AxisButton role="secondary" onClick={() => panels?.addValidation('')}>
-              {t('shell.studio.entity.addValidation')}
+            <AxisButton role="secondary" onClick={() => panels?.add(owner, '')}>
+              {t(texts.add)}
             </AxisButton>
           </AxisActionRow>
         )
       }
     >
-      <div data-testid="studio-field-/validations">
+      <div data-testid={`studio-field-${listPointer}`}>
         <Flex vertical gap="small">
-          <AxisTable<ValidationTableRow>
-            dataSource={list.map((validation, index) => ({ validation, index }))}
+          <AxisTable<NamedRow>
+            dataSource={list.map((item, index) => ({ item, index }))}
             rowKey={(row) => String(row.index)}
-            emptyText={t('shell.studio.entity.noValidations')}
+            emptyText={t(texts.empty)}
             rowAttributes={(row) =>
-              ({ 'data-testid': `studio-field-/validations/${row.index}` }) as React.HTMLAttributes<HTMLElement>
+              ({ 'data-testid': `studio-field-${listPointer}/${row.index}` }) as React.HTMLAttributes<HTMLElement>
             }
             reorder={readOnly ? undefined : { onMove: move }}
             rowActions={
@@ -2477,43 +2357,41 @@ const Validations = memo(function Validations({
                       },
                       {
                         key: 'remove',
-                        labelKey: 'shell.studio.entity.removeValidation',
+                        labelKey: texts.remove,
                         destructive: true,
                         onClick: () => {
                           setOpen((shown) =>
                             shown === index ? null : shown !== null && shown > index ? shown - 1 : shown,
                           )
-                          onChange(
-                            '/validations',
-                            list.filter((_, other) => other !== index),
-                          )
+                          write(list.filter((_, other) => other !== index))
                         },
                       },
                     ],
                   }
             }
-            columns={columns}
+            columns={[nameColumn, ...columns]}
           />
-          <RemovedRows layer={layer} list="/validations" />
+          <RemovedRows layer={layer} list={listPointer} />
         </Flex>
       </div>
       {open !== null && open < list.length && (
-        <ValidationPanel
+        <NamedItemPanel
+          owner={owner}
           index={open}
-          validation={list[open]}
+          item={list[open]}
           otherNames={names.filter((_, other) => other !== open)}
-          fieldOptions={fieldOptions}
           readOnly={readOnly}
           onChange={onChange}
           onClose={() => setOpen(null)}
+          body={body}
         />
       )}
       {staged !== null && (
-        <ValidationPanel
+        <NamedItemPanel
+          owner={owner}
           index={list.length}
-          validation={staged}
+          item={staged}
           otherNames={names}
-          fieldOptions={fieldOptions}
           readOnly={false}
           onChange={changeStaged}
           onClose={() => {
@@ -2522,42 +2400,46 @@ const Validations = memo(function Validations({
           }}
           onAdd={commitStaged}
           errors={stagedErrors}
+          body={body}
         />
       )}
     </SectionPart>
   )
-})
+}
 
 /**
- * Proposed, #3264: a validation in the platform's side panel, as a field is: its name, its expression, its message in
- * words and its field, picked by its label. An existing validation's edits go into the draft at once, its name only
- * while it is valid, and Done closes the panel; a new one, `onAdd` given, is held by the panel until Add validation.
+ * Proposed, #3264: an item of a list part in the platform's side panel, as a field is: its name, then the part's own
+ * `body`. Its name goes into the draft only while it is valid; Done closes the panel, and a new item, `onAdd` given, is
+ * held by the panel until its Add.
  */
-const ValidationPanel = memo(function ValidationPanel({
+function NamedItemPanel({
+  owner,
   index,
-  validation,
+  item,
   otherNames,
-  fieldOptions,
   readOnly,
   onChange,
   onClose,
   onAdd,
-  errors,
+  errors = {},
+  body,
 }: {
+  owner: ListOwner
   index: number
-  validation: unknown
+  item: unknown
   otherNames: readonly string[]
-  fieldOptions: ReferenceOption[]
   readOnly: boolean
   onChange: ChangeHandler
   onClose: () => void
   onAdd?: () => void
-  errors?: { name?: string; message?: string }
+  errors?: Record<string, string>
+  body: Parameters<typeof NamedItems>[0]['body']
 }) {
   const t = useText()
   const { spacing } = useDesignTokens()
-  const pointer = `/validations/${index}`
-  const content = isContent(validation) ? validation : {}
+  const texts = listTexts[owner]
+  const pointer = `/${owner}/${index}`
+  const content = isContent(item) ? item : {}
   const name = text(content.name)
   const editing = onAdd === undefined
   const [typed, setTyped] = useState<{ index: number; name?: string }>({ index })
@@ -2566,22 +2448,19 @@ const ValidationPanel = memo(function ValidationPanel({
   }
   const shownName = typed.index === index && typed.name !== undefined ? typed.name : name
   const nameError =
-    editing && typed.name !== undefined
-      ? nameProblem(typed.name, otherNames, 'shell.studio.entity.validationPanel.nameTaken')
-      : undefined
-  const expression = fieldTexts(t, 'validations.expression')
+    editing && typed.name !== undefined ? nameProblem(typed.name, otherNames, texts.nameTaken) : undefined
   const [root, setRoot] = useState<HTMLElement | null>(null)
-  // The panel opens on its first box, the name, whichever validation it shows.
+  // The panel opens on its first box, the name, whichever item it shows.
   useEffect(() => {
     root?.querySelector<HTMLElement>('input')?.focus()
   }, [root, index])
   useEffect(() => {
-    if (errors?.name !== undefined || errors?.message !== undefined) {
+    if (Object.keys(errors).length > 0) {
       focusFirstError(root)
     }
   }, [errors, root])
   const changeName = (next: string) => {
-    if (editing && nameProblem(next, otherNames, 'shell.studio.entity.validationPanel.nameTaken') !== undefined) {
+    if (editing && nameProblem(next, otherNames, texts.nameTaken) !== undefined) {
       setTyped({ index, name: next })
       return
     }
@@ -2599,14 +2478,13 @@ const ValidationPanel = memo(function ValidationPanel({
       focusFirstError(root)
     }
   }
-  const nameErrorText = errors?.name ?? (nameError === undefined ? undefined : t(nameError))
   return (
     <SidePanel
-      id="studio-validation-panel"
-      testId="studio-validation-panel"
-      title={editing ? name || t('shell.studio.entity.newValidation') : t('shell.studio.entity.newValidation')}
+      id={`studio-${owner}-panel`}
+      testId={`studio-${owner}-panel`}
+      title={editing ? name || t(texts.newTitle) : t(texts.newTitle)}
       onClose={close}
-      closeNameKey="shell.studio.entity.validationPanel.close"
+      closeNameKey={texts.close}
       actions={
         readOnly ? undefined : editing ? (
           <AxisButton role="main" onClick={done}>
@@ -2618,19 +2496,84 @@ const ValidationPanel = memo(function ValidationPanel({
               {t('shell.studio.cancel')}
             </AxisButton>
             <AxisButton role="main" onClick={onAdd}>
-              {t('shell.studio.entity.addValidation')}
+              {t(texts.add)}
             </AxisButton>
           </>
         )
       }
     >
       <ContentInsetContext.Provider value={spacing.sm}>
-        <Flex vertical gap="middle" ref={setRoot} data-testid="studio-validation-content" key={index}>
+        <Flex vertical gap="middle" ref={setRoot} key={index}>
           <div data-testid={`studio-field-${pointer}/name`}>
-            <AxisField {...fieldTexts(t, 'validations.name')} required error={nameErrorText}>
+            <AxisField
+              {...fieldTexts(t, `${owner}.name`)}
+              required
+              error={errors.name ?? (nameError === undefined ? undefined : t(nameError))}
+            >
               <Input value={shownName} onChange={(event) => changeName(event.target.value)} />
             </AxisField>
           </div>
+          {body({ pointer, content, onChange, readOnly, errors })}
+        </Flex>
+      </ContentInsetContext.Provider>
+    </SidePanel>
+  )
+}
+
+/** Proposed, #3264: the entity's validations: Name, Message and Field, each opening its expression, message and field. */
+const Validations = memo(function Validations({
+  validations,
+  fields,
+  readOnly,
+  layer,
+  onChange,
+}: {
+  validations: unknown
+  fields: unknown[]
+  readOnly: boolean
+  layer: DesignerLayer | undefined
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const labelDrafts = useContext(LabelTextsContext)
+  const list = validations === undefined ? [] : Array.isArray(validations) ? validations : undefined
+  const fieldOptions = fields.flatMap((field) =>
+    isContent(field) && text(field.name) !== ''
+      ? [{ name: text(field.name), labelKey: isContent(field.label) ? text(field.label.textKey) || null : null }]
+      : [],
+  )
+  const expression = fieldTexts(t, 'validations.expression')
+  return (
+    <NamedItems
+      owner="validations"
+      list={list}
+      readOnly={readOnly}
+      layer={layer}
+      onChange={onChange}
+      write={(next) => onChange('/validations', next)}
+      columns={[
+        {
+          key: 'message',
+          kind: 'freeText',
+          title: t('shell.studio.entity.validationColumn.message'),
+          render: (_, { item }) => <MessageCell message={isContent(item) ? item.message : undefined} />,
+        },
+        {
+          key: 'field',
+          kind: 'freeText',
+          title: t('shell.studio.entity.validationColumn.field'),
+          render: (_, { item }) => <FieldCell name={isContent(item) ? item.field : undefined} fields={fields} />,
+        },
+      ]}
+      newItem={(field) => ({ name: '', expression: '', message: { textKey: '' }, ...(field === '' ? {} : { field }) })}
+      problems={(item): Record<string, string> => {
+        const key = isContent(item.message) ? text(item.message.textKey) : ''
+        return labelled(labelDrafts?.texts[key])
+          ? {}
+          : { message: t('shell.studio.entity.validationPanel.messageRequired') }
+      }}
+      body={({ pointer, content, onChange: change, readOnly: off, errors }) => (
+        <>
           <div data-testid={`studio-field-${pointer}/expression`}>
             <AxisField {...expression} required>
               <Expression
@@ -2638,18 +2581,18 @@ const ValidationPanel = memo(function ValidationPanel({
                 name={expression.label}
                 value={text(content.expression)}
                 required
-                readOnly={readOnly}
-                onChange={onChange}
+                readOnly={off}
+                onChange={change}
               />
             </AxisField>
           </div>
           <div data-testid={`studio-field-${pointer}/message`}>
-            <AxisFieldGroup {...groupTexts(t, 'validations.messageText')} required error={errors?.message}>
+            <AxisFieldGroup {...groupTexts(t, 'validations.messageText')} required error={errors.message}>
               <LabelTexts
                 pointer={`${pointer}/message`}
                 value={content.message}
-                onChange={onChange}
-                invalid={errors?.message !== undefined}
+                onChange={change}
+                invalid={errors.message !== undefined}
               />
             </AxisFieldGroup>
           </div>
@@ -2661,11 +2604,119 @@ const ValidationPanel = memo(function ValidationPanel({
             options={fieldOptions}
             value={content.field}
             required={false}
-            onPick={(next) => onChange(`${pointer}/field`, next)}
+            onPick={(next) => change(`${pointer}/field`, next)}
           />
-        </Flex>
-      </ContentInsetContext.Provider>
-    </SidePanel>
+        </>
+      )}
+    />
+  )
+})
+
+/** A field's label in the author's language, else in English, else its name: the words a person knows it by. */
+function useFieldWords(): (field: unknown) => string {
+  const names = useContext(StudioNamesContext)
+  const drafts = useContext(LabelTextsContext)
+  const author = useContext(PlatformContext)?.current.locale ?? 'en'
+  return (field) => {
+    const content = isContent(field) ? field : {}
+    const key = isContent(content.label) ? text(content.label.textKey) : ''
+    const texts = key === '' ? {} : (drafts?.texts[key] ?? (names === undefined ? {} : textsOf(names, key)))
+    return (texts[author] || texts.en || '').trim() || text(content.name)
+  }
+}
+
+/**
+ * Proposed, #3264: the entity's indexes: Name, Fields by their labels in order, and Unique, each opening its fields and
+ * whether it is unique. A child collection, references and file field has no column of its own, so an index cannot
+ * name it.
+ */
+const Indexes = memo(function Indexes({
+  indexes,
+  fields,
+  readOnly,
+  layer,
+  onChange,
+}: {
+  indexes: unknown
+  fields: unknown[]
+  readOnly: boolean
+  layer: DesignerLayer | undefined
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const wordsOf = useFieldWords()
+  const list = indexes === undefined ? [] : Array.isArray(indexes) ? indexes : undefined
+  const choices = fields.flatMap((field) =>
+    isContent(field) &&
+    text(field.name) !== '' &&
+    !['child-collection', 'references', 'file'].includes(text(field.type))
+      ? [{ value: text(field.name), label: wordsOf(field) }]
+      : [],
+  )
+  const fieldsOf = (item: unknown) =>
+    isContent(item) && Array.isArray(item.fields) ? item.fields.filter((name) => typeof name === 'string') : []
+  return (
+    <NamedItems
+      owner="indexes"
+      list={list}
+      readOnly={readOnly}
+      layer={layer}
+      onChange={onChange}
+      write={(next) => onChange('/indexes', next.length === 0 ? undefined : next)}
+      columns={[
+        {
+          key: 'fields',
+          kind: 'freeText',
+          title: t('shell.studio.entity.indexColumn.fields'),
+          render: (_, { item }) => {
+            const named = fieldsOf(item)
+            return named.length === 0 ? (
+              <EmptyDash />
+            ) : (
+              named
+                .map((name) => {
+                  const field = fields.find((candidate) => isContent(candidate) && candidate.name === name)
+                  return field === undefined ? name : wordsOf(field)
+                })
+                .join(', ')
+            )
+          },
+        },
+        {
+          key: 'unique',
+          kind: 'fixed',
+          title: t('shell.studio.entity.indexColumn.unique'),
+          render: (_, { item }) => booleanText(isContent(item) && item.unique === true, t),
+        },
+      ]}
+      newItem={() => ({ name: '', fields: [] })}
+      problems={(item): Record<string, string> =>
+        fieldsOf(item).length > 0 ? {} : { fields: t('shell.studio.entity.indexPanel.fieldsRequired') }
+      }
+      body={({ pointer, content, onChange: change, errors }) => (
+        <>
+          <div data-testid={`studio-field-${pointer}/fields`}>
+            <AxisField {...fieldTexts(t, 'indexes.fields')} required error={errors.fields}>
+              <Select
+                mode="multiple"
+                virtual={false}
+                value={fieldsOf(content)}
+                options={choices}
+                optionFilterProp="label"
+                onChange={(next: string[]) => change(`${pointer}/fields`, next)}
+              />
+            </AxisField>
+          </div>
+          <div data-testid={`studio-field-${pointer}/unique`}>
+            <AxisCheckboxField
+              {...fieldTexts(t, 'indexes.unique')}
+              checked={content.unique === true}
+              onChange={(checked) => change(`${pointer}/unique`, checked ? true : undefined)}
+            />
+          </div>
+        </>
+      )}
+    />
   )
 })
 
