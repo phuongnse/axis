@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { antThemeFor } from '../platform/antTheme'
+import { designTokensFor } from '../platform/designTokens'
 import { setAt } from '../platform/jsonPatch'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames } from '../platform/studio'
@@ -21,7 +22,9 @@ import {
   selectRoot,
   shownDropdown,
   shownMenu,
+  tabTo,
 } from '../test/antd'
+import { withAntdStyles } from '../test/antdStyles'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 
@@ -113,12 +116,12 @@ function ThemeRoot({ children }: { children: ReactNode }) {
 }
 
 /**
- * Opens the "…" menu of the item `row` and returns its entry `name`. A row that holds a list has its own menu after the
- * item's first one, so this takes the first menu of the row, which is the item's own.
+ * Returns the button `name` of the item `row`. A single Remove is a button of its row, not an entry of a menu. A row
+ * that holds a list has its own buttons after the item's first one, so this takes the first button of that name, which
+ * is the item's own.
  */
 async function itemAction(row: HTMLElement, name: string) {
-  await userEvent.click(within(row).getAllByRole('button', { name: 'Actions' })[0])
-  return within(await shownMenu('Actions')).getByRole('menuitem', { name })
+  return within(row).getAllByRole('button', { name })[0]
 }
 
 /** `resource` is false where the page editor has no resource to write texts to, as in the module editor. */
@@ -1082,20 +1085,42 @@ describe('PageEditor parameters', () => {
     expect(onChange).toHaveBeenLastCalledWith('/parameters/0/values', undefined)
   })
 
-  it('draws Add parameter as a secondary button in the title row, and keeps no Remove button in a parameter row', () => {
+  it('draws Add parameter as a secondary button in the title row, and a trash icon for Remove parameter in a row', () => {
     renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
 
     const section = screen.getByTestId('studio-section-parameters')
     expect(within(section).getByRole('button', { name: 'Add parameter' })).toHaveClass('ant-btn-variant-outlined')
-    expect(within(screen.getByTestId(`${parameters}/0`)).queryByRole('button', { name: 'Remove parameter' })).toBeNull()
+    const remove = within(screen.getByTestId(`${parameters}/0`)).getByRole('button', { name: 'Remove parameter' })
+    expect(remove.querySelector('.anticon-delete')).not.toBeNull()
   })
 
-  it('removes a parameter from its "…" menu', async () => {
+  it('removes a parameter with its trash icon', async () => {
     const onChange = renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
 
-    await userEvent.click(within(screen.getByTestId(`${parameters}/0`)).getByRole('button', { name: 'Actions' }))
-    await userEvent.click(within(await shownMenu('Actions')).getByRole('menuitem', { name: 'Remove parameter' }))
+    await userEvent.click(await itemAction(screen.getByTestId(`${parameters}/0`), 'Remove parameter'))
     expect(onChange).toHaveBeenLastCalledWith('/parameters/0', undefined)
+  })
+
+  describe('with antd styles', () => {
+    withAntdStyles()
+
+    beforeEach(() => localStorage.setItem('axis.themeMode', 'dark'))
+
+    it('draws Remove parameter as the trash icon in dangerText, named by its tooltip, with no "…" menu', async () => {
+      renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
+
+      const row = screen.getByTestId(`${parameters}/0`)
+      const remove = within(row).getByRole('button', { name: 'Remove parameter' })
+      expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+      expect(remove).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
+      expect(within(row).queryByRole('button', { name: 'Actions' })).toBeNull()
+      await tabTo(remove)
+
+      // Other tooltips the tab passed may stay open, so the one of Remove parameter is found among them.
+      await waitFor(() =>
+        expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toContain('Remove parameter'),
+      )
+    })
   })
 
   it('shows a parameter that is not an object as a line with no menu', () => {
@@ -1657,24 +1682,21 @@ describe('PageEditor kpi and chart panels', () => {
   it('adds and removes chart measures but keeps one', async () => {
     const saved = renderStateful(page(chart))
 
-    expect(await itemAction(screen.getByTestId('studio-measure-0'), 'Remove measure')).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    )
-    await userEvent.keyboard('{Escape}')
+    expect(await itemAction(screen.getByTestId('studio-measure-0'), 'Remove measure')).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Add measure' }))
     expect(saved()).toMatchObject({ widgets: [{ measures: [{ name: '' }, { name: '', label: { textKey: '' } }] }] })
     await userEvent.click(await itemAction(screen.getByTestId('studio-measure-0'), 'Remove measure'))
     expect(saved()).toMatchObject({ widgets: [{ measures: [{ name: '' }] }] })
   })
 
-  it('draws Add measure as a secondary button on the Measures title row, with no Remove button in a measure', () => {
+  it('draws Add measure as a secondary button on the Measures title row, and Remove measure as a trash icon in a measure', () => {
     renderEditor(page(chart))
 
     const add = screen.getByRole('button', { name: 'Add measure' })
     expect(add.closest('legend')).not.toBeNull()
     expect(add).toHaveClass('ant-btn-variant-outlined')
-    expect(within(screen.getByTestId('studio-measure-0')).queryByRole('button', { name: 'Remove measure' })).toBeNull()
+    const remove = within(screen.getByTestId('studio-measure-0')).getByRole('button', { name: 'Remove measure' })
+    expect(remove.querySelector('.anticon-delete')).not.toBeNull()
   })
 
   it('keeps a measure the data source does not project and tags it unknown', () => {
@@ -1841,26 +1863,25 @@ describe('PageEditor container panels', () => {
   it('disables Remove column on the last column', async () => {
     await open({ type: 'columns', columns: [{ width: 12, widgets: [inbox] }] })
 
-    expect(await itemAction(screen.getByTestId('studio-column-0'), 'Remove column')).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    )
+    expect(await itemAction(screen.getByTestId('studio-column-0'), 'Remove column')).toBeDisabled()
   })
 
-  it('draws Add column and Add tab as secondary buttons on their title rows, with no Remove button in an item', async () => {
+  it('draws Add column and Add tab as secondary buttons on their title rows, and a trash icon in each item', async () => {
     await open(columns)
 
     const addColumn = screen.getByRole('button', { name: 'Add column' })
     expect(addColumn.closest('legend')).not.toBeNull()
     expect(addColumn).toHaveClass('ant-btn-variant-outlined')
-    expect(within(screen.getByTestId('studio-column-0')).queryByRole('button', { name: 'Remove column' })).toBeNull()
+    const removeColumn = within(screen.getByTestId('studio-column-0')).getByRole('button', { name: 'Remove column' })
+    expect(removeColumn.querySelector('.anticon-delete')).not.toBeNull()
     cleanup()
 
     await open(tabs)
     const addTab = screen.getByRole('button', { name: 'Add tab' })
     expect(addTab.closest('legend')).not.toBeNull()
     expect(addTab).toHaveClass('ant-btn-variant-outlined')
-    expect(within(screen.getByTestId('studio-tab-0')).queryByRole('button', { name: 'Remove tab' })).toBeNull()
+    const removeTab = within(screen.getByTestId('studio-tab-0')).getByRole('button', { name: 'Remove tab' })
+    expect(removeTab.querySelector('.anticon-delete')).not.toBeNull()
   })
 
   it('sets the texts of a tab label in the draft', async () => {
@@ -1899,7 +1920,7 @@ describe('PageEditor container panels', () => {
   it('disables Remove tab on the last tab', async () => {
     await open({ type: 'tabs', tabs: [tabs.tabs[0]] })
 
-    expect(await itemAction(screen.getByTestId('studio-tab-0'), 'Remove tab')).toHaveAttribute('aria-disabled', 'true')
+    expect(await itemAction(screen.getByTestId('studio-tab-0'), 'Remove tab')).toBeDisabled()
   })
 
   it('edits the key of the title of a section where there is no resource to write texts to', async () => {
@@ -2005,13 +2026,13 @@ describe('PageEditor container panels', () => {
     expect(onChange).toHaveBeenCalledWith('/widgets/0/collapsed', true)
   })
 
-  it('shows a malformed part as JSON only and keeps its Remove column in its menu', async () => {
+  it('shows a malformed part as JSON only and keeps its Remove column as a trash icon', async () => {
     const onChange = await open({ type: 'columns', columns: [{ width: 6, widgets: [inbox] }, 'oops'] })
 
     const part = within(screen.getByTestId('studio-column-1'))
     expect(part.getByTestId('studio-json-only')).toBeVisible()
     const remove = await itemAction(screen.getByTestId('studio-column-1'), 'Remove column')
-    expect(remove).not.toHaveAttribute('aria-disabled', 'true')
+    expect(remove).toBeEnabled()
     await userEvent.click(remove)
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns', [{ width: 6, widgets: [inbox] }])
   })

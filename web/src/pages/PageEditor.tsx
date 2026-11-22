@@ -72,7 +72,7 @@ function JsonOnly() {
 /**
  * The editor of a page. Its General section shows the page's name, title and description, its Parameters section lists the
  * parameters, and its Widgets section shows the widgets as a tree, and a panel for the selected widget. Each parameter
- * is a row with a name, a type, a Required switch and a "…" menu that holds Remove parameter. A `reference` parameter
+ * is a row with a name, a type, a Required switch and a trash icon that removes it. A `reference` parameter
  * also has a target entity and an `enum` parameter has its values, and a type change removes the one the new type does
  * not take. The tree nests the widgets inside `columns`, `tabs` and `section`. Every list has an Add widget picker, and
  * every widget has a Move to picker that lists the other widget lists and a "…" menu with Move up, Move down and Delete.
@@ -233,7 +233,8 @@ export function PageWidgets({
 
 /**
  * The parameters a page declares, each as a row with no box: a name, a type, a Required switch and the fields its type
- * takes, with Remove parameter in the row's "…" menu, see docs/reference/studio-editors-by-kind.md#page-parameters.
+ * takes, with Remove parameter as a trash icon at the row's end, see
+ * docs/reference/studio-editors-by-kind.md#page-parameters.
  */
 function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeHandler }) {
   const t = useText()
@@ -277,12 +278,11 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
                     <PageParameter base={base} parameter={parameter} onChange={onChange} />
                   </div>
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',
                         labelKey: 'shell.studio.page.removeParameter',
-                        destructive: true,
+                        meaning: 'remove',
                         onClick: () => onChange(base, undefined),
                       },
                     ]}
@@ -483,7 +483,6 @@ function WidgetRow({
             }}
           />
           <RowActions
-            fold
             actions={[
               {
                 key: 'moveUp',
@@ -500,7 +499,7 @@ function WidgetRow({
               {
                 key: 'delete',
                 labelKey: 'shell.studio.delete',
-                destructive: true,
+                meaning: 'remove',
                 onClick: () =>
                   tree.onChange(
                     listPointer,
@@ -1136,12 +1135,11 @@ function ChartPanel({
                   )}
                 </Flex>
                 <RowActions
-                  fold
                   actions={[
                     {
                       key: 'remove',
                       labelKey: 'shell.studio.page.removeMeasure',
-                      destructive: true,
+                      meaning: 'remove',
                       disabled: measures.length === 1,
                       onClick: () =>
                         onChange(
@@ -1204,7 +1202,7 @@ function RecordField({
 
 /**
  * The width of each column of a columns widget. Each column is a row with no box, and its Remove column is in the row's
- * "…" menu, off when one column is left. Add column is a secondary button on the Columns title row, see
+ * trash icon, off when one column is left. Add column is a secondary button on the Columns title row, see
  * docs/reference/studio-editors-by-kind.md#container-panels.
  */
 function ColumnsPanel({
@@ -1259,12 +1257,11 @@ function ColumnsPanel({
               )}
             </Flex>
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',
                   labelKey: 'shell.studio.page.removeColumn',
-                  destructive: true,
+                  meaning: 'remove',
                   disabled: columns.length === 1,
                   onClick: () =>
                     onChange(
@@ -1283,8 +1280,8 @@ function ColumnsPanel({
 }
 
 /**
- * The label of each tab of a tabs widget. Each tab is a row with no box, and its Remove tab is in the row's "…" menu, off
- * when one tab is left. Add tab is a secondary button on the Tabs title row.
+ * The label of each tab of a tabs widget. Each tab is a row with no box, and its Remove tab is a trash icon at the row's
+ * end, off when one tab is left. Add tab is a secondary button on the Tabs title row.
  */
 function TabsPanel({
   base,
@@ -1334,12 +1331,11 @@ function TabsPanel({
               )}
             </Flex>
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',
                   labelKey: 'shell.studio.page.removeTab',
-                  destructive: true,
+                  meaning: 'remove',
                   disabled: tabs.length === 1,
                   onClick: () =>
                     onChange(
@@ -1541,8 +1537,8 @@ function ParameterExpressions({
  * parameters. A `startProcess` action has a process and a label. A `delete` action has a label and a `visibleWhen`.
  * Any other action is JSON only, and can be removed. The Adds are one group of secondary buttons on the list's title
  * row: Add navigate action always, Add action for `startProcess` only when `startProcess` is set, and Add delete action
- * only when `deleteAction` is set. Each action is a row with no box, and Remove action is in its "…" menu. The row of
- * the action at `selected` has `aria-current` and sits on the selected tint, and scrolls into view. An Add
+ * only when `deleteAction` is set. Each action is a row with no box, and Remove action is a trash icon at its end. The
+ * row of the action at `selected` has `aria-current` and sits on the selected tint, and scrolls into view. An Add
  * selects the new action, and Remove selects the `widget`. With `layer`, a row of an action that the layer added or
  * changed is marked, and a removed action is a muted row under the rows.
  */
@@ -1603,16 +1599,15 @@ function Actions({
       : []),
   ]
 
-  /** Remove action in the row's "…" menu, which selects the widget. */
-  function removeMenu(actionPointer: string) {
+  /** Remove action as a trash icon at the row's end, which selects the widget. */
+  function removeButton(actionPointer: string) {
     return (
       <RowActions
-        fold
         actions={[
           {
             key: 'remove',
             labelKey: 'shell.studio.page.removeAction',
-            destructive: true,
+            meaning: 'remove',
             onClick: () => {
               onChange(actionPointer, undefined)
               onSelect(widget)
@@ -1643,7 +1638,7 @@ function Actions({
               return (
                 <SelectedMark key={position} testId={`studio-action-${position}`} selected={actionPointer === selected}>
                   <Flex vertical gap="small">
-                    <Flex justify="flex-end">{removeMenu(actionPointer)}</Flex>
+                    <Flex justify="flex-end">{removeButton(actionPointer)}</Flex>
                     <div data-testid={`studio-field-${actionPointer}`}>
                       <JsonOnly />
                     </div>
@@ -1661,7 +1656,7 @@ function Actions({
                         <LayerMarkTag layer={layer} list={pointer} index={position} name={action.name} />
                       )}
                     </Flex>
-                    {removeMenu(actionPointer)}
+                    {removeButton(actionPointer)}
                   </Flex>
                   {action.type === 'navigate' ? (
                     <NavigateFields pointer={actionPointer} action={action} onChange={onChange} />
