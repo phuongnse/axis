@@ -54,6 +54,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { useTableView } from '../platform/useTableView'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
+import type { LabelTextDrafts } from './draftHistory'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
 import { PlatformContext } from './context'
 import { Expression } from './ProcessFields'
@@ -543,8 +544,11 @@ const Fields = memo(function Fields({
   const panels = useContext(DesignerPanelsContext)
   // How the field's panels close when another part's panel opens: quietly, with the focus going to that panel.
   const closeQuietly = useRef(() => {})
+  // Drops what the panel held for its field, read when a field opens, as it is made further down.
+  const dropHeldRef = useRef(() => {})
   useLayoutEffect(() => {
     closeQuietly.current = () => {
+      dropHeldRef.current()
       setStaged(null)
       setStagedErrors({})
       if (latest.current.shown !== null) {
@@ -558,7 +562,9 @@ const Fields = memo(function Fields({
   const openDrawer = useCallback(
     (index: number) => {
       panels?.take('fields')
-      // One side panel shows at a time, so a field opened from the table takes the place of a new field's panel.
+      // One side panel shows at a time, so a field opened from the table takes the place of a new field's panel, and
+      // what the panel held for the last field is dropped.
+      dropHeldRef.current()
       setStaged(null)
       setStagedErrors({})
       setDrawer({ index, open: true })
@@ -704,6 +710,7 @@ const Fields = memo(function Fields({
 
   function addField() {
     panels?.take('fields')
+    dropHeld()
     // An open field's panel gives way to the new field's, as one side panel shows at a time.
     // The new field's panel takes the place of an open field's, and the focus goes into it, not back to the row.
     if (latest.current.shown !== null) {
@@ -725,7 +732,66 @@ const Fields = memo(function Fields({
     }
   }
 
-  const labelDrafts = useContext(LabelTextsContext)
+  // Proposed, #3264: a panel holds what is typed, the open field's settings and its label texts, until Done or Add
+  // field puts them into the page; Cancel, Close and opening another panel drop them.
+  const held = useHeldTexts()
+  const [edit, setEdit] = useState<{ index: number; field: Content } | null>(null)
+  const [editErrors, setEditErrors] = useState<{ label?: string; name?: string }>({})
+  const dropHeld = () => {
+    held.drop()
+    setEdit(null)
+    setEditErrors({})
+  }
+  useLayoutEffect(() => {
+    dropHeldRef.current = dropHeld
+  })
+
+  /** What is wrong with a field before it goes into the page: a label in words and a name no other field has. */
+  function fieldProblems(field: Content | null, others: string[]) {
+    const key = isContent(field?.label) ? text(field.label.textKey) : ''
+    const problem = nameProblem(text(field?.name), others)
+    return {
+      ...(labelled(held.value?.texts[key]) ? {} : { label: t('shell.studio.entity.fieldPanel.labelRequired') }),
+      ...(problem === undefined ? {} : { name: t(problem) }),
+    }
+  }
+
+  /** A change in an open field's panel goes to the field the panel holds. */
+  function changeEdit(pointer: string, value: unknown) {
+    setEditErrors({})
+    if (shown === null) {
+      return
+    }
+    const prefix = `/fields/${shown}`
+    const base = edit?.index === shown ? edit.field : isContent(fields?.[shown]) ? (fields![shown] as Content) : {}
+    if (pointer === prefix) {
+      setEdit({ index: shown, field: isContent(value) ? value : {} })
+    } else if (pointer.startsWith(`${prefix}/`)) {
+      setEdit({ index: shown, field: setAt(base, pointer.slice(prefix.length), value) as Content })
+    } else {
+      onChange(pointer, value)
+    }
+  }
+
+  /** Done puts the open field's held edits into the page, when its label and name are right. */
+  function commitEdit() {
+    if (shown === null) {
+      return
+    }
+    const field = edit?.index === shown ? edit.field : isContent(fields?.[shown]) ? (fields![shown] as Content) : {}
+    const errors = fieldProblems(field, namesExcept(fields!, shown))
+    if (errors.label !== undefined || errors.name !== undefined) {
+      setEditErrors(errors)
+      return
+    }
+    if (edit?.index === shown) {
+      onChange(`/fields/${shown}`, field)
+    }
+    held.flush()
+    setEdit(null)
+    setEditErrors({})
+    closeDrawer()
+  }
 
   /**
    * Proposed, #3264: Add field puts the new field into the draft only with a label, in words in any language, and a
@@ -733,18 +799,14 @@ const Fields = memo(function Fields({
    * with the errors under the label and the name.
    */
   function commitStaged() {
-    const key = isContent(staged?.label) ? text(staged.label.textKey) : ''
-    const problem = nameProblem(text(staged?.name), namesExcept(fields!, null))
-    const errors = {
-      ...(labelled(labelDrafts?.texts[key]) ? {} : { label: t('shell.studio.entity.fieldPanel.labelRequired') }),
-      ...(problem === undefined ? {} : { name: t(problem) }),
-    }
+    const errors = fieldProblems(staged, namesExcept(fields!, null))
     if (errors.label !== undefined || errors.name !== undefined) {
       setStagedErrors(errors)
       return
     }
     onChange('/fields', [...fields!, staged])
     onOriginsChange?.([...rowOrigins(fields!, origins), null])
+    held.flush()
     setStaged(null)
     setStagedErrors({})
   }
@@ -758,6 +820,9 @@ const Fields = memo(function Fields({
       </SectionPart>
     )
   }
+
+  // The open field as the panel holds it, its held edits over the draft's.
+  const shownField = shown === null ? undefined : edit?.index === shown ? edit.field : fields[shown]
 
   const columns: AxisColumn<FieldRow>[] = [
     {
@@ -874,51 +939,53 @@ const Fields = memo(function Fields({
           <RemovedRows layer={layer} list="/fields" />
         </Flex>
       </div>
-      <FieldDrawer
-        index={shown}
-        open={drawerOpen && staged === null}
-        focusPath={focusPath}
-        onFocused={clearFocusPath}
-        field={shown === null ? undefined : fields[shown]}
-        otherNames={namesExcept(fields, shown)}
-        currencyNames={
-          shown !== null && isContent(fields[shown]) && editableSettings(fields[shown]).includes('currency')
-            ? currencyNames
-            : undefined
-        }
-        matchSources={
-          shown !== null && isContent(fields[shown]) && editableSettings(fields[shown]).includes('match')
-            ? matchSources
-            : undefined
-        }
-        readOnly={readOnly}
-        warning={shown === null ? undefined : warnings?.get(shown)}
-        validations={validations}
-        onChange={onChange}
-        onClose={closeDrawer}
-      />
-      {staged !== null && (
+      <LabelTextsContext.Provider value={held.value}>
         <FieldDrawer
-          index={fields.length}
-          open
-          focusPath={null}
+          index={shown}
+          open={drawerOpen && staged === null}
+          focusPath={focusPath}
           onFocused={clearFocusPath}
-          field={staged}
-          otherNames={namesExcept(fields, null)}
-          currencyNames={editableSettings(staged).includes('currency') ? currencyNames : undefined}
-          matchSources={editableSettings(staged).includes('match') ? matchSources : undefined}
-          readOnly={false}
-          warning={undefined}
-          validations={undefined}
-          onChange={changeStaged}
+          field={shownField}
+          currencyNames={
+            isContent(shownField) && editableSettings(shownField).includes('currency') ? currencyNames : undefined
+          }
+          matchSources={
+            isContent(shownField) && editableSettings(shownField).includes('match') ? matchSources : undefined
+          }
+          readOnly={readOnly}
+          warning={shown === null ? undefined : warnings?.get(shown)}
+          validations={validations}
+          onChange={changeEdit}
           onClose={() => {
-            setStaged(null)
-            setStagedErrors({})
+            dropHeld()
+            closeDrawer()
           }}
-          onAdd={commitStaged}
-          errors={stagedErrors}
+          onDone={commitEdit}
+          errors={editErrors}
         />
-      )}
+        {staged !== null && (
+          <FieldDrawer
+            index={fields.length}
+            open
+            focusPath={null}
+            onFocused={clearFocusPath}
+            field={staged}
+            currencyNames={editableSettings(staged).includes('currency') ? currencyNames : undefined}
+            matchSources={editableSettings(staged).includes('match') ? matchSources : undefined}
+            readOnly={false}
+            warning={undefined}
+            validations={undefined}
+            onChange={changeStaged}
+            onClose={() => {
+              held.drop()
+              setStaged(null)
+              setStagedErrors({})
+            }}
+            onAdd={commitStaged}
+            errors={stagedErrors}
+          />
+        )}
+      </LabelTextsContext.Provider>
     </SectionPart>
   )
 })
@@ -1140,7 +1207,9 @@ function fieldLabel(field: unknown, names: StudioNames | undefined, locale: stri
 const LabelCell = memo(function LabelCell({ field }: { field: unknown }) {
   const names = useContext(StudioNamesContext)
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const label = fieldLabel(field, names, locale)
+  // Proposed, #3264: the label as the draft has it, typed in the panel and not yet saved, over the saved texts.
+  const drafted = useMessageText(isContent(field) ? field.label : undefined)
+  const label = drafted || fieldLabel(field, names, locale)
   return label === '' ? <EmptyDash /> : label
 })
 
@@ -1216,8 +1285,8 @@ function focusInDrawer(root: HTMLElement, path: string | null, pointer: string, 
  */
 const FieldDrawer = memo(function FieldDrawer({
   onAdd,
+  onDone,
   errors,
-  otherNames,
   index,
   open,
   focusPath,
@@ -1244,10 +1313,10 @@ const FieldDrawer = memo(function FieldDrawer({
   onChange: ChangeHandler
   onClose: () => void
   onAdd?: () => void
+  /** Proposed, #3264: puts an open field's held edits into the page, as Done. */
+  onDone?: () => void
   /** Proposed, #3264: what Add field found wrong with a new field, under its label and its name. */
   errors?: { label?: string; name?: string }
-  /** The names of the entity's other fields, which the field's name may not take. */
-  otherNames: readonly string[]
 }) {
   const t = useText()
   const { spacing } = useDesignTokens()
@@ -1262,30 +1331,11 @@ const FieldDrawer = memo(function FieldDrawer({
   // The drawer's root, set once its content has drawn, so the focus effect below runs after the drawer has opened.
   const [root, setRoot] = useState<HTMLElement | null>(null)
   const labelTexts = useContext(LabelTextsContext)
-  const labelPointer = `${pointer}/label`
-  const labelKey = isContent(content.label) ? text(content.label.textKey) : ''
-  // Proposed, #3264: an open field's label and name go into the draft only while they are valid, so the draft always
-  // has both. While one is not, the panel shows what was typed with its error, and the draft keeps the last valid one.
-  const [typed, setTyped] = useState<{ index: number | null; name?: string; label?: Record<string, string> }>({
-    index,
-  })
-  // Another field, or the panel opened anew, starts with what the draft holds, dropping what was typed for the last one:
-  // what was typed belongs to the open panel's field, and a closed panel has none.
-  const typedFor = open ? index : null
-  if (typed.index !== typedFor) {
-    setTyped({ index: typedFor })
-  }
-  const mine = typed.index === typedFor ? typed : { index: typedFor }
-  const shownName = mine.name ?? name
   const editing = onAdd === undefined
-  const nameError = editing && mine.name !== undefined ? nameProblem(mine.name, otherNames) : undefined
-  const labelError = editing && mine.label !== undefined && !labelled(mine.label)
-  const namingTexts = useMemo(() => {
-    if (labelTexts === null) {
-      return labelTexts
-    }
-    if (!editing) {
-      return nameTouched
+  // A new field takes its name from its label until the name is changed by hand.
+  const namingTexts = useMemo(
+    () =>
+      labelTexts === null || editing || nameTouched
         ? labelTexts
         : {
             ...labelTexts,
@@ -1293,50 +1343,20 @@ const FieldDrawer = memo(function FieldDrawer({
               labelTexts.onTextsChange(at, key, texts)
               onChange(`${pointer}/name`, nameFromLabel(texts[author] ?? texts.en ?? ''))
             },
-          }
-    }
-    return {
-      ...labelTexts,
-      texts: mine.label === undefined ? labelTexts.texts : { ...labelTexts.texts, [labelKey]: mine.label },
-      onTextsChange: (at: string, key: string, texts: Record<string, string>) => {
-        if (at === labelPointer && !labelled(texts)) {
-          setTyped((current) => ({ ...(current.index === index ? current : { index }), label: texts }))
-          return
-        }
-        setTyped((current) => ({ ...(current.index === index ? current : { index }), label: undefined }))
-        labelTexts.onTextsChange(at, key, texts)
-      },
-    }
-  }, [labelTexts, editing, nameTouched, onChange, pointer, author, mine.label, labelKey, labelPointer, index])
+          },
+    [labelTexts, editing, nameTouched, onChange, pointer, author],
+  )
   const changeName = (next: string) => {
     setNameTouched(true)
-    if (editing && nameProblem(next, otherNames) !== undefined) {
-      setTyped((current) => ({ ...(current.index === index ? current : { index }), name: next }))
-      return
-    }
-    setTyped((current) => ({ ...(current.index === index ? current : { index }), name: undefined }))
     onChange(`${pointer}/name`, next)
   }
-  const labelErrorText = errors?.label ?? (labelError ? t('shell.studio.entity.fieldPanel.labelRequired') : undefined)
-  // Done closes only a field whose label and name are valid, and otherwise takes the person to the first box in error.
-  // Close puts back the last valid ones, which the draft holds.
-  const done = () => {
-    if (nameError === undefined && !labelError) {
-      onClose()
-    } else {
-      focusFirstError(root)
-    }
-  }
-  // Add field's errors take the person to the first box in error as they show.
+  const labelErrorText = errors?.label
+  // Done and Add field's errors take the person to the first box in error as they show.
   useEffect(() => {
     if (errors?.label !== undefined || errors?.name !== undefined) {
       focusFirstError(root)
     }
   }, [errors, root])
-  const close = () => {
-    setTyped({ index })
-    onClose()
-  }
   // The field the panel last moved focus into, so opening another field in the open panel moves focus into it too.
   const wasOpen = useRef<number | null>(null)
   const wantFocus = useRef(false)
@@ -1369,22 +1389,20 @@ const FieldDrawer = memo(function FieldDrawer({
         id="studio-field-panel"
         testId="studio-field-panel"
         title={onAdd ? t('shell.studio.entity.newField') : name || t('shell.studio.entity.unnamedField')}
-        onClose={close}
+        onClose={onClose}
         closeNameKey="shell.studio.entity.fieldPanel.close"
         actions={
-          readOnly ? undefined : onAdd ? (
+          readOnly ? undefined : (
+            // Proposed, #3264: the panel holds what is typed until its main action puts it into the page, Done for a
+            // field, Add field for a new one; Cancel and Close drop it.
             <>
-              <AxisButton role="secondary" onClick={close}>
+              <AxisButton role="secondary" onClick={onClose}>
                 {t('shell.studio.cancel')}
               </AxisButton>
-              <AxisButton role="main" onClick={onAdd}>
-                {t('shell.studio.entity.addField')}
+              <AxisButton role="main" onClick={onAdd ?? onDone}>
+                {t(onAdd ? 'shell.studio.entity.addField' : 'shell.studio.entity.fieldPanel.done')}
               </AxisButton>
             </>
-          ) : (
-            <AxisButton role="main" onClick={done}>
-              {t('shell.studio.entity.fieldPanel.done')}
-            </AxisButton>
           )
         }
       >
@@ -1424,12 +1442,8 @@ const FieldDrawer = memo(function FieldDrawer({
                         </AxisFieldGroup>
                       </div>
                       <div data-testid={`studio-field-${pointer}/name`}>
-                        <AxisField
-                          {...fieldTexts(t, 'fields.name')}
-                          required
-                          error={errors?.name ?? (nameError === undefined ? undefined : t(nameError))}
-                        >
-                          <Input value={shownName} onChange={(event) => changeName(event.target.value)} />
+                        <AxisField {...fieldTexts(t, 'fields.name')} required error={errors?.name}>
+                          <Input value={name} onChange={(event) => changeName(event.target.value)} />
                         </AxisField>
                       </div>
                       <div data-testid={`studio-field-${pointer}/type`}>
@@ -2133,8 +2147,11 @@ function NamedItems({
   write: (next: unknown[]) => void
   columns: AxisColumn<NamedRow>[]
   newItem: (preset: string) => Content
-  /** What is wrong with a new item beside its name, by the input's name, such as `message` or `fields`. */
-  problems: (item: Content) => Record<string, string>
+  /**
+   * What is wrong with an item beside its name before it goes into the page, by the input's name, such as `message` or
+   * `fields`, given the label texts the panel holds.
+   */
+  problems: (item: Content, texts: LabelTextDrafts | undefined) => Record<string, string>
   body: (args: {
     pointer: string
     content: Content
@@ -2151,6 +2168,19 @@ function NamedItems({
   const [open, setOpen] = useState<number | null>(null)
   const [staged, setStaged] = useState<Content | null>(null)
   const [stagedErrors, setStagedErrors] = useState<Record<string, string>>({})
+  // Proposed, #3264: the panel holds an open item's edits and its label texts until Done puts them into the page.
+  const held = useHeldTexts()
+  const [edit, setEdit] = useState<{ index: number; item: Content } | null>(null)
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({})
+  const dropHeld = () => {
+    held.drop()
+    setEdit(null)
+    setEditErrors({})
+  }
+  const dropHeldRef = useRef(dropHeld)
+  useLayoutEffect(() => {
+    dropHeldRef.current = dropHeld
+  })
   const latest = useRef({ list, write })
   useLayoutEffect(() => {
     latest.current = { list, write }
@@ -2158,6 +2188,7 @@ function NamedItems({
   useLayoutEffect(
     () =>
       panels?.register(owner, () => {
+        dropHeldRef.current()
         setOpen(null)
         setStaged(null)
         setStagedErrors({})
@@ -2170,12 +2201,14 @@ function NamedItems({
     opener.current = {
       open: (index) => {
         panels?.take(owner)
+        dropHeld()
         setStaged(null)
         setStagedErrors({})
         setOpen(index)
       },
       add: (preset) => {
         panels?.take(owner)
+        dropHeld()
         setOpen(null)
         setStagedErrors({})
         setStaged(newItem(preset))
@@ -2218,16 +2251,62 @@ function NamedItems({
     }
   }
 
+  /** What is wrong with an item before it goes into the page: its name, then the part's own checks. */
+  function itemProblems(item: Content, others: string[]) {
+    const problem = nameProblem(text(item.name), others, texts.nameTaken)
+    return { ...(problem === undefined ? {} : { name: t(problem) }), ...problems(item, held.value?.texts) }
+  }
+
   function commitStaged() {
-    const problem = nameProblem(text(staged?.name), names, texts.nameTaken)
-    const errors = { ...(problem === undefined ? {} : { name: t(problem) }), ...problems(staged ?? {}) }
+    const errors = itemProblems(staged ?? {}, names)
     if (Object.keys(errors).length > 0) {
       setStagedErrors(errors)
       return
     }
     write([...list!, staged])
+    held.flush()
     setStaged(null)
     setStagedErrors({})
+  }
+
+  /** A change in an open item's panel goes to the item the panel holds. */
+  function changeEdit(pointer: string, value: unknown) {
+    setEditErrors({})
+    if (open === null) {
+      return
+    }
+    const prefix = `${listPointer}/${open}`
+    const base = edit?.index === open ? edit.item : isContent(list![open]) ? (list![open] as Content) : {}
+    if (pointer === prefix) {
+      setEdit({ index: open, item: isContent(value) ? value : {} })
+    } else if (pointer.startsWith(`${prefix}/`)) {
+      setEdit({ index: open, item: setAt(base, pointer.slice(prefix.length), value) as Content })
+    } else {
+      onChange(pointer, value)
+    }
+  }
+
+  /** Done puts the open item's held edits into the page, when its name and the part's checks are right. */
+  function commitEdit() {
+    if (open === null) {
+      return
+    }
+    const item = edit?.index === open ? edit.item : isContent(list![open]) ? (list![open] as Content) : {}
+    const errors = itemProblems(
+      item,
+      names.filter((_, other) => other !== open),
+    )
+    if (Object.keys(errors).length > 0) {
+      setEditErrors(errors)
+      return
+    }
+    if (edit?.index === open) {
+      onChange(`${listPointer}/${open}`, item)
+    }
+    held.flush()
+    setEdit(null)
+    setEditErrors({})
+    setOpen(null)
   }
 
   const nameColumn: AxisColumn<NamedRow> = {
@@ -2319,64 +2398,70 @@ function NamedItems({
           <RemovedRows layer={layer} list={listPointer} />
         </Flex>
       </div>
-      {open !== null && open < list.length && (
-        <NamedItemPanel
-          owner={owner}
-          index={open}
-          item={list[open]}
-          otherNames={names.filter((_, other) => other !== open)}
-          readOnly={readOnly}
-          onChange={onChange}
-          onClose={() => setOpen(null)}
-          body={body}
-        />
-      )}
-      {staged !== null && (
-        <NamedItemPanel
-          owner={owner}
-          index={list.length}
-          item={staged}
-          otherNames={names}
-          readOnly={false}
-          onChange={changeStaged}
-          onClose={() => {
-            setStaged(null)
-            setStagedErrors({})
-          }}
-          onAdd={commitStaged}
-          errors={stagedErrors}
-          body={body}
-        />
-      )}
+      <LabelTextsContext.Provider value={held.value}>
+        {open !== null && open < list.length && (
+          <NamedItemPanel
+            owner={owner}
+            index={open}
+            item={edit?.index === open ? edit.item : list[open]}
+            readOnly={readOnly}
+            onChange={changeEdit}
+            onClose={() => {
+              dropHeld()
+              setOpen(null)
+            }}
+            onDone={commitEdit}
+            errors={editErrors}
+            body={body}
+          />
+        )}
+        {staged !== null && (
+          <NamedItemPanel
+            owner={owner}
+            index={list.length}
+            item={staged}
+            readOnly={false}
+            onChange={changeStaged}
+            onClose={() => {
+              held.drop()
+              setStaged(null)
+              setStagedErrors({})
+            }}
+            onAdd={commitStaged}
+            errors={stagedErrors}
+            body={body}
+          />
+        )}
+      </LabelTextsContext.Provider>
     </SectionPart>
   )
 }
 
 /**
  * Proposed, #3264: an item of a list part in the platform's side panel, as a field is: its name, then the part's own
- * `body`. Its name goes into the draft only while it is valid; Done closes the panel, and a new item, `onAdd` given, is
- * held by the panel until its Add.
+ * `body`. The panel holds what is typed until Done, or Add for a new item, puts it into the page; Cancel and Close drop
+ * it.
  */
 function NamedItemPanel({
   owner,
   index,
   item,
-  otherNames,
   readOnly,
   onChange,
   onClose,
   onAdd,
+  onDone,
   errors = {},
   body,
 }: {
   owner: ListOwner
   index: number
   item: unknown
-  otherNames: readonly string[]
   readOnly: boolean
   onChange: ChangeHandler
   onClose: () => void
   onAdd?: () => void
+  onDone?: () => void
   errors?: Record<string, string>
   body: Parameters<typeof NamedItems>[0]['body']
 }) {
@@ -2386,62 +2471,32 @@ function NamedItemPanel({
   const pointer = `/${owner}/${index}`
   const content = isContent(item) ? item : {}
   const name = text(content.name)
-  const editing = onAdd === undefined
-  const [typed, setTyped] = useState<{ index: number; name?: string }>({ index })
-  if (typed.index !== index) {
-    setTyped({ index })
-  }
-  const shownName = typed.index === index && typed.name !== undefined ? typed.name : name
-  const nameError =
-    editing && typed.name !== undefined ? nameProblem(typed.name, otherNames, texts.nameTaken) : undefined
   const [root, setRoot] = useState<HTMLElement | null>(null)
   // The panel opens on its first box, the name, whichever item it shows.
   useEffect(() => {
     root?.querySelector<HTMLElement>('input')?.focus()
   }, [root, index])
+  // Done and Add's errors take the person to the first box in error as they show.
   useEffect(() => {
     if (Object.keys(errors).length > 0) {
       focusFirstError(root)
     }
   }, [errors, root])
-  const changeName = (next: string) => {
-    if (editing && nameProblem(next, otherNames, texts.nameTaken) !== undefined) {
-      setTyped({ index, name: next })
-      return
-    }
-    setTyped({ index })
-    onChange(`${pointer}/name`, next)
-  }
-  const close = () => {
-    setTyped({ index })
-    onClose()
-  }
-  const done = () => {
-    if (nameError === undefined) {
-      onClose()
-    } else {
-      focusFirstError(root)
-    }
-  }
   return (
     <SidePanel
       id={`studio-${owner}-panel`}
       testId={`studio-${owner}-panel`}
-      title={editing ? name || t(texts.newTitle) : t(texts.newTitle)}
-      onClose={close}
+      title={onAdd ? t(texts.newTitle) : name || t(texts.newTitle)}
+      onClose={onClose}
       closeNameKey={texts.close}
       actions={
-        readOnly ? undefined : editing ? (
-          <AxisButton role="main" onClick={done}>
-            {t('shell.studio.entity.fieldPanel.done')}
-          </AxisButton>
-        ) : (
+        readOnly ? undefined : (
           <>
-            <AxisButton role="secondary" onClick={close}>
+            <AxisButton role="secondary" onClick={onClose}>
               {t('shell.studio.cancel')}
             </AxisButton>
-            <AxisButton role="main" onClick={onAdd}>
-              {t(texts.add)}
+            <AxisButton role="main" onClick={onAdd ?? onDone}>
+              {t(onAdd ? texts.add : 'shell.studio.entity.fieldPanel.done')}
             </AxisButton>
           </>
         )
@@ -2450,12 +2505,8 @@ function NamedItemPanel({
       <ContentInsetContext.Provider value={spacing.sm}>
         <Flex vertical gap="middle" ref={setRoot} key={index}>
           <div data-testid={`studio-field-${pointer}/name`}>
-            <AxisField
-              {...fieldTexts(t, `${owner}.name`)}
-              required
-              error={errors.name ?? (nameError === undefined ? undefined : t(nameError))}
-            >
-              <Input value={shownName} onChange={(event) => changeName(event.target.value)} />
+            <AxisField {...fieldTexts(t, `${owner}.name`)} required error={errors.name}>
+              <Input value={name} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
             </AxisField>
           </div>
           {body({ pointer, content, onChange, readOnly, errors })}
@@ -2480,7 +2531,6 @@ const Validations = memo(function Validations({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const labelDrafts = useContext(LabelTextsContext)
   const list = validations === undefined ? [] : Array.isArray(validations) ? validations : undefined
   const fieldOptions = fields.flatMap((field) =>
     isContent(field) && text(field.name) !== ''
@@ -2511,11 +2561,9 @@ const Validations = memo(function Validations({
         },
       ]}
       newItem={(field) => ({ name: '', expression: '', message: { textKey: '' }, ...(field === '' ? {} : { field }) })}
-      problems={(item): Record<string, string> => {
+      problems={(item, held): Record<string, string> => {
         const key = isContent(item.message) ? text(item.message.textKey) : ''
-        return labelled(labelDrafts?.texts[key])
-          ? {}
-          : { message: t('shell.studio.entity.validationPanel.messageRequired') }
+        return labelled(held?.[key]) ? {} : { message: t('shell.studio.entity.validationPanel.messageRequired') }
       }}
       body={({ pointer, content, onChange: change, readOnly: off, errors }) => (
         <>
@@ -2664,6 +2712,39 @@ const Indexes = memo(function Indexes({
     />
   )
 })
+
+/**
+ * Proposed, #3264: the label texts a side panel holds until its main action, Done or Add, puts them into the page. Its
+ * `value` is the page's label texts with the held ones over them, for the panel's `LabelTextsContext`, so the panel shows
+ * what is typed while the page does not. `flush` writes what is held into the draft, and `drop` forgets it.
+ */
+function useHeldTexts() {
+  const outer = useContext(LabelTextsContext)
+  const [held, setHeld] = useState<Record<string, { pointer: string; texts: Record<string, string> }>>({})
+  const value = useMemo(
+    () =>
+      outer === null
+        ? null
+        : {
+            ...outer,
+            texts: {
+              ...outer.texts,
+              ...Object.fromEntries(Object.entries(held).map(([key, own]) => [key, own.texts])),
+            },
+            onTextsChange: (pointer: string, key: string, texts: Record<string, string>) =>
+              setHeld((current) => ({ ...current, [key]: { pointer, texts } })),
+          },
+    [outer, held],
+  )
+  const flush = () => {
+    for (const [key, { pointer, texts }] of Object.entries(held)) {
+      outer?.onTextsChange(pointer, key, texts)
+    }
+    setHeld({})
+  }
+  const drop = () => setHeld({})
+  return { value, flush, drop }
+}
 
 /**
  * The text of a label, such as a validation's message, in the author's language, else in English, from the draft's
