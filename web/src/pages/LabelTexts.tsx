@@ -23,9 +23,20 @@ type Resource = NonNullable<React.ContextType<typeof LabelTextsContext>>
  * docs/reference/studio.md#label-texts. A label with no key, or an empty one, gets a key made from the resource and the
  * path, which is never shown. Other labels that use the key are counted, because writing the texts changes them too.
  * Outside the resource's context, as in the module editor, it is the plain key box, because a module layer's label is
- * a key and a save there writes no text.
+ * a key and a save there writes no text. `invalid` marks the box that a person types in as in error, once the screen
+ * refuses the label, as the caller's field does, see docs/reference/actions-and-controls.md#fields.
  */
-export function LabelTexts({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
+export function LabelTexts({
+  pointer,
+  value,
+  onChange,
+  invalid,
+}: {
+  pointer: string
+  value: unknown
+  onChange: ChangeHandler
+  invalid?: boolean
+}) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const resource = useContext(LabelTextsContext)
@@ -35,6 +46,8 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
     return (
       <Input
         aria-label={t('shell.studio.labelKey')}
+        aria-invalid={invalid || undefined}
+        status={invalid ? 'error' : undefined}
         value={typeof textKey === 'string' ? textKey : ''}
         onChange={(event) => onChange(`${pointer}/textKey`, event.target.value)}
       />
@@ -47,7 +60,16 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
       </div>
     )
   }
-  return <LabelEditor pointer={pointer} value={value} onChange={onChange} names={names} resource={resource} />
+  return (
+    <LabelEditor
+      pointer={pointer}
+      value={value}
+      onChange={onChange}
+      names={names}
+      resource={resource}
+      invalid={invalid}
+    />
+  )
 }
 
 function LabelEditor({
@@ -56,12 +78,14 @@ function LabelEditor({
   onChange,
   names,
   resource,
+  invalid,
 }: {
   pointer: string
   value: unknown
   onChange: ChangeHandler
   names: StudioNames
   resource: Resource
+  invalid?: boolean
 }) {
   const t = useText()
   const { colour, size, spacing } = useDesignTokens()
@@ -115,6 +139,8 @@ function LabelEditor({
       <div>
         <Input
           aria-label={shown === undefined ? undefined : languageName(shown, author)}
+          aria-invalid={invalid || undefined}
+          status={invalid ? 'error' : undefined}
           value={shown === undefined ? '' : (texts[shown] ?? '')}
           onChange={(event) => shown !== undefined && changeTexts({ ...texts, [shown]: event.target.value })}
           suffix={

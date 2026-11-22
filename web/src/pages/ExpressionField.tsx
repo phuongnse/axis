@@ -8,8 +8,9 @@ const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 /**
  * The editor of one expression, the one way every place draws it: the expression editor when `check` says where the
- * draft is checked, a plain box otherwise. The `id`, `aria-describedby` and `aria-required` that `AxisField` gives its
- * input reach the plain boxes only, as the expression editor does not take them yet. It keeps its own name.
+ * draft is checked, a plain box otherwise. The `id`, `aria-describedby`, `aria-required`, `aria-invalid` and `status` that
+ * `AxisField` gives its input reach the plain boxes only, as the expression editor does not take them yet. It keeps its
+ * own name.
  */
 export function ExpressionField({
   check,
@@ -21,6 +22,8 @@ export function ExpressionField({
   id,
   'aria-describedby': describedBy,
   'aria-required': ariaRequired,
+  'aria-invalid': ariaInvalid,
+  status,
 }: {
   check: ExpressionCheckValue | null
   pointer: string
@@ -31,6 +34,8 @@ export function ExpressionField({
   id?: string
   'aria-describedby'?: string
   'aria-required'?: boolean
+  'aria-invalid'?: boolean
+  status?: 'error'
 }) {
   if (check === null) {
     return (
@@ -39,6 +44,8 @@ export function ExpressionField({
         id={id}
         aria-describedby={describedBy}
         aria-required={ariaRequired}
+        aria-invalid={ariaInvalid}
+        status={status}
         value={value}
         onChange={(event) => onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)}
       />
@@ -52,6 +59,8 @@ export function ExpressionField({
           id={id}
           aria-describedby={describedBy}
           aria-required={ariaRequired}
+          aria-invalid={ariaInvalid}
+          status={status}
           value={value}
           readOnly
           aria-busy="true"

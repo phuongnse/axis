@@ -341,16 +341,20 @@ describe('AxisField status', () => {
   })
 })
 
-function renderOutside(field: React.ReactNode) {
-  return render(
+function outsideTree(field: React.ReactNode) {
+  return (
     <ThemeModeProvider initialMode="light">
       <ConfigProvider theme={{ token: { motion: false } }}>
         <TextProvider catalogs={catalogs} development={false}>
           {field}
         </TextProvider>
       </ConfigProvider>
-    </ThemeModeProvider>,
+    </ThemeModeProvider>
   )
+}
+
+function renderOutside(field: React.ReactNode) {
+  return render(outsideTree(field))
 }
 
 describe('AxisField outside a form', () => {
@@ -457,6 +461,50 @@ describe('AxisField outside a form', () => {
         <Input />
       </AxisField>,
     ).toBeDefined()
+  })
+})
+
+describe('AxisField error outside a form', () => {
+  it('draws the error under the input, marks the input in error and puts the error first in its description', () => {
+    renderOutside(
+      <AxisField label="Name" help="Letters and digits." error="Enter a name.">
+        <Input value="" onChange={() => {}} />
+      </AxisField>,
+    )
+
+    const input = screen.getByRole('textbox', { name: 'Name' })
+    expect(screen.getByText('Enter a name.')).toBeVisible()
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(input).toHaveClass('ant-input-status-error')
+    expect(input).toHaveAccessibleDescription('Enter a name. Letters and digits.')
+  })
+
+  it('marks no input and draws no error while the field has none', () => {
+    renderOutside(
+      <AxisField label="Name" help="Letters and digits.">
+        <Input value="" onChange={() => {}} />
+      </AxisField>,
+    )
+
+    const input = screen.getByRole('textbox', { name: 'Name' })
+    expect(input).not.toHaveAttribute('aria-invalid')
+    expect(input).not.toHaveClass('ant-input-status-error')
+    expect(input).toHaveAccessibleDescription('Letters and digits.')
+  })
+
+  it('takes the error and its mark away once the caller drops the error', () => {
+    const field = (error?: string) => (
+      <AxisField label="Name" help="Letters and digits." error={error}>
+        <Input value="Orders" onChange={() => {}} />
+      </AxisField>
+    )
+    const { rerender } = renderOutside(field('Use a shorter name.'))
+    expect(screen.getByText('Use a shorter name.')).toBeVisible()
+
+    rerender(outsideTree(field()))
+
+    expect(screen.queryByText('Use a shorter name.')).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Name' })).not.toHaveAttribute('aria-invalid')
   })
 })
 

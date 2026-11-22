@@ -6,7 +6,13 @@ import { requiredMark } from './requiredMark'
 import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
 
-type FieldInput = ReactElement<{ id?: string; 'aria-describedby'?: string; onChange?: (...args: never[]) => void }>
+type FieldInput = ReactElement<{
+  id?: string
+  'aria-describedby'?: string
+  'aria-invalid'?: boolean
+  status?: 'error'
+  onChange?: (...args: never[]) => void
+}>
 
 /** What the screen found about the field beyond its rules, see docs/reference/actions-and-controls.md#fields. */
 export type AxisFieldStatus =
@@ -29,6 +35,8 @@ type FormFieldProps = {
   initialValue?: FormItemProps['initialValue']
   /** What the screen found about the field, such as whether a name is free. It takes the place of the field's own errors while shown. */
   status?: AxisFieldStatus
+  /** A field in a form takes its refusal as a `status`, so it takes no `error`. */
+  error?: never
   /** A field in a form is marked required by its `requiredMessage`, the one way to mark it. */
   required?: never
   hideLabel?: never
@@ -47,6 +55,12 @@ type OwnFieldProps = {
   getValueFromEvent?: never
   initialValue?: never
   status?: never
+  /**
+   * The message under the input, once the screen refuses its value, such as "Enter a name.". The input is marked
+   * `aria-invalid` and drawn in the error look. The message goes first in the input's description. The caller drops it
+   * once the value is right.
+   */
+  error?: string
   /** Marks the field required: the shared `requiredMark` after the label and `aria-required` on the input. The screen checks the value. */
   required?: boolean
   /** Hides the label from the eye while it still names the input, for a control in a table cell whose row and column name it. */
@@ -90,6 +104,10 @@ function isEmpty(value: unknown): boolean {
  * A `status` on a field with a `name` shows a check's result under the input: busy while it runs, a message a screen
  * reader hears when it passed, and an error or a warning when it refused or failed.
  *
+ * An `error` on a field without a `name` shows the screen's refusal the same way: the message under the input in
+ * `dangerText`, and the input marked `aria-invalid` in its error look. A group of fields takes the same `error` in
+ * `AxisFieldGroup`, and the caller marks the inputs inside it.
+ *
  * See docs/reference/actions-and-controls.md#fields and docs/reference/frontend.md#platform-field-help.
  */
 export function AxisField(props: AxisFieldProps) {
@@ -123,7 +141,7 @@ function statusItemProps(
 }
 
 /** A field the caller holds the value of: a label tied to the input, then the help and the input. */
-function OwnField({ label, help, required, hideLabel, children }: OwnFieldProps) {
+function OwnField({ label, help, error, required, hideLabel, children }: OwnFieldProps) {
   const { colour } = useDesignTokens()
   const ownId = useId()
   const id = children.props.id ?? ownId
@@ -139,7 +157,13 @@ function OwnField({ label, help, required, hideLabel, children }: OwnFieldProps)
       >
         {requiredMark(label, { required: required === true })}
       </label>
-      <HelpedInput help={help} input={children} id={id} {...(required === true ? { 'aria-required': true } : {})} />
+      <HelpedInput
+        help={help}
+        input={children}
+        id={id}
+        error={error}
+        {...(required === true ? { 'aria-required': true } : {})}
+      />
     </div>
   )
 }
@@ -199,21 +223,29 @@ type HelpedInputProps = {
   help: string
   input: FieldInput
   status?: AxisFieldStatus
+  /** The message under the input, which marks the input as in error. */
+  error?: string
   id?: string
   'aria-describedby'?: string
   'aria-required'?: boolean
   onChange?: (...args: never[]) => void
 }
 
-/** The help and the input under the label. The help joins the input's description, after the error Ant Design adds. */
+/**
+ * The help and the input under the label, and the error under the input. The error goes first in the input's
+ * description, then the help, as the form's field does with Ant Design's error.
+ */
 const HelpedInput = forwardRef(function HelpedInput(
-  { help, input, status, 'aria-describedby': described, ...control }: HelpedInputProps,
+  { help, input, status, error, 'aria-describedby': described, ...control }: HelpedInputProps,
   ref: Ref<unknown>,
 ) {
   const { spacing, colour } = useDesignTokens()
   const helpId = `${useId()}-help`
+  const errorId = `${useId()}-error`
   const own = input.props['aria-describedby']
-  const joined = [help === '' ? undefined : helpId, described, own].filter((id) => id !== undefined)
+  const joined = [error === undefined ? undefined : errorId, help === '' ? undefined : helpId, described, own].filter(
+    (id) => id !== undefined,
+  )
   const describedBy = joined.length === 0 ? undefined : joined.join(' ')
   return (
     <>
@@ -237,7 +269,13 @@ const HelpedInput = forwardRef(function HelpedInput(
         ref,
         'aria-describedby': describedBy,
         'aria-busy': status?.state === 'running' ? true : undefined,
+        ...(error === undefined ? {} : { 'aria-invalid': true, status: 'error' }),
       } as object)}
+      {error !== undefined && (
+        <div id={errorId} style={{ color: colour.dangerText }}>
+          {error}
+        </div>
+      )}
     </>
   )
 })

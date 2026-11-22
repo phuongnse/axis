@@ -193,14 +193,17 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **Help sits close to its label** _(planned)_. A field's help sits just under the label's line and `spacing-xs` above
   the input. The gap is judged in IBM Plex Sans, the app's font, as the space between lines differs from font to font.
   Every help line is one size, in `textMuted`, and a choice's option help is one too.
-- **A box in error looks it** _(planned)_. A field whose value the screen refuses is drawn in its error look, with its
-  error in `dangerText` under it and `aria-invalid` on the input, whether a form holds the field or the screen does.
-  `AxisField` and `AxisFieldGroup` take `error` for a field the screen holds, `AxisFieldGroup` takes `required` and
-  `fold`, and `LabelTexts` takes `invalid`. An error shows from the refused action on, and while the value stays wrong.
-  It goes as soon as the value is right.
-- **One way to the first error** _(planned)_. A refused action that submits what a person typed, such as Save, Add, Done
-  or Next, moves the focus to the first box in error and scrolls it into view. A screen that holds its fields calls
-  `focusFirstError`, and an Ant Design form sets `scrollToFirstError={{ focus: true }}`.
+- **A box in error looks it**. A field a screen holds, whose value the screen refuses, is drawn in its error look, with
+  its error in `dangerText` under it and `aria-invalid` on the input. `AxisField` takes `error` for it, `AxisFieldGroup`
+  takes `error` and `LabelTexts` takes `invalid`. An error shows from the refused action on, and while the value stays
+  wrong. It goes as soon as the value is right.
+- **A box in error looks it in a form** _(planned)_. A form's field whose value the form refuses gets the same error look
+  and `aria-invalid`. That covers the record form's fields and the forms that draw their own error line. `AxisFieldGroup`
+  also takes `required` and `fold`, for #3264's build.
+- **One way to the first error**. A screen that holds its fields calls `focusFirstError` after a refused action, such as
+  Done, so the focus moves to the first box in error and scrolls it into view. The resource form's item dialog does this.
+- **Every Ant Design form takes the focus to its first error** _(planned)_. Each Ant Design form sets
+  `scrollToFirstError={{ focus: true }}`, so a refused Save, Add, OK or Next moves the focus to the first box in error.
 - **One look for yes or no** _(planned)_. A yes-or-no setting is a checkbox with its label on its right and its help under
   the label, the same in a form as on a screen that holds its fields. A switch is for a setting that takes effect as it
   is turned on, and no other.
