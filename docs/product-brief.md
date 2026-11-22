@@ -97,9 +97,7 @@ The reasons are in [D166](decisions/d166-axis-is-designed-for-small-businesses-f
 ## Ways to run Axis
 
 The same software runs in three ways. An **operator** is a hosting company or an organization's IT team
-that runs Axis as a SaaS for its own customers. The operator's own billing system holds its prices,
-invoices and payments, and Axis keeps the plans as sets of quotas, the subscription's clock and a
-billing API for that system.
+that runs Axis as a SaaS for its own customers.
 
 - **SaaS, shared**. Many customers share a cell, which is one full installation of
   Axis in a region that the operator runs. Each tenant, one of the operator's customers with its own
@@ -109,6 +107,10 @@ billing API for that system.
 - **SaaS, dedicated**. One of the operator's customers has a cell of its own that the operator runs.
 - **Self-hosted.** The customer installs Axis on premises or in its own cloud, see
   [installation](reference/installation.md). This serves large organizations, banks and government.
+
+**The operator's billing system** _(planned for M34)_. The operator's own billing system holds its
+prices, invoices and payments, and Axis keeps the plans as sets of quotas, the subscription's clock and
+a billing API for that system.
 
 The reasons are in [D168](decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md).
 
