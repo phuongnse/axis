@@ -4,7 +4,7 @@ import dayjs from 'dayjs'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { chooseOption, formItem, optionTexts } from '../test/antd'
+import { chooseOption, emptyDescription, formItem, optionTexts } from '../test/antd'
 import { ShellAsideHost } from '../test/shellAsideHost'
 import { dialog } from '../test/tableFilter'
 import { isSignInNeeded } from './signInNeeded'
@@ -1917,9 +1917,9 @@ describe('ProcessInstancePage step run panel', () => {
 
     renderPage('?step=registerPurchase&stepTab=attempts')
 
-    const panel = await stepPanel()
-    expect(panel.getByText('No attempts yet.')).toBeVisible()
-    expect(panel.queryByTestId('inspector-run-attempts')).not.toBeInTheDocument()
+    const element = await screen.findByTestId('inspector-step-run')
+    expect(emptyDescription('No attempts yet.', element)).toBeVisible()
+    expect(within(element).queryByTestId('inspector-run-attempts')).not.toBeInTheDocument()
   })
 
   it('has no Input, Output or Attempts tab for the run of a task, so its panel has no tab bar', async () => {

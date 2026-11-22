@@ -5,6 +5,7 @@ import { AxisTable, type AxisColumn } from './AxisTable'
 import { BodyView } from './BodyView'
 import { CopyableId } from './CopyableId'
 import { EventTime } from './EventTime'
+import { EmptyState } from './EmptyState'
 import { NotSet } from './EmptyValue'
 import { fillText } from './fillText'
 import { formatDuration } from './formatValue'
@@ -289,13 +290,12 @@ function attemptDetails(t: Translate, locale: string, attempt: CallAttempt): Rea
  */
 export function RunAttempts({ instance, runs, run, locale }: RunPaneProps) {
   const t = useText()
-  const empty = useEmptyStyle()
   const call = callOf(instance, runs, run)
   if (call === undefined) {
     return null
   }
   if (call.attempts.length === 0) {
-    return <span style={empty}>{t('shell.inspector.noAttempts')}</span>
+    return <EmptyState text={t('shell.inspector.noAttempts')} />
   }
   const columns: AxisColumn<CallAttempt>[] = [
     { key: 'number', title: '#', dataIndex: 'number', kind: 'fixed' },

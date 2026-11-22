@@ -14,7 +14,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
-import { chooseOption, openDropdown, optionTexts } from '../test/antd'
+import { chooseOption, emptyDescription, openDropdown, optionTexts } from '../test/antd'
 import { LabelTextsContext } from './labelTextsContext'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
@@ -595,6 +595,12 @@ describe('SchemaForm lists of objects', () => {
     expect(add).toHaveClass('ant-btn-variant-text')
     expect(within(plain).queryByRole('button', { name: 'Remove' })).toBeNull()
     expect(within(plain).getAllByRole('button', { name: 'Actions' })).toHaveLength(2)
+  })
+
+  it('says "Nothing added yet." under a list of plain values that has no items', () => {
+    renderForm(listSchema, { kind: 'example', rows: [], plain: [] })
+
+    expect(emptyDescription('Nothing added yet.', screen.getByTestId('studio-field-/plain'))).toBeVisible()
   })
 
   it("removes a row of a list of plain values from the row's Actions menu, and Add appends an item", async () => {

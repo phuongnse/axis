@@ -9,7 +9,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, optionTexts, shownDropdown, shownMenu } from '../test/antd'
+import { chooseOption, emptyDescription, optionTexts, shownDropdown, shownMenu } from '../test/antd'
 import { FormSteps } from './FormSteps'
 import { LabelTextsContext } from './labelTextsContext'
 
@@ -94,6 +94,22 @@ describe.each(['light', 'dark'])('FormSteps in %s mode', (mode) => {
 })
 
 describe('FormSteps', () => {
+  it('says the form is one page when it has no steps key', () => {
+    renderSteps(undefined)
+
+    expect(
+      emptyDescription('No steps, so the form is one page.', screen.getByTestId('studio-field-/steps')),
+    ).toBeVisible()
+  })
+
+  it('says the form is one page when its list of steps is empty', () => {
+    renderSteps([])
+
+    expect(
+      emptyDescription('No steps, so the form is one page.', screen.getByTestId('studio-field-/steps')),
+    ).toBeVisible()
+  })
+
   it('puts Add step on the right of the heading and nowhere else in the part', () => {
     renderSteps(steps)
 

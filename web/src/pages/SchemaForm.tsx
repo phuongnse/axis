@@ -26,6 +26,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { EmptyState } from '../platform/EmptyState'
 import { RowActions } from '../platform/AxisTable'
 import { PlatformContext } from './context'
 import { relaxedPointLabel } from './relaxEntries'
@@ -510,6 +511,7 @@ function SchemaNode({
     }
     input = (
       <Flex vertical gap="small">
+        {items.length === 0 && <EmptyState text={t('shell.studio.list.noItems')} />}
         {items.map((item, index) => (
           <Flex key={index} gap="small" align="flex-start">
             <div style={{ flex: 1 }}>
