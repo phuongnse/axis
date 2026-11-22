@@ -10,6 +10,7 @@ import { buildResolveBody } from './recordBody'
 import { requiredMark } from './requiredMark'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { DialogFooter } from './DialogFooter'
 
 interface ResolveDialogProps {
   call: InstanceCall
@@ -87,10 +88,15 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
       open
       width={size.dialog.medium}
       title={t('shell.inspector.commands.resolve')}
-      okText={t('shell.inspector.commands.send')}
-      cancelText={t('shell.inspector.commands.close')}
-      confirmLoading={sending}
-      onOk={() => form.submit()}
+      footer={
+        <DialogFooter
+          finishText={t('shell.inspector.commands.send')}
+          cancelText={t('shell.inspector.commands.close')}
+          finishing={sending}
+          onFinish={() => form.submit()}
+          onCancel={onClose}
+        />
+      }
       onCancel={onClose}
       destroyOnHidden
     >

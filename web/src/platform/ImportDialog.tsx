@@ -2,8 +2,9 @@ import { Flex, Form, Modal, Typography, Upload, type UploadFile } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import type { UploadChangeParam } from 'antd/es/upload'
 import { useEffect, useRef, useState } from 'react'
-import { AxisActionRow, AxisButton } from './AxisButton'
+import { AxisButton } from './AxisButton'
 import { AxisField } from './AxisField'
+import { DialogFooter } from './DialogFooter'
 import {
   commitImport,
   fetchImport,
@@ -184,6 +185,8 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
   }
 
   const busy = phase === 'uploading' || phase === 'checking' || phase === 'committing'
+  // Once the file is checked, Commit is the finish and Check steps back to a secondary action.
+  const checked = phase === 'checked' || phase === 'committing'
   const status =
     phase === 'uploading' || phase === 'checking'
       ? t('shell.table.importChecking')
@@ -203,24 +206,23 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
       onCancel={onClose}
       destroyOnHidden
       footer={
-        <AxisActionRow justify="end">
-          <AxisButton role="secondary" onClick={onClose}>
-            {t('shell.table.importClose')}
-          </AxisButton>
-          <AxisButton
-            role={phase === 'checked' || phase === 'committing' ? 'secondary' : 'finish'}
-            disabled={busy || phase === 'checked'}
-            loading={phase === 'uploading' || phase === 'checking'}
-            onClick={() => form.submit()}
-          >
-            {t('shell.table.importCheck')}
-          </AxisButton>
-          {(phase === 'checked' || phase === 'committing') && (
-            <AxisButton role="finish" loading={phase === 'committing'} onClick={() => void commit()}>
-              {t('shell.table.importCommit')}
-            </AxisButton>
-          )}
-        </AxisActionRow>
+        <DialogFooter
+          // A new key mounts Commit as its own button, so Check's spinner does not turn into Commit's.
+          key={checked ? 'commit' : 'check'}
+          actions={
+            checked ? (
+              <AxisButton role="secondary" disabled={busy || phase === 'checked'} onClick={() => form.submit()}>
+                {t('shell.table.importCheck')}
+              </AxisButton>
+            ) : null
+          }
+          cancelText={t('shell.table.importClose')}
+          finishText={t(checked ? 'shell.table.importCommit' : 'shell.table.importCheck')}
+          finishing={busy}
+          finishDisabled={busy && !checked}
+          onFinish={checked ? () => void commit() : () => form.submit()}
+          onCancel={onClose}
+        />
       }
     >
       <Flex vertical gap="middle">

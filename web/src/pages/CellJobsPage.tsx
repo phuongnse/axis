@@ -12,6 +12,7 @@ import { useFollowCellJob } from '../platform/useFollowCellJob'
 import { useTableView } from '../platform/useTableView'
 import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
+import { DialogFooter } from '../platform/DialogFooter'
 
 /** The columns the view's filter and sort can name, in table order, see `docs/reference/tenant-lifecycle.md#routes`. */
 const jobFields = [
@@ -151,10 +152,15 @@ export function CellJobsPage() {
           title={t('shell.cell.jobs.runAgainConfirm')
             .replace('{kind}', confirming.kind)
             .replace('{tenant}', confirming.tenantId)}
-          okText={t('shell.cell.jobs.runAgainOk')}
-          cancelText={t('shell.users.roles.cancel')}
-          confirmLoading={busy}
-          onOk={() => void runAgain(confirming)}
+          footer={
+            <DialogFooter
+              finishText={t('shell.cell.jobs.runAgainOk')}
+              cancelText={t('shell.users.roles.cancel')}
+              finishing={busy}
+              onFinish={() => void runAgain(confirming)}
+              onCancel={() => setConfirming(null)}
+            />
+          }
           onCancel={() => setConfirming(null)}
         >
           <Flex vertical gap="small">

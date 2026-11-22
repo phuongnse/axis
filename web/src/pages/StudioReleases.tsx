@@ -4,6 +4,7 @@ import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
 import { Link } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
+import { DialogFooter } from '../platform/DialogFooter'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
 import { ReleasePublisher } from '../platform/ReleasePublisher'
@@ -145,17 +146,21 @@ export function StudioActivateDialog({
       open={release !== null}
       width={size.dialog.small}
       title={title}
-      okText={t('shell.studio.activate.confirm')}
-      okButtonProps={{ disabled: loading }}
-      cancelText={t('shell.studio.cancel')}
       footer={
-        blocked === null ? undefined : (
+        blocked === null ? (
+          <DialogFooter
+            finishText={t('shell.studio.activate.confirm')}
+            cancelText={t('shell.studio.cancel')}
+            finishDisabled={loading}
+            onFinish={onConfirm}
+            onCancel={onCancel}
+          />
+        ) : (
           <AxisButton role="secondary" onClick={onCancel}>
             {t('shell.studio.close')}
           </AxisButton>
         )
       }
-      onOk={onConfirm}
       onCancel={onCancel}
     >
       {release !== null &&

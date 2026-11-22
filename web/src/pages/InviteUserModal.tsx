@@ -9,6 +9,7 @@ import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { fetchUserRoles, inviteUser, type RoleChange, type UserRoles } from '../platform/users'
+import { DialogFooter } from '../platform/DialogFooter'
 
 /** The fields of the form. */
 interface InviteFields {
@@ -123,9 +124,14 @@ export function InviteUserModal({
         open
         width={size.dialog.medium}
         title={t('shell.users.invite.title')}
-        okText={t('shell.users.invite.send')}
-        cancelText={t('shell.users.roles.cancel')}
-        onOk={() => form.submit()}
+        footer={
+          <DialogFooter
+            finishText={t('shell.users.invite.send')}
+            cancelText={t('shell.users.roles.cancel')}
+            onFinish={() => form.submit()}
+            onCancel={onClose}
+          />
+        }
         onCancel={onClose}
       >
         <Flex vertical gap="middle">
@@ -197,10 +203,15 @@ export function InviteUserModal({
         open={pending !== null}
         width={size.dialog.small}
         title={t('shell.users.invite.confirm')}
-        okText={t('shell.users.invite.send')}
-        cancelText={t('shell.users.roles.cancel')}
-        confirmLoading={busy}
-        onOk={() => void send()}
+        footer={
+          <DialogFooter
+            finishText={t('shell.users.invite.send')}
+            cancelText={t('shell.users.roles.cancel')}
+            finishing={busy}
+            onFinish={() => void send()}
+            onCancel={() => setPending(null)}
+          />
+        }
         onCancel={() => setPending(null)}
       >
         {pending && (

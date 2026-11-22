@@ -10,6 +10,7 @@ import { PartBoundary } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import type { ChangeHandler } from './SchemaForm'
+import { DialogFooter } from '../platform/DialogFooter'
 
 /** A column of the list: one property of the item, named by its field text. */
 export interface ObjectListColumn {
@@ -232,9 +233,14 @@ export function ObjectListTable({
         title={
           editing && named(t(editing.index === null ? 'shell.studio.list.addTitle' : 'shell.studio.list.editTitle'))
         }
-        okText={t('shell.studio.list.done')}
-        cancelText={t('shell.studio.cancel')}
-        onOk={done}
+        footer={
+          <DialogFooter
+            finishText={t('shell.studio.list.done')}
+            cancelText={t('shell.studio.cancel')}
+            onFinish={done}
+            onCancel={cancel}
+          />
+        }
         onCancel={cancel}
         destroyOnHidden
       >

@@ -15,6 +15,7 @@ import { kindGroupNames, kindSingular, studioKinds } from '../platform/studioKin
 import { createStarter, starterKinds, textResourceName } from '../platform/studioStarters'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { DialogFooter } from '../platform/DialogFooter'
 
 /** The locale a new text resource copies when the application has no site. */
 const fallbackLocale = 'en'
@@ -118,10 +119,15 @@ export function StudioNewResource({
             ? 'shell.studio.newResource.title'
             : `shell.studio.newResource.kindTitle.${fixedKind}`,
         )}
-        okText={t('shell.studio.newResource.create')}
-        cancelText={t('shell.studio.cancel')}
-        confirmLoading={creating}
-        onOk={() => form.submit()}
+        footer={
+          <DialogFooter
+            finishText={t('shell.studio.newResource.create')}
+            cancelText={t('shell.studio.cancel')}
+            finishing={creating}
+            onFinish={() => form.submit()}
+            onCancel={() => setOpen(false)}
+          />
+        }
         onCancel={() => setOpen(false)}
         // Each opening starts with empty fields.
         afterClose={() => form.resetFields()}

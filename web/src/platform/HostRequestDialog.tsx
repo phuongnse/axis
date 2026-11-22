@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { AxisField } from './AxisField'
+import { DialogFooter } from './DialogFooter'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import type { CellHostRequest, CellWriteResult } from './cell'
 import { requiredMark } from './requiredMark'
@@ -103,17 +104,21 @@ export function HostRequestDialog({
       data-testid={`${testId}-dialog`}
       width={size.dialog.large}
       title={title}
-      okText={t(`${texts}.addHostOk`)}
-      cancelText={t('shell.users.roles.cancel')}
-      confirmLoading={sending}
-      onOk={() => form.submit()}
       onCancel={onClose}
       footer={
         added ? (
           <AxisButton role="secondary" onClick={onClose}>
             {t(`${texts}.close`)}
           </AxisButton>
-        ) : undefined
+        ) : (
+          <DialogFooter
+            finishText={t(`${texts}.addHostOk`)}
+            cancelText={t('shell.users.roles.cancel')}
+            finishing={sending}
+            onFinish={() => form.submit()}
+            onCancel={onClose}
+          />
+        )
       }
     >
       <Flex vertical gap="middle">

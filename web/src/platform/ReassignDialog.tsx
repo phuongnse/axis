@@ -8,6 +8,7 @@ import { requiredMark } from './requiredMark'
 import { searchUsers, type ReassignBody, type ReassignRole, type UserOption } from './tasks'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { DialogFooter } from './DialogFooter'
 
 interface ReassignDialogProps {
   roles: readonly ReassignRole[]
@@ -108,10 +109,15 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
       open
       width={size.dialog.medium}
       title={t('shell.task.reassignTitle')}
-      okText={t('shell.task.reassignSend')}
-      cancelText={t('shell.task.reassignCancel')}
-      confirmLoading={sending}
-      onOk={() => form.submit()}
+      footer={
+        <DialogFooter
+          finishText={t('shell.task.reassignSend')}
+          cancelText={t('shell.task.reassignCancel')}
+          finishing={sending}
+          onFinish={() => form.submit()}
+          onCancel={onClose}
+        />
+      }
       onCancel={onClose}
       destroyOnHidden
     >

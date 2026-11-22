@@ -1,6 +1,7 @@
 import { Flex, Form, Input, Modal } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisField } from './AxisField'
+import { DialogFooter } from './DialogFooter'
 import { useState, type ReactNode } from 'react'
 import type { CommandResult } from './inspection'
 import { requiredMark } from './requiredMark'
@@ -21,7 +22,7 @@ interface ReasonDialogProps {
   /** The field's help. Defaults to the operator's help. */
   help?: string
   /** The words of the send button. Defaults to the operator's "Send". */
-  okText?: string
+  finishText?: string
   /** The words of the button that closes the dialog. Defaults to the operator's "Close". */
   cancelText?: string
   /** What the field says when it is empty. */
@@ -52,7 +53,7 @@ export function ReasonDialog({
   children,
   label,
   help,
-  okText,
+  finishText,
   cancelText,
   requiredMessage,
   tooLongMessage,
@@ -91,10 +92,15 @@ export function ReasonDialog({
       open
       width={dialogSize === 'medium' ? size.dialog.medium : size.dialog.small}
       title={title}
-      okText={okText ?? t('shell.inspector.commands.send')}
-      cancelText={cancelText ?? t('shell.inspector.commands.close')}
-      confirmLoading={sending}
-      onOk={() => form.submit()}
+      footer={
+        <DialogFooter
+          finishText={finishText ?? t('shell.inspector.commands.send')}
+          cancelText={cancelText ?? t('shell.inspector.commands.close')}
+          finishing={sending}
+          onFinish={() => form.submit()}
+          onCancel={onClose}
+        />
+      }
       onCancel={onClose}
       destroyOnHidden
     >

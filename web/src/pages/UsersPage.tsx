@@ -30,6 +30,7 @@ import { TenantExportSection } from './TenantExportSection'
 import { TenantHostsSection } from './TenantHostsSection'
 import { TenantModelKeySection } from './TenantModelKeySection'
 import { TenantUsageSection } from './TenantUsageSection'
+import { DialogFooter } from '../platform/DialogFooter'
 
 /** The columns the view's filter and sort can name, in table order, see `docs/reference/user-administration.md#read-routes`. */
 const userFields = [
@@ -329,10 +330,15 @@ export function UsersPage() {
         open={pending !== null}
         width={size.dialog.small}
         title={pending && t(`shell.users.${pending.command}.confirm`)}
-        okText={pending && t(`shell.users.${pending.command}.ok`)}
-        cancelText={t('shell.users.roles.cancel')}
-        confirmLoading={busy}
-        onOk={() => void run()}
+        footer={
+          <DialogFooter
+            finishText={pending && t(`shell.users.${pending.command}.ok`)}
+            cancelText={t('shell.users.roles.cancel')}
+            finishing={busy}
+            onFinish={() => void run()}
+            onCancel={() => setPending(null)}
+          />
+        }
         onCancel={() => setPending(null)}
       >
         {pending && (

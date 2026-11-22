@@ -188,10 +188,15 @@ function SetKeyDialog({
       open
       width={size.dialog.small}
       title={title}
-      okText={t('shell.users.modelKey.save')}
-      cancelText={t('shell.users.roles.cancel')}
-      confirmLoading={busy}
-      onOk={() => form.submit()}
+      footer={
+        <DialogFooter
+          finishText={t('shell.users.modelKey.save')}
+          cancelText={t('shell.users.roles.cancel')}
+          finishing={busy}
+          onFinish={() => form.submit()}
+          onCancel={onCancel}
+        />
+      }
       onCancel={onCancel}
     >
       <Form

@@ -1,6 +1,8 @@
 import { Flex, Form, Input, Modal } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
+import { DialogFooter } from '../platform/DialogFooter'
 import { requiredMark } from '../platform/requiredMark'
 import { useRef, useState } from 'react'
 import { CellJobTable } from '../platform/CellJobTable'
@@ -92,16 +94,21 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
       width={job ? size.dialog.large : size.dialog.medium}
       data-testid="cell-create"
       title={t('shell.cell.create.title')}
-      okText={t('shell.cell.create.ok')}
-      cancelText={t('shell.cell.create.close')}
-      confirmLoading={busy}
-      footer={(_origin, { OkBtn, CancelBtn }) => (
-        <>
-          <CancelBtn />
-          {!job && <OkBtn />}
-        </>
-      )}
-      onOk={() => form.submit()}
+      footer={
+        job ? (
+          <AxisButton role="secondary" onClick={close}>
+            {t('shell.cell.create.close')}
+          </AxisButton>
+        ) : (
+          <DialogFooter
+            finishText={t('shell.cell.create.ok')}
+            cancelText={t('shell.cell.create.close')}
+            finishing={busy}
+            onFinish={() => form.submit()}
+            onCancel={close}
+          />
+        )
+      }
       onCancel={close}
     >
       {job ? (
