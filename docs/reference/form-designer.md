@@ -12,7 +12,7 @@ and the rest of Studio is in [Studio](studio.md).
 The canvas draws the unsaved draft with the site's form widget, in its sections and steps, so an author
 sees the form as a user will. Above it sits the [Used on](#used-on) list, and beside it the field palette,
 the layout outline and the [property panel](#property-panel). The form's steps show on the canvas's own
-[steps bar](#step-switch). It has no width switch.
+[steps bar](#steps-bar). It has no width switch.
 
 - **Placeholder data.** The canvas opens a placeholder record, so each field shows a placeholder value
   made from its type and a child collection shows placeholder rows, and no request goes to `/api/apps/`.
@@ -26,13 +26,12 @@ the layout outline and the [property panel](#property-panel). The form's steps s
 - **Many steps warn.** A form with more than six steps shows a warning above the canvas, which never
   blocks a save.
 
-## Step switch
-
-_(planned)_
+## Steps bar
 
 The steps show once, on the form widget's own steps bar on the canvas. Each step is a button that shows its sections
-and selects it. A section dropped on a step moves to that step, as [moves](#moves) says. There is no switch above the
-canvas, and a form without `steps` has no steps bar. A step draws no fill on hover or when selected, and the focus ring
+and selects it. Selecting a step anywhere shows it on the canvas, such as in the layout outline or after Add step. A
+section dropped on a step moves to that step, as [moves](#moves) says. There is no switch above the canvas, and a form
+without `steps` has no steps bar. A step draws no fill on hover or when selected, and the focus ring
 shows for the keyboard. Next and Back still do nothing. A step that a diagnostic names takes the mark of a section or
 field, as [conditions and marks](#conditions-and-marks) says: the error-coloured border, its text label and
 `data-marked`, with no icon of its own.
@@ -72,12 +71,13 @@ form, and a drop never copies one.
 
 ## Layout outline
 
-The layout outline lists the steps, sections and fields of the draft, and a click selects a row. A
-section is named by its `name`, or `Section {number}`, because its title loads only inside the canvas.
+The layout outline lists the steps, sections and fields of the draft, and a click selects a row. The chosen row sits
+on the selected tint, as a chosen item of a menu does. A section is named by its `name`, or `Section {number}`, because
+its title loads only inside the canvas.
 
 ## Moves
 
-Every move goes through the layout outline or the canvas's [steps bar](#step-switch), by a pointer drag or by the keyboard, and
+Every move goes through the layout outline or the canvas's [steps bar](#steps-bar), by a pointer drag or by the keyboard, and
 a live region says where the element lands. A move is one change of the draft, so one Undo reverses it,
 and the moved element keeps all its keys and stays selected.
 
@@ -123,8 +123,8 @@ can delete it. Each add or delete is one Undo step, and a live region names what
 ## Property panel
 
 The property panel edits the selected element. A click, Enter or Space selects a field or a section,
-and a click on a step selects it and shows its sections. The selected element has `aria-current` and an
-outline in the primary colour. With nothing selected, the panel asks the author to select something.
+and a click on a step selects it and shows its sections. A selected field or section has `aria-current` and an
+outline in the primary colour, and a selected step is the current step of the steps bar. With nothing selected, the panel asks the author to select something.
 The selection is kept across the Design, Form and JSON tabs while the resource stays open.
 
 | Element | The panel shows                                                                                                                                                                                                 |

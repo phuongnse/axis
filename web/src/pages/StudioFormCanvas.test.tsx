@@ -15,6 +15,7 @@ import type {
 import { studioResourceAddress } from '../platform/studioAddress'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema } from '../platform/studioSchemas'
+import { designTokensFor } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioEditor } from './StudioEditor'
@@ -259,6 +260,12 @@ async function openDesign() {
   return screen.findByTestId('studio-form-canvas', {}, slow)
 }
 
+/** Picks a step on the canvas's steps bar, as an author does. */
+async function pickStep(canvas: HTMLElement, name: string) {
+  const bar = await within(canvas).findByTestId('steps-bar', {}, slow)
+  await userEvent.click(within(bar).getByRole('button', { name }))
+}
+
 /** The CodeMirror view of the expression editor with the given name inside `panel`. */
 async function expressionView(panel: HTMLElement, name: string): Promise<EditorView> {
   let view: EditorView | null = null
@@ -303,17 +310,33 @@ describe('the Design tab of a form', () => {
     expect(appRequests(fetchMock)).toEqual([])
   })
 
-  it('shows the sections of the step that the switch picks', async () => {
+  it('shows the sections of the step that the steps bar picks', async () => {
     stub()
     renderEditor()
 
     const canvas = await openDesign()
-    const steps = await screen.findByTestId('studio-form-steps', {}, slow)
-    expect(within(steps).getByText('Describe the problem')).toBeInTheDocument()
+    const steps = await within(canvas).findByTestId('steps-bar', {}, slow)
+    expect(within(steps).getByRole('button', { name: 'Describe the problem' })).toBeInTheDocument()
     await within(canvas).findByRole('textbox', { name: 'Title' }, slow)
     expect(within(canvas).queryByRole('textbox', { name: 'Resolution' })).not.toBeInTheDocument()
 
-    await userEvent.click(within(steps).getByText('Add details'))
+    await pickStep(canvas, 'Add details')
+
+    expect(await within(canvas).findByRole('textbox', { name: 'Resolution' }, slow)).toBeInTheDocument()
+    expect(within(canvas).queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('studio-form-steps')).not.toBeInTheDocument()
+  })
+
+  it('shows a step that is selected in the layout outline on the canvas', async () => {
+    stub()
+    renderEditor()
+
+    const canvas = await openDesign()
+    await within(canvas).findByRole('textbox', { name: 'Title' }, slow)
+    const row = screen
+      .getByTestId('studio-form-outline')
+      .querySelector<HTMLElement>('[data-testid="studio-outline-step"][data-path="/steps/1"]')!
+    await userEvent.click(row)
 
     expect(await within(canvas).findByRole('textbox', { name: 'Resolution' }, slow)).toBeInTheDocument()
     expect(within(canvas).queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
@@ -324,7 +347,7 @@ describe('the Design tab of a form', () => {
     renderEditor()
 
     const canvas = await openDesign()
-    await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
+    await pickStep(canvas, 'Add details')
 
     const field = await within(canvas).findByRole('group', { name: 'resolution' }, slow)
     const marks = within(field).getAllByTestId('studio-condition-mark')
@@ -345,12 +368,15 @@ describe('the Design tab of a form', () => {
     renderEditor()
 
     const canvas = await openDesign()
-    const steps = await screen.findByTestId('studio-form-steps', {}, slow)
-    await waitFor(() => expect(within(steps).getByText(/Describe the problem, has problems/)).toBeInTheDocument(), slow)
-    expect(within(steps).getByText(/Describe the problem/)).toHaveAttribute('data-marked', 'true')
-    expect(within(steps).getByText('Add details')).not.toHaveAttribute('data-marked')
+    const steps = await within(canvas).findByTestId('steps-bar', {}, slow)
+    const marked = await within(canvas).findByRole('group', { name: 'Describe the problem, has problems' }, slow)
+    expect(marked).toHaveAttribute('data-marked', 'true')
+    expect(marked).toHaveAttribute('data-path', '/steps/0')
+    expect(marked).toHaveStyle({ borderColor: designTokensFor('light').colour.danger })
+    expect(within(canvas).getByRole('group', { name: 'Add details' })).not.toHaveAttribute('data-marked')
+    expect(steps.querySelectorAll('[aria-current]')).toHaveLength(1)
 
-    await userEvent.click(within(steps).getByText('Add details'))
+    await pickStep(canvas, 'Add details')
     const field = await within(canvas).findByRole('group', { name: 'resolution, has problems' }, slow)
     expect(field).toHaveAttribute('data-marked', 'true')
     expect(field).toHaveAttribute('data-path', '/sections/1/fields/1')
@@ -370,7 +396,7 @@ describe('the Design tab of a form', () => {
     expect(await screen.findByTestId('studio-canvas-cannot-draw', {}, slow)).toHaveTextContent(
       'The form cannot show until its errors are fixed.',
     )
-    expect(screen.queryByTestId('studio-form-steps')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('steps-bar')).not.toBeInTheDocument()
   })
 
   it('asks the author to select something while nothing is selected', async () => {
@@ -389,7 +415,7 @@ describe('the Design tab of a form', () => {
     renderEditor()
 
     const canvas = await openDesign()
-    await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
+    await pickStep(canvas, 'Add details')
     const field = await within(canvas).findByRole('group', { name: 'resolution' }, slow)
     await userEvent.click(field)
 
@@ -421,7 +447,7 @@ describe('the Design tab of a form', () => {
     renderEditor()
 
     const canvas = await openDesign()
-    await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
+    await pickStep(canvas, 'Add details')
     await userEvent.click(await within(canvas).findByRole('group', { name: 'resolution' }, slow))
     const view = await expressionView(screen.getByTestId('studio-design-panel'), 'Visible when')
     act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "status != 'open'" } }))
@@ -463,7 +489,7 @@ describe('the Design tab of a form', () => {
     const title = await within(canvas).findByRole('group', { name: 'title' }, slow)
 
     expect(title.closest('[data-testid^="field-column-"]')).toHaveStyle({ gridColumn: 'span 4' })
-    await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
+    await pickStep(canvas, 'Add details')
     const status = await within(canvas).findByRole('group', { name: 'status' }, slow)
     expect(status.closest('[data-testid^="field-column-"]')).toHaveStyle({ gridColumn: 'span 12' })
   })
@@ -558,41 +584,43 @@ describe('the Design tab of a form', () => {
     expect(screen.getByTestId('studio-design-panel')).toHaveTextContent('Axis fills this field')
   })
 
-  it('selects a step in the switch, shows its title and shows its sections', async () => {
+  it('picks a step on the steps bar, shows its title in the panel and shows its sections', async () => {
     stub()
     renderEditor()
 
     const canvas = await openDesign()
-    const steps = await screen.findByTestId('studio-form-steps', {}, slow)
-    await userEvent.click(within(steps).getByText('Add details'))
+    const steps = await within(canvas).findByTestId('steps-bar', {}, slow)
+    await pickStep(canvas, 'Add details')
 
     const panel = screen.getByTestId('studio-design-panel')
     const title = within(panel).getByTestId('studio-field-/steps/1/title')
     expect(within(title).getByRole('textbox', { name: 'English' })).toHaveValue('Add details')
     expect(within(title).queryByRole('textbox', { name: 'Text key' })).toBeNull()
-    expect(within(steps).getByText('Add details')).toHaveAttribute('aria-current', 'true')
+    expect(steps.querySelectorAll('[aria-current]')).toHaveLength(1)
+    expect(steps.querySelectorAll('li')[1]).toHaveAttribute('aria-current', 'step')
     expect(await within(canvas).findByRole('textbox', { name: 'Resolution' }, slow)).toBeInTheDocument()
   })
 
-  it('selects the step already shown when its label is clicked', async () => {
+  it('selects the step already shown when its button is clicked', async () => {
     stub()
     renderEditor()
 
     const canvas = await openDesign()
-    const steps = await screen.findByTestId('studio-form-steps', {}, slow)
-    const first = within(steps).getByText('Describe the problem')
-    expect(first).not.toHaveAttribute('aria-current')
+    const steps = await within(canvas).findByTestId('steps-bar', {}, slow)
+    const first = within(steps).getByRole('button', { name: 'Describe the problem' })
     await userEvent.click(first)
 
-    expect(first).toHaveAttribute('aria-current', 'true')
     const title = within(screen.getByTestId('studio-design-panel')).getByTestId('studio-field-/steps/0/title')
     expect(within(title).getByRole('textbox', { name: 'English' })).toHaveValue('Describe the problem')
 
     // A field inside the shown step takes the selection. A click on the step takes it back.
     await userEvent.click(await within(canvas).findByRole('group', { name: 'title' }, slow))
-    expect(first).not.toHaveAttribute('aria-current')
+    expect(within(screen.getByTestId('studio-design-panel')).queryByTestId('studio-field-/steps/0/title')).toBeNull()
     await userEvent.click(first)
-    expect(first).toHaveAttribute('aria-current', 'true')
+    expect(
+      within(screen.getByTestId('studio-design-panel')).getByTestId('studio-field-/steps/0/title'),
+    ).toBeInTheDocument()
+    expect(steps.querySelectorAll('[aria-current]')).toHaveLength(1)
   })
 
   it('selects a section and shows its title and visibleWhen', async () => {
@@ -600,7 +628,7 @@ describe('the Design tab of a form', () => {
     renderEditor()
 
     const canvas = await openDesign()
-    await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
+    await pickStep(canvas, 'Add details')
     const section = await within(canvas).findByRole('group', { name: 'The details' }, slow)
     await userEvent.click(section)
 

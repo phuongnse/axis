@@ -408,15 +408,15 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     );
     await page.getByRole("tab", { name: "Design", exact: true }).click();
 
-    const steps = page.getByTestId("studio-form-steps");
+    const canvas = page.getByTestId("studio-form-canvas");
+    const steps = canvas.getByTestId("steps-bar");
     await expect(steps).toContainText("Describe the problem");
     await expect(steps).toContainText("Add details");
-    const canvas = page.getByTestId("studio-form-canvas");
     await expect(
       canvas.getByRole("textbox", { name: "Title", exact: true }),
     ).toBeVisible();
 
-    await steps.getByText("Add details", { exact: true }).click();
+    await steps.getByRole("button", { name: "Add details", exact: true }).click();
     await expect(
       canvas
         .getByTestId("studio-form-field")
@@ -570,7 +570,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     });
   });
 
-  test("an author drops a section on a step in the switch, removes a step and a section with the keyboard, and saves the form", async ({
+  test("an author drops a section on a step of the steps bar, removes a step and a section with the keyboard, and saves the form", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });

@@ -1,6 +1,15 @@
 import { useDndContext, useDroppable } from '@dnd-kit/core'
-import { Flex, Segmented } from 'antd'
-import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
+import { Flex } from 'antd'
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type SyntheticEvent,
+} from 'react'
 import { useLocation } from 'react-router'
 import { fillText } from '../platform/fillText'
 import { StatusTag } from '../platform/StatusTag'
@@ -42,11 +51,12 @@ const fieldConditions: ConditionKey[] = ['visibleWhen', 'requiredWhen', 'readOnl
  * Draws the unsaved draft of a form with the site's own form widget. It posts the draft to the draft page metadata
  * route 300 ms after the last edit or after a save, or of its module with `module`, and redraws from the answer. While it is mounted, the widget's `/api/apps/` calls
  * get placeholder data in the browser and none goes to the server, and the form opens the placeholder record, so every
- * field holds a placeholder value. A submit on the canvas does nothing, and a click only selects. A form with steps gets a step switch
- * that picks the step the canvas shows. No condition is evaluated, so every field and section shows. An element with
+ * field holds a placeholder value. A submit on the canvas does nothing, and a click only selects. A form with steps shows
+ * its steps bar on the canvas, and a click on a step of the bar selects it and shows its sections. A selected step is
+ * always the one shown. No condition is evaluated, so every field and section shows. An element with
  * `visibleWhen`, `requiredWhen` or `readOnlyWhen` has a mark for each condition with its text from the draft. A
  * section, field or step that a diagnostic names is marked. A click, Enter or Space on a field or a section selects it,
- * and a click on a step selects it too. While a section moves, a step's entry in the switch takes the section on a drop.
+ * and a click on a step selects it too. While a section moves, a step of the bar takes the section on a drop.
  * The selected element has an outline and `aria-current`, and a panel beside the canvas shows its properties. An edit
  * there changes the draft, and so does the Move to step picker of a section. An `aside` goes in the panel above the
  * properties.
@@ -91,6 +101,11 @@ export function StudioFormCanvas({
   const widget = drawn?.widget ?? null
   const diagnostics = useMemo(() => drawn?.diagnostics ?? [], [drawn])
   const steps = widget?.form?.steps ?? []
+  // The step that holds the selection is shown, so a step picked in the outline or added shows on the canvas too.
+  const picked = steps.findIndex((entry) => entry.path === selected)
+  if (picked >= 0 && picked !== step) {
+    setStep(picked)
+  }
   // The draft is counted, not the drawn form, so the warning shows at once and whatever is selected.
   const draftSteps = Array.isArray(draft.steps) ? draft.steps.length : 0
   const shownStep = Math.min(step, Math.max(steps.length - 1, 0))
@@ -144,6 +159,25 @@ export function StudioFormCanvas({
     const fields = form.sections.flatMap((section) => section.fields)
     return {
       step: shownStep,
+      pickStep: (index) => {
+        const path = form.steps[index]?.path
+        if (path !== undefined) {
+          onSelect(path)
+        }
+      },
+      stepEntry: (index, content) => {
+        const entry = form.steps[index]
+        return (
+          <StepEntry
+            index={index}
+            titleKey={entry.titleKey}
+            path={entry.path}
+            marked={entry.path !== undefined && diagnosticsAt(diagnostics, entry.path).length > 0}
+          >
+            {content}
+          </StepEntry>
+        )
+      },
       section: (index, content) => {
         const section = form.sections[index]
         return (
@@ -201,24 +235,6 @@ export function StudioFormCanvas({
           </div>
         )}
         <TextProvider catalogs={catalogs} development={outer.development}>
-          {steps.length > 0 && (
-            <StepSwitch
-              value={shownStep}
-              selected={selected}
-              onChange={(index) => {
-                setStep(index)
-                const path = steps[index]?.path
-                if (path !== undefined) {
-                  onSelect(path)
-                }
-              }}
-              steps={steps.map((entry) => ({
-                titleKey: entry.titleKey,
-                path: entry.path,
-                marked: diagnosticsAt(diagnostics, entry.path).length > 0,
-              }))}
-            />
-          )}
           <div data-testid="studio-form-canvas" onClickCapture={click} onSubmitCapture={cancel}>
             {drawn?.widget === null && (
               <CanvasAlert testId="studio-canvas-cannot-draw" textKey="shell.studio.design.formCannotDraw" />
@@ -256,75 +272,73 @@ export function StudioFormCanvas({
   )
 }
 
-function StepSwitch({
-  value,
-  selected,
-  onChange,
-  steps,
-}: {
-  value: number
-  selected: string | null
-  onChange: (step: number) => void
-  steps: { titleKey: string; path: string | undefined; marked: boolean }[]
-}) {
-  const t = useText()
-  return (
-    <Segmented
-      data-testid="studio-form-steps"
-      aria-label={t('shell.studio.design.step')}
-      value={value}
-      onChange={onChange}
-      options={steps.map((step, index) => ({
-        value: index,
-        label: (
-          <StepSwitchEntry
-            index={index}
-            step={step}
-            selected={selected}
-            // The switch fires onChange only when the value changes, so a click on the step already shown needs this.
-            onClick={() => onChange(index)}
-          />
-        ),
-      }))}
-    />
-  )
-}
-
-/** A step's entry in the switch. While a section moves, it is a drop target that appends the section to the step. */
-function StepSwitchEntry({
+/**
+ * A step of the canvas's steps bar, wrapped around the step's button. A click on it selects the step, as a click on a
+ * section or a field does, and it is a drop target while a section moves, so a section dropped on it joins the step. It
+ * is marked as a section or a field is when a diagnostic names it.
+ */
+function StepEntry({
   index,
-  step,
-  selected,
-  onClick,
+  titleKey,
+  path,
+  marked,
+  children,
 }: {
   index: number
-  step: { titleKey: string; path: string | undefined; marked: boolean }
-  selected: string | null
-  onClick: () => void
+  titleKey: string
+  path: string | undefined
+  marked: boolean
+  children: ReactNode
 }) {
   const t = useText()
-  const { colour, radius } = useDesignTokens()
+  const tokens = useDesignTokens()
   const { active } = useDndContext()
   const sectionMoving = typeof (active?.data.current as { section?: unknown } | undefined)?.section === 'number'
-  const pointer = step.path ?? `/steps/${index}`
+  const pointer = path ?? `/steps/${index}`
   const { setNodeRef, isOver } = useDroppable({
-    id: `switch:${pointer}`,
+    id: `step:${pointer}`,
     data: { pointer },
     disabled: !sectionMoving,
   })
+  const mark = markedFrame(t, tokens, t(titleKey), marked)
   return (
     <span
       ref={setNodeRef}
+      role="group"
       data-testid="studio-form-step"
-      data-path={step.path}
-      data-marked={step.marked ? 'true' : undefined}
-      aria-current={step.path !== undefined && step.path === selected ? 'true' : undefined}
-      onClick={onClick}
-      style={{ outline: isOver ? `2px solid ${colour.primary}` : undefined, borderRadius: radius.base }}
+      data-form-frame=""
+      data-path={path}
+      data-marked={marked ? 'true' : undefined}
+      aria-label={mark.label}
+      style={{
+        ...mark.style,
+        display: 'inline-flex',
+        outline: isOver ? `2px solid ${tokens.colour.primary}` : undefined,
+        outlineOffset: 2,
+      }}
     >
-      {step.marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name: t(step.titleKey) }) : t(step.titleKey)}
+      {children}
     </span>
   )
+}
+
+/**
+ * The name and the border of a frame on the canvas, which a diagnostic marks as it marks a step, a section or a field.
+ * The name of a marked frame reads "has problems".
+ */
+function markedFrame(
+  t: ReturnType<typeof useText>,
+  tokens: Pick<ReturnType<typeof useDesignTokens>, 'colour' | 'radius'>,
+  name: string,
+  marked: boolean,
+): { label: string; style: CSSProperties } {
+  return {
+    label: marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name }) : name,
+    style: {
+      border: `1px solid ${marked ? tokens.colour.danger : 'transparent'}`,
+      borderRadius: tokens.radius.base,
+    },
+  }
 }
 
 /**
@@ -358,9 +372,11 @@ function FormElementFrame({
   children: ReactNode
 }) {
   const t = useText()
-  const { colour, radius } = useDesignTokens()
+  const tokens = useDesignTokens()
+  const { colour } = tokens
   const marked = diagnosticsAt(diagnostics, path).length > 0
   const name = translate ? t(label) : label
+  const mark = markedFrame(t, tokens, name, marked)
   const texts = conditions.flatMap((key) => {
     const text = path === undefined ? undefined : getAt(draft, `${path}/${key}`)
     return typeof text === 'string' && text !== '' ? [{ key, text }] : []
@@ -372,7 +388,7 @@ function FormElementFrame({
       data-form-frame=""
       data-path={path}
       data-marked={marked ? 'true' : undefined}
-      aria-label={marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name }) : name}
+      aria-label={mark.label}
       aria-current={selected ? 'true' : undefined}
       tabIndex={path === undefined ? undefined : 0}
       onKeyDown={(event) => {
@@ -386,8 +402,7 @@ function FormElementFrame({
         }
       }}
       style={{
-        border: `1px solid ${marked ? colour.danger : 'transparent'}`,
-        borderRadius: radius.base,
+        ...mark.style,
         outline: selected ? `2px solid ${colour.primary}` : undefined,
         outlineOffset: 2,
       }}

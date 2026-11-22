@@ -144,7 +144,8 @@ body as nested lists, and a row opens its widget's panel at its own pointer, suc
 - **Moving.** Every row has a Move to picker and a "…" menu at its end, with Move up, Move down and
   Delete. The menu's actions replace only the list that holds the widget, Move up is off on the list's first
   row and Move down on its last, and Delete is destructive. The row's button that selects the widget is
-  outlined in the primary colour while the widget is selected, with `aria-current`, and grey otherwise.
+  a subtle button on the selected tint in `primaryText`, with `aria-pressed="true"` while the widget is selected and
+  `aria-pressed="false"` otherwise.
   Move to lists every other widget list as a path, such as
   `Page › columns 1 › Column 2`, leaves out the widget's own list and the lists inside it, and replaces
   the page's `widgets` in one change. A type change or a move keeps the widget's name.
@@ -214,7 +215,7 @@ panel, its undo and its drag and drop.
   the action, by its JSON Pointer, such as `/widgets/0/rowActions/1`, or `/widgets/0/navigate` for a
   KPI, and not its widget. The button has `aria-current` and an outline in the primary colour, the
   widget tree keeps its widget selected, and the panel shows the widget's panel with the action's row
-  marked by `aria-current`, outlined in the primary colour and scrolled into view. Adding a navigate, `startProcess` or `delete` action
+  marked by `aria-current`, on the selected tint and scrolled into view. Adding a navigate, `startProcess` or `delete` action
   in the panel selects the new action, and removing an action selects its widget. The button runs
   nothing: it does not navigate, start a process, open a delete confirmation or call `/api/apps/`.
 - **Actions that fold.** A KPI's navigate action is a subtle button on the label line, and the

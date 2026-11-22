@@ -256,10 +256,10 @@ Design's padding above the label reads as a gap too wide.
 - **Tabs** _(planned)_. Tabs switch between areas or views of one content, such as Form, JSON and Used by.
 - **A segmented control** _(planned)_. It is one choice of two to five options that changes what shows in place, at
   once, such as a chart's period. It never holds an action.
-- **A group of buttons never shows a selection** _(planned)_. A chosen item of choices drawn as buttons is on the
+- **A group of buttons never shows a selection**. A chosen item of choices drawn as buttons is on the
   selected tint in `primaryText`, through `AxisButton`'s `selected`, never by a heavier role.
-- **A form's steps on the steps bar** _(planned)_. A form's steps are picked on the form widget's own steps bar, on the
-  canvas, not in a switch above it, see [step switch](form-designer.md#step-switch). The steps show once.
+- **A form's steps on the steps bar**. A form's steps are picked on the form widget's own steps bar, on the
+  canvas, not in a switch above it, see [steps bar](form-designer.md#steps-bar). The steps show once.
 
 ## Text
 

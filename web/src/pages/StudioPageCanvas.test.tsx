@@ -471,13 +471,13 @@ describe('the Design tab of a page', () => {
     it('selects the widget that is clicked on the canvas in the tree and opens its panel', async () => {
       const { design } = await openDesign([{ type: 'kpi' }, { type: 'chart' }])
       await screen.findByTestId('chart-widget', {}, slow)
-      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-pressed', 'true')
       expect(within(design).queryByTestId('studio-field-/widgets/1')).not.toBeInTheDocument()
 
       await userEvent.click(within(design).getByTestId('chart-widget'))
 
-      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
-      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'false')
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-pressed', 'false')
       expect(within(design).getByTestId('studio-field-/widgets/1')).toBeInTheDocument()
       expect(frame(design, '/widgets/1')).toHaveAttribute('aria-current', 'true')
       expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=Shop&resource=dashboard')
@@ -515,7 +515,7 @@ describe('the Design tab of a page', () => {
       expect(frame(design, '/widgets/1')).toHaveFocus()
       await userEvent.keyboard('{Enter}')
 
-      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'true')
       expect(frame(design, '/widgets/1')).toHaveAttribute('aria-current', 'true')
       expect(frame(design, '/widgets/0')).not.toHaveAttribute('aria-current')
     })
@@ -789,7 +789,7 @@ describe('the Design tab of a page', () => {
       const list = within(design).getByTestId(listId)
       expect(card === undefined ? list : within(list).getByTestId(card)).toHaveAttribute('aria-current', 'true')
       expect(button(design, widget, key)).toHaveAttribute('aria-current', 'true')
-      expect(within(design).getByTestId(`studio-widget-${widget}`)).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId(`studio-widget-${widget}`)).toHaveAttribute('aria-pressed', 'true')
       // The widget itself is not the selection, so its frame is not outlined.
       expect(
         within(design)
@@ -836,7 +836,7 @@ describe('the Design tab of a page', () => {
       await userEvent.click(within(design).getByTestId('kpi-tile'))
 
       expect(design.querySelector('[data-action][aria-current="true"]')).toBeNull()
-      expect(within(design).getByTestId('studio-widget-/widgets/3')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/3')).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('draws an action that the site would hide, a row action whose visibleWhen fails and a form action with no record', async () => {
@@ -864,7 +864,7 @@ describe('the Design tab of a page', () => {
 
       expect(within(list).queryByTestId('studio-action-2')).not.toBeInTheDocument()
       expect(within(list).getByTestId('studio-action-1')).not.toHaveAttribute('aria-current')
-      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('runs nothing when an action button is clicked: no request, no navigation and no confirmation', async () => {
@@ -900,7 +900,7 @@ describe('the Design tab of a page', () => {
       const saved = posts.at(-1)!.widgets
       expect(saved[0].rowActions).toHaveLength(2)
       expect(saved[1]).toEqual({ ...newWidget('kpi'), name: 'kpi1' })
-      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('inserts from the palette after a KPI whose navigate action is selected', async () => {
@@ -911,7 +911,7 @@ describe('the Design tab of a page', () => {
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(5), slow)
       expect(posts.at(-1)!.widgets[4]).toEqual({ ...newWidget('kpi'), name: 'kpi1' })
-      expect(within(design).getByTestId('studio-widget-/widgets/4')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/4')).toHaveAttribute('aria-pressed', 'true')
     })
   })
 
@@ -937,7 +937,7 @@ describe('the Design tab of a page', () => {
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
       expect(posts.at(-1)!.widgets[1]).toEqual({ ...newWidget('kpi'), name: 'kpi1' })
-      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'true')
       const announcement = palette.getByTestId('studio-palette-announcement')
       expect(announcement).toHaveTextContent(/^Inserted kpi in Page, position 2\.$/)
     })
@@ -968,7 +968,7 @@ describe('the Design tab of a page', () => {
         () => expect(posts.at(-1)!.widgets[1]).toMatchObject({ widgets: [{ type: 'chart' }, newWidget('kpi')] }),
         slow,
       )
-      expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-pressed', 'true')
       expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent(
         /^Inserted kpi in Page › section 2, position 2\.$/,
       )
@@ -1060,7 +1060,7 @@ describe('the Design tab of a page', () => {
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
       expect(posts.at(-1)!.widgets[1]).toEqual({ ...newWidget('detail'), name: 'detail1' })
-      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'true')
       const announcement = palette.getByTestId('studio-palette-announcement')
       expect(announcement).toHaveTextContent(/^Inserted detail in Page, position 2\.$/)
     })
@@ -1089,7 +1089,7 @@ describe('the Design tab of a page', () => {
         () => expect(posts.at(-1)!.widgets[1]).toMatchObject({ widgets: [{ type: 'chart' }, newWidget('kpi')] }),
         slow,
       )
-      expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-pressed', 'true')
       expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent(
         /^Inserted kpi in Page › section 2, position 2\.$/,
       )
@@ -1215,7 +1215,7 @@ describe('the Design tab of a page', () => {
         measures: [{ name: 'count', label: { textKey: '' } }],
         title: { textKey: '' },
       })
-      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'true')
       expect(screen.getByTestId('studio-palette-announcement')).toHaveTextContent(
         /^Inserted chart in Page, position 2\.$/,
       )
@@ -1243,7 +1243,7 @@ describe('the Design tab of a page', () => {
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toHaveLength(3), slow)
       expect(posts.at(-1)!.widgets[1]).toEqual({ type: 'table', name: 'table1', entity: 'Ticket' })
-      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'true')
       const announcement = screen.getByTestId('studio-palette-announcement')
       expect(announcement).toHaveTextContent(/^Inserted table in Page, position 2\.$/)
     })
@@ -1328,7 +1328,7 @@ describe('the Design tab of a page', () => {
       drag('/widgets/1', { kind: 'list', pointer: '/widgets/2/widgets' })
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toEqual([{ type: 'chart' }, section([{ type: 'kpi' }])]), slow)
-      expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/0')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/0')).toHaveAttribute('aria-pressed', 'true')
       expect(announcement).toHaveTextContent(/^Moved kpi to Page › section 2, position 1\.$/)
     })
 
@@ -1365,14 +1365,14 @@ describe('the Design tab of a page', () => {
       await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}')
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['chart', 'kpi']), slow)
-      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-pressed', 'true')
       expect(announcement).toHaveTextContent(/^Moved kpi to Page, position 2\.$/)
       await waitFor(() => expect(frame('/widgets/1')).toHaveFocus(), slow)
 
       await userEvent.keyboard('{Alt>}{ArrowUp}{/Alt}')
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['kpi', 'chart']), slow)
-      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-pressed', 'true')
       expect(announcement).toHaveTextContent(/^Moved kpi to Page, position 1\.$/)
       await waitFor(() => expect(frame('/widgets/0')).toHaveFocus(), slow)
     })
@@ -1401,7 +1401,7 @@ describe('the Design tab of a page', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 500))
       expect(posts).toHaveLength(before)
-      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
+      expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('flags a section dragged over its own list while dragging, and the drop changes nothing', async () => {

@@ -1,5 +1,6 @@
 import { Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useSelectedItemTint } from '../platform/antTheme'
 import { AxisButton, AxisButtonGroup } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField, type AxisFieldProps } from '../platform/AxisField'
@@ -94,7 +95,7 @@ function JsonOnly() {
  * on the page or on a widget, stays as it is. A widget of a type it has no panel for shows its type and points to the
  * JSON view. The caller can keep the selected widget and pass it as `selected` and `onSelect`. The selection can also
  * name an action of a widget, such as `/widgets/0/rowActions/1`, or `/widgets/0/navigate` for a KPI. The tree and the
- * panel are then those of the widget, and the panel marks the action's row with `aria-current`, scrolls it into view
+ * panel are then those of the widget, and the panel marks the action's row with `aria-current` and the selected tint, scrolls it into view
  * and, when the action is new, selects it. Removing an action selects its widget.
  *
  * The editor does not mark a customization layer. A caller that shows one uses {@link PageWidgets}.
@@ -453,8 +454,8 @@ function WidgetRow({
       <Flex vertical gap="small">
         <Flex gap="small" wrap align="center" data-testid={`studio-widget-row-${pointer}`}>
           <AxisButton
-            role={pointer === tree.selected ? 'main' : 'secondary'}
-            aria-current={pointer === tree.selected}
+            role="subtle"
+            selected={pointer === tree.selected}
             data-testid={`studio-widget-${pointer}`}
             style={{ textAlign: 'left' }}
             onClick={() => tree.onSelect(pointer)}
@@ -1541,7 +1542,7 @@ function ParameterExpressions({
  * Any other action is JSON only, and can be removed. The Adds are one group of secondary buttons on the list's title
  * row: Add navigate action always, Add action for `startProcess` only when `startProcess` is set, and Add delete action
  * only when `deleteAction` is set. Each action is a row with no box, and Remove action is in its "…" menu. The row of
- * the action at `selected` has `aria-current` and a border in the primary colour, and scrolls into view. An Add
+ * the action at `selected` has `aria-current` and sits on the selected tint, and scrolls into view. An Add
  * selects the new action, and Remove selects the `widget`. With `layer`, a row of an action that the layer added or
  * changed is marked, and a removed action is a muted row under the rows.
  */
@@ -1718,18 +1719,19 @@ function useScrolledTo<T extends HTMLElement>(selected: boolean) {
 }
 
 /**
- * The row of a selectable action or KPI navigate action. The selected one has `aria-current`, scrolls into view and has
- * an outline in the primary colour. An unselected row has no border, see docs/reference/studio-editors-by-kind.md#navigate-actions.
+ * The row of a selectable action or KPI navigate action. The selected one has `aria-current`, scrolls into view and sits
+ * on the selected tint. An unselected row has no fill or border, see docs/reference/studio-editors-by-kind.md#navigate-actions.
  */
 function SelectedMark({ testId, selected, children }: { testId: string; selected: boolean; children: ReactNode }) {
-  const { colour, radius } = useDesignTokens()
+  const { radius } = useDesignTokens()
+  const tint = useSelectedItemTint()
   const ref = useScrolledTo<HTMLDivElement>(selected)
   return (
     <div
       ref={ref}
       data-testid={testId}
       aria-current={selected ? 'true' : undefined}
-      style={selected ? { border: `1px solid ${colour.primary}`, borderRadius: radius.base, padding: 8 } : undefined}
+      style={selected ? { background: tint, borderRadius: radius.base, padding: 8 } : undefined}
     >
       {children}
     </div>
