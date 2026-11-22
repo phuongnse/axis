@@ -640,17 +640,10 @@ const Fields = memo(function Fields({
    */
   function commitStaged() {
     const key = isContent(staged?.label) ? text(staged.label.textKey) : ''
-    const labelled = Object.values(labelDrafts?.texts[key] ?? {}).some((value) => value.trim() !== '')
-    const name = text(staged?.name)
+    const problem = nameProblem(text(staged?.name), namesExcept(fields!, null))
     const errors = {
-      ...(labelled ? {} : { label: t('shell.studio.entity.fieldPanel.labelRequired') }),
-      ...(name === ''
-        ? { name: t('shell.studio.entity.fieldPanel.nameRequired') }
-        : !/^[A-Za-z][A-Za-z0-9]*$/.test(name)
-          ? { name: t('shell.studio.entity.fieldPanel.nameInvalid') }
-          : fields!.some((field) => fieldName(field)?.toLowerCase() === name.toLowerCase())
-            ? { name: t('shell.studio.entity.fieldPanel.nameTaken') }
-            : {}),
+      ...(labelled(labelDrafts?.texts[key]) ? {} : { label: t('shell.studio.entity.fieldPanel.labelRequired') }),
+      ...(problem === undefined ? {} : { name: t(problem) }),
     }
     if (errors.label !== undefined || errors.name !== undefined) {
       setStagedErrors(errors)
@@ -782,6 +775,7 @@ const Fields = memo(function Fields({
         focusPath={focusPath}
         onFocused={clearFocusPath}
         field={shown === null ? undefined : fields[shown]}
+        otherNames={namesExcept(fields, shown)}
         currencyNames={
           shown !== null && isContent(fields[shown]) && editableSettings(fields[shown]).includes('currency')
             ? currencyNames
@@ -806,6 +800,7 @@ const Fields = memo(function Fields({
           focusPath={null}
           onFocused={clearFocusPath}
           field={staged}
+          otherNames={namesExcept(fields, null)}
           currencyNames={editableSettings(staged).includes('currency') ? currencyNames : undefined}
           matchSources={editableSettings(staged).includes('match') ? matchSources : undefined}
           readOnly={false}
@@ -871,6 +866,32 @@ function nameFromLabel(label: string): string {
     )
     .join('')
   return joined.replace(/^[0-9]+/, '')
+}
+
+/**
+ * Proposed, #3264: what is wrong with a field's name, as the text key of its error, or `undefined` when nothing is: it
+ * is empty, it does not start with a letter or has more than letters and digits, or another field has it, ignoring case.
+ * Add field and an open field's panel check a name the same way.
+ */
+function nameProblem(name: string, others: readonly string[]): string | undefined {
+  if (name === '') return 'shell.studio.entity.fieldPanel.nameRequired'
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) return 'shell.studio.entity.fieldPanel.nameInvalid'
+  if (others.some((other) => other.toLowerCase() === name.toLowerCase()))
+    return 'shell.studio.entity.fieldPanel.nameTaken'
+  return undefined
+}
+
+/** The names of the fields, but the one at `except`, which a field's name may not take. */
+function namesExcept(fields: readonly unknown[], except: number | null): string[] {
+  return fields.flatMap((field, position) => {
+    const name = position === except ? null : fieldName(field)
+    return name ? [name] : []
+  })
+}
+
+/** Whether a label's texts have words in at least one language. */
+function labelled(texts: Record<string, string> | undefined): boolean {
+  return Object.values(texts ?? {}).some((value) => value.trim() !== '')
 }
 
 /** `list` with its item at `from` moved to `to`, the items between them shifting by one. */
@@ -1064,6 +1085,7 @@ function focusInDrawer(root: HTMLElement, path: string | null, pointer: string, 
 const FieldDrawer = memo(function FieldDrawer({
   onAdd,
   errors,
+  otherNames,
   index,
   open,
   focusPath,
@@ -1094,6 +1116,8 @@ const FieldDrawer = memo(function FieldDrawer({
   onAdd?: () => void
   /** Proposed, #3264: what Add field found wrong with a new field, under its label and its name. */
   errors?: { label?: string; name?: string }
+  /** The names of the entity's other fields, which the field's name may not take. */
+  otherNames: readonly string[]
 }) {
   const t = useText()
   const content = isContent(field) ? field : {}
@@ -1105,9 +1129,24 @@ const FieldDrawer = memo(function FieldDrawer({
   // column's name from its display name.
   const [nameTouched, setNameTouched] = useState(false)
   const labelTexts = useContext(LabelTextsContext)
-  const namingTexts = useMemo(
-    () =>
-      labelTexts === null || onAdd === undefined || nameTouched
+  const labelPointer = `${pointer}/label`
+  const labelKey = isContent(content.label) ? text(content.label.textKey) : ''
+  // Proposed, #3264: an open field's label and name go into the draft only while they are valid, so the draft always
+  // has both. While one is not, the panel shows what was typed with its error, and the draft keeps the last valid one.
+  const [typed, setTyped] = useState<{ index: number | null; name?: string; label?: Record<string, string> }>({
+    index,
+  })
+  const mine = typed.index === index ? typed : { index }
+  const shownName = mine.name ?? name
+  const editing = onAdd === undefined
+  const nameError = editing && mine.name !== undefined ? nameProblem(mine.name, otherNames) : undefined
+  const labelError = editing && mine.label !== undefined && !labelled(mine.label)
+  const namingTexts = useMemo(() => {
+    if (labelTexts === null) {
+      return labelTexts
+    }
+    if (!editing) {
+      return nameTouched
         ? labelTexts
         : {
             ...labelTexts,
@@ -1115,9 +1154,40 @@ const FieldDrawer = memo(function FieldDrawer({
               labelTexts.onTextsChange(at, key, texts)
               onChange(`${pointer}/name`, nameFromLabel(texts[author] ?? texts.en ?? ''))
             },
-          },
-    [labelTexts, onAdd, nameTouched, onChange, pointer, author],
-  )
+          }
+    }
+    return {
+      ...labelTexts,
+      texts: mine.label === undefined ? labelTexts.texts : { ...labelTexts.texts, [labelKey]: mine.label },
+      onTextsChange: (at: string, key: string, texts: Record<string, string>) => {
+        if (at === labelPointer && !labelled(texts)) {
+          setTyped((current) => ({ ...(current.index === index ? current : { index }), label: texts }))
+          return
+        }
+        setTyped((current) => ({ ...(current.index === index ? current : { index }), label: undefined }))
+        labelTexts.onTextsChange(at, key, texts)
+      },
+    }
+  }, [labelTexts, editing, nameTouched, onChange, pointer, author, mine.label, labelKey, labelPointer, index])
+  const changeName = (next: string) => {
+    setNameTouched(true)
+    if (editing && nameProblem(next, otherNames) !== undefined) {
+      setTyped((current) => ({ ...(current.index === index ? current : { index }), name: next }))
+      return
+    }
+    setTyped((current) => ({ ...(current.index === index ? current : { index }), name: undefined }))
+    onChange(`${pointer}/name`, next)
+  }
+  // Done closes only a field whose label and name are valid. Close puts back the last valid ones, which the draft holds.
+  const done = () => {
+    if (nameError === undefined && !labelError) {
+      onClose()
+    }
+  }
+  const close = () => {
+    setTyped({ index })
+    onClose()
+  }
   // The drawer's root, set once its content has drawn, so the focus effect below runs after the drawer has opened.
   const [root, setRoot] = useState<HTMLElement | null>(null)
   const wasOpen = useRef(false)
@@ -1150,12 +1220,12 @@ const FieldDrawer = memo(function FieldDrawer({
         id="studio-field-panel"
         testId="studio-field-panel"
         title={onAdd ? t('shell.studio.entity.newField') : name || t('shell.studio.entity.unnamedField')}
-        onClose={onClose}
+        onClose={close}
         closeNameKey="shell.studio.entity.fieldPanel.close"
         actions={
           readOnly ? undefined : onAdd ? (
             <>
-              <AxisButton role="secondary" onClick={onClose}>
+              <AxisButton role="secondary" onClick={close}>
                 {t('shell.studio.cancel')}
               </AxisButton>
               <AxisButton role="main" onClick={onAdd}>
@@ -1163,7 +1233,7 @@ const FieldDrawer = memo(function FieldDrawer({
               </AxisButton>
             </>
           ) : (
-            <AxisButton role="main" onClick={onClose}>
+            <AxisButton role="main" onClick={done}>
               {t('shell.studio.entity.fieldPanel.done')}
             </AxisButton>
           )
@@ -1188,21 +1258,25 @@ const FieldDrawer = memo(function FieldDrawer({
                   {/* Proposed, #3264: the label first, typed in words with its translations as the entity's label
                       is, then the name, which a new field takes from its label until the name is changed by hand. */}
                   <div data-testid={`studio-field-${pointer}/label`}>
-                    <AxisFieldGroup {...groupTexts(t, 'fields.label')} required error={errors?.label}>
+                    <AxisFieldGroup
+                      {...groupTexts(t, 'fields.label')}
+                      required
+                      error={
+                        errors?.label ?? (labelError ? t('shell.studio.entity.fieldPanel.labelRequired') : undefined)
+                      }
+                    >
                       <LabelTextsContext.Provider value={namingTexts}>
                         <LabelTexts pointer={`${pointer}/label`} value={content.label} onChange={onChange} />
                       </LabelTextsContext.Provider>
                     </AxisFieldGroup>
                   </div>
                   <div data-testid={`studio-field-${pointer}/name`}>
-                    <AxisField {...fieldTexts(t, 'fields.name')} required error={errors?.name}>
-                      <Input
-                        value={name}
-                        onChange={(event) => {
-                          setNameTouched(true)
-                          onChange(`${pointer}/name`, event.target.value)
-                        }}
-                      />
+                    <AxisField
+                      {...fieldTexts(t, 'fields.name')}
+                      required
+                      error={errors?.name ?? (nameError === undefined ? undefined : t(nameError))}
+                    >
+                      <Input value={shownName} onChange={(event) => changeName(event.target.value)} />
                     </AxisField>
                   </div>
                   <div data-testid={`studio-field-${pointer}/type`}>
