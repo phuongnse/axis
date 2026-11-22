@@ -28,7 +28,7 @@ The sidebar starts with the application's row, at the height of the band beside 
 meet. The row is a menu of every application, with the open one marked, and New application… after
 them. It has no entry back to the list, because Studio in the header's app switcher leads there. The
 row and the band stay in place while the page scrolls, and only the sidebar's entries scroll, under
-the row. Where the footer sits beside the sidebar is in [layout](shell.md#layout).
+the row. How the sidebar and the page scroll is in [layout](shell.md#layout).
 
 Under the row come Overview, Releases, History and Settings, which concern the whole application.
 History lists the application's revisions, see [revisions](ai-authoring-in-studio.md#revisions).

@@ -171,7 +171,7 @@ Result, Started and Duration.
 
 ### The guide
 
-The bar at the foot of the window guides the author in every state. It is an
+The bar at the foot of the page guides the author in every state. It is an
 [action bar](actions-and-controls.md#buttons) with a few words of where the request stands, at most one main
 action, and the other actions before it. Actions that do not fit fold into More, and
 [what comes next](actions-and-controls.md#what-comes-next) gives the rule for every screen. Drop… sits in the

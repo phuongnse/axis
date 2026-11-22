@@ -68,9 +68,16 @@ their own controls where they expect them.
   stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
   a scrollbar comes. A panel with no close button, such as the process designer's step panel, gives way while a panel
   the person opened is open, and comes back when that one closes. The page keeps the browser's scroll.
+- **A side panel's scroll** _(planned)_. The panel is as tall as the column under the header and scrolls from its top,
+  with its scrollbar at its edge. Its head, the name and the close button, stays at the top of that scroll on
+  `surface`, as the band stays at the top of the page's frame. A `borderSubtle` rule runs under the head, from the
+  panel's start edge to its scrollbar, so the body that scrolls under it is parted from it.
+- **A side panel's head names what it shows** _(planned)_. The head names what the panel shows, such as the field's
+  name or New field, though the field's Name box repeats it. Once the body scrolls, the head tells which item is open,
+  and the panel's name is its accessible name.
 - **A side panel's actions** _(planned)_. `SidePanel` takes `actions`, drawn in an `ActionBar` at the panel's foot that
   stays in place under the body. The actions are outlined, with the main action last on the right, so Cancel stands
-  before the main action.
+  before the main action. Its actions end where the body's content ends, past the room the body keeps for its scrollbar.
 - **A part of the page in the side panel** _(planned)_. A part of what the page edits, such as an entity's field while
   the other fields show, is edited in the side panel rather than a dialog. The panel keeps what is typed until Done, or
   the main action of a new part, and Cancel stands beside that action in its bar. Cancel and Close drop what is typed, and the panel asks first when
@@ -96,6 +103,13 @@ their own controls where they expect them.
   under the header with a scroll of its own. That scroll stops at its end, as
   [scroll areas](actions-and-controls.md#scroll-areas) say. A regular band and the footer scroll with the
   page. The page declares its colour scheme, so every scrollbar, the page's and the sidebar's, follows the mode.
+- **Each region scrolls on its own** _(planned)_. The window does not scroll, and the shell is as tall as the
+  window. The header stays at the top. Under it each region scrolls in a frame of its own, with its scrollbar at
+  its own edge: the sidebar's menu, the page's frame and the side panel. So a scrollbar always stands beside what
+  it scrolls, as in a workspace such as VS Code or Gmail. Each region stops at its end, see
+  [scroll areas](actions-and-controls.md#scroll-areas).
+- **What stays at the top of the page** _(planned)_. What stays at the top of the page, such as Studio's compact
+  band, stays at the top of the page's frame.
 - **Flush page area.** Pages draw on `surface`, flush with the frame, with `spacing-lg` padding. A wide table
   scrolls inside its widget, so the page never scrolls sideways.
 - **Flush page area for sites.** An application site's pages draw on the same flush page area, with no
@@ -137,11 +151,13 @@ their own controls where they expect them.
 - **A handle on a rule** _(planned)_. Every size handle, the side panel's included, is one handle: a grip of two bars
   in `border` at the middle of its rule, lying over the rule, and the rule and the grip turn `primary` under the
   pointer or a drag. `ResizeHandle` draws it.
-- **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer.
+- **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area.
 - **The bar slot.** The save bar and a Studio request's guide draw in the shell's bar slot, `ShellBarSlot`, in the
   content column right above the footer. The slot sticks to the window's foot while the page scrolls and rests above
   the footer at the page's end, so a bar never covers the footer. Outside a shell, as in a widget preview, a bar draws
   in place. See the [save bar](studio-resource-form.md#save-bar).
+- **The page's frame holds the save bar** _(planned)_. The page's frame holds the page and the bar slot at its foot,
+  so the save bar stays at the frame's foot while the page scrolls.
 - **No link back** _(planned)_. A page has no link back, because the navigation and the browser lead back. A record's
   page whose record does not exist keeps one link to its list, see [routing](frontend.md#routing).
 - **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it, with `spacing-xs`
@@ -151,8 +167,10 @@ their own controls where they expect them.
   [legal line](legal.md#legal-line): the copyright "© <year> Axis" on the left and the legal links on
   the right, from the `legal` of the site the shell shows, see [legal settings](legal.md#legal-settings).
   It shows no server status, and a page that cannot reach the server says so where it fails.
-- **Footer across the window** _(planned for M35)_. The footer runs across the whole window, under the sidebar, the page
-  and the right column. It sits at the window's foot even when the page is short.
+- **No footer** _(planned)_. The shell has no footer, so no row of the window is kept for one, and it shows no copyright
+  and no version. App shells such as Gmail, Slack or Jira show no footer, and a footer at the end of the page's scroll
+  would span only the page's column. The legal links are in the [account button](#account-button) for a signed-in
+  person, see the [legal line](legal.md#legal-line).
 - **Version.** A signed-in person also sees the server's version in the footer, after the copyright.
   An anonymous visitor never sees it, because it tells an attacker which known weaknesses to try.
 - **The version as an item of its own**. The version stands beside the copyright as
@@ -276,6 +294,10 @@ Sign-in itself is in [sign-in and the session](security.md#sign-in-and-the-sessi
   does the browser go to the identity provider's sign-out page.
 - **Account menu.** Its menu holds Your account (`shell.account.title`), which opens the
   [account page](platform-pages.md#tabs), and Sign out, as [signed in](#account-button) says.
+- **The Legal group** _(planned)_. Between Your account and Sign out, each part set off by a divider, the menu holds a
+  group named Legal, `shell.legal.label`. It holds Privacy and Terms when the site or its tenant sets them, then
+  Licences, always, as the language and theme menu groups its choices. Its links and labels are the
+  [legal line](legal.md#legal-line)'s.
 - **Texts.** The platform texts are `shell.account.signIn`, `shell.account.signOut` and
   `shell.account.label`, the menu's label.
 
@@ -345,6 +367,8 @@ Starting sign-in at once after a failure would loop, as the identity provider's 
 The warning is an alert that screen readers announce, with the platform text `shell.home.signInFailed` or
 `shell.home.signInDeclined`. The card's button returns to `/` after sign-in, never to any of these
 addresses.
+- **The legal line under the card** _(planned)_. The card ends in the legal line, under it and as wide as it, as the
+  identity provider's card does. The shell has no footer to hold the line.
 
 ### Endpoints
 
