@@ -31,6 +31,7 @@ import {
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment, setAt } from '../platform/jsonPatch'
 import { SidePanel } from '../platform/SidePanel'
+import { focusFirstError } from '../platform/focusFirstError'
 import { PartBoundary, SectionPart, SectionParts } from '../platform/SectionParts'
 import { withoutModulePrefix, type StudioNames } from '../platform/studio'
 import { studioResourceAddress } from '../platform/studioAddress'
@@ -866,11 +867,6 @@ function nameFromLabel(label: string): string {
     )
     .join('')
   return joined.replace(/^[0-9]+/, '')
-}
-
-/** Moves focus to the first box in error of the panel's content, as a form does when it refuses to submit. */
-function focusFirstError(root: HTMLElement | null) {
-  root?.querySelector<HTMLElement>('input[aria-invalid="true"], textarea[aria-invalid="true"]')?.focus()
 }
 
 /**
