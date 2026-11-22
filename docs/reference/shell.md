@@ -90,7 +90,7 @@ their own controls where they expect them.
   focus to the button. The breakpoint is in [narrow width](frontend.md#narrow-width).
 - **Window.** The shell fills the browser window: the page has no margin round it, and the document
   behind it is `canvas` in both modes, so no white shows at its edges or when the page scrolls past its
-  end.
+  end. Text that draws no colour of its own takes `text` of the mode, as the controls' text does.
 - **Scrolling.** The page keeps the browser's own scroll. The header stays at the top and a compact
   band stays under it. The sidebar's background runs the page's height, while its navigation stays
   under the header with a scroll of its own. That scroll stops at its end, as

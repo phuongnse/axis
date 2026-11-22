@@ -372,3 +372,27 @@ for (const preview of previews) {
     });
   }
 }
+
+test("the studio preview's Problems panel draws its text at its contrast in dark mode", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 992, height: 720 });
+  const recording = await openHarness(
+    page,
+    "?preview=studio&state=overview-with-errors-and-changes-not-live&mode=dark",
+  );
+  await page.getByTestId("studio-problems").click();
+  await expect(page.getByTestId("studio-diagnostics")).toBeVisible();
+  await settle(page, page.locator('[data-preview="studio"]'));
+
+  const samples = await page
+    .getByTestId("studio-diagnostics")
+    .evaluate(collectSamples);
+  expect(
+    findingsOf("studio", "Problems panel", "dark", samples).map(
+      describeFinding,
+    ),
+  ).toEqual([]);
+  expect(recording.errors).toEqual([]);
+});
