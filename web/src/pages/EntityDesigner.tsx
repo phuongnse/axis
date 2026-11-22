@@ -37,7 +37,7 @@ import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { ContentInsetContext } from '../platform/contentInsetContext'
 import { withoutModulePrefix, type StudioNames } from '../platform/studio'
 import { studioResourceAddress } from '../platform/studioAddress'
-import { labelText, referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
+import { labelText, referenceOptions, StudioNamesContext, textsOf, type ReferenceOption } from '../platform/studioNames'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -2247,6 +2247,22 @@ const Validations = memo(function Validations({
 })
 
 /**
+ * The text of a label, such as a validation's message, in the author's language, else in English, from the draft's
+ * texts over the application's, or the empty text when it has none.
+ */
+function useMessageText(label: unknown): string {
+  const names = useContext(StudioNamesContext)
+  const drafts = useContext(LabelTextsContext)
+  const author = useContext(PlatformContext)?.current.locale ?? 'en'
+  const key = isContent(label) ? text(label.textKey) : ''
+  if (key === '') {
+    return ''
+  }
+  const texts = drafts?.texts[key] ?? (names === undefined ? {} : textsOf(names, key))
+  return (texts[author] || texts.en || '').trim()
+}
+
+/**
  * One validation of the entity, which draws again only when its own validation or the field names change. With
  * `atField`, as in the field drawer's Validation group, it has no field picker and its message is typed as label texts,
  * see docs/reference/entity-designer.md#settings. Its "…" menu holds Remove validation, and Move up and Move down too
@@ -2278,12 +2294,15 @@ const ValidationRow = memo(function ValidationRow({
   const pointer = `/validations/${index}`
   const content = isContent(validation) ? validation : {}
   const expression = fieldTexts(t, 'validations.expression')
+  const message = useMessageText(content.message)
   return (
     <Flex vertical gap="small" data-testid={`studio-field-${pointer}`}>
       <Flex gap="small" align="center" justify="space-between">
-        <Flex gap="small" align="center">
-          <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
-            {text(content.name)}
+        {/* Proposed, #3264: a validation is told by its message in the author's language, as people read it, and its
+            name, which the designer makes and keeps for layers, is never shown: Studio shows no internal code. */}
+        <Flex gap="small" align="center" style={{ minWidth: 0 }}>
+          <Typography.Text strong={message !== ''} type={message === '' ? 'secondary' : undefined}>
+            {message === '' ? t('shell.studio.entity.newValidation') : message}
           </Typography.Text>
           {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
         </Flex>
@@ -2332,31 +2351,21 @@ const ValidationRow = memo(function ValidationRow({
           />
         </AxisField>
       </div>
-      {atField ? (
-        <div data-testid={`studio-field-${pointer}/message`}>
-          <AxisFieldGroup {...groupTexts(t, 'validations.messageText')}>
-            <LabelTexts pointer={`${pointer}/message`} value={content.message} onChange={onChange} />
-          </AxisFieldGroup>
-        </div>
-      ) : (
-        <>
-          <Picker
-            pointer={`${pointer}/message/textKey`}
-            {...fieldTexts(t, 'validations.message')}
-            kind="text"
-            value={isContent(content.message) ? content.message.textKey : undefined}
-            required
-            onPick={(next) => onChange(`${pointer}/message/textKey`, next ?? '')}
-          />
-          <Picker
-            pointer={`${pointer}/field`}
-            {...fieldTexts(t, 'validations.field')}
-            options={fieldNames}
-            value={content.field}
-            required
-            onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
-          />
-        </>
+      {/* Proposed, #3264: the message is typed in words with its translations, as a field's label is. */}
+      <div data-testid={`studio-field-${pointer}/message`}>
+        <AxisFieldGroup {...groupTexts(t, 'validations.messageText')} required>
+          <LabelTexts pointer={`${pointer}/message`} value={content.message} onChange={onChange} />
+        </AxisFieldGroup>
+      </div>
+      {atField ? null : (
+        <Picker
+          pointer={`${pointer}/field`}
+          {...fieldTexts(t, 'validations.field')}
+          options={fieldNames}
+          value={content.field}
+          required
+          onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
+        />
       )}
     </Flex>
   )
