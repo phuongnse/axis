@@ -101,7 +101,8 @@ An add-on lets a business have more users without moving to the next plan.
 
 - **User packs.** An add-on adds a fixed number of users, such as 10. A business with a few more
   people than its plan takes a pack instead of the next plan.
-- **Adding and dropping.** The operator's billing system adds or drops a pack of a tenant. Dropping one
+- **Adding and dropping.** The operator's billing system adds or drops a pack of a tenant through the
+  [billing API](billing-api.md#setting-the-plan-and-add-ons). Dropping one
   that would leave more enabled users than the new number is refused, naming how many users to disable
   first.
 
@@ -109,7 +110,8 @@ An add-on lets a business have more users without moving to the next plan.
 
 _(planned for M34)_
 
-The operator's billing system changes a tenant's plan, and Axis refuses a smaller plan that the
+The operator's billing system changes a tenant's plan through the
+[billing API](billing-api.md#setting-the-plan-and-add-ons), and Axis refuses a smaller plan that the
 tenant's use does not fit.
 
 - **A larger plan** applies at once, and the control plane writes its quotas to the cell.
