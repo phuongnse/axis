@@ -20,8 +20,8 @@ commerce.
   delays a step and never skips one. Every change of state writes an audit record.
 - **The `control_plane.subscriptions` table.** `id`, `tenant_id`, `sign_up_id`, `state` (`trialing`,
   `active`, `pastDue`, `readOnly`, `cancelled`, `deleting` or `deleted`), `trial_ends_at`, `next_at`, `step_id`, `plan_code`,
-  `plan_version`, `period` (`month` or `year`), `paid_through` and `created_at`. The
-  plan and period are empty until a plan is set, see
+  `plan_version`, `paid_through` and `created_at`. The
+  plan is empty until a plan is set, see
   [the catalogue](plans.md#the-catalogue). `paid_through` is the date the tenant is paid through, set by the
   [billing API](billing-api.md#setting-the-paid-through-date), and it is empty until then. A
   subscription with a `paid_through` is a paid tenant. A [confirmed sign-up](sign-up.md#the-verify-page) starts the subscription as `trialing`, with the
@@ -91,9 +91,11 @@ A subscription is in one of these states, and each state says how the tenant wor
 - **The clock follows the paid-through date.** Once the date has passed, the clock moves an `active`
   subscription to `pastDue`, then to `readOnly` after the grace and to `deleting` after 90 days, as for an ended
   trial but with the longer wait.
-- **Cancelling** _(planned for M34)_. The operator's billing system ends the subscription at its
-  paid-through date through the [billing API](billing-api.md#ending-a-subscription). The tenant keeps
-  working to that date, then follows the same path as an unpaid one.
+- **Cancelling.** The operator's billing system ends the subscription at its paid-through date through the
+  [billing API](billing-api.md#ending-a-subscription). The call makes an `active` subscription `cancelled` in
+  its transaction, with a new step id and the audit record `subscription.cancelled` by the billing client. The
+  move keeps `paid_through` and `next_at`, so the tenant works until the day after its paid-through date. Then
+  the clock moves it to `readOnly` with one read-only call to the cell, and to `deleting` after 90 days.
 
 ## The timeline
 

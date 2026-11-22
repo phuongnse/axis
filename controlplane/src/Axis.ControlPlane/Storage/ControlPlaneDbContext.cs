@@ -144,8 +144,6 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             {
                 table.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'active', 'pastDue', 'readOnly', 'cancelled', 'deleting', 'deleted')");
                 table.HasCheckConstraint("ck_subscriptions_plan", "(plan_code IS NULL) = (plan_version IS NULL)");
-                table.HasCheckConstraint("ck_subscriptions_purchase", "period IS NULL OR plan_code IS NOT NULL");
-                table.HasCheckConstraint("ck_subscriptions_period", "period IN ('month', 'year')");
             });
             subscription.HasKey(s => s.Id).HasName("pk_subscriptions");
             subscription.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
@@ -157,7 +155,6 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             subscription.Property(s => s.StepId).HasColumnName("step_id").ValueGeneratedNever();
             subscription.Property(s => s.PlanCode).HasColumnName("plan_code");
             subscription.Property(s => s.PlanVersion).HasColumnName("plan_version");
-            subscription.Property(s => s.Period).HasColumnName("period");
             subscription.Property(s => s.PaidThrough).HasColumnName("paid_through").HasColumnType("date");
             subscription.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             subscription.HasOne<SignUpRow>().WithMany().HasForeignKey(s => s.SignUpId).HasConstraintName("fk_subscriptions_sign_up_id").OnDelete(DeleteBehavior.Restrict);

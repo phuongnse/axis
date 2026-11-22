@@ -4,6 +4,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { findNamed, freshKey, isObject, pointerSegment, renameKey } from '../platform/scenarioSteps'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
@@ -120,6 +121,7 @@ function StubCard({
                 keyField={fieldText('output.name')}
                 addLabel={t('shell.studio.scenario.addOutput')}
                 prefix="output"
+                emptyText={t('shell.studio.scenario.noOutput')}
                 onChange={onChange}
               />
             )}
@@ -211,44 +213,47 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
         )}
         {section(
           'users',
-          userNames.map((user) => {
-            const pointer = `/users/${pointerSegment(user)}`
-            const roles = Array.isArray(users[user]) ? (users[user] as string[]) : []
-            return (
-              <div key={user} data-testid={`studio-field-${pointer}`}>
-                <Flex gap="small" align="flex-start">
-                  <Flex vertical gap="small" style={{ flex: 1 }}>
-                    <AxisField {...texts.field('users.id')}>
-                      <KeyInput value={user} onRename={(next) => renameUser(user, next)} />
-                    </AxisField>
-                    <AxisField {...texts.field('users.roles')}>
-                      <Select
-                        virtual={false}
-                        mode="multiple"
-                        style={{ minWidth: 240 }}
-                        value={roles}
-                        options={[...new Set([...roleNames, ...roles])].map((role) => ({ value: role, label: role }))}
-                        onChange={(next: string[]) => onChange(pointer, next)}
+          <>
+            {userNames.length === 0 && <EmptyState text={t('shell.studio.scenario.noUsers')} />}
+            {userNames.map((user) => {
+              const pointer = `/users/${pointerSegment(user)}`
+              const roles = Array.isArray(users[user]) ? (users[user] as string[]) : []
+              return (
+                <div key={user} data-testid={`studio-field-${pointer}`}>
+                  <Flex gap="small" align="flex-start">
+                    <Flex vertical gap="small" style={{ flex: 1 }}>
+                      <AxisField {...texts.field('users.id')}>
+                        <KeyInput value={user} onRename={(next) => renameUser(user, next)} />
+                      </AxisField>
+                      <AxisField {...texts.field('users.roles')}>
+                        <Select
+                          virtual={false}
+                          mode="multiple"
+                          style={{ minWidth: 240 }}
+                          value={roles}
+                          options={[...new Set([...roleNames, ...roles])].map((role) => ({ value: role, label: role }))}
+                          onChange={(next: string[]) => onChange(pointer, next)}
+                        />
+                      </AxisField>
+                    </Flex>
+                    {componentDisabled ? null : (
+                      <RowActions
+                        fold
+                        actions={[
+                          {
+                            key: 'remove',
+                            labelKey: 'shell.studio.scenario.remove',
+                            destructive: true,
+                            onClick: () => onChange(pointer, undefined),
+                          },
+                        ]}
                       />
-                    </AxisField>
+                    )}
                   </Flex>
-                  {componentDisabled ? null : (
-                    <RowActions
-                      fold
-                      actions={[
-                        {
-                          key: 'remove',
-                          labelKey: 'shell.studio.scenario.remove',
-                          destructive: true,
-                          onClick: () => onChange(pointer, undefined),
-                        },
-                      ]}
-                    />
-                  )}
-                </Flex>
-              </div>
-            )
-          }),
+                </div>
+              )
+            })}
+          </>,
           componentDisabled ? undefined : (
             <AxisButton role="secondary" onClick={() => onChange(`/users/${freshKey(users, 'user')}`, [])}>
               {t('shell.studio.scenario.addUser')}
@@ -257,9 +262,12 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
         )}
         {section(
           'stubs',
-          stubs.map((stub, index) => (
-            <StubCard key={index} pointer={`/stubs/${index}`} stub={isObject(stub) ? stub : {}} onChange={onChange} />
-          )),
+          <>
+            {stubs.length === 0 && <EmptyState text={t('shell.studio.scenario.noStubs')} />}
+            {stubs.map((stub, index) => (
+              <StubCard key={index} pointer={`/stubs/${index}`} stub={isObject(stub) ? stub : {}} onChange={onChange} />
+            ))}
+          </>,
           componentDisabled ? undefined : (
             <AxisButton
               role="secondary"
@@ -271,9 +279,12 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
         )}
         {section(
           'steps',
-          steps.map((_, index) => (
-            <ScenarioStep key={index} steps={steps} index={index} users={userNames} onChange={onChange} />
-          )),
+          <>
+            {steps.length === 0 && <EmptyState text={t('shell.studio.scenario.noSteps')} />}
+            {steps.map((_, index) => (
+              <ScenarioStep key={index} steps={steps} index={index} users={userNames} onChange={onChange} />
+            ))}
+          </>,
           componentDisabled ? undefined : (
             <AxisButton
               role="secondary"

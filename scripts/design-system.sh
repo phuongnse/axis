@@ -3,8 +3,9 @@
 # that sets window.Axis with a mount function for each widget preview. scripts/design-system-header.mjs
 # writes its first line, /* @ds-bundle: {...} */, with the namespace and the card names in order. Then
 # scripts/check-design-system.mjs checks the bundle: that line, one script, no import, no literal </script
-# or <!--, no font, at most 6 MB. It needs no Chromium and saves no HTML files. The local agent session
-# publishes the bundle as the Design System artifact. web/design-system.html is its harness.
+# or <!--, no font, at most 6 MB, and it warns within 256 KB of that cap. It needs no Chromium and saves
+# no HTML files. The local agent session publishes the bundle as the Design System artifact.
+# web/design-system.html is its harness.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

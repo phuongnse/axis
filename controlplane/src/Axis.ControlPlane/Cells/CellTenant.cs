@@ -20,3 +20,12 @@ internal sealed record CellAdministratorList(IReadOnlyList<CellAdministratorItem
 
 /// <summary>One item of <see cref="CellAdministratorList"/>.</summary>
 internal sealed record CellAdministratorItem(string? Email, string? DisplayName, string? Language);
+
+/// <summary>One quota of a tenant's use: the limit and the amount used. Each is null while nothing sets or fills it.</summary>
+internal sealed record CellQuotaUse(long? Limit, long? Used);
+
+/// <summary>The <c>usage</c> of <c>GET /api/cell/tenants/{id}</c>, see <c>docs/reference/tenant-lifecycle.md#routes</c>.</summary>
+internal sealed record CellTenantUsage(CellQuotaUse Storage, CellQuotaUse Users, CellQuotaUse Applications, CellQuotaUse EmailsPerDay);
+
+/// <summary>One tenant as <c>GET /api/cell/tenants/{id}</c> reads it, of which the client reads the <c>status</c> and the <c>usage</c>. The usage is null when the body holds none.</summary>
+internal sealed record CellTenantRead(string Status, CellTenantUsage? Usage);

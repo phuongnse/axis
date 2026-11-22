@@ -5,6 +5,7 @@ import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { StudioBindingsContext } from '../platform/studioCatalog'
 import { useText } from '../platform/texts'
 import { WarningLine } from '../platform/WarningLine'
@@ -228,6 +229,7 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
                   onChange={onChange}
                 />
               ))}
+              {operations.length === 0 && <EmptyState text={t('shell.studio.connector.noOperations')} />}
             </Flex>
           </div>,
           componentDisabled ? undefined : (
@@ -402,6 +404,11 @@ function FieldRows({
         }
       >
         <Flex vertical gap="small">
+          {list.length === 0 && (
+            <EmptyState
+              text={t(kind === 'input' ? 'shell.studio.connector.noInput' : 'shell.studio.connector.noOutput')}
+            />
+          )}
           {list.map((row, index) => {
             const field = isContent(row) ? row : {}
             const rowPointer = `${pointer}/${index}`
@@ -525,6 +532,7 @@ function NestedFields({
         }
       >
         <Flex vertical gap="small">
+          {list.length === 0 && <EmptyState text={t('shell.studio.connector.noNestedFields')} />}
           {list.map((row, index) => {
             const field = isContent(row) ? row : {}
             const rowPointer = `${pointer}/${index}`

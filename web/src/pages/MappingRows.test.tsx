@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { emptyDescription } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { MappingRows } from './MappingRows'
 import type { ChangeHandler } from './SchemaForm'
@@ -108,6 +109,23 @@ describe('MappingRows', () => {
     expect(screen.queryByRole('combobox', { name: `Add ${title}` })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
+  })
+
+  it.each([false, true])('shows the empty line when it has no rows, read-only: %s', (readOnly) => {
+    renderRows({ data: {}, readOnly })
+
+    expect(
+      emptyDescription(
+        platformEnglish['shell.studio.process.noMappings'],
+        screen.getByTestId('studio-field-/steps/1/output'),
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('shows no empty line when it has rows', () => {
+    renderRows()
+
+    expect(screen.queryByText(platformEnglish['shell.studio.process.noMappings'])).toBeNull()
   })
 
   it('points to the JSON view for a value that is not an object', () => {

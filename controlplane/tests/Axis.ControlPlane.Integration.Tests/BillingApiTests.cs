@@ -27,9 +27,9 @@ using Testcontainers.PostgreSql;
 namespace Axis.ControlPlane.Integration.Tests;
 
 /// <summary>
-/// The billing API's paid-through call on a real PostgreSQL, see <c>docs/reference/billing-api.md</c>. The billing client signs in with a token that a stub
+/// The billing API's paid-through call, plan call, end call and read on a real PostgreSQL, see <c>docs/reference/billing-api.md</c>. The billing client signs in with a token that a stub
 /// identity provider's key signs, and the control plane checks it as it checks the operator's real one. The moves then run end to end: the call, the change
-/// of state, and the jobs that write the plan's quotas to a cell that <see cref="CellStub"/> stands in for, and resume the tenant. Each test class instance has
+/// of state, and the jobs that write the plan's quotas to a cell that <see cref="CellStub"/> stands in for, and resume the tenant. The plan call's moves run to the cell the same way. The end call is followed by the clock, and the read gets its usage from the stub cell. Each test class instance has
 /// a container of its own, with the region <c>vn</c> and the cell <c>vn-1</c>. Every tenant holds a marker of ten digits.
 /// </summary>
 public sealed class BillingApiTests : IAsyncLifetime
@@ -105,6 +105,15 @@ public sealed class BillingApiTests : IAsyncLifetime
             builder.UseSetting("ControlPlane:Billing:Audience", Audience);
             builder.UseSetting("ControlPlane:Billing:ClientId", BillingClient);
             builder.ConfigureServices(services => services.RemoveAll<RecurringJob>());
+
+            // The read finds a tenant's cell as the jobs do. The host's options list no cell, so it registers no quota or resume handler.
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<CellClients>();
+                services.AddSingleton(_clients);
+                services.AddKeyedSingleton("directory", _dataSource);
+            });
+            builder.ConfigureServices(services => services.Replace(ServiceDescriptor.Singleton(_catalogue)));
             builder.ConfigureServices(services => services.Configure<JwtBearerOptions>("Axis.Billing", jwt => jwt.BackchannelHttpHandler = new IdentityProvider(_key)));
         });
         _http = _factory.CreateClient();
@@ -403,6 +412,444 @@ public sealed class BillingApiTests : IAsyncLifetime
         await AssertUnchangedAsync(id, state);
     }
 
+    [Fact]
+    public async Task The_billing_client_sets_team_version_2_with_two_user_packs_and_the_cell_receives_its_quotas_with_the_users_raised()
+    {
+        var id = await SeedAsync(Tenant, "active");
+        var step = await StepAsync(id);
+
+        var response = await PutPlanAsync(Tenant, "plan:inv-1", Team(2, ("users-10", 2)), Token());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var root = answer.RootElement;
+        Assert.Equal(Tenant, root.GetProperty("tenantId").GetString());
+        Assert.Equal("active", root.GetProperty("state").GetString());
+        Assert.Equal("team", root.GetProperty("plan").GetProperty("code").GetString());
+        Assert.Equal(2, root.GetProperty("plan").GetProperty("version").GetInt32());
+        var addOn = Assert.Single(root.GetProperty("addOns").EnumerateArray());
+        Assert.Equal("users-10", addOn.GetProperty("code").GetString());
+        Assert.Equal(2, addOn.GetProperty("quantity").GetInt32());
+
+        Assert.Equal(2, await ScalarAsync<int>($"SELECT plan_version FROM control_plane.subscriptions WHERE id = '{id}'"));
+        Assert.Equal("active", await StateAsync(id));
+        Assert.Equal(step, await StepAsync(id));
+        Assert.Equal("users-10:2", await TextAsync($"SELECT add_on_code || ':' || quantity FROM control_plane.subscription_add_ons WHERE subscription_id = '{id}'"));
+        var record = Assert.Single(await AuditAsync(id.ToString()));
+        Assert.Equal(("billing", BillingClient, "subscription.planSet"), (record.ActorKind, record.Actor, record.Action));
+        Assert.Equal(1L, await ScalarAsync<long>($"SELECT count(*) FROM control_plane.jobs WHERE kind = '{SubscriptionQuotas.JobKind}'"));
+        Assert.Empty(_cell.Calls);
+
+        await DrainAsync();
+
+        var put = Assert.Single(_cell.Puts);
+        Assert.Equal($"/api/cell/tenants/{Tenant}/quotas", put.Path);
+        Assert.Equal(25 + 20, put.Set[QuotaKeys.Users]);
+        Assert.Equal(21_474_836_480, put.Set[QuotaKeys.Storage]);
+    }
+
+    [Fact]
+    public async Task A_second_plan_call_with_no_packs_drops_the_packs_and_the_cell_receives_the_included_users()
+    {
+        var id = await SeedAsync(Tenant, "active");
+        Assert.Equal(HttpStatusCode.OK, (await PutPlanAsync(Tenant, "plan:inv-2", Team(2, ("users-10", 2)), Token())).StatusCode);
+
+        var response = await PutPlanAsync(Tenant, "plan:inv-3", Team(2), Token());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0L, await ScalarAsync<long>($"SELECT count(*) FROM control_plane.subscription_add_ons WHERE subscription_id = '{id}'"));
+        Assert.Equal(2, (await AuditAsync(id.ToString())).Count);
+
+        await DrainAsync();
+
+        Assert.Equal(25, _cell.Puts[^1].Set[QuotaKeys.Users]);
+    }
+
+    [Fact]
+    public async Task A_plan_call_with_the_same_values_still_writes_a_record_and_queues_the_quotas_and_a_trial_takes_the_plan_at_once()
+    {
+        var id = await SeedAsync(Tenant, "trialing");
+
+        var response = await PutPlanAsync(Tenant, "plan:same", Team(1), Token());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("trialing", await StateAsync(id));
+        Assert.Equal("subscription.planSet", Assert.Single(await AuditAsync(id.ToString())).Action);
+        await DrainAsync();
+        Assert.Equal(25, Assert.Single(_cell.Puts).Set[QuotaKeys.Users]);
+    }
+
+    [Theory]
+    [InlineData("""{"code":"unknown","version":1,"addOns":[]}""")]
+    [InlineData("""{"code":"team","version":9,"addOns":[]}""")]
+    [InlineData("""{"code":"trial","version":1,"addOns":[]}""")]
+    [InlineData("""{"code":"team","version":2,"addOns":[{"code":"users-50","quantity":1}]}""")]
+    [InlineData("""{"code":"team","version":2,"addOns":[{"code":"users-10","quantity":0}]}""")]
+    [InlineData("""{"code":"team","version":2,"addOns":[{"code":"users-10","quantity":-1}]}""")]
+    [InlineData("""{"code":"team","version":2,"addOns":[{"code":"users-10","quantity":1},{"code":"users-10","quantity":2}]}""")]
+    public async Task A_plan_or_add_on_that_the_catalogue_does_not_list_or_a_trial_plan_or_a_bad_quantity_or_a_repeated_code_answers_422_and_changes_nothing(string body)
+    {
+        var id = await SeedAsync(Tenant, "active");
+
+        var response = await PutAsync(Tenant, "plan:refused", body, Token(), "plan");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        await AssertPlanUnchangedAsync(id, "active");
+    }
+
+    [Fact]
+    public async Task A_plan_call_with_no_token_answers_401_and_one_without_the_billing_scope_answers_403_and_neither_changes_anything()
+    {
+        var id = await SeedAsync(Tenant, "active");
+        var body = Team(2, ("users-10", 1));
+
+        var none = await PutPlanAsync(Tenant, "plan:none", body, null);
+        var noScope = await PutPlanAsync(Tenant, "plan:noscope", body, Token(scope: null));
+        var wrongScope = await PutPlanAsync(Tenant, "plan:wrongscope", body, Token(scope: "openid profile"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal("Bearer", Assert.Single(none.Headers.WwwAuthenticate).ToString());
+        Assert.Equal(HttpStatusCode.Forbidden, noScope.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, wrongScope.StatusCode);
+        await AssertPlanUnchangedAsync(id, "active");
+    }
+
+    [Theory]
+    [InlineData("not json", "code")]
+    [InlineData("[]", "code")]
+    [InlineData("""{"version":2,"addOns":[]}""", "code")]
+    [InlineData("""{"code":"","version":2,"addOns":[]}""", "code")]
+    [InlineData("""{"code":7,"version":2,"addOns":[]}""", "code")]
+    [InlineData("""{"code":"team","addOns":[]}""", "version")]
+    [InlineData("""{"code":"team","version":"2","addOns":[]}""", "version")]
+    [InlineData("""{"code":"team","version":2.5,"addOns":[]}""", "version")]
+    [InlineData("""{"code":"team","version":2}""", "addOns")]
+    [InlineData("""{"code":"team","version":2,"addOns":{}}""", "addOns")]
+    [InlineData("""{"code":"team","version":2,"addOns":["users-10"]}""", "addOns")]
+    [InlineData("""{"code":"team","version":2,"addOns":[{"quantity":1}]}""", "addOns")]
+    [InlineData("""{"code":"team","version":2,"addOns":[{"code":"users-10","quantity":"1"}]}""", "addOns")]
+    [InlineData("""{"code":"team","version":2,"addOns":[{"code":"users-10","quantity":1.5}]}""", "addOns")]
+    public async Task A_plan_body_that_does_not_parse_or_holds_a_malformed_value_answers_400_keyed_by_the_field_and_changes_nothing(string body, string field)
+    {
+        var id = await SeedAsync(Tenant, "active");
+
+        var response = await PutAsync(Tenant, "plan:body", body, Token(), "plan");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty(field, out _));
+        await AssertPlanUnchangedAsync(id, "active");
+    }
+
+    [Fact]
+    public async Task A_plan_call_with_no_key_or_for_an_unknown_tenant_answers_400_or_404_and_changes_nothing()
+    {
+        var id = await SeedAsync(Tenant, "active");
+
+        var missing = await PutPlanAsync(Tenant, null, Team(2), Token());
+        var unknown = await PutPlanAsync("bill-0000000000", "plan:unknown", Team(2), Token());
+
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        await AssertPlanUnchangedAsync(id, "active");
+    }
+
+    [Theory]
+    [InlineData("deleting")]
+    [InlineData("deleted")]
+    public async Task A_plan_call_on_a_deleting_or_deleted_subscription_answers_409_and_changes_nothing(string state)
+    {
+        var id = await SeedAsync(Tenant, state);
+
+        var response = await PutPlanAsync(Tenant, "plan:deleting", Team(2, ("users-10", 1)), Token());
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await AssertPlanUnchangedAsync(id, state);
+    }
+
+    [Fact]
+    public async Task The_same_key_and_body_twice_on_the_plan_call_answer_the_same_and_write_one_record_and_one_job_and_the_same_key_on_another_route_answers_422()
+    {
+        var id = await SeedAsync(Tenant, "active");
+        var body = Team(2, ("users-10", 2));
+
+        var first = await PutPlanAsync(Tenant, "plan:inv-9", body, Token());
+        var second = await PutPlanAsync(Tenant, "plan:inv-9", body, Token());
+        var other = await PutAsync(Tenant, "plan:inv-9", $$"""{"paidThrough":"{{_paidThrough:yyyy-MM-dd}}"}""", Token());
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(
+            await first.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            await second.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, other.StatusCode);
+        Assert.Single(await AuditAsync(id.ToString()));
+        Assert.Equal(1L, await ScalarAsync<long>($"SELECT count(*) FROM control_plane.jobs WHERE kind = '{SubscriptionQuotas.JobKind}'"));
+        Assert.Equal(1L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
+    }
+
+    [Fact]
+    public async Task A_plan_set_on_a_trial_that_pins_none_and_then_a_paid_through_date_make_it_active_and_the_cell_receives_the_plans_quotas()
+    {
+        var id = await SeedAsync(Tenant, "trialing", pinsPlan: false);
+
+        var plan = await PutPlanAsync(Tenant, "plan:trial", Team(2, ("users-10", 1)), Token());
+        var paid = await PutAsync(Tenant, "paid-through:trial", $$"""{"paidThrough":"{{_paidThrough:yyyy-MM-dd}}"}""", Token());
+
+        Assert.Equal(HttpStatusCode.OK, plan.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, paid.StatusCode);
+        Assert.Equal("active", await StateAsync(id));
+        Assert.Equal(
+            ["subscription.active", "subscription.planSet"],
+            (await AuditAsync(id.ToString())).Select(record => record.Action).Order(StringComparer.Ordinal).ToArray());
+
+        await DrainAsync();
+
+        Assert.All(_cell.Puts, put => Assert.Equal(35, put.Set[QuotaKeys.Users]));
+        Assert.Equal(21_474_836_480, _cell.Puts[^1].Set[QuotaKeys.Storage]);
+    }
+
+    [Fact]
+    public async Task Ending_an_active_subscription_makes_it_cancelled_with_one_record_by_the_billing_client_and_the_clock_makes_it_read_only_after_its_paid_through_date()
+    {
+        var id = await SeedAsync(Tenant, "active", paidThrough: DateOnly.FromDateTime(DateTime.UtcNow));
+        var before = await StepAsync(id);
+        var nextAt = await TextAsync($"SELECT next_at::text FROM control_plane.subscriptions WHERE id = '{id}'");
+
+        var response = await PostAsync(Tenant, "end:inv-1", Token());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using (var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)))
+        {
+            Assert.Equal(Tenant, answer.RootElement.GetProperty("tenantId").GetString());
+            Assert.Equal("cancelled", answer.RootElement.GetProperty("state").GetString());
+            Assert.Equal($"{DateTime.UtcNow:yyyy-MM-dd}", answer.RootElement.GetProperty("paidThrough").GetString());
+            Assert.False(answer.RootElement.TryGetProperty("usage", out _));
+        }
+
+        Assert.Equal("cancelled", await StateAsync(id));
+        var step = await StepAsync(id);
+        Assert.NotEqual(before, step);
+        Assert.Equal(nextAt, await TextAsync($"SELECT next_at::text FROM control_plane.subscriptions WHERE id = '{id}'"));
+        var record = Assert.Single(await AuditAsync(id.ToString()));
+        Assert.Equal(("billing", BillingClient, "subscription.cancelled"), (record.ActorKind, record.Actor, record.Action));
+
+        // The tenant works until the day after its paid-through date: the clock has nothing due yet.
+        await _clock.RunAsync(new ClaimedJob(Guid.NewGuid(), SubscriptionClock.JobKind, [], 1), TestContext.Current.CancellationToken);
+
+        Assert.Equal("cancelled", await StateAsync(id));
+        Assert.Empty(_cell.Calls);
+
+        await Execute($"UPDATE control_plane.subscriptions SET paid_through = paid_through - 2, next_at = next_at - interval '2 days' WHERE id = '{id}'");
+        await _clock.RunAsync(new ClaimedJob(Guid.NewGuid(), SubscriptionClock.JobKind, [], 1), TestContext.Current.CancellationToken);
+
+        Assert.Equal("readOnly", await StateAsync(id));
+        var readOnly = Assert.Single(_cell.ReadOnlys);
+        Assert.Equal($"/api/cell/tenants/{Tenant}/read-only", readOnly.Path);
+        Assert.Equal($"read-only:{step}", readOnly.Key);
+        var records = await AuditAsync(id.ToString());
+        Assert.Equal(["subscription.cancelled", "subscription.readOnly"], records.Select(record => record.Action));
+        Assert.Equal(("billing", "job"), (records[0].ActorKind, records[1].ActorKind));
+    }
+
+    [Fact]
+    public async Task Ending_a_cancelled_subscription_answers_200_and_writes_nothing()
+    {
+        var id = await SeedAsync(Tenant, "cancelled");
+        var step = await StepAsync(id);
+
+        var response = await PostAsync(Tenant, "end:again", Token());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("cancelled", answer.RootElement.GetProperty("state").GetString());
+        Assert.Equal(step, await StepAsync(id));
+        Assert.Empty(await AuditAsync(id.ToString()));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs"));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
+    }
+
+    [Theory]
+    [InlineData("trialing")]
+    [InlineData("pastDue")]
+    [InlineData("readOnly")]
+    [InlineData("deleting")]
+    [InlineData("deleted")]
+    public async Task Ending_a_subscription_that_is_not_active_or_cancelled_answers_409_and_changes_nothing(string state)
+    {
+        var id = await SeedAsync(Tenant, state);
+        var step = await StepAsync(id);
+
+        var response = await PostAsync(Tenant, "end:refused", Token());
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(step, await StepAsync(id));
+        await AssertUnchangedAsync(id, state);
+    }
+
+    [Fact]
+    public async Task Ending_without_a_key_answers_400_and_changes_nothing()
+    {
+        var id = await SeedAsync(Tenant, "active");
+
+        var response = await PostAsync(Tenant, null, Token());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertUnchangedAsync(id, "active");
+    }
+
+    [Fact]
+    public async Task The_same_key_sent_twice_to_the_end_call_answers_the_same_text_and_writes_one_record_and_a_key_first_used_on_another_call_answers_422()
+    {
+        var id = await SeedAsync(Tenant, "active");
+        var other = await SeedAsync(OtherTenant, "readOnly");
+
+        var first = await PostAsync(Tenant, "end:inv-2", Token());
+        var second = await PostAsync(Tenant, "end:inv-2", Token());
+        var paidThrough = await PutAsync(OtherTenant, "shared-key", $$"""{"paidThrough":"{{_paidThrough:yyyy-MM-dd}}"}""", Token());
+        var reused = await PostAsync(OtherTenant, "shared-key", Token());
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(
+            await first.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            await second.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Single(await AuditAsync(id.ToString()));
+        Assert.Equal(HttpStatusCode.OK, paidThrough.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, reused.StatusCode);
+        Assert.Equal("active", await StateAsync(other));
+        Assert.Equal("subscription.active", Assert.Single(await AuditAsync(other.ToString())).Action);
+        Assert.Equal(2L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
+    }
+
+    [Fact]
+    public async Task Reading_a_tenant_returns_its_state_dates_plan_add_ons_and_the_usage_of_its_cell_and_writes_no_record()
+    {
+        var id = await SeedAsync(Tenant, "active", paidThrough: _paidThrough);
+        await Execute($"INSERT INTO control_plane.subscription_add_ons (subscription_id, add_on_code, quantity) VALUES ('{id}', 'users-10', 2)");
+        _cell.Usage = new
+        {
+            storage = new { limit = 10_737_418_240L, used = 1_048_576L },
+            users = new { limit = 45L, used = 12L },
+            applications = new { limit = 5L, used = (long?)null },
+            emailsPerDay = new { limit = 2000L, used = 40L },
+        };
+
+        var response = await GetAsync(Tenant, Token());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var root = answer.RootElement;
+        Assert.Equal(Tenant, root.GetProperty("tenantId").GetString());
+        Assert.Equal("active", root.GetProperty("state").GetString());
+        Assert.Equal($"{_paidThrough:yyyy-MM-dd}", root.GetProperty("paidThrough").GetString());
+        Assert.Equal($"{_paidThrough.AddDays(1):yyyy-MM-dd}T00:00:00Z", root.GetProperty("nextAt").GetString());
+        Assert.Equal(JsonValueKind.String, root.GetProperty("trialEndsAt").ValueKind);
+        Assert.Equal(("team", 1), (root.GetProperty("plan").GetProperty("code").GetString(), root.GetProperty("plan").GetProperty("version").GetInt32()));
+        var addOn = Assert.Single(root.GetProperty("addOns").EnumerateArray());
+        Assert.Equal(("users-10", 2), (addOn.GetProperty("code").GetString(), addOn.GetProperty("quantity").GetInt32()));
+        var usage = root.GetProperty("usage");
+        Assert.Equal((10_737_418_240L, 1_048_576L), (usage.GetProperty("storage").GetProperty("limit").GetInt64(), usage.GetProperty("storage").GetProperty("used").GetInt64()));
+        Assert.Equal((45L, 12L), (usage.GetProperty("users").GetProperty("limit").GetInt64(), usage.GetProperty("users").GetProperty("used").GetInt64()));
+        Assert.Equal(5L, usage.GetProperty("applications").GetProperty("limit").GetInt64());
+        Assert.Equal(JsonValueKind.Null, usage.GetProperty("applications").GetProperty("used").ValueKind);
+        Assert.Equal((2000L, 40L), (usage.GetProperty("emailsPerDay").GetProperty("limit").GetInt64(), usage.GetProperty("emailsPerDay").GetProperty("used").GetInt64()));
+        Assert.Equal($"/api/cell/tenants/{Tenant}", Assert.Single(_cell.Reads));
+        Assert.Empty(_cell.Calls);
+        Assert.Empty(await AuditAsync(id.ToString()));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs"));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
+    }
+
+    [Fact]
+    public async Task Reading_a_deleted_subscription_returns_null_usage_and_does_not_call_the_cell()
+    {
+        await SeedAsync(Tenant, "deleted", pinsPlan: false);
+
+        var response = await GetAsync(Tenant, Token());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("deleted", answer.RootElement.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, answer.RootElement.GetProperty("usage").ValueKind);
+        Assert.Equal(JsonValueKind.Null, answer.RootElement.GetProperty("plan").ValueKind);
+        Assert.Empty(_cell.Reads);
+    }
+
+    [Fact]
+    public async Task Reading_a_tenant_whose_cell_fails_or_is_unknown_answers_502_and_changes_nothing()
+    {
+        var id = await SeedAsync(Tenant, "active");
+        _cell.FailReads = true;
+
+        var failed = await GetAsync(Tenant, Token());
+
+        _cell.FailReads = false;
+        await Execute("INSERT INTO directory.cells (id, region_code, internal_url, cap, tenant_count) VALUES ('vn-2', 'vn', 'https://vn-2.test', 100, 1)");
+        await Execute($"UPDATE directory.tenants SET cell_id = 'vn-2' WHERE id = '{Tenant}'");
+        var elsewhere = await GetAsync(Tenant, Token());
+
+        Assert.Equal(HttpStatusCode.BadGateway, failed.StatusCode);
+        Assert.Equal(HttpStatusCode.BadGateway, elsewhere.StatusCode);
+        Assert.Single(_cell.Reads);
+        Assert.Empty(await AuditAsync(id.ToString()));
+    }
+
+    [Fact]
+    public async Task The_end_call_and_the_read_with_no_token_answer_401_and_with_a_token_without_the_billing_scope_answer_403_and_change_nothing()
+    {
+        var id = await SeedAsync(Tenant, "active");
+
+        var endNone = await PostAsync(Tenant, "end:none", null);
+        var readNone = await GetAsync(Tenant, null);
+        var endScope = await PostAsync(Tenant, "end:scope", Token(scope: null));
+        var readScope = await GetAsync(Tenant, Token(scope: "openid profile"));
+
+        foreach (var response in new[] { endNone, readNone })
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.Equal("Bearer", Assert.Single(response.Headers.WwwAuthenticate).ToString());
+        }
+
+        Assert.Equal(HttpStatusCode.Forbidden, endScope.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, readScope.StatusCode);
+        Assert.Empty(_cell.Reads);
+        await AssertUnchangedAsync(id, "active");
+    }
+
+    [Fact]
+    public async Task Ending_or_reading_an_unknown_tenant_or_one_that_another_region_holds_answers_404()
+    {
+        await Execute("INSERT INTO directory.regions (code, tenant_domain, api_url) VALUES ('sg', 'sg.example.com', 'https://api.sg.example.com')");
+        await Execute("INSERT INTO directory.cells (id, region_code, internal_url, cap, tenant_count) VALUES ('sg-1', 'sg', 'https://sg-1.test', 100, 1)");
+        await Execute("INSERT INTO directory.tenants (id, region_code, cell_id) VALUES ('bill-7351860294', 'sg', 'sg-1')");
+
+        var unknown = await GetAsync("bill-0000000000", Token());
+        var elsewhere = await GetAsync("bill-7351860294", Token());
+        var endElsewhere = await PostAsync("bill-7351860294", "end:elsewhere", Token());
+
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, elsewhere.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, endElsewhere.StatusCode);
+        Assert.Empty(_cell.Reads);
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
+    }
+
+    private async Task AssertPlanUnchangedAsync(Guid id, string state)
+    {
+        Assert.Equal(state, await StateAsync(id));
+        Assert.Equal(1, await ScalarAsync<int>($"SELECT plan_version FROM control_plane.subscriptions WHERE id = '{id}'"));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.subscription_add_ons"));
+        Assert.Empty(await AuditAsync(id.ToString()));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs"));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
+    }
+
+    private static string Team(int version, params (string Code, int Quantity)[] addOns) =>
+        JsonSerializer.Serialize(new { code = "team", version, addOns = addOns.Select(a => new { code = a.Code, quantity = a.Quantity }) });
+
+    private Task<HttpResponseMessage> PutPlanAsync(string tenant, string? key, string body, string? token) => PutAsync(tenant, key, body, token, "plan");
+
     private async Task AssertUnchangedAsync(Guid id, string state)
     {
         Assert.Equal(state, await StateAsync(id));
@@ -412,9 +859,9 @@ public sealed class BillingApiTests : IAsyncLifetime
         Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
     }
 
-    private async Task<HttpResponseMessage> PutAsync(string tenant, string? key, string body, string? token)
+    private async Task<HttpResponseMessage> PutAsync(string tenant, string? key, string body, string? token, string route = "paid-through")
     {
-        using var request = new HttpRequestMessage(HttpMethod.Put, $"/api/billing/v1/tenants/{tenant}/subscription/paid-through")
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"/api/billing/v1/tenants/{tenant}/subscription/{route}")
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
         };
@@ -423,6 +870,33 @@ public sealed class BillingApiTests : IAsyncLifetime
             request.Headers.Add("Idempotency-Key", key);
         }
 
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return await _http.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> PostAsync(string tenant, string? key, string? token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/billing/v1/tenants/{tenant}/subscription/end");
+        if (key is not null)
+        {
+            request.Headers.Add("Idempotency-Key", key);
+        }
+
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return await _http.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> GetAsync(string tenant, string? token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/billing/v1/tenants/{tenant}/subscription");
         if (token is not null)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);

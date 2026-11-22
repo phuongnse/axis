@@ -532,6 +532,50 @@ public sealed class ControlPlaneOptionsTests
         Assert.DoesNotContain("12345678901", exception.Message, StringComparison.Ordinal);
     }
 
+    // A plan has no price, see docs/reference/plans.md#the-catalogue. Any setting that a plan does not have stops the start, and Prices is the example.
+    [Fact]
+    public void A_catalogue_with_no_prices_starts_and_a_plan_that_sets_prices_stops_the_start_and_the_message_names_the_setting_and_not_the_value()
+    {
+        using (var valid = ControlPlaneFactory.Create(settings: ControlPlaneFactory.TrialPlanSettings()))
+        {
+            using var client = valid.CreateClient();
+
+            Assert.Single(valid.Services.GetRequiredService<ControlPlaneOptions>().Plans);
+        }
+
+        var settings = ControlPlaneFactory.TrialPlanSettings();
+        settings["ControlPlane:Plans:0:Prices:VND:month"] = "12345678901";
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Plans:0:Prices", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("12345678901", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_add_on_that_sets_prices_stops_the_start_and_the_message_names_the_setting_and_not_the_value()
+    {
+        var settings = ControlPlaneFactory.TrialPlanSettings();
+        settings["ControlPlane:Plans:0:Trial"] = "false";
+        settings["ControlPlane:Plans:0:AddOns:0:Code"] = "users-10";
+        settings["ControlPlane:Plans:0:AddOns:0:Users"] = "10";
+        using (var valid = ControlPlaneFactory.Create(settings: settings))
+        {
+            using var client = valid.CreateClient();
+
+            Assert.Single(valid.Services.GetRequiredService<ControlPlaneOptions>().Plans[0].AddOns);
+        }
+
+        settings["ControlPlane:Plans:0:AddOns:0:Prices:VND"] = "12345678901";
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Plans:0:AddOns:0:Prices", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("12345678901", exception.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_valid_sign_up_application_loads()
     {
@@ -717,6 +761,15 @@ public sealed class ControlPlaneOptionsTests
 
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("Bearer", Assert.Single(response.Headers.WwwAuthenticate).Scheme);
+
+        var end = await client.PostAsync("/api/billing/v1/tenants/acme/subscription/end", null, TestContext.Current.CancellationToken);
+        var read = await client.GetAsync("/api/billing/v1/tenants/acme/subscription", TestContext.Current.CancellationToken);
+
+        foreach (var refused in new[] { end, read })
+        {
+            Assert.Equal(System.Net.HttpStatusCode.Unauthorized, refused.StatusCode);
+            Assert.Equal("Bearer", Assert.Single(refused.Headers.WwwAuthenticate).Scheme);
+        }
     }
 
     [Fact]

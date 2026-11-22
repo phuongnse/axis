@@ -43,13 +43,13 @@ The numbers above show the shape only.
   in the middle of what they agreed. A plan version that a subscription pins is never removed.
 - **The start check.** The control plane checks `ControlPlane:Plans` at start and stops on a bad
   catalogue. It refuses a number that is not plain digits, a missing
-  quota key, a repeated code and version, a trial plan with an add-on, a trial plan with more than 10 included
+  quota key, a setting that a plan or an add-on does not have, a repeated code and version, a trial plan with an add-on, a trial plan with more than 10 included
   users, and a second trial plan code. The message
   names the plan code, version and setting, and never holds a value. The quota keys it requires are
   the platform's own list of quotas except `users`, so a new quota makes every catalogue invalid
   until its plans set it. An empty catalogue is valid.
-- **The pin.** A subscription holds a plan code and version and a period (`month` or
-  `year`). They are empty until a plan is set, and a trial works without them. After the
+- **The pin.** A subscription holds a plan code and version, with no billing period. They are empty until the [billing API](billing-api.md#setting-the-plan-and-add-ons) sets a plan,
+  and a trial works without them. After the
   migrations the start reads every pinned version, and it stops when `ControlPlane:Plans` no longer
   lists one, naming each missing plan code and version.
 - **The trial's plan.** A plan marked `"trial": true` has no add-ons.
@@ -62,7 +62,8 @@ The numbers above show the shape only.
   10 users. Every plan marked trial has one code, and the newest version of it, the highest version
   number, applies to a new trial. A trial pins no plan, so a new version reaches the next trial.
   [Provisioning](sign-up.md#provisioning) sends the quotas of that version, with `users` set to its
-  included users. A region with no trial plan answers `503` to `POST /api/sign-up`.
+  included users. A region with no trial plan answers `503` to `POST /api/sign-up`. A trial whose plan the
+  billing API has set takes the quotas of that plan.
 
 ## From a plan to the quotas
 
@@ -74,9 +75,9 @@ The control plane turns a subscription's plan and add-ons into the tenant's quot
   rows, and it carries no idempotency key. A `deleting` or `deleted` subscription, and one that pins
   no plan, gets no call. A job that cannot reach the cell, or whose tenant has no directory row, fails
   and the job queue retries it.
-- **The other events** _(planned for M34)_. When a subscription starts, changes its plan or adds or
-  drops an add-on, the code that makes the move queues `writeQuotas` in the same transaction,
-  through the one helper that every move uses.
+- **The other events.** A plan set through the [billing API](billing-api.md#setting-the-plan-and-add-ons)
+  and a move to `active` queue `writeQuotas` in the same transaction as the move, through the one helper
+  that every move uses.
 - **Users.** `users` is `includedUsers` plus the users of every add-on pack the subscription holds. The
   packs are the rows of `control_plane.subscription_add_ons`: `subscription_id`, `add_on_code`,
   `quantity` and `created_at`, one row for each code. A code that the pinned plan version does not list
@@ -95,25 +96,20 @@ The control plane turns a subscription's plan and add-ons into the tenant's quot
 
 ## Add-ons
 
-_(planned for M34)_
-
 An add-on lets a business have more users without moving to the next plan.
 
 - **User packs.** An add-on adds a fixed number of users, such as 10. A business with a few more
   people than its plan takes a pack instead of the next plan.
 - **Adding and dropping.** The operator's billing system adds or drops a pack of a tenant through the
-  [billing API](billing-api.md#setting-the-plan-and-add-ons). Dropping one
-  that would leave more enabled users than the new number is refused, naming how many users to disable
-  first.
+  [billing API](billing-api.md#setting-the-plan-and-add-ons).
+- **Dropping a pack that the use does not fit** _(planned for M34)_. Dropping one that would leave more
+  enabled users than the new number is refused, naming how many users to disable first.
 
 ## Changing a plan
 
-_(planned for M34)_
-
 The operator's billing system changes a tenant's plan through the
-[billing API](billing-api.md#setting-the-plan-and-add-ons), and Axis refuses a smaller plan that the
-tenant's use does not fit.
+[billing API](billing-api.md#setting-the-plan-and-add-ons).
 
 - **A larger plan** applies at once, and the control plane writes its quotas to the cell.
-- **A smaller plan** is refused when the tenant's use is over one of the smaller plan's quotas, such as
-  more users or storage. The refusal names each quota and the amount over.
+- **A smaller plan** _(planned for M34)_. It is refused when the tenant's use is over one of the smaller
+  plan's quotas, such as more users or storage. The refusal names each quota and the amount over.

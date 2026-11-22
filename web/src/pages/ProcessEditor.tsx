@@ -6,6 +6,7 @@ import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { StudioNamesContext } from '../platform/studioNames'
 import type { StudioNames } from '../platform/studio'
 import type { JsonSchema } from '../platform/studioSchemas'
@@ -267,6 +268,7 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
                   </Flex>
                 )
               })}
+              {parameters.length === 0 && <EmptyState text={t('shell.studio.process.noParameters')} />}
             </Flex>
           </AxisFieldGroup>
         )}
@@ -797,6 +799,7 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
               </Flex>
             )
           })}
+          {escalations.length === 0 && <EmptyState text={t('shell.studio.process.noEscalations')} />}
         </Flex>
       </AxisFieldGroup>
     </div>
@@ -1176,6 +1179,7 @@ function Decision({
                 </Flex>
               )
             })}
+            {branches.length === 0 && <EmptyState text={t('shell.studio.process.noBranches')} />}
           </Flex>
         </AxisFieldGroup>
       </div>
@@ -1274,6 +1278,7 @@ function Outcomes({
               </Flex>
             )
           })}
+          {outcomes.length === 0 && <EmptyState text={t('shell.studio.process.noOutcomes')} />}
         </Flex>
       </AxisFieldGroup>
     </div>

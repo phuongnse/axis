@@ -1,4 +1,4 @@
-# D165. Axis is under the AGPL and MIT licences only, with no commercial licence
+# D170. Axis is under the AGPL, and what others build on is under the MIT licence, with no commercial licence
 
 Status: **Agreed**
 
@@ -20,7 +20,12 @@ competing service.
   changed Axis to users over a network must offer those users its source.
 - **What others build on is under the MIT licence,** so that it binds nobody: `src/Axis.Extensions`,
   which extension packages reference, and `samples/`, the sample applications, packages, modules and
-  templates. Each holds its own `LICENSE` file.
+  templates. Also under the MIT licence are `modules/`, the built-in modules, which a business builds
+  its application from, and which a developer or a partner may base a module of their own on, or an
+  application may eject into its own files. `applications/`, the built-in applications that a business
+  starts from, is under the MIT licence too. So is `sdk/`, the runner protocol's schema and the Node.js
+  and Python SDKs, which a package imports and a customer-hosted runner implements. Each holds its own
+  `LICENSE` file.
 - **The widget SDK is under the MIT licence too** _(planned for M22)_. `@axis/widgets-sdk`, the npm
   package a custom widget builds on, holds its own `LICENSE` file.
 - **An application belongs to its author.** An application's own resources, and a business's
@@ -46,6 +51,10 @@ How Axis shows its licence and offers its source is in
 - **The AGPL with a commercial licence sold beside it,** as D120 had it. It brought income and
   support. But contributors would first have to give the owner the right to sell their code under
   another licence, and Axis is a project for its community.
-- **A permissive licence.** A larger company could host Axis and compete with its own code.
+- **A permissive licence for the platform itself.** A larger company could host Axis and compete with
+  its own code.
+- **Keeping `modules/`, `applications/` and `sdk/` under the AGPL.** A module, an application or a
+  runner built on them would come under the AGPL, which binds whoever builds on Axis. `src/Axis.Extensions`
+  and `samples/` are under the MIT licence for that reason, and these three folders need the same.
 - **A licence that is not open source.** It would cost the trust of the developers and the public
   bodies that Axis wants later.

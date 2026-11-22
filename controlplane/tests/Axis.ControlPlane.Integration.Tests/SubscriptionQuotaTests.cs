@@ -420,8 +420,8 @@ public sealed class SubscriptionQuotaTests : IAsyncLifetime
             VALUES ('{signUp}', 'An', '{tenant}@example.com', '{tenant}@example.com', 'Acme', '{tenant}', 'en', '', 'verified', now())
             """);
         await Execute($"""
-            INSERT INTO control_plane.subscriptions (id, tenant_id, sign_up_id, state, trial_ends_at, step_id{(pinned ? ", plan_code, plan_version, period" : "")})
-            VALUES ('{id}', '{tenant}', '{signUp}', '{state}', now(), '{Guid.CreateVersion7()}'{(pinned ? ", 'team', 1, 'month'" : "")})
+            INSERT INTO control_plane.subscriptions (id, tenant_id, sign_up_id, state, trial_ends_at, step_id{(pinned ? ", plan_code, plan_version" : "")})
+            VALUES ('{id}', '{tenant}', '{signUp}', '{state}', now(), '{Guid.CreateVersion7()}'{(pinned ? ", 'team', 1" : "")})
             """);
         return id;
     }

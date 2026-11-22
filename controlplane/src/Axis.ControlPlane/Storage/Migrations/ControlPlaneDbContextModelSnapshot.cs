@@ -520,10 +520,6 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .HasColumnType("date")
                         .HasColumnName("paid_through");
 
-                    b.Property<string>("Period")
-                        .HasColumnType("text")
-                        .HasColumnName("period");
-
                     b.Property<string>("PlanCode")
                         .HasColumnType("text")
                         .HasColumnName("plan_code");
@@ -568,11 +564,7 @@ namespace Axis.ControlPlane.Storage.Migrations
 
                     b.ToTable("subscriptions", "control_plane", t =>
                         {
-                            t.HasCheckConstraint("ck_subscriptions_period", "period IN ('month', 'year')");
-
                             t.HasCheckConstraint("ck_subscriptions_plan", "(plan_code IS NULL) = (plan_version IS NULL)");
-
-                            t.HasCheckConstraint("ck_subscriptions_purchase", "period IS NULL OR plan_code IS NOT NULL");
 
                             t.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'active', 'pastDue', 'readOnly', 'cancelled', 'deleting', 'deleted')");
                         });
