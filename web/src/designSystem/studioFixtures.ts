@@ -605,6 +605,70 @@ const errorAnswers: StateAnswers = {
   },
 }
 
+/**
+ * More problems than the Problems panel shows at once, so its body scrolls under its head, see #4934. Each is a real
+ * compiler code, see docs/reference/diagnostic-codes-resources.md.
+ */
+const manyProblemAnswers: StateAnswers = {
+  ...errorAnswers,
+  diagnostics: [
+    ...errorAnswers.diagnostics,
+    ...(
+      [
+        [
+          'AXC0011',
+          'Another field of the entity already uses this name.',
+          'entities/Request.json',
+          '/fields/3/name',
+          id(firstEntityId),
+        ],
+        ['AXC0012', 'The reference names no entity.', 'entities/Request.json', '/fields/4/target', id(firstEntityId)],
+        [
+          'AXC0013',
+          'The minimum length is above the maximum length.',
+          'entities/Request.json',
+          '/fields/1/minLength',
+          id(firstEntityId),
+        ],
+        ['AXC0014', 'The choice field has no values.', 'entities/Request.json', '/fields/5', id(firstEntityId)],
+        ['AXC0021', 'The widget names no entity.', 'pages/request-list.json', '/widgets/1/entity', pageId],
+        ['AXC0023', 'The navigation entry names no page.', 'sites/requests.json', '/navigation/2/page', siteId],
+        ['AXC0024', 'Another site of the application already uses this path.', 'sites/requests.json', '/path', siteId],
+        [
+          'AXC0025',
+          'The default language is not one the site offers.',
+          'sites/requests.json',
+          '/locales/default',
+          siteId,
+        ],
+        ['AXC0027', 'A text that English has is missing from Vietnamese.', 'texts/vi.json', '/texts', manifestId],
+        ['AXC0028', 'No language has the text of this label.', 'forms/request-form.json', '/title/textKey', formId],
+        [
+          'AXC0029',
+          'The display field names no required text field.',
+          'entities/Request.json',
+          '/displayField',
+          id(firstEntityId),
+        ],
+        [
+          'AXC0030',
+          'The referenced entity has no display field.',
+          'entities/Request.json',
+          '/fields/4/target',
+          id(firstEntityId),
+        ],
+      ] as const
+    ).map(([code, message, file, path, resourceId]) => ({
+      code,
+      severity: 'error' as const,
+      message,
+      file,
+      path,
+      resourceId,
+    })),
+  ],
+}
+
 const unpublishedAnswers: StateAnswers = {
   diagnostics: [],
   releases: { active: null, folderContentHash: 'n1', items: [], changes: null, partChanges: null },
@@ -946,6 +1010,7 @@ export const studioFixtures = {
   manyRows: workspaceRoutes(manyFolder),
   longNames: workspaceRoutes(longFolder),
   withErrors: workspaceRoutes(typicalFolder, errorAnswers),
+  manyProblems: workspaceRoutes(typicalFolder, manyProblemAnswers),
   newApplication: workspaceRoutes(newFolder, unpublishedAnswers),
   releasePage: { ...workspaceRoutes(typicalFolder), [`${folderPath}/releases/2`]: () => typicalRelease },
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },

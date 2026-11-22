@@ -391,6 +391,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: `/studio?app=${application}`,
     },
     {
+      // Proposed, #4934: the page scrolls in its own frame beside the side panel, and the panel's body under its head.
+      caption: 'Problems panel with many problems',
+      fixtures: studioFixtures.manyProblems,
+      entry: `/studio?app=${application}`,
+      clickOnMount: '[data-testid="studio-problems"]',
+    },
+    {
       caption: 'Overview of a new application',
       fixtures: studioFixtures.newApplication,
       entry: `/studio?app=${application}`,
@@ -418,7 +425,28 @@ export const previews: Record<string, readonly PreviewState[]> = {
       fixtures: studioFixtures.releasePage,
       entry: `/studio?app=${application}&view=release&release=2`,
     },
-  ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
+  ].map(
+    ({
+      clickOnMount,
+      ...state
+    }: {
+      caption: string
+      fixtures: Record<string, FixtureRoute>
+      entry: string
+      clickOnMount?: string
+    }) => ({
+      ...state,
+      draw: () =>
+        clickOnMount === undefined ? (
+          <ShellPreview />
+        ) : (
+          <ClickOnMount selector={clickOnMount}>
+            <ShellPreview />
+          </ClickOnMount>
+        ),
+      frameHeight: 640,
+    }),
+  ),
   studioPageDesign: studioDesignerStates(typicalPageId),
   studioFormDesign: studioDesignerStates(typicalFormId),
   studioProcessDesign: studioDesignerStates(typicalProcessId),
