@@ -218,6 +218,9 @@ function entityTexts(folder: Folder): StudioNames['texts'] {
 const pageAndProcessTexts: StudioNames['texts'] = [
   { key: 'requestList.title', texts: { [locale]: 'Requests' }, usedBy: 1 },
   { key: 'request.sections.details', texts: { [locale]: 'Details' }, usedBy: 1 },
+  { key: 'request.steps.what', texts: { [locale]: 'What you need' }, usedBy: 1 },
+  { key: 'request.steps.cost', texts: { [locale]: 'Cost' }, usedBy: 1 },
+  { key: 'request.steps.check', texts: { [locale]: 'Check and send' }, usedBy: 1 },
   { key: 'requestApproval.review', texts: { [locale]: 'Review the request' }, usedBy: 1 },
   { key: 'task.approve', texts: { [locale]: 'Approve' }, usedBy: 1 },
   { key: 'task.reject', texts: { [locale]: 'Reject' }, usedBy: 1 },
@@ -322,6 +325,26 @@ const formMetadata = {
     },
   },
   diagnostics: [],
+} satisfies StudioFormMetadataAnswer
+
+/** Proposed, #4902: the form as a wizard of three steps, for the form designer's Steps state, which shows its step tabs. */
+const stepTitles = ['request.steps.what', 'request.steps.cost', 'request.steps.check']
+const formWithStepsResource: StudioResource = {
+  ...formResource,
+  content: {
+    ...(formResource.content as Record<string, unknown>),
+    steps: stepTitles.map((titleKey) => ({ title: { textKey: titleKey }, sections: ['general'] })),
+  },
+}
+const formWithStepsMetadata = {
+  ...formMetadata,
+  widget: {
+    ...formMetadata.widget,
+    form: {
+      ...formMetadata.widget.form,
+      steps: stepTitles.map((titleKey, index) => ({ titleKey, sections: ['general'], path: `/steps/${index}` })),
+    },
+  },
 } satisfies StudioFormMetadataAnswer
 
 /** The form's uses: the process's approval task uses it, so the form designer lists the process. */
@@ -948,5 +971,10 @@ export const studioFixtures = {
   withErrors: workspaceRoutes(typicalFolder, errorAnswers),
   newApplication: workspaceRoutes(newFolder, unpublishedAnswers),
   releasePage: { ...workspaceRoutes(typicalFolder), [`${folderPath}/releases/2`]: () => typicalRelease },
+  formWithSteps: {
+    ...workspaceRoutes(typicalFolder),
+    [`${folderPath}/resources/${formId}`]: () => formWithStepsResource,
+    [`${folderPath}/resources/${formId}/page-metadata`]: () => formWithStepsMetadata,
+  },
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
 } satisfies Record<string, Record<string, FixtureRoute>>

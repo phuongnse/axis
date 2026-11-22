@@ -1,6 +1,5 @@
 import { CloseOutlined, FilterOutlined } from '@ant-design/icons'
-import { Badge, DatePicker, Flex, Input, InputNumber, Modal, Select, Tag } from 'antd'
-import { FilledText } from './FilledText'
+import { Badge, DatePicker, Flex, Input, InputNumber, Modal, Segmented, Select, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useState } from 'react'
 import { datePickerChevrons } from './datePickerChevrons'
@@ -127,27 +126,14 @@ function GroupEditor({
   return (
     <Flex vertical gap="small">
       <Flex gap="small" align="center">
-        {/* Proposed, #4902: whether a group needs all or any of its conditions is a value of the filter, which Apply
-            applies, so it is a select in a sentence, not a segmented control, which changes what shows at once. */}
-        <span>
-          <FilledText
-            text={t('shell.table.filterMatch')}
-            parts={{
-              mode: (
-                <Select<'all' | 'any'>
-                  aria-label={t('shell.table.filterMatchLabel')}
-                  value={mode}
-                  popupMatchSelectWidth={false}
-                  onChange={(next) => onChange(makeGroup(next, nodes))}
-                  options={[
-                    { value: 'all', label: t('shell.table.filterAll') },
-                    { value: 'any', label: t('shell.table.filterAny') },
-                  ]}
-                />
-              ),
-            }}
-          />
-        </span>
+        <Segmented<'all' | 'any'>
+          value={mode}
+          onChange={(next) => onChange(makeGroup(next, nodes))}
+          options={[
+            { value: 'all', label: t('shell.table.filterAll') },
+            { value: 'any', label: t('shell.table.filterAny') },
+          ]}
+        />
         {onRemove && (
           <AxisButton role="icon" nameKey="shell.table.filterRemove" icon={<CloseOutlined />} onClick={onRemove} />
         )}

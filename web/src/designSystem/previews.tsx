@@ -420,7 +420,17 @@ export const previews: Record<string, readonly PreviewState[]> = {
     },
   ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
   studioPageDesign: studioDesignerStates(typicalPageId),
-  studioFormDesign: studioDesignerStates(typicalFormId),
+  studioFormDesign: [
+    ...studioDesignerStates(typicalFormId),
+    // Proposed, #4902: a wizard form, so its steps show as tabs over the canvas.
+    {
+      caption: 'Steps',
+      fixtures: studioFixtures.formWithSteps,
+      entry: `/studio?app=${application}&resource=${typicalFormId}`,
+      draw: () => <ShellPreview />,
+      frameHeight: 640,
+    },
+  ],
   studioProcessDesign: studioDesignerStates(typicalProcessId),
   signIn: [
     {
