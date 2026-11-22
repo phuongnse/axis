@@ -400,7 +400,7 @@ export function StudioEditor({
           <>
             {name === null ? t('shell.studio.removedRow') : t('shell.studio.removedNamed').replace('{name}', name)}{' '}
             <AxisButton
-              role="plain"
+              role="subtle"
               aria-label={t('shell.studio.undoRemoval')}
               onClick={() => {
                 messageApi.destroy('studio-removed')
@@ -1174,7 +1174,7 @@ export function StudioEditor({
                       <AxisActionRow align="center">
                         {jsonProblems > 0 && (
                           <AxisButton
-                            role="plain"
+                            role="subtle"
                             style={{ color: colour.dangerText }}
                             onClick={() => jsonViewRef.current?.nextProblem()}
                           >
@@ -1184,19 +1184,19 @@ export function StudioEditor({
                           </AxisButton>
                         )}
                         <AxisButton
-                          role="icon"
+                          role="subtle"
                           nameKey="shell.studio.json.find"
                           icon={<SearchOutlined />}
                           onClick={() => jsonViewRef.current?.openFind()}
                         />
                         <AxisButton
-                          role="icon"
+                          role="subtle"
                           nameKey="shell.studio.json.format"
                           icon={<AlignLeftOutlined />}
                           disabled={jsonInvalid}
                           onClick={format}
                         />
-                        <AxisButton role="icon" nameKey="shell.copy.copy" icon={<CopyOutlined />} onClick={copy} />
+                        <AxisButton role="subtle" nameKey="shell.copy.copy" icon={<CopyOutlined />} onClick={copy} />
                       </AxisActionRow>
                     ) : undefined
                   }

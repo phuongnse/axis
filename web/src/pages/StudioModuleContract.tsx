@@ -516,7 +516,8 @@ function RowName({ name, added, onRemove }: { name: string; added: boolean; onRe
       {name}
       <LayerMarkLabel mark="added" name={name} />
       <AxisButton
-        role="destructive"
+        role="secondary"
+        destructive
         size="small"
         aria-label={fillText(t('shell.studio.contract.removeName'), { name })}
         onClick={onRemove}

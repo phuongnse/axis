@@ -34,7 +34,12 @@ export function TableViewsButton({ saved }: { saved: TableSavedViews }) {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <AxisButton role="icon" nameKey="shell.table.views" icon={<FolderOpenOutlined />} onClick={() => setOpen(true)} />
+      <AxisButton
+        role="subtle"
+        nameKey="shell.table.views"
+        icon={<FolderOpenOutlined />}
+        onClick={() => setOpen(true)}
+      />
       <SavedItemsDialog<SavedTableView>
         open={open}
         onClose={() => setOpen(false)}

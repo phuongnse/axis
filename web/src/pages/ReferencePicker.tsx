@@ -155,7 +155,7 @@ function OpenResource({ application, id, name }: { application: string; id: stri
   const open = useLinkClickHandler<HTMLElement>(address)
   return (
     <AxisButton
-      role="icon"
+      role="subtle"
       joined
       nameKey="shell.studio.reference.open"
       nameSuffix={name}

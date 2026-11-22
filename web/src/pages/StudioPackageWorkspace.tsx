@@ -588,7 +588,7 @@ function Workspace({
                       <span>{name}</span>
                       {isUnsaved(path) && <UnsavedDot />}
                       <AxisButton
-                        role="icon"
+                        role="subtle"
                         nameKey="shell.studio.packages.closeFile"
                         nameValues={{ file: path }}
                         icon={<CloseOutlined />}

@@ -101,7 +101,9 @@ describe('SectionPart', () => {
           <>
             <AxisButton role="secondary">Add row</AxisButton>
             <AxisButton role="main">Import</AxisButton>
-            <AxisButton role="destructive">Clear</AxisButton>
+            <AxisButton role="secondary" destructive>
+              Clear
+            </AxisButton>
           </>
         }
       >

@@ -650,7 +650,7 @@ function Deadline({
         {t('shell.studio.process.addDeadline')}
       </AxisButton>
     ) : (
-      <AxisButton role="destructive" onClick={() => onChange(deadlinePointer, undefined)}>
+      <AxisButton role="secondary" destructive onClick={() => onChange(deadlinePointer, undefined)}>
         {t('shell.studio.process.removeDeadline')}
       </AxisButton>
     )
@@ -948,7 +948,7 @@ function WaitEvent({
                 {t('shell.studio.process.addTimeout')}
               </AxisButton>
             ) : (
-              <AxisButton role="destructive" onClick={() => onChange(timeoutPointer, undefined)}>
+              <AxisButton role="secondary" destructive onClick={() => onChange(timeoutPointer, undefined)}>
                 {t('shell.studio.process.removeTimeout')}
               </AxisButton>
             )

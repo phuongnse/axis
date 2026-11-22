@@ -324,7 +324,7 @@ export function SeedGrid({
                 key: 'remove',
                 kind: 'fixed',
                 render: (_, row) => (
-                  <AxisButton role="destructive" onClick={() => onChange(`/records/${row.index}`, undefined)}>
+                  <AxisButton role="secondary" destructive onClick={() => onChange(`/records/${row.index}`, undefined)}>
                     {t('shell.studio.seed.removeRecord')}
                   </AxisButton>
                 ),

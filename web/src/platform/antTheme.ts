@@ -225,10 +225,13 @@ const fieldParents = [`.${fieldClass}`, `.${fieldClass} .ant-form-item-control-i
  * token for the gap under a message, for an unticked box's error border or for a message's icon, which it draws in the
  * seed colour, so these rules carry them. The border and the icon take the mode's text colour: a page with two modes
  * would give them one colour. An input of an `AxisField` fills the field's width, and a select joined with its action
- * fills it together with the action, see docs/reference/shell.md#layout.
+ * fills it together with the action, see docs/reference/shell.md#layout. A subtle button, which Ant Design draws as a
+ * text button, takes the light fill on keyboard focus that it takes on hover, see
+ * docs/reference/actions-and-controls.md#buttons.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
   const { colour, type } = designTokensFor(mode, page)
+  const hoverFill = theme.getDesignToken(antThemeFor(mode, page)).colorBgTextHover
   const fieldWidth = fieldParents.flatMap((parent) => fieldInputs.map((input) => `${parent} > ${input}`)).join(', ')
   return [
     // An input fills its field, and a select joined with its action fills it too, see docs/reference/shell.md#layout.
@@ -236,6 +239,7 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
     // A message sits 4px under its control. The gap under the message is the form's.
     `.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: ${type.fontSize}px; line-height: 20px; }`,
     '.ant-form-item-margin-offset { display: none; }',
+    `.ant-btn-variant-text:not(:disabled):focus-visible { background: ${hoverFill}; }`,
     `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,
     // The icon of a message takes its kind's text colour, which passes contrast. Naming the alert twice outranks the
     // seed colour that Ant Design draws the icon in.

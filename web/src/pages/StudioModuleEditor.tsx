@@ -399,7 +399,8 @@ export function StudioModuleEditor({
             {t('shell.studio.module.layer')}
           </StatusTag>
           <AxisButton
-            role="destructive"
+            role="secondary"
+            destructive
             data-testid="studio-module-reset-all"
             disabled={saving || resetting || reconnecting}
             onClick={() => setResetOpen(true)}

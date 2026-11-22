@@ -49,7 +49,7 @@ export function OpenRecordButton({ entity, id, label }: Omit<RecordProps, 'id'> 
   }
   return (
     <AxisButton
-      role="icon"
+      role="subtle"
       joined
       nameKey="shell.form.openRecord"
       nameSuffix={label}

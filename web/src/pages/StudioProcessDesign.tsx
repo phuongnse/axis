@@ -318,7 +318,7 @@ export default function StudioProcessDesign({
                       <Typography.Text>
                         {transitionName(graph, selectedTransition, t('shell.studio.processGraph.to'))}
                       </Typography.Text>
-                      <AxisButton role="destructive" onClick={() => removeTransition(selectedTransition)}>
+                      <AxisButton role="secondary" destructive onClick={() => removeTransition(selectedTransition)}>
                         {t('shell.studio.process.removeTransition')}
                       </AxisButton>
                     </Flex>
