@@ -19,7 +19,7 @@ the files agree, title and status included.
 | [D5](decisions/d5-configuration-is-authored-as-files-first.md) | Configuration is authored as files first | **Agreed** |
 | [D6](decisions/d6-in-configuration-logic-uses-a-typed-expression-language.md) | In-configuration logic uses a typed expression language | **Agreed** |
 | D7 | Custom code lives in extension packages | Superseded by [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md), [last text](https://github.com/phuongnse/axis/blob/bce8153e05dd8e5bc81b846a4bad04714759bc58/docs/decisions/d7-custom-code-lives-in-extension-packages.md) |
-| [D8](decisions/d8-custom-ui-widgets-are-packaged-react-components.md) | Custom UI widgets are packaged React components | **Agreed, deferred** |
+| [D8](decisions/d8-custom-ui-widgets-are-packaged-react-components.md) | Custom UI widgets are packaged React components | **Agreed** |
 | [D9](decisions/d9-authentication-oidc-through-a-bff-ready-for-fapi-20.md) | Authentication: OIDC through a BFF, ready for FAPI 2.0 | **Agreed** |
 | [D10](decisions/d10-tenant-aware-from-day-one-full-tenancy-later.md) | Tenant-aware from day one, full tenancy later | **Agreed** |
 | [D11](decisions/d11-durable-process-engine.md) | Durable process engine | **Agreed** |

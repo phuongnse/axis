@@ -1,6 +1,6 @@
 // - Each decision file is docs/decisions/d<n>-<slug>.md, starts with '# D<n>. <title>', where the
-//   slug is the title's anchor, and has a 'Status: **<status>**' line whose status starts with
-//   Agreed or Proposed.
+//   slug is the title's anchor, and has a 'Status: **Agreed**' or 'Status: **Proposed**' line, with no
+//   other words in the status.
 // - docs/decisions.md has one row per decision, numbered from 1 with no gaps, in order. The row of a
 //   decision file has the file's title and status. The row of a superseded decision has no file: it
 //   names the live decisions that superseded it and links the last text of its file at a commit on
@@ -12,7 +12,7 @@ import { lines, markdownFiles, relativePath } from './helpers.mjs'
 
 const decisionFilePattern = /^d(\d+)-([a-z0-9-]+)\.md$/
 const decisionTitlePattern = /^# D(\d+)\. (.+)$/
-const statusPattern = /^Status: \*\*((?:Agreed|Proposed)\b[^*]*)\*\*$/
+const statusPattern = /^Status: \*\*(Agreed|Proposed)\*\*$/
 export const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
 export const supersededRowPattern =
   /^\| D(\d+) \| (.+?) \| Superseded by ((?:\[D\d+\]\(decisions\/[^)]+\)(?:, | and ))*\[D\d+\]\(decisions\/[^)]+\)), \[last text\]\((https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/blob\/[0-9a-f]{40}\/docs\/decisions\/d(\d+)-[a-z0-9-]+\.md)\) \|$/

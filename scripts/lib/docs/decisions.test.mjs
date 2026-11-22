@@ -72,6 +72,14 @@ describe('decisions', () => {
     ])
   })
 
+  test('reports a decision status that adds words to Agreed or Proposed', () => {
+    write('docs/decisions/d2-typed-expressions.md', '# D2. Typed expressions\n\nStatus: **Agreed, deferred**\n')
+
+    assert.deepEqual(messages(), [
+      "docs/decisions/d2-typed-expressions.md:3: needs a 'Status: **Agreed**' or 'Status: **Proposed**' line",
+    ])
+  })
+
   const sha = 'a'.repeat(40)
   const lastText = (name) => `[last text](https://github.com/owner/axis/blob/${sha}/docs/decisions/${name})`
 
