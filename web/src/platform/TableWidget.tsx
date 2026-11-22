@@ -171,6 +171,47 @@ function ResolvedOpenLink({
   )
 }
 
+/**
+ * Shows the records of the widget's entity, or the rows of its data source. A row of a data source
+ * carries the id of its root record, so a row action can open a form for it. A row of a grouped
+ * data source is a group with no id, so it has no row action buttons. Each `navigate` row action is
+ * a link or a button on every row with an id, and each toolbar action a button above the table. Both open
+ * the target page with the parameter values in the URL query. Each `startProcess` row action is a
+ * button on every row with an id that starts the process with that row's record as subject, with an
+ * `Idempotency-Key` kept until the start has a final answer. A `201` loads the current page of rows
+ * again, and a failure shows above the table. Each `delete` row action is a button on every row with an
+ * id that opens a confirmation dialog, then sends `DELETE` to the record API. A `204` shows a success
+ * message above the table and loads the current page of rows again. A `403`, `404` or `409` shows its own
+ * message above the table and keeps the rows, and any other answer shows a generic failure. A table
+ * over an entity whose access lists `import` has an Import button next to the toolbar actions, which opens the
+ * import dialog. When the import is committed the dialog closes, a success message shows above the table and
+ * the current page of rows loads again. The canvas draws the button and opens nothing. A table whose access lists
+ * `export` has an Export dropdown with CSV and Excel. It fetches the export route with the table's parameter
+ * values, search and sort, but no paging, and saves the file under the server's name. A file the server cut
+ * at the row limit shows a notice above the table. A `403`, `409` or `503` shows its own message, and any
+ * other failure a generic one. The canvas draws the button and exports nothing. A toolbar action to a form page
+ * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
+ * a button whose expressions the SPA cannot work out is hidden. The identifying column, which is the entity's
+ * display field when the table shows it and otherwise the first column, comes first. The first `navigate` row
+ * action is the link of its cell, with a real address, so Ctrl+click opens a new tab. An address that needs a
+ * reference path is read when the row draws, so the link has its `href` before any click. The cell is plain text
+ * when `visibleWhen` hides the action, and shows the action's label when the cell is empty. A file
+ * column keeps its download link, so then no action is the link. The other row actions show in the row, a delete
+ * as a trash icon. Three or more configured ones, or any number below 992 px, fold into one "Actions" menu. The
+ * toolbar always shows. Its right side has a Refresh button that loads the current page of rows again, then Import,
+ * Export and the toolbar actions, with the first toolbar action last. The table is drawn on `AxisTable`, which owns the
+ * toolbar order, the column widths, the 40 px rows, the folding of row actions, the paging and the em dash of an empty
+ * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at the
+ * edge of their column. Every other column, an enum too, fits its content.
+ * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
+ * and the back button keep them. A table with a column the builder offers has a Filter button, and its filter
+ * lives in the URL as `filter` and goes to the rows and export routes as it is. A measure column of a grouped data
+ * source has no filter. A data source table also has a filter bar, whose values live in the URL under the parameter
+ * names. A data source parameter that the widget binds to a page parameter has no filter input: the table sends the
+ * page parameter's value under the data source parameter's name,
+ * and leaves that page parameter in the URL as it is. A table whose rows can be searched has a search
+ * box, which AxisTable draws and whose text lives in the URL as `search`. The text is sent as typed.
+ */
 export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
   const { size } = useDesignTokens()
