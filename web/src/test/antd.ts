@@ -40,6 +40,34 @@ export function shownMenu(name: string): Promise<HTMLElement> {
   )
 }
 
+/** The popup that holds `menu`, which Ant Design gives the menu's minimum width. */
+export function menuPopup(menu: HTMLElement): HTMLElement {
+  const popup = menu.closest<HTMLElement>('.ant-dropdown')
+  if (!popup) throw new Error('The menu is not inside a dropdown')
+  return popup
+}
+
+/** The items of `menu`, each one Ant Design's menu item. */
+export function menuItems(menu: HTMLElement): HTMLElement[] {
+  return [...menu.querySelectorAll<HTMLElement>('.ant-dropdown-menu-item')]
+}
+
+/**
+ * The padding tokens of `menu` and of its first item: each `--ant-` custom property with padding in its name, with its
+ * value on the menu and on the item. Ant Design's padding is a shorthand of these tokens, and jsdom drops a shorthand
+ * that reads a token, so a test compares the tokens the shorthand is made of.
+ */
+export function menuPadding(menu: HTMLElement): Record<string, string> {
+  const menuStyle = getComputedStyle(menu)
+  const itemStyle = getComputedStyle(menuItems(menu)[0])
+  const names = Array.from({ length: menuStyle.length }, (_, index) => menuStyle[index]).filter((name) =>
+    /^--ant-.*padding/.test(name),
+  )
+  return Object.fromEntries(
+    names.map((name) => [name, `${menuStyle.getPropertyValue(name)} ${itemStyle.getPropertyValue(name)}`]),
+  )
+}
+
 /**
  * Opens the "…" menu of the one Actions button in `scope` and returns it once it is shown. Give a scope that holds one
  * such button, such as a step card's own wrapper, since a card's rows have their own menus.

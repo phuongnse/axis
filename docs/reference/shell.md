@@ -254,16 +254,13 @@ theme.
   The entry of the current page, a site or a tool, is drawn selected, as the language and theme menu
   draws its current choices, and marked `aria-current="page"`. With nobody signed in the app switcher
   is not shown. On a site's own host it lists only that site and no tools.
-- **Menus.** Every dropdown menu keeps `spacing-xs` round its items, so a selected last item does not
-  sit on the menu's edge.
-- **Inset as Ant Design draws it** _(planned for M35)_. Menu items keep the inset that Ant Design draws, with no spacing
+- **Inset as Ant Design draws it.** Menu items keep the inset that Ant Design draws, with no spacing
   of Axis's own round them.
 - **Language and theme.** An icon button with a settings gear, named "Language and theme", opens one
-  menu with the site's languages and the themes, for signed-in people and for nobody signed in alike. A
-  divider separates the languages from the themes. The current language and theme are drawn selected,
-  [as a marked choice](actions-and-controls.md#menus) is, not only marked for assistive technology. At
-  narrow width the button sits in the Menu panel, see [layout](#layout).
-- **No divider between the groups** _(planned for M35)_. No divider separates the languages from the themes.
+  menu with the site's languages and the themes, for signed-in people and for nobody signed in alike. The current
+  language and theme are drawn selected, [as a marked choice](actions-and-controls.md#menus) is, not only marked for
+  assistive technology. At narrow width the button sits in the Menu panel, see [layout](#layout).
+- **No divider between the groups.** No divider separates the languages from the themes.
 - **Themes.** The themes are System, Light and Dark. System is the default when the browser holds no
   choice, and follows the operating system's light or dark setting, changing at once when it changes.
   Light and Dark keep their mode. The choice is kept in `localStorage` under `axis.themeMode`, as
