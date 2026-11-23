@@ -1,7 +1,7 @@
-import { ConfigProvider } from 'antd'
+import { ConfigProvider, theme } from 'antd'
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { antThemeFor, fieldRules } from './antTheme'
+import { antThemeFor } from './antTheme'
 import { AxisAlert, type AlertKind } from './AxisAlert'
 import { designTokensFor } from './designTokens'
 import { withAntdStyles } from '../test/antdStyles'
@@ -23,6 +23,34 @@ describe.each(Object.entries(icons) as [AlertKind, string][])('the %s message', 
   })
 })
 
+describe('a message of three lines', () => {
+  it('aligns the icon with the first line, in a box one line high', () => {
+    const config = antThemeFor('light')
+    const { fontSize, lineHeight } = theme.getDesignToken(config)
+    render(
+      <ConfigProvider theme={config}>
+        <AxisAlert
+          kind="info"
+          message={
+            <>
+              First line.
+              <br />
+              Second line.
+              <br />
+              Third line.
+            </>
+          }
+        />
+      </ConfigProvider>,
+    )
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveStyle({ alignItems: 'flex-start' })
+    const icon = within(alert).getByRole('img', { name: icons.info, hidden: true }).parentElement
+    expect(icon).toHaveStyle({ height: `${fontSize * lineHeight}px`, display: 'flex', alignItems: 'center' })
+  })
+})
+
 describe.each(['light', 'dark'] as const)('the icon colour in %s mode', (mode) => {
   withAntdStyles()
 
@@ -36,17 +64,13 @@ describe.each(['light', 'dark'] as const)('the icon colour in %s mode', (mode) =
     }
     for (const kind of Object.keys(icons) as AlertKind[]) {
       const { unmount } = render(
-        <>
-          <style>{fieldRules(mode)}</style>
-          <ConfigProvider theme={antThemeFor(mode)}>
-            <AxisAlert kind={kind} message="Saved" />
-          </ConfigProvider>
-        </>,
+        <ConfigProvider theme={antThemeFor(mode)}>
+          <AxisAlert kind={kind} message="Saved" />
+        </ConfigProvider>,
       )
       const alert = screen.getByRole('alert')
-      expect(within(alert).getByRole('img', { name: icons[kind], hidden: true })).toHaveStyle({
-        color: textColour[kind],
-      })
+      const icon = within(alert).getByRole('img', { name: icons[kind], hidden: true }).parentElement
+      expect(icon).toHaveStyle({ color: textColour[kind] })
       unmount()
     }
   })
