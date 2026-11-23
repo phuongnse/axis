@@ -125,6 +125,24 @@ public sealed class MinioFixture : IAsyncLifetime
             wait,
             cancellationToken);
 
+    /// <summary>The keys of the bucket, sorted ordinally. When MinIO drops a connection or answers that the client disconnected, the list is sent again, up to five tries.</summary>
+    public static Task<List<string>> ListKeysAsync(IAmazonS3 s3, string bucket, CancellationToken cancellationToken) =>
+        ListKeysAsync((request, token) => s3.ListObjectsV2Async(request, token), bucket, cancellationToken);
+
+    internal static async Task<List<string>> ListKeysAsync(Func<ListObjectsV2Request, CancellationToken, Task<ListObjectsV2Response>> list, string bucket, CancellationToken cancellationToken, Func<TimeSpan, CancellationToken, Task>? wait = null)
+    {
+        List<string> keys = [];
+        await RetryDroppedAsync(
+            async token =>
+            {
+                var response = await list(new ListObjectsV2Request { BucketName = bucket }, token);
+                keys = [.. (response.S3Objects ?? []).Select(item => item.Key).Order(StringComparer.Ordinal)];
+            },
+            wait,
+            cancellationToken);
+        return keys;
+    }
+
     private static async Task RetryDroppedAsync(Func<CancellationToken, Task> attempt, Func<TimeSpan, CancellationToken, Task>? wait, CancellationToken cancellationToken)
     {
         wait ??= Task.Delay;

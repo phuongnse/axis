@@ -5,7 +5,6 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Amazon.S3;
-using Amazon.S3.Model;
 using Axis.Admin;
 using Axis.Administration;
 using Axis.Configuration.Tests;
@@ -2215,8 +2214,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     private async Task<List<string>> KeysAsync()
     {
         using var s3 = _exportStorage!.NewClient();
-        var response = await s3.ListObjectsV2Async(new ListObjectsV2Request { BucketName = _exportStorage.Bucket }, CancellationToken);
-        return [.. (response.S3Objects ?? []).Select(item => item.Key).Order(StringComparer.Ordinal)];
+        return await MinioFixture.ListKeysAsync(s3, _exportStorage.Bucket, CancellationToken);
     }
 
     private async Task<long> DownloadRecordsAsync() =>
