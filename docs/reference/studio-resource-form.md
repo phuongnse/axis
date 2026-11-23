@@ -84,10 +84,10 @@ rows apart. Add, or Add row in a dialog, sits on the list's title row. Each row'
 - **Columns.** A column that would be empty on every row, such as Connectors when no module has any, is
   left out, while the opened item shows every field. A column of a boolean, a number or a choice is as wide as
   its content.
-- **Add… and the row** _(planned)_. Add…, such as Add module…, is the list's main action. The first cell is a link to
+- **Add… and the row** _(planned, #5059)_. Add…, such as Add module…, is the list's main action. The first cell is a link to
   `&item=<pointer>`, such as `&item=/modules/0`, which opens the item in the side panel. Each row keeps Remove alone,
   as an icon, see [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
-- **The panel edits a copy** _(planned)_. The item opens in the side panel, titled by the verb that opened it: "Add
+- **The panel edits a copy** _(planned, #5059)_. The item opens in the side panel, titled by the verb that opened it: "Add
   module", because it adds an installed module and creates none, or "Edit module". The item's name comes from the text
   `shell.studio.item.<kind>.<path>`, which every list of objects in a kind with field texts has. A list without one
   reads "item", as in Add item…. The panel's fields are the item's fields at their real pointers. Done, or Add for a
@@ -96,7 +96,7 @@ rows apart. Add, or Add row in a dialog, sits on the list's title row. Each row'
   first, as [fields](actions-and-controls.md#fields) says, and the panel stays open. Cancel leaves the list as it was,
   so Add… adds no row until Done. Inside the panel a nested list is rows of inputs with Add row on its title row,
   because the panel never opens another.
-- **Labels in the panel** _(planned)_. The texts typed in a label's boxes in the panel are held with the copy. Done
+- **Labels in the panel** _(planned, #5059)_. The texts typed in a label's boxes in the panel are held with the copy. Done
   writes them with the item, in the same step to undo, and Cancel drops them, so the label's texts stay as they were.
 - **Layer marks.** In a module's resource, a row that the [customization layer](customization-layers.md#in-studio)
   added or changed shows its tag in the first cell, and the rows the layer removed show below the table.
@@ -172,7 +172,7 @@ With nothing to save it is not drawn. At narrow width the bar's actions wrap, as
   on a site's form, see [layout](shell.md#layout) and [saving](form-widget.md#saving).
 - **Undo and Redo**. They show, as icons after the line, only where the editor gives them, so a site's
   form has none.
-- **Discard** _(planned)_. Discard is in the destructive tone, drawn in `dangerText`, wherever the bar shows.
+- **Discard** _(planned, #5133)_. Discard is in the destructive tone, drawn in `dangerText`, wherever the bar shows.
 
 ## Form and JSON
 

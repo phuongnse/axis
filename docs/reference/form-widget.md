@@ -242,7 +242,7 @@ returns no label when the user may not read the target's display field.
 
 A child collection field shows its rows as a table under the field's label.
 
-- **Label on the toolbar** _(planned)_. An editable collection's label, its required mark and its help sit on the
+- **Label on the toolbar** _(planned, #5133)_. An editable collection's label, its required mark and its help sit on the
   left of its table's toolbar, on one row with Add row on the right. A read-only collection has no toolbar and keeps
   its label above its table.
 

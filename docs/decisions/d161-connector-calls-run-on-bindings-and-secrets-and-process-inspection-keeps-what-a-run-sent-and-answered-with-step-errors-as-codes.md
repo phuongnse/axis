@@ -68,7 +68,7 @@ decision replaces D25 and D34 and keeps every part of them that still holds, as 
   structured, so an application's pages never show an exception's message or stack trace.
 - **A `processInspector` widget** lists the instances of one process and draws an instance's path on
   its graph, and the record history links to an instance when the user may inspect it.
-- **The instance detail carries what the instance page needs.** _(planned)_ The
+- **The instance detail carries what the instance page needs.** The
   [instance detail](../reference/process-inspection.md#instance-detail) holds the process title, the
   labels, who started the instance, its input and result, and the values that a run read and made,
   each under the masking rule.

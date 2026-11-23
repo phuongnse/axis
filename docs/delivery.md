@@ -363,7 +363,7 @@ A milestone goes from a readiness check to its close in five steps.
    - the **From** column of [concepts.md](domain/concepts.md) for every concept listed for this
      milestone, moved to a later milestone when the concept was not delivered;
    - every `_(planned for Mx)_` marker for this milestone in any doc, removed when the work was built,
-     otherwise moved, added to a row's "Done when" or changed to `_(planned)_`, as
+     otherwise moved, added to a row's "Done when" or changed to `_(planned, #<n>)_`, as
      [planned work](writing-docs.md#planned-work) says. A moved marker has an open issue in its new
      milestone, which the sweep links in its pull request or opens first;
    - the doc sections that the milestone's pull requests changed: what is said twice is merged into
@@ -483,7 +483,7 @@ change, a design review and a sync are in the
   built has no such issue, so the session first writes one build issue *blocked by* the design issue.
   Then it removes the label.
 - **NexKit writes the docs change once the label is removed.** It plans the design issue like any
-  issue and writes each rule where it lives, marked as planned, as
+  issue and writes each rule where it lives, marked as planned with the number of its build issue, as
   [writing the docs](writing-docs.md#planned-work) says. The rules
   go in the reference pages, configuration and APIs included. It adds a decision only for a choice
   between real alternatives. Its pull request closes the design issue, which starts the issues that

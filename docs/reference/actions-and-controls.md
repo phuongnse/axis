@@ -41,9 +41,9 @@ widget names a role, never an Ant Design button type.
 - **A region's main action keeps its border.** It keeps its border wherever it sits, a title row included.
   A section's Add, such as Add field, Add validation or Add index, is a secondary button in the title row, and a
   title row's tools stay subtle. `TitleRowActions` draws a title row's actions in their own roles.
-- **One size to a group** _(planned)_. The usual size is the default, and the small size is for tables and dense rows.
+- **One size to a group** _(planned, #5062)_. The usual size is the default, and the small size is for tables and dense rows.
   A group has one size.
-- **An inline link** _(planned)_. A link inside a value, such as a reference in a table cell, takes the height of a
+- **An inline link** _(planned, #5131)_. A link inside a value, such as a reference in a table cell, takes the height of a
   line of text and no padding.
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
   in the fill colours `primary` and `danger`, which fail contrast on a dark surface, so Axis writes
@@ -65,17 +65,17 @@ widget names a role, never an Ant Design button type.
   are one joined group in their role. Each button of the group is as wide as the widest, stays a button of its own
   with no selected state, and the group has a name for assistive technology. A group of one is a plain button of its
   role.
-- **Which actions go together** _(planned)_. Do the actions change or remove the same thing? Then they manage that
+- **Which actions go together** _(planned, #5130)_. Do the actions change or remove the same thing? Then they manage that
   thing. If not, they are tools, which stay side by side.
-- **Actions that manage one thing fold into a split button** _(planned)_. From three on, the one used most stays the
+- **Actions that manage one thing fold into a split button** _(planned, #5130)_. From three on, the one used most stays the
   button and the others are the entries of a menu on its joined caret, in their order, a destructive one in
   `dangerText`. Its menu holds at least two entries and never repeats the button, and a destructive entry comes last,
   after a divider. It is one button in one shape, as Ant Design joins one with Space.Compact: its text does the action and
   its caret opens the menu. `AxisSplitButton` draws it.
-- **Tools stay side by side** _(planned)_. Find, Format, Copy, Zoom in, Zoom out, Move up, Move down, Undo and Redo
+- **Tools stay side by side** _(planned, #5130)_. Find, Format, Copy, Zoom in, Zoom out, Move up, Move down, Undo and Redo
   stay as buttons, because a menu would cost a click each time. They fold into "…" only when their row runs out of
   room.
-- **All text or all icons** _(planned)_. A group of actions is all text or all icons. The "…" or the caret that opens
+- **All text or all icons** _(planned, #5130)_. A group of actions is all text or all icons. The "…" or the caret that opens
   a menu is no action of its own, so it stays an icon beside text or icons alike.
 - **A page's actions and a tree's rows keep their own rules**. A page's actions keep the page's rules, and
   a file tree's node keeps its actions on a right click, Shift+F10 or the menu key.
@@ -126,7 +126,7 @@ choices.
   size token, and wider when an item needs the room.
 - **One threshold everywhere**. One or two actions show as buttons in a table's row or a list's item. From three
   on, or when the row runs out of room, they fold into one "…" menu.
-- **One threshold on a heading** _(planned)_. One or two actions show as buttons on a page's heading or a section's
+- **One threshold on a heading** _(planned, #5134)_. One or two actions show as buttons on a page's heading or a section's
   title row. From three on, they fold into one "…" menu, as a row's actions do.
 - **A destructive entry comes last.** In a menu of actions, a destructive entry comes after the others, behind one
   divider.
@@ -213,11 +213,11 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   [Studio's reconnect](studio.md#reconnect). This holds for every form and dialog, as it does for the form widget's Save. A confirmation
   that asks the user to type a name before a destructive action keeps its button off until the name
   matches, as [the cell console's Delete](cell-console.md#actions) does.
-- **A group's title lines up with its fields** _(planned)_. A group's title, such as Entity label, starts at the inset
+- **A group's title lines up with its fields** _(planned, #5049)_. A group's title, such as Entity label, starts at the inset
   of a field's label, so the fields of a section line up whether they are one field or a group. The group's help sits
   under its title, and its action, such as Add validation, sits to the right of the title and the help together, so
   the action does not push the help away.
-- **Help sits close to its label** _(planned)_. A field's help sits just under the label's line and `spacing-xs` above
+- **Help sits close to its label** _(planned, #5049)_. A field's help sits just under the label's line and `spacing-xs` above
   the input. The gap is judged in IBM Plex Sans, the app's font, as the space between lines differs from font to font.
   Every help line is one size, in `textMuted`, and a choice's option help is one too.
 - **A box in error looks it**. A field a screen holds, whose value the screen refuses, is drawn in its error look, with
@@ -225,9 +225,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   takes `error` and `LabelTexts` takes `invalid`. An error shows from the refused action on, and while the value stays
   wrong. It goes as soon as the value is right. A record form marks each field the server refuses the same way, and a
   cell of a child collection too, see [saving](form-widget.md#saving).
-- **A box in error looks it in the forms that draw their own error line** _(planned)_. A form that draws its own error
+- **A box in error looks it in the forms that draw their own error line** _(planned, #5136)_. A form that draws its own error
   line, such as the text table, gives its boxes the same error look and `aria-invalid` too.
-- **AxisFieldGroup's required and fold** _(planned)_. `AxisFieldGroup` also takes `required` and `fold`, for #3264's build.
+- **AxisFieldGroup's required and fold** _(planned, #5049)_. `AxisFieldGroup` also takes `required` and `fold`, for #3264's build.
 - **One way to the first error**. A refused action that submits what a person typed, such as Save, Add, Done or Next,
   moves the focus to the first box in error and scrolls it into view. An Ant Design form sets
   `scrollToFirstError={{ focus: true }}`, and a Vitest check refuses a form in `web/src` that does not, the sign-in
@@ -236,12 +236,12 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **A screen that holds its fields focuses its first error**. Such a screen calls `focusFirstError` after a refused
   action, such as Done, so the focus moves to the first box in error and scrolls it into view. The resource form's
   item dialog does this, and so does the record form after a refused save or Next, see [saving](form-widget.md#saving).
-- **One look for yes or no** _(planned)_. A yes-or-no setting is a checkbox with its label on its right and its help under
+- **One look for yes or no** _(planned, #5049)_. A yes-or-no setting is a checkbox with its label on its right and its help under
   the label, the same in a form as on a screen that holds its fields. A switch is for a setting that takes effect as it
   is turned on, and no other.
-- **A pair's help** _(planned)_. A pair of fields in `AxisFieldRow` takes one title and one help, and its fields take no
+- **A pair's help** _(planned, #5049)_. A pair of fields in `AxisFieldRow` takes one title and one help, and its fields take no
   help of their own, so their boxes line up.
-- **A radio group is a value of a form** _(planned)_. A radio group holds one value of a form. It is kept with the form
+- **A radio group is a value of a form**. A radio group holds one value of a form. It is kept with the form
   and saves with it, as the form's other values do.
 
 ## Tab bars
@@ -255,8 +255,8 @@ Design's padding above the label reads as a gap too wide.
 - **A page's tab row.** A tab row on a page, such as a Studio resource's Design, Form, JSON and Used by, has the
   same look. Its rule reaches the page's edges, past the content area's padding. The row sits `spacing-sm` into the
   gap above it, and its content starts `spacing-md` under its rule.
-- **Tabs** _(planned)_. Tabs switch between areas or views of one content, such as Form, JSON and Used by.
-- **A segmented control** _(planned)_. It is one choice of two to five options that changes what shows in place, at
+- **Tabs**. Tabs switch between areas or views of one content, such as Form, JSON and Used by.
+- **A segmented control**. It is one choice of two to five options that changes what shows in place, at
   once, such as a chart's period. It never holds an action.
 - **A group of buttons never shows a selection**. A chosen item of choices drawn as buttons is on the
   selected tint in `primaryText`, through `AxisButton`'s `selected`, never by a heavier role.
@@ -273,7 +273,7 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   A state is a sentence, as in "Release 7 is live". Facts of different kinds take a column or a line
   of their own, such as when a release was published and by whom. A "·" glues facts of different
   kinds into one line with no order, and a screen reader may read it out.
-- **No dash between facts either** _(planned)_. Neither a middle dot nor a dash joins facts. A fact of a different
+- **No dash between facts either**. Neither a middle dot nor a dash joins facts. A fact of a different
   kind takes its own term or line, such as a run's Branch beside Went to, or Started via under Started by. What
   qualifies one thing sits in parentheses, with peers in them joined by a comma, such as "(run 2)" or an
   operation's "(ERP)".
@@ -286,7 +286,7 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   logs, JSON and the API, and reads Hidden in the table. A value in the table has no copy button. A JSON body is a table
   by default, with Table and JSON as line tabs right above it, see [tab bars](#tab-bars). Other text shows as it is in
   the code font.
-- **A person by name** _(planned)_. A person is always named, so a page read by someone else, or seen in a screenshot,
+- **A person by name** _(planned, #5132)_. A person is always named, so a page read by someone else, or seen in a screenshot,
   still says who. The signed-in person's own name is followed by "(you)" ("(bạn)") in `textMuted`, and is never
   replaced by You or Me. "Me" stays for the reader's own voice, such as a filter Assigned to me. A name is a link only
   to a page about the person that the reader may open, such as a user's page for an administrator, and plain text for
@@ -453,9 +453,9 @@ be kept right.
   set up for three or more actions folds each row that has two or more. A row with one action shows it as a
   button, even at narrow width. A known Remove or Delete is the trash icon in `dangerText`, named by a tooltip.
   See [menus](#menus).
-- **A known action is its icon wherever its row is** _(planned)_. A row's Remove or Delete that is a button is the
+- **A known action is its icon wherever its row is** _(planned, #5087)_. A row's Remove or Delete that is a button is the
   trash icon in `dangerText`, named by a tooltip, in a list's row as in a table's.
-- **A column of row controls has no header text** _(planned)_. The column of a row's "…" or icon buttons, and the
+- **A column of row controls has no header text** _(planned, #5087)_. The column of a row's "…" or icon buttons, and the
   column of drag handles, show no header words, as their icons say what they are. Each header still has a name for
   screen readers alone, such as Actions or Drag to reorder, because a header with no name fails the accessibility
   check. The controls show on every row, never only on hover, and each has its name as a tooltip.
@@ -508,7 +508,7 @@ be kept right.
 - **A row's details**. A row with more to show than its columns, such as a call's attempt, folds open to
   its details from a fold in its first cell, drawn as a group row's fold, named "Show the details" or "Hide the details"
   while open, with no column of its own. `AxisTable`'s `details` and its group rows open a row one way.
-- **Reordering by dragging** _(planned)_. A table whose rows have an order that means something takes `reorder` in
+- **Reordering by dragging** _(planned, #5049)_. A table whose rows have an order that means something takes `reorder` in
   `AxisTable`, on `@dnd-kit/sortable`. Each row starts with a handle named Drag to reorder, and the rows between make
   room while a row is dragged. The keyboard uses the same handle: Space picks the row up, the arrow keys move it, Space
   drops it and Escape cancels. Move up and Move down stay in the row's menu, as the way to move a row without a drag.
@@ -530,7 +530,7 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   new tab, and the page has room to grow.
 - **A side panel goes with a page and never opens a record.** It is for what accompanies the page: the
   problems panel, filters or help, and a part of what the page edits, as the rule below says.
-- **A part of what the page edits opens in the side panel** _(planned)_. A part is a field, validation or index of an
+- **A part of what the page edits opens in the side panel** _(planned, #5059)_. A part is a field, validation or index of an
   entity, an application's module or package, or any item of a [list of objects](studio-resource-form.md#lists-of-objects).
   Its name is a real link to the panel's address, which opens the panel in place on a plain click and a new tab on
   Ctrl+click, and its address can be copied. The panel holds its edits until Done, or Add for a new part, with Cancel
@@ -539,27 +539,27 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   or Delete…, asking for a little, such as a reason, a name or an invitation, or choosing one thing. It
   never holds a record's detail or a long form, and never opens a dialog of its own. What needs much
   scrolling, or to be come back to, is a page.
-- **A dialog never edits a part of the page** _(planned)_. A part opens in the side panel instead, so a dialog never
+- **A dialog never edits a part of the page** _(planned, #5059)_. A part opens in the side panel instead, so a dialog never
   edits a field, a validation, an index or a list's item.
 - **A reference opens what it names**. A record's label, shown read-only, is a real link to its record page,
   with an `href` so Ctrl+click opens a new tab. The link passes the page it leaves as `from`, see
   [shell layout](shell.md#layout). It never opens a dialog. A record the person cannot open is plain text.
 - **A link goes to an address.** A link is a real `<a href>` or the router's link, so it opens in a new tab and its
   address can be copied. It is in `primaryText`. An action with no address is a button, never a link.
-- **A link is underlined** _(planned)_. In running text, and on hover when a link stands alone, it is underlined.
+- **A link is underlined** _(planned, #5134)_. In running text, and on hover when a link stands alone, it is underlined.
 - **What opens a view gets an address.** A resource named in Problems, test results or a form's Used on is a
   real link to the resource at its path, and a shared grant's Open policy links to the policy. Ctrl+click opens
   either in a new tab. See [Studio's route and address](studio.md#route-and-address).
 - **A field's name gets an address.** A field's name links to `&field=<name>`, and a plain click opens the field in
   place, as [entity designer](entity-designer.md#fields) says.
-- **A list's first cell gets an address** _(planned)_. A list of objects' first cell links to `&item=<pointer>`, which
+- **A list's first cell gets an address** _(planned, #5059)_. A list of objects' first cell links to `&item=<pointer>`, which
   opens the item.
 - **A package file's place is a link.** A package file's place, such as `lib/x.py, line 3`, links to
   `&view=packages&package=<id>&file=<path>&line=<n>`, which opens the file at that line. See
   [Studio's route and address](studio.md#route-and-address).
 - **A reference reads as words.** A resource's name and its muted kind are inline text, so a reference
   follows the words before it on their line and wraps as words do.
-- **A link in a value opens in the same site** _(planned)_. A reference in a value is an inline link only when the
+- **A link in a value opens in the same site** _(planned, #5131)_. A reference in a value is an inline link only when the
   thing it names opens in the same site, such as a record, an instance, a sub-process or a step's run. A thing in
   another site, such as Studio, opens only from a button named for it, such as Open in Studio. So a call's connector
   and operation are plain text.
@@ -601,9 +601,9 @@ wheel with the page under two rules.
 - **One scroll area in each direction.** A scroll area never sits inside another that scrolls the same
   way, because two areas would share one wheel. So a list in a dialog grows, and the dialog's body scrolls
   it. A wide table may still scroll sideways inside a page or dialog that scrolls down.
-- **The shell's regions are scroll areas** _(planned)_. The window does not scroll. The sidebar's menu, the page's frame
+- **The shell's regions are scroll areas** _(planned, #5065)_. The window does not scroll. The sidebar's menu, the page's frame
   and a side panel each scroll on their own and stop at their end, see [layout](shell.md#layout).
-- **One scroll per pane** _(planned)_. A pane scrolls as one from top to bottom, however many blocks it holds. A code
+- **One scroll per pane** _(planned, #5065)_. A pane scrolls as one from top to bottom, however many blocks it holds. A code
   editor in it is as tall as its text with no scroll of its own. One a person types in keeps a least height and reaches
   the pane's foot when its text is shorter. An action bar at the pane's foot stays in place.
 

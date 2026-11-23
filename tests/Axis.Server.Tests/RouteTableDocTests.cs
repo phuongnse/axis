@@ -41,7 +41,7 @@ public sealed partial class RouteTableDocTests
             "_(planned for later)_",
             "",
             "## `PUT /api/x/{id}`",
-            "_(planned)_",
+            "_(planned, #12)_",
             "",
             "  | Group | Route |",
             "  | ----- | ----- |",
@@ -54,7 +54,7 @@ public sealed partial class RouteTableDocTests
             "| Route | What it does |",
             "| ----- | ------------ |",
             "| `GET /api/planned` _(planned for later)_ | Not mapped yet. |",
-            "| `POST /api/bare` _(planned)_ | Agreed, not built by any milestone. |",
+            "| `POST /api/bare` _(planned, #12)_ | Agreed, not built by any milestone; issue 12 builds it. |",
             "| `GET /api/z/` | Trailing slash is dropped. |",
             "| Create application | Plain text. |",
         ];
@@ -166,8 +166,8 @@ public sealed partial class RouteTableDocTests
     [GeneratedRegex(@"`(?<method>GET|POST|PUT|PATCH|DELETE|HEAD) (?<path>/\S*)`")]
     private static partial Regex RouteSpan();
 
-    // A planned marker, for a milestone or bare, see docs/writing-docs.md#planned-work.
-    [GeneratedRegex(@"_\(planned(?: for [^)]+)?\)_")]
+    // A planned marker, for a milestone, with the number of its issue or bare, see docs/writing-docs.md#planned-work.
+    [GeneratedRegex(@"_\(planned(?: for [^)#]+?)?(?:, #\d+)?\)_")]
     private static partial Regex PlannedMarker();
 
     // A parameter such as {exportId:guid} or {*path} is written {} on both sides of the comparison.
