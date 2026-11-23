@@ -241,8 +241,6 @@ Each billing client has a limit of its own, so a billing system in a loop cannot
 
 ## Events
 
-_(planned for M34)_
-
 The control plane tells the operator's billing system what happens to each tenant, so the billing system can
 start a customer, ask for a payment or charge for usage without polling, as
 [D168](../decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md)
@@ -276,7 +274,10 @@ is final.
 
 ### Tenant created
 
-`tenant.created` is written when a sign-up is confirmed and its trialing subscription is made.
+`tenant.created` is written when a sign-up is confirmed and its trialing subscription is made. `tenantId` is the
+id that the billing routes take, which is the tenant's subdomain, and `host` is that subdomain on the region's
+tenant domain. The business name and the administrator's name, email and language are read from the sign-up when
+the event is sent, and every attempt sends the same ones.
 
 ```json
 {
@@ -296,6 +297,8 @@ is final.
 ```
 
 ### Subscription state changed
+
+_(planned for M34)_
 
 `subscription.stateChanged` is written with every move that writes a `subscription.<state>` audit record,
 see [audit records](#audit-records). A plan call, or a paid-through call that leaves the state as it was,
@@ -318,6 +321,8 @@ writes none.
 ```
 
 ### Daily usage
+
+_(planned for M34)_
 
 `usage.daily` is written once for each tenant that is not `deleted` and each finished UTC day, once the day's
 row is final. It reads the row from the cell's [usage days](tenant-lifecycle.md#routes) route, and
