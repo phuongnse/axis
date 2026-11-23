@@ -60,8 +60,10 @@ loses no work.
   summary, outcome, tokens, checks, resource and times. The columns are in [authoring request storage](authoring-request-storage.md#authoring-requests).
 - **Model messages.** A step's full model messages, resource contents included, are kept in its row
   in `messages`.
-- **Deleting model messages** _(planned for M35)_. A step's model messages are deleted after 30 days,
-  and are kept until then for the author and the audit.
+- **Deleting model messages.** The worker clears a step's `messages` once the step's `finished_at` is over
+  30 days old, by its own clock, when the tenant becomes ready and then every 24 hours, see
+  [clean-up](process-execution.md#worker-settings). The step stays. Until then the messages are kept for the
+  author and the audit. A step that has not finished keeps its messages.
 - **Claimed with a lease.** The agent host claims a request whose state needs work, as the publisher
   claims [publish requests](authoring-publishing.md#lifecycle): it sets `claimed_by` and `claimed_until`, renews
   the lease while it works, and lets it lapse when it stops. A host that dies leaves the request

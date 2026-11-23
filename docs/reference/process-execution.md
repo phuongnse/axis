@@ -350,6 +350,7 @@ and by its own clock:
 | Files         | `deleted` files, and `pending` files uploaded more than 24 hours ago, see [storage and clean-up](file-fields.md#storage-and-clean-up)                   | When the tenant becomes ready, then at most every 5 minutes  |
 | Import files  | The files of imports uploaded more than 24 hours ago, keeping the imports, see [import](import-export.md#import)                                         | When the tenant becomes ready, then at most every 5 minutes  |
 | Notifications | In-app notifications older than `Notifications:RetentionDays`, with their read rows in one transaction, see [in-app notifications](notifications.md#in-app-notifications) | When the tenant becomes ready, then every 24 hours           |
+| Model messages | The `messages` of authoring request steps that finished over 30 days ago, keeping the steps, see [durable requests](authoring-requests.md#durable-requests) | When the tenant becomes ready, then every 24 hours           |
 
 A database without the clean-up's table yet is skipped. Any other failure is logged as a warning and
 does not hold back the tenant's work items.

@@ -51,7 +51,7 @@ namespace Axis.Worker;
 /// the failure in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
 /// Once a tenant is ready, the poll also deletes its expired sessions and sweeps its deleted and abandoned files,
 /// and clears the files of its imports uploaded more than 24 hours ago, each at most every five minutes by its own clock,
-/// and deletes its old in-app notifications every 24 hours. In a cell it also measures the storage of each ready tenant and counts its failed work every
+/// and deletes its old in-app notifications and clears the model messages of its old authoring request steps every 24 hours. In a cell it also measures the storage of each ready tenant and counts its failed work every
 /// hour and records both in the platform database as the tenant's usage, counts its enabled realm users and its applications and copies its emails sent into the day's row, and brings the users quota step of the tenant's realm in step
 /// with its <c>users</c> quota. That housekeeping is outside the rounds.
 /// </summary>
@@ -118,6 +118,9 @@ internal sealed partial class WorkerService(
 
     // The old in-app notifications of each ready tenant are deleted once a day. It has its own timer, so no other clean-up delays it.
     private readonly TenantSchedule _notificationsCleaned = new(NotificationRetention.Interval, time);
+
+    // The model messages of old authoring request steps of each ready tenant are cleared once a day. It has its own timer, so no other clean-up delays it.
+    private readonly TenantSchedule _authoringMessagesCleared = new(AuthoringMessageRetention.Interval, time);
 
     // The storage of each ready tenant is measured once an hour in a cell. It has its own timer, so no other clean-up delays it.
     private readonly TenantSchedule _usageSampled = new(TimeSpan.FromHours(1), time);
@@ -517,6 +520,7 @@ internal sealed partial class WorkerService(
                 _filesSweptAt.Remove(tenantId);
                 _importFilesCleared.Forget(tenantId);
                 _notificationsCleaned.Forget(tenantId);
+                _authoringMessagesCleared.Forget(tenantId);
                 _usageSampled.Forget(tenantId);
                 health.TenantDropped(tenantId);
                 _schedulesToSkip.Remove(tenantId);
@@ -626,6 +630,7 @@ internal sealed partial class WorkerService(
             await SweepFilesAsync(tenantId, stoppingToken);
             await ClearExpiredImportFilesAsync(tenantId, stoppingToken);
             await RemoveOldNotificationsAsync(tenantId, stoppingToken);
+            await ClearOldAuthoringMessagesAsync(tenantId, stoppingToken);
             await SampleUsageAsync(tenantId, stoppingToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
@@ -769,6 +774,40 @@ internal sealed partial class WorkerService(
         catch (NpgsqlException exception)
         {
             LogNotificationCleanupFailed(exception, tenantId);
+        }
+        finally
+        {
+            accessor.Current = previous;
+        }
+    }
+
+    /// <summary>
+    /// Clears the model messages of the tenant's authoring request steps that finished more than 30 days ago and keeps the steps,
+    /// at most once per 24 hours, see <c>docs/reference/authoring-requests.md#durable-requests</c>. The time comes from the worker's clock.
+    /// A database without the tables or the column yet is skipped. Any other database failure is logged and does not hold back the work items.
+    /// </summary>
+    private async Task ClearOldAuthoringMessagesAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        if (!_authoringMessagesCleared.TryStart(tenantId, out var now))
+        {
+            return;
+        }
+
+        var previous = accessor.Current;
+        accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await connections.OpenConnectionAsync(cancellationToken);
+            var cleared = await AuthoringMessageRetention.ClearExpiredAsync(connection, now, cancellationToken);
+            LogAuthoringMessagesCleared(cleared, tenantId);
+        }
+        catch (PostgresException exception) when (exception.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.UndefinedColumn)
+        {
+            // The configuration migrations have not created the table or the column yet.
+        }
+        catch (NpgsqlException exception)
+        {
+            LogAuthoringMessageCleanupFailed(exception, tenantId);
         }
         finally
         {
@@ -1051,6 +1090,12 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Debug, "Removed {Count} old notification(s) of tenant {TenantId}.")]
     private partial void LogNotificationsRemoved(int count, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Clearing the model messages of the old authoring request steps of tenant {TenantId} failed.")]
+    private partial void LogAuthoringMessageCleanupFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Debug, "Cleared the model messages of {Count} old authoring request step(s) of tenant {TenantId}.")]
+    private partial void LogAuthoringMessagesCleared(int count, string tenantId);
 
     [LoggerMessage(LogLevel.Warning, "Measuring the storage of tenant {TenantId} failed.")]
     private partial void LogUsageSampleFailed(Exception exception, string tenantId);
