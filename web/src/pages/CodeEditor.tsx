@@ -7,19 +7,10 @@ import {
 } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { bracketMatching, codeFolding, foldGutter, foldKeymap, indentOnInput } from '@codemirror/language'
-import { getChunks, getOriginalDoc, unifiedMergeView } from '@codemirror/merge'
 import { diagnosticCount, linter, lintGutter, nextDiagnostic, type Diagnostic } from '@codemirror/lint'
 import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state'
-import {
-  EditorView,
-  GutterMarker,
-  highlightActiveLine,
-  highlightActiveLineGutter,
-  keymap,
-  lineNumberWidgetMarker,
-  lineNumbers,
-} from '@codemirror/view'
+import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
 import { useSelectedItemTint } from '../platform/antTheme'
 import { changeTint } from '../platform/changeTint'
@@ -29,6 +20,7 @@ import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { indentFolding, languageSupport, type FileLanguage } from './fileLanguage'
 import { findPanel } from './jsonFindPanel'
 import { useFillHeight } from './jsonViewHeight'
+import { diffText, lineDiff } from './lineDiff'
 
 /** Marks a change that came from the value, not from the author, so it is not reported as an edit. */
 const external = Annotation.define<boolean>()
@@ -48,12 +40,13 @@ export interface CodeEditorProps {
   /** The language that colours, folds and indents the text, such as `fileLanguage(path)` of a file. */
   language: FileLanguage
   /**
-   * Proposed: the text before a change. With it, the editor shows `value` as a line diff against it, see #4623: each
-   * removed line on the `danger` tint after "−" in the text colour, each added line on the `success` tint after "+" in
-   * the language's colours, the changed words inside a changed line underlined, and an unchanged stretch folded to "N unchanged lines" but for the 3
-   * lines on each side of a change. A removed line shows its number in the text before, and every other line its number
-   * in `value`. An empty `value` against a text is a removed file, which shows the text before with each line removed
-   * and numbered, in no language's colours. It is read when the editor is built, as `lint` is, and goes with `readOnly`.
+   * Proposed: the text before a change. With it, the editor shows `value` as a line diff against it, see #4623 and
+   * `lineDiff`: each removed line on the `danger` tint after "−" in the text colour, each added line on the `success`
+   * tint after "+" in the language's colours, the changed words of a line that changed in part underlined, an unchanged
+   * stretch folded to "N unchanged lines" but for the 3 lines on each side of a change, and two columns of numbers, the
+   * text before's and `value`'s. An empty `value` against a text is a removed file, which shows the text before with
+   * each line removed, in no language's colours. It is read when the editor is built, as `lint` is, and goes with
+   * `readOnly`.
    */
   original?: string
   /** Refuses the author's edits. The cursor, find and `goTo` still work. */
@@ -131,7 +124,7 @@ export default function CodeEditor({
   }))
   // A removed file shows the text it had, each line marked removed, see lineDiff.
   const removedFile = original !== undefined && original !== '' && value === ''
-  const text = removedFile ? original : value
+  const text = original === undefined ? value : diffText(removedFile ? original : value)
   const shownLanguage: FileLanguage = removedFile ? 'plain' : language
   const selectedTint = useSelectedItemTint()
   const theme = editorTheme(tokens, mode, selectedTint, !grow ? 'scroll' : readOnly ? 'grow' : 'growEditable')
@@ -217,7 +210,7 @@ export default function CodeEditor({
           EditorView.contentAttributes.of({ 'aria-label': label }),
           initial.original === undefined
             ? []
-            : lineDiff(initial.removedFile ? '' : initial.original, initial.removedFile),
+            : lineDiff(initial.removedFile ? '' : diffText(initial.original), initial.removedFile),
           initial.lint
             ? [
                 lintGutter(),
@@ -347,63 +340,6 @@ function codePhrases(t: (key: string) => string) {
   })
 }
 
-/**
- * Proposed: the line diff of `original` against the editor's text, with no accept or reject buttons and no change gutter,
- * as the "−" and "+" marks and the tints of the editor's theme show each change, see #4623. Removed lines show their
- * numbers in `original` in the line numbers. A removed file is its own text against nothing, each line drawn removed, so
- * its lines keep their numbers. The changed words are marked in a changed file only.
- */
-function lineDiff(original: string, removed: boolean) {
-  return [
-    unifiedMergeView({
-      original,
-      // A removed line is in the text colour: a language's colours on the `danger` tint fall below 4.5:1.
-      syntaxHighlightDeletions: false,
-      // A whole file added or removed marks its lines only, as every word of it changed.
-      highlightChanges: original !== '' && !removed,
-      mergeControls: false,
-      gutter: false,
-      collapseUnchanged: { margin: 3, minSize: 4 },
-    }),
-    removed ? EditorView.editorAttributes.of({ class: 'cm-removedFile' }) : [],
-    lineNumberWidgetMarker.of((view, _widget, block) => {
-      // The removed lines of a chunk are one block at the chunk's start in the editor's text.
-      const chunk = getChunks(view.state)?.chunks.find((candidate) => candidate.fromB === block.from)
-      if (!chunk || chunk.fromA >= chunk.toA) {
-        return null
-      }
-      const before = getOriginalDoc(view.state)
-      const first = before.lineAt(chunk.fromA).number
-      const last = before.lineAt(Math.max(chunk.fromA, Math.min(chunk.endA, before.length))).number
-      return new RemovedLineNumbers(first, last)
-    }),
-  ]
-}
-
-/** Proposed: the numbers of a run of removed lines, one under another beside them, see #4623. */
-class RemovedLineNumbers extends GutterMarker {
-  readonly first: number
-  readonly last: number
-
-  constructor(first: number, last: number) {
-    super()
-    this.first = first
-    this.last = last
-  }
-
-  eq(other: RemovedLineNumbers) {
-    return other.first === this.first && other.last === this.last
-  }
-
-  toDOM() {
-    const numbers = document.createElement('div')
-    for (let line = this.first; line <= this.last; line++) {
-      numbers.appendChild(document.createElement('div')).textContent = String(line)
-    }
-    return numbers
-  }
-}
-
 /** Proposed: the underline of the words that changed inside a changed line, in a state's text colour, see #4623. */
 function changedWords(textColour: string): string {
   return `linear-gradient(${textColour}, ${textColour}) bottom / 100% 2px no-repeat`
@@ -489,6 +425,9 @@ const editorTheme = sharedTheme((tokens, mode, selectedTint: string, height: Edi
       '&.cm-merge-b .cm-changedText': { background: changedWords(colour.successText) },
       '.cm-deletedChunk': { backgroundColor: changeTint(colour.danger), paddingLeft: 0 },
       '.cm-deletedChunk .cm-deletedText': { background: changedWords(colour.dangerText) },
+      // A line added or removed whole shows no underline: every word of it changed.
+      '.cm-wholeLineChange .cm-changedText, .cm-wholeLineChange.cm-deletedLine .cm-deletedText': { background: 'none' },
+      '.cm-beforeLineNumbers .cm-gutterElement': { paddingInline: `${spacing.sm}px`, textAlign: 'right' },
       '.cm-collapsedLines': {
         color: colour.textMuted,
         background: colour.fillSubtle,
