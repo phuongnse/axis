@@ -226,19 +226,19 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   and one after; a non-breaking space between a number and its unit, "250 GB", and none before "%": "80%".
 - **Acronyms stay in English**, ID, URL, PIN, JSON, and an English term the glossary keeps is not mixed with a
   translation of the same concept on one screen.
-- **The person a task goes to is "người được giao".** _(planned for M35)_ An expression that lets a user pick that person
-  reads "Biểu thức chọn người làm công việc.". A role's people read "Những người có vai trò này …", never "Vai trò mà
-  những người có vai trò đó …".
-- **A code keeps its name, with its meaning in brackets.** _(planned for M35)_ "như read (đọc) hoặc update (cập nhật)",
-  "object (nhóm trường)". "header" stays "header", never "tiêu đề".
-- **An empty field that falls back to a code names the code's kind.** _(planned for M35)_ "Để trống thì dùng claim name.".
-- **Axis is the subject of what it refuses or ignores.** _(planned for M35)_ Studio's help says what Axis refuses or
-  ignores, actively and without "bị": "Axis từ chối lần đăng nhập ở mức khác.", "Axis bỏ qua giá trị claim không ứng với
-  vai trò nào của ứng dụng.". A claim value "ứng với" a role. This applies to Studio's help. The sign-up rule under
-  Principles covers sign-up texts only.
-- **Used by's relations are the verb alone.** _(planned for M35)_ Where the row names the resource, a relation is the verb
-  alone: "Phát ra", "Chờ", "Gửi đi", "Gọi thao tác", "Giả lập thao tác", "Kiểm thử". It names the resource only where the
-  verb needs "cho" or "với": "Cấp quyền cho vai trò này", "Kiểm thử với vai trò này". An action is "hành động", never "nút".
+- **The person a task goes to is "người được giao".** An expression that lets a user pick that person reads "Biểu thức
+  chọn người làm công việc.". A role's people read "Những người có vai trò này …", never "Vai trò mà những người có vai
+  trò đó …".
+- **A code keeps its name, with its meaning in brackets.** "như read (đọc) hoặc update (cập nhật)", "object (nhóm
+  trường)". "header" stays "header", never "tiêu đề".
+- **An empty field that falls back to a code names the code's kind.** "Để trống thì dùng claim name.".
+- **Axis is the subject of what it refuses or ignores.** Studio's help says what Axis refuses or ignores, actively and
+  without "bị": "Axis từ chối lần đăng nhập ở mức khác.", "Axis bỏ qua giá trị claim không ứng với vai trò nào của ứng
+  dụng.". A claim value "ứng với" a role. This applies to Studio's help. The sign-up rule under Principles covers
+  sign-up texts only.
+- **Used by's relations are the verb alone.** Where the row names the resource, a relation is the verb alone: "Phát ra",
+  "Chờ", "Gửi đi", "Gọi thao tác", "Giả lập thao tác", "Kiểm thử". It names the resource only where the verb needs "cho"
+  or "với": "Cấp quyền cho vai trò này", "Kiểm thử với vai trò này". An action is "hành động", never "nút".
 - **A scenario's fixed time names its event.** Its label is "Runs at" / "Chạy lúc", as the time bullet
   above asks, and its example says what the time means.
 
