@@ -34,8 +34,8 @@ import { PlatformContext } from './context'
 import {
   authoringRequestStates,
   endedAuthoringRequestStates,
-  requestName,
   requestResult,
+  requestTitle,
 } from './studioAuthoringRequest'
 import { StudioAuthoringRequestResult } from './StudioAuthoringRequestResult'
 import { StudioRequestStatus } from './StudioRequestStatus'
@@ -245,7 +245,7 @@ export function StudioAuthoringRequestPage({
   return (
     <div data-testid="studio-ai-request">
       <PageLayout
-        title={requestName(request.text)}
+        title={requestTitle(request)}
         tags={
           <StatusTag tone={state.tone} data-testid="studio-ai-request-state">
             {t(state.word)}
@@ -266,7 +266,16 @@ export function StudioAuthoringRequestPage({
                 <Typography.Text>{t('shell.studio.aiRequest.plan.writing')}</Typography.Text>
               </Flex>
             ) : (
-              <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{request.plan}</Typography.Paragraph>
+              <>
+                <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {request.plan?.summary}
+                </Typography.Paragraph>
+                <ul style={{ margin: 0 }}>
+                  {request.plan?.changes.map((change, index) => (
+                    <li key={index}>{change}</li>
+                  ))}
+                </ul>
+              </>
             )}
           </Flex>
         )}

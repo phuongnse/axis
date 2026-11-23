@@ -50,6 +50,14 @@ export function requestName(text: string): string {
   return sentence.length > maxNameLength ? `${sentence.slice(0, maxNameLength).trimEnd()}…` : sentence
 }
 
+/**
+ * What a request is called on the screens: the title AI gave it with its plan, or the first sentence of its words until then,
+ * see docs/reference/ai-authoring-in-studio.md#the-heading.
+ */
+export function requestTitle(request: Pick<AuthoringRequest, 'title' | 'text'>): string {
+  return request.title ?? requestName(request.text)
+}
+
 /** The Checks line of a request: its verdict, and the text key of its summary with the values that fill the key. */
 export interface ChecksResult {
   passed: boolean

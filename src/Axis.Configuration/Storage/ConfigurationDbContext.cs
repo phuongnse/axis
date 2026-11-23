@@ -266,7 +266,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             request.Property(r => r.Binding).HasColumnName("binding");
             request.Property(r => r.State).HasColumnName("state");
             request.Property(r => r.DraftId).HasColumnName("draft_id");
-            request.Property(r => r.Plan).HasColumnName("plan");
+            request.Property(r => r.Plan).HasColumnName("plan").HasColumnType("jsonb");
+            request.Property(r => r.Title).HasColumnName("title");
             request.Property(r => r.Round).HasColumnName("round").HasDefaultValue(0);
             request.Property(r => r.Tokens).HasColumnName("tokens").HasDefaultValue(0L);
             request.Property(r => r.AutoAccept).HasColumnName("auto_accept").HasDefaultValue(false);

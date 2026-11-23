@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Agent;
 using Axis.Agent.Models;
 using Axis.Data.Storage;
@@ -12,14 +13,18 @@ using static Axis.Integration.Tests.Polling;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The planning step of the agent host writes a plan from the seven read tools of the MCP server, see
+/// The planning step of the agent host reads the application through the seven read tools of the MCP server and ends with a <c>propose_plan</c> call, see
 /// <c>docs/reference/authoring-requests.md#states</c>. The model is the scripted adapter, so no test calls a paid model, and the step reaches the
-/// server of <see cref="AuthoringRealm"/> as the author. A call to any other tool, or to another application, gets a tool error and never reaches the server.
-/// A step that gets no plan within 25 model calls stops the request as <c>failed</c> with the outcome <c>noPlan</c>.
+/// server of <see cref="AuthoringRealm"/> as the author. A call to any other tool, or to another application, gets a tool error and never reaches the server,
+/// and so does <c>propose_plan</c>, which the host answers itself. A valid call stores the plan as an object with its title and ends the step.
+/// A step that gets no valid call, within 25 model calls or before its turn ends, stops the request as <c>failed</c> with the outcome <c>noPlan</c>.
 /// </summary>
 public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
 {
     private static readonly AuthoringLoopOptions _options = new(TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(100));
+
+    /// <summary>A stored plan of the plan's shape with only a summary, for a test that puts a request in a state that has a plan.</summary>
+    internal const string PlanJson = """{"summary":"A plan.","questions":[],"changes":[],"decisions":[],"risks":[],"checks":[],"checklist":[],"details":[]}""";
 
     private readonly AuthoringRealm _realm = new(keycloak, database);
 
@@ -41,17 +46,136 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
         await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not move the request to awaitingApproval.");
         await host.StopAsync(CancellationToken);
 
-        Assert.Equal("Add a cost centre field to the purchase request entity.", await ScalarAsync($"SELECT plan FROM axis.authoring_requests WHERE id = '{id}'"));
+        Assert.Equal("Add a cost centre field to the purchase request entity.", await PlanAsync(id));
         Assert.Equal("1:plan:-:310:true", await StepsAsync(id));
         Assert.Equal("310", await ScalarAsync($"SELECT tokens FROM axis.authoring_requests WHERE id = '{id}'"));
         var messages = await ScalarAsync($"SELECT messages::text FROM axis.authoring_request_steps WHERE request_id = '{id}'");
         Assert.Contains("list_resources", messages, StringComparison.Ordinal);
         Assert.Contains("toolResult", messages, StringComparison.Ordinal);
         Assert.Equal(["list_applications", "list_resources"], server.ToolCalls);
-        // The model is offered the five read tools and the two package read tools, and no other.
+        // The model is offered the five read tools, the two package read tools and propose_plan, and no other.
         Assert.Equal(
-            ["list_package_files", "list_resources", "read_module_resource", "read_names", "read_package_file", "read_reference", "read_resource"],
+            ["list_package_files", "list_resources", "propose_plan", "read_module_resource", "read_names", "read_package_file", "read_reference", "read_resource"],
             script.Calls[0].Tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_valid_propose_plan_call_stores_the_plan_as_an_object_with_its_title_and_ends_the_step_with_no_further_model_call()
+    {
+        using var client = await _realm.SignInAsync();
+        var id = await SendAsync(client);
+        var input = PlanInput("Purchases get a cost centre.", "Add a cost centre");
+        var plan = input["plan"]!.AsObject();
+        plan["questions"] = new JsonArray(new JsonObject { ["question"] = "Which team owns it?", ["options"] = new JsonArray("Sales", "Finance"), ["recommended"] = 2 });
+        plan["decisions"] = new JsonArray(new JsonObject { ["decision"] = "A list of cost centres", ["reason"] = "A person picks one." });
+        plan["risks"] = new JsonArray("Old purchases have no cost centre.");
+        plan["checks"] = new JsonArray("A scenario sets a cost centre.");
+        plan["details"] = new JsonArray("Edit the purchase entity.");
+        var script = new ScriptedModelAdapter([ToolUse("plan-1", "propose_plan", input.ToJsonString(), 5, 5), Answer("Never sent.")]);
+        var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
+        await using var host = BuildAgent(_realm, script, server);
+        await host.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not move the request to awaitingApproval.");
+        await host.StopAsync(CancellationToken);
+
+        Assert.Equal("Add a cost centre", await ScalarAsync($"SELECT title FROM axis.authoring_requests WHERE id = '{id}'"));
+        Assert.Equal("object", await ScalarAsync($"SELECT jsonb_typeof(plan) FROM axis.authoring_requests WHERE id = '{id}'"));
+        var stored = JsonNode.Parse(await ScalarAsync($"SELECT plan::text FROM axis.authoring_requests WHERE id = '{id}'"));
+        var expected = JsonNode.Parse(plan.ToJsonString())!;
+        Assert.True(JsonNode.DeepEquals(expected, stored), stored!.ToJsonString());
+        Assert.Equal("1:plan:-:10:true", await StepsAsync(id));
+        Assert.Single(script.Calls);
+        // The host answers the call itself, so the server never sees it.
+        Assert.Equal(["list_applications"], server.ToolCalls);
+        Assert.Contains("The plan is stored.", await ScalarAsync($"SELECT messages::text FROM axis.authoring_request_steps WHERE request_id = '{id}'"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_missing_group_is_stored_as_an_empty_list_so_a_stored_plan_always_has_all_eight_keys()
+    {
+        using var client = await _realm.SignInAsync();
+        var id = await SendAsync(client);
+        var script = new ScriptedModelAdapter([Plan("A plan.")]);
+        await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
+        await host.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not move the request to awaitingApproval.");
+        await host.StopAsync(CancellationToken);
+
+        Assert.Equal("8", await ScalarAsync($"SELECT count(*) FROM jsonb_object_keys((SELECT plan FROM axis.authoring_requests WHERE id = '{id}'))"));
+        Assert.Equal("[]", await ScalarAsync($"SELECT (plan->'questions')::text FROM axis.authoring_requests WHERE id = '{id}'"));
+        Assert.Equal("4", await ScalarAsync($"SELECT jsonb_array_length(plan->'checklist') FROM axis.authoring_requests WHERE id = '{id}'"));
+    }
+
+    [Fact]
+    public async Task A_propose_plan_call_that_breaks_the_shape_gets_a_tool_error_and_a_turn_that_then_ends_is_noPlan_with_no_plan_and_no_title()
+    {
+        using var client = await _realm.SignInAsync();
+        var id = await SendAsync(client);
+        var script = new ScriptedModelAdapter([Plan("A plan.", 4, 1, new string('a', 81)), Answer("Here is the plan in words.", 3, 2)]);
+        var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
+        await using var host = BuildAgent(_realm, script, server);
+        await host.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await StateAsync(id) == "failed", "The host did not stop the request as failed.");
+        await host.StopAsync(CancellationToken);
+
+        Assert.Equal("1:plan:noPlan:10:true", await StepsAsync(id));
+        Assert.Equal("true", await ScalarAsync($"SELECT (plan IS NULL AND title IS NULL)::text FROM axis.authoring_requests WHERE id = '{id}'"));
+        Assert.Equal("true", await ScalarAsync($"SELECT (refresh_token IS NULL)::text FROM axis.authoring_requests WHERE id = '{id}'"));
+        var error = Assert.IsType<ModelToolResult>(Assert.Single(script.Calls[1].Messages[^1].Content));
+        Assert.True(error.IsError);
+        Assert.Contains("80", error.Content, StringComparison.Ordinal);
+        Assert.Equal(["list_applications"], server.ToolCalls);
+    }
+
+    [Fact]
+    public async Task A_model_may_correct_an_invalid_propose_plan_call_and_its_next_valid_call_stores_the_plan()
+    {
+        using var client = await _realm.SignInAsync();
+        var id = await SendAsync(client);
+        var script = new ScriptedModelAdapter([Plan("A plan.", title: ""), Plan("The corrected plan.", title: "Add a cost centre")]);
+        await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
+        await host.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not move the request to awaitingApproval.");
+        await host.StopAsync(CancellationToken);
+
+        Assert.Equal("The corrected plan.", await PlanAsync(id));
+        Assert.Equal("Add a cost centre", await ScalarAsync($"SELECT title FROM axis.authoring_requests WHERE id = '{id}'"));
+        Assert.Equal(2, script.Calls.Count);
+    }
+
+    [Fact]
+    public async Task The_read_route_answers_title_null_while_the_request_is_planning_and_the_stored_title_and_the_plan_object_after_the_plan()
+    {
+        using var client = await _realm.SignInAsync();
+        var id = await SendAsync(client);
+        using (var planning = await StudioPublishTests.SendAsync(client, HttpMethod.Get, $"{Url}/{id}", Host))
+        {
+            Assert.Equal(HttpStatusCode.OK, planning.StatusCode);
+            using var body = await StudioPublishTests.ReadAsync(planning);
+            Assert.Equal("planning", body.RootElement.GetProperty("state").GetString());
+            Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("title").ValueKind);
+            Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("plan").ValueKind);
+        }
+
+        var script = new ScriptedModelAdapter([Plan("Purchases get a cost centre.", title: "Add a cost centre")]);
+        await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
+        await host.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not move the request to awaitingApproval.");
+        await host.StopAsync(CancellationToken);
+
+        using var planned = await StudioPublishTests.SendAsync(client, HttpMethod.Get, $"{Url}/{id}", Host);
+        using var read = await StudioPublishTests.ReadAsync(planned);
+        Assert.Equal("Add a cost centre", read.RootElement.GetProperty("title").GetString());
+        var plan = read.RootElement.GetProperty("plan");
+        Assert.Equal(JsonValueKind.Object, plan.ValueKind);
+        Assert.Equal("Purchases get a cost centre.", plan.GetProperty("summary").GetString());
+        Assert.Equal("Change: Purchases get a cost centre.", plan.GetProperty("changes")[0].GetString());
+        Assert.Equal(PlanShape.ChecklistItems, plan.GetProperty("checklist").EnumerateArray().Select(entry => entry.GetProperty("item").GetString()));
+        Assert.Equal(0, plan.GetProperty("questions").GetArrayLength());
+
+        using var list = await StudioPublishTests.SendAsync(client, HttpMethod.Get, Url, Host);
+        using var listed = await StudioPublishTests.ReadAsync(list);
+        Assert.Equal("Add a cost centre", listed.RootElement.GetProperty("items")[0].GetProperty("title").GetString());
     }
 
     [Fact]
@@ -174,7 +298,24 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
     internal static ModelAnswer ToolUse(string callId, string tool, string input, int inputTokens, int outputTokens) =>
         new([new ModelToolCall(callId, tool, Json(input))], ModelStopReason.ToolUse, new ModelTokens(inputTokens, outputTokens));
 
-    internal static ModelAnswer Plan(string text, int inputTokens = 0, int outputTokens = 0) =>
+    // The answer that ends a planning step: one propose_plan call with the plan's shape, its only change "Change: <summary>" and Axis's checklist.
+    internal static ModelAnswer Plan(string summary, int inputTokens = 0, int outputTokens = 0, string title = "Add a cost centre") =>
+        ToolUse("plan-1", "propose_plan", PlanInput(summary, title).ToJsonString(), inputTokens, outputTokens);
+
+    internal static JsonObject PlanInput(string summary, string title) => new()
+    {
+        ["application"] = "PurchaseRequests",
+        ["title"] = title,
+        ["plan"] = new JsonObject
+        {
+            ["summary"] = summary,
+            ["changes"] = new JsonArray($"Change: {summary}"),
+            ["checklist"] = new JsonArray([.. PlanShape.ChecklistItems.Select(item => (JsonNode)new JsonObject { ["item"] = item, ["how"] = "The plan does." })]),
+        },
+    };
+
+    // The answer of a step that ends its turn with text, such as the review, rather than with a tool call.
+    internal static ModelAnswer Answer(string text, int inputTokens = 0, int outputTokens = 0) =>
         new([new ModelText(text)], ModelStopReason.EndTurn, new ModelTokens(inputTokens, outputTokens));
 
     internal static JsonElement Json(string json)
@@ -234,7 +375,7 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
 
     private Task<string> StateAsync(Guid id) => ScalarAsync($"SELECT state FROM axis.authoring_requests WHERE id = '{id}'");
 
-    private Task<string> PlanAsync(Guid id) => ScalarAsync($"SELECT coalesce(plan, '') FROM axis.authoring_requests WHERE id = '{id}'");
+    private Task<string> PlanAsync(Guid id) => ScalarAsync($"SELECT coalesce(plan->>'summary', '') FROM axis.authoring_requests WHERE id = '{id}'");
 
     private Task<string> StepsAsync(Guid id, string? kind = null) =>
         ScalarAsync(

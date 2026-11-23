@@ -6,7 +6,7 @@ import type {
   StudioDiagnostic,
   StudioScenarioResult,
 } from '../platform/studio'
-import { requestResult } from './studioAuthoringRequest'
+import { requestResult, requestTitle } from './studioAuthoringRequest'
 
 const error: StudioDiagnostic = {
   code: 'AXIS-E101',
@@ -73,8 +73,18 @@ function requestOf(overrides: Partial<AuthoringRequest>): AuthoringRequest {
     author: 'u1',
     authorName: 'Linh Nguyen',
     text: 'Add a cost centre.',
+    title: null,
     state: 'ready',
-    plan: 'Add a cost centre.',
+    plan: {
+      summary: 'Add a cost centre.',
+      questions: [],
+      changes: [],
+      decisions: [],
+      risks: [],
+      checks: [],
+      checklist: [],
+      details: [],
+    },
     round: 0,
     tokens: 0,
     autoAccept: false,
@@ -85,6 +95,17 @@ function requestOf(overrides: Partial<AuthoringRequest>): AuthoringRequest {
     ...overrides,
   }
 }
+
+describe('requestTitle', () => {
+  it("is the title AI gave the request, or else the first sentence of the request's words", () => {
+    expect(requestTitle(requestOf({ title: 'Add a cost centre', text: 'Please add a cost centre. Thanks.' }))).toBe(
+      'Add a cost centre',
+    )
+    expect(requestTitle(requestOf({ title: null, text: 'Please add a cost centre. Thanks.' }))).toBe(
+      'Please add a cost centre.',
+    )
+  })
+})
 
 describe('requestResult', () => {
   it('shows a passed check with all scenarios passing, and a review that was not run for the author', () => {

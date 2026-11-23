@@ -235,7 +235,7 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
 
     // The request is approved without the step before it, as the approval leaves it.
     private async Task WorkingAsync(Guid id) =>
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = 'A plan.' WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = '{PlanJson}' WHERE id = '{id}' RETURNING 1");
 
     // The working step's row is finished when it moved the request on in the same transaction, so the checking step may already run.
     private Task WorkFinishedAsync(Guid id) =>

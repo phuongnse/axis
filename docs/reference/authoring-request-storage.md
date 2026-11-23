@@ -12,15 +12,17 @@ when the author approves, changes the plan or drops it. The publisher moves a `r
 
 - **`axis.authoring_requests`.** One row per request: `id` (`uuid`, a version 7 UUID),
   `application_id` (`uuid`, the application `id`), `author` (`text`, a user id), `text`, `state`
-  (`text`, see [states](authoring-requests.md#states)), `binding`, `plan`, `claimed_by` (all `text`,
-  null), `draft_id` (`uuid`, null), `round` (`integer`) and `tokens` (`bigint`), both 0 at first,
+  (`text`, see [states](authoring-requests.md#states)), `binding`, `title`, `claimed_by` (all `text`,
+  null), `plan` (`jsonb`, null, of [the plan's shape](authoring-requests.md#states)), `draft_id` (`uuid`, null), `round` (`integer`) and `tokens` (`bigint`), both 0 at first,
   `auto_accept` (`boolean`, false at first), `sent_at` (`timestamptz`), and `approved_at`,
   `finished_at` and `claimed_until` (`timestamptz`, null), and `refresh_token` (`bytea`, null). The
   `round` counts the request's moves to `fixing`, its fix rounds, see [fix rounds](authoring-requests.md#budgets). The
   `refresh_token` holds the agent host's refresh token, encrypted with the tenant data key in the
   [sensitive value format](data-encryption.md#sensitive-field-values) and bound to the tenant and the
   request. No route answers it, and a drop, an accept or a failure sets it to null. Indexes on
-  `(application_id, sent_at, id)` and `(sent_at)` serve the list and the monthly count.
+  `(application_id, sent_at, id)` and `(sent_at)` serve the list and the monthly count. The planning step
+  sets `title`, at most 80 characters, and `plan` together. A plan stored as text before `plan` became `jsonb`
+  is `{ summary }` with its text as the summary and every other group `[]`.
 - **`axis.authoring_request_steps`.** One row per step: `id` (`uuid`), `request_id` (`uuid`, deleted
   with its request), `ordinal` (`integer`, unique per request), `kind`, `input_summary` and `outcome`
   (`text`, null), `tokens` (`bigint`), `messages` (`jsonb`, null), `checks` (`jsonb`, null), `started_at` (`timestamptz`) and
@@ -55,8 +57,8 @@ when the author approves, changes the plan or drops it. The publisher moves a `r
 
 _(planned for M35)_
 
-- **`axis.authoring_requests`.** `title` (`text`, null), `client` (`text`, `studio` or the outside client id),
-  `co_authors` (`text[]`) and `plan` as `jsonb` of [the plan's shape](authoring-requests.md#states).
+- **`axis.authoring_requests`.** `client` (`text`, `studio` or the outside client id) and
+  `co_authors` (`text[]`).
 - **`axis.authoring_request_steps`.** The `changeRequest` step kind holds the author's comment in `input_summary`.
   A `write` step holds the resource it wrote in a `resource` column, `jsonb` of `{ kind, id, name }`, which is null on
   every other step.

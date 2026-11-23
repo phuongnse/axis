@@ -75,6 +75,39 @@ const pascal = (text) =>
 /** The name of the case's application in the Studio folder that all tenants share, such as `ApprovalsEvalSmoke` for the start `approvals` and the tenant `eval-smoke`. */
 export const applicationName = (start, tenantId) => `${pascal(start.name)}${pascal(tenantId)}`
 
+/** Axis's checklist, word for word as a plan must give it, see docs/reference/authoring-requests.md#states. */
+export const planChecklist = [
+  'The draft does what the request and the approved plan say, and nothing more.',
+  'A change that a built-in module covers uses it, with a customization layer.',
+  'Each behaviour that the draft adds or changes has a scenario.',
+  'Every text the draft adds has each locale the application offers.',
+]
+
+/**
+ * The Messages API answer of a scripted model that ends planning: one `propose_plan` call for `application` with a plan of the plan's
+ * shape. Its summary is `summary` and its only change is "Change: <summary>", so a page that shows both finds each once.
+ */
+export const planAnswer = (application, summary, usage) => ({
+  content: [
+    {
+      type: 'tool_use',
+      id: 'plan-1',
+      name: 'propose_plan',
+      input: {
+        application,
+        title: 'Change the application',
+        plan: {
+          summary,
+          changes: [`Change: ${summary}`],
+          checklist: planChecklist.map((item) => ({ item, how: 'The plan does.' })),
+        },
+      },
+    },
+  ],
+  stop_reason: 'tool_use',
+  usage,
+})
+
 /** The domain of the tenants' hosts. The stack's one certificate is made for `*.eval.localhost`, because OpenSSL refuses a wildcard with one label after it, such as `*.localhost`. */
 export const tenantDomain = 'eval.localhost'
 

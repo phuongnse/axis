@@ -15,6 +15,9 @@ internal enum ModelLoopEnd
 
     /// <summary>The model did not end its turn within the calls it was allowed.</summary>
     OutOfCalls,
+
+    /// <summary>The step took what it needed from a tool call and asked the loop to stop.</summary>
+    Finished,
 }
 
 /// <summary>What a <see cref="ModelLoop"/> leaves: how it ended, the last answer and every message as JSON.</summary>
@@ -27,8 +30,9 @@ internal sealed record ModelLoopResult(ModelLoopEnd End, ModelAnswer? Last, stri
 /// </summary>
 internal static class ModelLoop
 {
-    /// <summary>Runs the model until it ends its turn, is cut off, or has made <paramref name="maxCalls"/> calls.</summary>
+    /// <summary>Runs the model until it ends its turn, is cut off, has made <paramref name="maxCalls"/> calls, or the step says it is finished.</summary>
     /// <param name="answer">The step's answer to one tool call. A tool error is a result with <see cref="ModelToolResult.IsError"/>.</param>
+    /// <param name="finished">Asked after the answers to a turn's tool calls. When it says <see langword="true"/> the loop stops with <see cref="ModelLoopEnd.Finished"/> and makes no further call.</param>
     /// <param name="maxOutputTokens">The binding's output limit, which the estimate before each call counts as the call's output.</param>
     /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim.</exception>
     /// <exception cref="AuthoringOverBudgetException">
@@ -44,7 +48,8 @@ internal static class ModelLoop
         int maxCalls,
         int maxOutputTokens,
         Func<ModelToolCall, CancellationToken, Task<ModelToolResult>> answer,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<bool>? finished = null)
     {
         var messages = new List<ModelMessage> { new(ModelRole.User, [new ModelText(firstMessage)]) };
         ModelAnswer? last = null;
@@ -70,6 +75,11 @@ internal static class ModelLoop
 
                     // A model that says it uses a tool and names none gets an empty turn, and the call counts against the bound.
                     messages.Add(new ModelMessage(ModelRole.User, results.Count > 0 ? results : [new ModelText("No tool was called.")]));
+                    if (finished?.Invoke() == true)
+                    {
+                        return new ModelLoopResult(ModelLoopEnd.Finished, last, MessagesJson(messages));
+                    }
+
                     break;
                 case ModelStopReason.EndTurn:
                     return new ModelLoopResult(ModelLoopEnd.EndTurn, last, MessagesJson(messages));

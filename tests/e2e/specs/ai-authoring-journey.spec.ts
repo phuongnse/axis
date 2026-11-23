@@ -7,7 +7,7 @@ import { expect, test } from '../test'
 import { sparePort } from '../activate'
 import { runAdmin } from '../admin-tool'
 import { startAgentHost } from '../agent-host'
-import { askAi, holdAiSpecLock, signIn, startSpecPublisher, type AuthoringAccount } from '../ai-authoring'
+import { askAi, holdAiSpecLock, planAnswer, signIn, startSpecPublisher, type AuthoringAccount } from '../ai-authoring'
 import { csrfHeaders } from '../csrf'
 import { startDirectoryServer } from '../directory-server'
 import { addAuthenticator, submitCode, submitPassword } from '../keycloak'
@@ -359,7 +359,7 @@ test("an author asks AI for a director's approval above a threshold, and the req
     await writeFile(
       answersFile,
       JSON.stringify([
-        { content: [{ type: 'text', text: plan }], stop_reason: 'end_turn', usage },
+        planAnswer(application, plan, usage),
         {
           content: [
             { type: 'tool_use', id: 'read-1', name: 'read_resource', input: { application, id: employeeRole } },
@@ -619,7 +619,7 @@ test("a request that lets a requester decide their own request is refused by the
     await writeFile(
       answersFile,
       JSON.stringify([
-        { content: [{ type: 'text', text: refusedPlan }], stop_reason: 'end_turn', usage },
+        planAnswer(application, refusedPlan, usage),
         {
           content: [
             {
