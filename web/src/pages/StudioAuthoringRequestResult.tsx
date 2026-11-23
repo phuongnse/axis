@@ -149,7 +149,8 @@ export function StudioAuthoringRequestResult({
       {files.length > 0 && (
         <Flex vertical gap={spacing.xs}>
           <Typography.Text strong>{t('shell.studio.aiRequest.changes')}</Typography.Text>
-          <StudioChanges files={files} resources={[]} folded />
+          {/* Proposed: a request's changes open at first, as a revision's do, since the author decides on them, see #4623. */}
+          <StudioChanges files={files} resources={[]} />
         </Flex>
       )}
     </Flex>
