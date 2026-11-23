@@ -68,7 +68,6 @@
   "shell.account.ai.connectFailed.billing": "Tài khoản của bạn ở nhà cung cấp không trả được phí cho yêu cầu. Hãy nạp thêm tiền hoặc nâng hạn mức chi tiêu ở nhà cung cấp, rồi kết nối lại.",
   "shell.account.ai.connectFailed.provider-unavailable": "Không liên lạc được với nhà cung cấp. Hãy thử lại sau ít phút.",
   "shell.account.ai.connectFailed.failed": "Chưa kết nối được AI của bạn.",
-  "shell.account.ai.state": "Trạng thái",
   "shell.account.ai.state.working": "Đang hoạt động",
   "shell.account.ai.state.refused": "Bị từ chối",
   "shell.account.ai.state.billing": "Lỗi thanh toán",

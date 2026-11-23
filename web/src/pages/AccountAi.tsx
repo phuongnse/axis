@@ -36,7 +36,7 @@ const states: Record<OwnAiState, { tone: StatusTone; notice?: 'error' | 'warning
  * Proposed (#3926): the account page's AI tab, where a person connects their own AI, whose key runs every AI request
  * they send. With no AI connected it says so and offers Connect your AI…, which opens a dialog of the provider and the API
  * key. It names no model: the author chooses one for each request in Studio's request panel, which #5204 designs. Once
- * connected it shows the provider, the key's last four characters and the key's state, with what to do when the provider
+ * connected it shows the provider and the key's last four characters with the key's state as a tag beside them, with what to do when the provider
  * refused the key or could not bill for it, and offers Change your AI… and Remove your AI…. After each change the tab
  * reads the AI again, so it shows what the server stored. See docs/reference/model-bindings.md#a-persons-own-key.
  */
@@ -192,14 +192,17 @@ function Connected({
       <TermList
         terms={[
           { key: 'provider', term: t('shell.account.ai.provider'), value: provider?.name ?? connection.provider },
-          { key: 'key', term: t('shell.account.ai.key'), value: maskedKey(connection.ending) },
           {
-            key: 'state',
-            term: t('shell.account.ai.state'),
+            key: 'key',
+            term: t('shell.account.ai.key'),
+            // The key's state is a tag beside the key, as a session's This session sits beside its time.
             value: (
-              <StatusTag tone={tone} data-testid="account-ai-state">
-                {t(`shell.account.ai.state.${connection.state}`)}
-              </StatusTag>
+              <Flex gap="small" align="center">
+                {maskedKey(connection.ending)}
+                <StatusTag tone={tone} data-testid="account-ai-state">
+                  {t(`shell.account.ai.state.${connection.state}`)}
+                </StatusTag>
+              </Flex>
             ),
           },
         ]}

@@ -190,12 +190,15 @@ describe('the design-system shell states', () => {
 
     render(<Preview states={previews.shell} />)
 
-    expect(await screen.findByTestId('account-ai-state', {}, { timeout: 15000 })).toHaveTextContent('Refused')
-    expect(screen.getByText('••••x7Qa')).toBeVisible()
+    const state = await screen.findByTestId('account-ai-state', {}, { timeout: 15000 })
+    expect(state).toHaveTextContent('Refused')
+    // The key's state is a tag beside the key, not a fact of its own.
+    expect(state.parentElement).toHaveTextContent('••••x7Qa')
+    expect(within(state.closest('dl')!).queryByText('State')).toBeNull()
     const notice = screen.getByTestId('account-ai-state-notice')
     expect(notice).toHaveTextContent('Change your AI to go on.')
     // What to do comes before the facts.
-    expect(notice.compareDocumentPosition(screen.getByText('••••x7Qa')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(notice.compareDocumentPosition(state) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Change your AI…' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Remove your AI…' })).toBeVisible()
   }, 30000)

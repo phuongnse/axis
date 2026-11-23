@@ -68,7 +68,6 @@
   "shell.account.ai.connectFailed.billing": "Your provider account cannot pay for requests. Add credit or raise its spend limit with your provider, then connect again.",
   "shell.account.ai.connectFailed.provider-unavailable": "Your provider could not be reached. Try again in a few minutes.",
   "shell.account.ai.connectFailed.failed": "Your AI was not connected.",
-  "shell.account.ai.state": "State",
   "shell.account.ai.state.working": "Working",
   "shell.account.ai.state.refused": "Refused",
   "shell.account.ai.state.billing": "Billing problem",
