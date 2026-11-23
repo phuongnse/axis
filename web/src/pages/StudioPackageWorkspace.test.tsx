@@ -944,7 +944,7 @@ describe('StudioPackageWorkspace', () => {
 
       const panel = within(output()).getByRole('tabpanel')
       expect(within(output()).getByRole('tab', { name: 'Problems' })).toBeInTheDocument()
-      expect(within(panel).getAllByRole('listitem')).toHaveLength(1)
+      expect(within(panel).getAllByTestId('studio-problem')).toHaveLength(1)
       expect(within(panel).queryByText('Problem in packages/other/axis-package.json')).not.toBeInTheDocument()
       expect(within(panel).queryByText('Problem in entities/a.json')).not.toBeInTheDocument()
 
@@ -962,7 +962,7 @@ describe('StudioPackageWorkspace', () => {
       ])
       await screen.findByTestId('studio-package-tree')
 
-      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' }))
+      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/lib/x.py' }))
 
       const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
       await waitFor(() =>
@@ -973,7 +973,7 @@ describe('StudioPackageWorkspace', () => {
       // A file that is already open jumps again.
       await userEvent.click(screen.getByRole('link', { name: 'packages/tools/adapter.py' }))
       await screen.findByRole('textbox', { name: 'adapter.py' })
-      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' }))
+      await userEvent.click(screen.getByRole('link', { name: 'packages/tools/lib/x.py' }))
       await waitFor(() =>
         expect(within(screen.getByTestId('studio-package-status')).getByText('Line 3, column 1')).toBeInTheDocument(),
       )
@@ -984,7 +984,7 @@ describe('StudioPackageWorkspace', () => {
       renderWorkspace(true, 'tools', [problem('packages/tools/lib/x.py', { line: 3 })])
       await screen.findByTestId('studio-package-tree')
 
-      expect(within(output()).getByRole('link', { name: 'packages/tools/lib/x.py, line 3' })).toHaveAttribute(
+      expect(within(output()).getByRole('link', { name: 'packages/tools/lib/x.py' })).toHaveAttribute(
         'href',
         '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3',
       )
@@ -1241,7 +1241,7 @@ describe('StudioPackageWorkspace', () => {
       )
 
       await userEvent.click(panel.getByRole('tab', { name: 'Problems' }))
-      await userEvent.click(await screen.findByRole('link', { name: 'packages/tools/lib/x.py, line 2' }))
+      await userEvent.click(await screen.findByRole('link', { name: 'packages/tools/lib/x.py' }))
 
       const view = EditorView.findFromDOM(await screen.findByRole('textbox', { name: 'lib/x.py' }))!
       await waitFor(() =>
@@ -1423,7 +1423,7 @@ describe('StudioPackageWorkspace', () => {
       expect(await panel.findByText('No test ran. See the problems.', {}, { timeout: 3000 })).toBeInTheDocument()
       await userEvent.click(panel.getByRole('tab', { name: 'Problems' }))
 
-      expect(await screen.findByRole('link', { name: 'packages/tools/lib/x.py, line 2' })).toBeInTheDocument()
+      expect(await screen.findByRole('link', { name: 'packages/tools/lib/x.py' })).toBeInTheDocument()
     })
   })
 })

@@ -83,14 +83,23 @@ describe('StudioProblems', () => {
     expect(screen.queryByText('error')).not.toBeInTheDocument()
   })
 
-  it("links a package file's problem to its address, and draws another file's problem as muted text", () => {
-    renderProblems([{ ...error, file: 'packages/tools/lib/x.py', line: 3 }, error], (file, line) =>
-      studioFileAddress('Shop', file, line),
+  it("links a package file's group to its first problem's line, and draws another file's group as muted text", () => {
+    renderProblems(
+      [
+        { ...error, file: 'packages/tools/lib/x.py', line: 3 },
+        { ...error, file: 'packages/tools/lib/x.py', line: 5 },
+        error,
+      ],
+      (file, line) => studioFileAddress('Shop', file, line),
     )
 
-    expect(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'packages/tools/lib/x.py' })).toHaveAttribute(
       'href',
       '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3',
+    )
+    expect(screen.getByRole('link', { name: 'Show' })).toHaveAttribute(
+      'href',
+      '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=5',
     )
     expect(screen.queryByRole('link', { name: 'entities/purchase-request.json' })).not.toBeInTheDocument()
     expect(screen.getByText('entities/purchase-request.json')).toHaveStyle({
@@ -101,7 +110,7 @@ describe('StudioProblems', () => {
   it('stops the panel at its end, so the page does not scroll', () => {
     renderProblems([error])
 
-    const body = screen.getByText('AXIS-E101').closest('ul')!.parentElement!
+    const body = screen.getByTestId('studio-problem-group').parentElement!.parentElement!
     expect(body).toHaveStyle({ overflowY: 'auto', overscrollBehavior: 'contain' })
   })
 })
@@ -157,9 +166,30 @@ describe('StudioProblemList', () => {
       version: 'a',
       usedBy: 0,
     },
+    {
+      id: 'e2',
+      kind: 'entity',
+      name: 'Invoice',
+      file: 'entities/invoice.json',
+      version: 'a',
+      usedBy: 0,
+    },
   ]
+  const addressList = (diagnostics: StudioDiagnostic[]) => (
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioProblemList
+            diagnostics={diagnostics}
+            resources={resources}
+            addressOf={(id, path) => studioResourceAddress('Shop', id, path)}
+          />
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>
+  )
 
-  it('lists errors before warnings, and a resource with no addressOf is plain text, not a link', () => {
+  it('lists each resource once, errors before warnings, and a resource with no addressOf is plain text, not a link', () => {
     const warning: StudioDiagnostic = { ...error, code: 'AXIS-W201', severity: 'warning', resourceId: 'w1' }
     render(
       <ThemeModeProvider>
@@ -169,7 +199,7 @@ describe('StudioProblemList', () => {
       </ThemeModeProvider>,
     )
 
-    const codes = screen.getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent)
+    const codes = screen.getAllByTestId('studio-problem').map((item) => item.querySelector('strong')?.textContent)
     expect(codes).toEqual(['AXIS-E102', 'AXIS-W201'])
     expect(screen.getByText('PurchaseRequest')).toBeInTheDocument()
     expect(screen.getByText('Entity')).toBeInTheDocument()
@@ -177,54 +207,63 @@ describe('StudioProblemList', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it("links the resource of a problem to its address at the problem's path, named by its title", async () => {
-    render(
-      <MemoryRouter>
-        <ThemeModeProvider>
-          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-            <StudioProblemList
-              diagnostics={[resourceError]}
-              resources={resources}
-              addressOf={(id, path) => studioResourceAddress('Shop', id, path)}
-            />
-          </TextProvider>
-        </ThemeModeProvider>
-      </MemoryRouter>,
-    )
+  it('groups the problems of two resources in two groups, the group with an error first, errors first in each', () => {
+    const warningOne: StudioDiagnostic = { ...resourceError, code: 'AXIS-W101', severity: 'warning' }
+    const warningTwo: StudioDiagnostic = { ...resourceError, code: 'AXIS-W102', severity: 'warning', resourceId: 'e2' }
+    render(addressList([warningOne, warningTwo, resourceError]))
 
+    const groups = screen.getAllByTestId('studio-problem-group')
+    expect(groups).toHaveLength(2)
+    expect(within(groups[0]).getByRole('link', { name: 'PurchaseRequest' })).toBeInTheDocument()
+    expect(within(groups[1]).getByRole('link', { name: 'Invoice' })).toBeInTheDocument()
+    const codes = within(groups[0])
+      .getAllByTestId('studio-problem')
+      .map((item) => item.querySelector('strong')?.textContent)
+    expect(codes).toEqual(['AXIS-E102', 'AXIS-W101'])
+    expect(within(groups[1]).getAllByTestId('studio-problem')).toHaveLength(1)
+  })
+
+  it("links a group's heading to its first problem's place, and each later problem to its own with a Show link", () => {
+    const second: StudioDiagnostic = { ...resourceError, code: 'AXIS-E103', path: '/fields/1' }
+    render(addressList([resourceError, second]))
+
+    const [first, later] = screen.getAllByTestId('studio-problem')
+    expect(within(first).queryByRole('link', { name: 'Show' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'PurchaseRequest' })).toHaveAttribute(
       'href',
       '/studio?app=Shop&resource=e1&path=%2Ffields%2F0',
     )
+    expect(within(later).getByRole('link', { name: 'Show' })).toHaveAttribute(
+      'href',
+      '/studio?app=Shop&resource=e1&path=%2Ffields%2F1',
+    )
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it("draws a problem's severity tag outside its text column, which holds the code, the message and the link", () => {
-    render(
-      <MemoryRouter>
-        <ThemeModeProvider>
-          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-            <StudioProblemList
-              diagnostics={[resourceError]}
-              resources={resources}
-              addressOf={(id, path) => studioResourceAddress('Shop', id, path)}
-            />
-          </TextProvider>
-        </ThemeModeProvider>
-      </MemoryRouter>,
-    )
+  it("draws a problem's severity tag outside its text column, which holds the code and the message", () => {
+    render(addressList([resourceError]))
 
-    const item = screen.getByRole('listitem')
+    const item = screen.getAllByTestId('studio-problem')[0]
     const tag = within(item).getByText('Error').closest<HTMLElement>('[data-tone]')!
     const text = within(item).getByTestId('studio-problem-text')
     expect(text).not.toContainElement(tag)
     expect(tag.nextElementSibling).toBe(text)
     expect(within(text).getByText('AXIS-E102')).toBeInTheDocument()
     expect(within(text).getByText('The field has no type.')).toBeInTheDocument()
-    expect(within(text).getByRole('link', { name: 'PurchaseRequest' })).toBeInTheDocument()
+    expect(within(text).queryByRole('link')).not.toBeInTheDocument()
   })
 
-  it('shows the file of a problem with no resource in muted text, and no link', () => {
+  it('shows the Show link of a later problem in its text column', () => {
+    const second: StudioDiagnostic = { ...resourceError, code: 'AXIS-E103', path: '/fields/1' }
+    render(addressList([resourceError, second]))
+
+    const [, later] = screen.getAllByTestId('studio-problem')
+    expect(within(later).getByTestId('studio-problem-text')).toContainElement(
+      within(later).getByRole('link', { name: 'Show' }),
+    )
+  })
+
+  it('shows the file of a problem with no resource in a heading of muted text, and no link', () => {
     render(
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
@@ -233,20 +272,23 @@ describe('StudioProblemList', () => {
       </ThemeModeProvider>,
     )
 
-    const item = screen.getByRole('listitem')
-    expect(within(item).getByText('entities/purchase-request.json')).toBeInTheDocument()
-    expect(within(item).queryByRole('link')).not.toBeInTheDocument()
-    expect(within(item).queryByRole('button')).not.toBeInTheDocument()
+    const group = screen.getByTestId('studio-problem-group')
+    expect(within(group).getByText('entities/purchase-request.json')).toBeInTheDocument()
+    expect(within(group).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(group).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByText(/Path:/)).not.toBeInTheDocument()
   })
 
-  it('makes the file of a problem with no resource a link to its address when fileAddressOf gives one', () => {
+  it("groups a package file's problems under a link to the file, at its first problem's line, with no line in the name", () => {
     render(
       <MemoryRouter>
         <ThemeModeProvider>
           <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
             <StudioProblemList
-              diagnostics={[{ ...error, file: 'packages/tools/lib/x.py', line: 3 }, error]}
+              diagnostics={[
+                { ...error, file: 'packages/tools/lib/x.py', line: 3 },
+                { ...error, file: 'packages/tools/lib/x.py', line: 5 },
+              ]}
               resources={resources}
               fileAddressOf={(file, line) => studioFileAddress('Shop', file, line)}
             />
@@ -255,9 +297,14 @@ describe('StudioProblemList', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('link', { name: 'packages/tools/lib/x.py, line 3' })).toHaveAttribute(
+    expect(screen.getAllByTestId('studio-problem-group')).toHaveLength(1)
+    expect(screen.getByRole('link', { name: 'packages/tools/lib/x.py' })).toHaveAttribute(
       'href',
       '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=3',
+    )
+    expect(screen.getByRole('link', { name: 'Show' })).toHaveAttribute(
+      'href',
+      '/studio?app=Shop&view=packages&package=tools&file=lib%2Fx.py&line=5',
     )
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })

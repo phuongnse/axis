@@ -300,7 +300,7 @@ line's summary sits under it, across the columns and flush with the name.
 
 The checks' detail folds in under its line, inside it and indented `spacing-md`. It shows the compile's
 problems through [`StudioProblemList`](shared-widgets.md#which-widget), then the results of the scenarios,
-see [scenario results](#scenario-results). Each scenario's name links to it. Each problem is a bullet of the list, with its severity tag after the bullet.
+see [scenario results](#scenario-results). Each scenario's name links to it. The problems are grouped by file, each file a heading with its problems as bullets under it, and each problem has its severity tag after the bullet.
 `spacing-xs` parts the lines of one group, and `spacing-sm` parts the review from the checks.
 
 ### What the review found

@@ -651,9 +651,9 @@ describe('StudioPage', () => {
     const panel = await openProblems()
     await within(panel).findByText('The application has no description.')
 
-    const item = within(panel).getByText('AXC0001').closest('li')!
-    expect(within(item).queryByRole('button')).not.toBeInTheDocument()
-    expect(within(item).getByText('application.json')).toBeInTheDocument()
+    const group = within(panel).getByText('AXC0001').closest<HTMLElement>('[data-testid="studio-problem-group"]')!
+    expect(within(group).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(group).getByText('application.json')).toBeInTheDocument()
     expect(within(panel).getByRole('link', { name: 'PurchaseRequest' })).toBeInTheDocument()
   })
 
@@ -1005,7 +1005,7 @@ describe('StudioPage', () => {
       const panel = await openProblems()
       expect(button).toHaveAttribute('aria-expanded', 'true')
       expect(within(screen.getByTestId('aside')).getByTestId('studio-diagnostics')).toBe(panel)
-      const items = within(panel).getAllByRole('listitem')
+      const items = within(panel).getAllByTestId('studio-problem')
       expect(items[0]).toHaveTextContent('AXC0101')
       expect(items[1]).toHaveTextContent('AXC0001')
 

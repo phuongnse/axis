@@ -102,21 +102,22 @@ comes first, so it is never next to Publish….
 ## Problems panel
 
 The band's errors and warnings open a Problems panel on the right, under the header. It is
-not modal, so the page stays usable while it is open. It lists every error and then every warning, each
-with its severity, code and message, then its resource as a link, with the kind muted after it. A problem
-that names no resource shows its file with its line. A package file's place is a link to that file at its line, and
-another file's place is muted text. Opening the link opens its resource at the place the
-problem names and leaves the panel open, so an author can fix one problem after another. Ctrl+click opens the
-resource in a new tab. The panel scrolls on its own and stops at its
+not modal, so the page stays usable while it is open. It lists each resource once, as a heading, with its problems
+under it: errors first, then warnings, and the groups with an error first. The heading is the resource as a link, with
+the kind muted after it, and it opens the resource at the first problem's place. A problem that names no resource is
+grouped under its file. A package file's heading is a link to that file at its first problem's line, and another file's
+heading is muted text. Each later problem in a group has a Show link to its own place, so an author can fix one problem
+after another. Ctrl+click opens a link in a new tab. The panel scrolls on its own and stops at its
 end, as [scroll areas](actions-and-controls.md#scroll-areas) say. A package's workspace lists its own problems with the
-same list in its output panel, where a package file's problem is a link that opens the file in the workspace, see
+same list in its output panel, where a package file's heading is a link that opens the file in the workspace, see
 [a package's files](studio-packages.md#a-packages-files).
 
-- **A problem's row**. Each problem is a bullet, see [layout shows structure](actions-and-controls.md#layout-shows-structure),
-  and its severity is a status tag in words, Error in `danger` or Warning in `attention`, from the
-  texts `shell.studio.problems.severity.error` and `shell.studio.problems.severity.warning`. The tag sits `spacing-xs`
-  from a text column of its own, which holds the code and message, so a long message wraps under itself. The
-  resource or file follows the message on its line, and goes to the next line only when the line is full.
+- **A problem's row**. Each problem is a bullet under its group's heading, see
+  [layout shows structure](actions-and-controls.md#layout-shows-structure), and its severity is a status tag in words,
+  Error in `danger` or Warning in `attention`, from the texts `shell.studio.problems.severity.error` and
+  `shell.studio.problems.severity.warning`. The tag sits `spacing-xs` from a text column of its own, which holds the code
+  and message, so a long message wraps under itself. A later problem's Show link, from `shell.studio.problems.show`,
+  follows the message on its line, and goes to the next line only when the line is full.
 - **The shared frame.** The panel is drawn in `SidePanel`, the one side panel frame of every page, at the
   width the person last chose, see [layout](shell.md#layout).
 

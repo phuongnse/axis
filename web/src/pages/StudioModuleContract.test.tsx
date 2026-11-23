@@ -443,7 +443,7 @@ describe('StudioModuleContract', () => {
       renderLayered([diagnostic, { ...diagnostic, code: 'AXC0371', severity: 'warning' as const }])
 
       const list = await screen.findByTestId('studio-contract-diagnostics')
-      const [errorItem, warningItem] = within(list).getAllByRole('listitem')
+      const [errorItem, warningItem] = within(list).getAllByTestId('studio-problem')
       expect(within(errorItem).getByText('Error')).toHaveAttribute('data-tone', 'danger')
       expect(within(warningItem).getByText('Warning')).toHaveAttribute('data-tone', 'attention')
     })
@@ -460,7 +460,7 @@ describe('StudioModuleContract', () => {
       renderLayered([{ ...diagnostic, code: 'AXC0371', severity: 'warning' as const }, diagnostic])
 
       const list = await screen.findByTestId('studio-contract-diagnostics')
-      const [first, second] = within(list).getAllByRole('listitem')
+      const [first, second] = within(list).getAllByTestId('studio-problem')
       expect(first).toHaveTextContent('AXC0370')
       expect(within(first).getByText('Error')).toHaveAttribute('data-tone', 'danger')
       expect(second).toHaveTextContent('AXC0371')

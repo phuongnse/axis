@@ -216,10 +216,11 @@ says where they come from and what opening one does.
 - **Loading.** The panel loads `GET /api/studio/apps/{application}/diagnostics` when an application
   opens. A save, a create, a delete and a text write replace the list with the diagnostics they
   answered, and a request that ends replaces it as [publishing](#publishing) says.
-- **Opening one.** A diagnostic that names a resource is a link to it at the diagnostic's `path`, as a Used by
-  entry is, or at its top when the path is empty. Ctrl+click opens it in a new tab. A package file's diagnostic
-  links to the file at its line, see [a package's files](studio-packages.md#a-packages-files). Any other diagnostic
-  opens nothing.
+- **Opening one.** The heading of a resource's group is a link to it at the `path` of the group's first diagnostic, as a
+  Used by entry is, or at its top when the path is empty. Each later diagnostic in the group has a Show link to its own
+  `path`. Ctrl+click opens a link in a new tab. A package file's group links to the file at the first diagnostic's line,
+  and its Show links open the other lines, see [a package's files](studio-packages.md#a-packages-files). Any other
+  diagnostic opens nothing.
 - **Never blocking.** A diagnostic never blocks a save.
 
 ## Publishing
