@@ -4,7 +4,9 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.ControlPlane.Audit;
+using Axis.ControlPlane.BillingEvents;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
@@ -39,11 +41,15 @@ public sealed class BillingApiTests : IAsyncLifetime
     private const string BillingClient = "billing-client";
     private const string Tenant = "bill-4172903856";
     private const string OtherTenant = "bill-5938162047";
+    private const string EventsUrl = "https://billing.example/events";
+    private const string EventsKey = "billing-events-key";
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine").Build();
     private readonly PlanCatalogue _catalogue = BillingSeed.Catalogue();
     private readonly CellStub _cell = new();
     private readonly RSA _key = RSA.Create(2048);
+    private static readonly string _eventsSecret = "whsec_" + Convert.ToBase64String(Encoding.UTF8.GetBytes(EventsKey));
+
     private readonly DateOnly _paidThrough = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private NpgsqlDataSource _dataSource = null!;
     private ILoggerFactory _loggers = null!;
@@ -913,6 +919,112 @@ public sealed class BillingApiTests : IAsyncLifetime
         Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
     }
 
+    [Fact]
+    public async Task A_paid_through_call_that_makes_a_trialing_subscription_active_delivers_one_signed_state_event_that_names_both_states()
+    {
+        var receiver = new ReceiverStub(HttpStatusCode.OK);
+        using var factory = EventsFactory(receiver);
+        using var client = factory.CreateClient();
+        await SeedAsync(Tenant, "trialing");
+
+        var response = await PutAsync(Tenant, "paid-through:event", $$"""{"paidThrough":"{{_paidThrough:yyyy-MM-dd}}"}""", Token(), client: client);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await WaitAsync(async () => await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendBillingEvent' AND state = 'succeeded'") == 1);
+        var request = Assert.Single(receiver.Requests);
+        var body = JsonNode.Parse(request.Body)!.AsObject();
+        Assert.Equal("subscription.stateChanged", body["type"]!.GetValue<string>());
+        Assert.Equal(body["id"]!.GetValue<string>(), request.Headers["webhook-id"]);
+        var data = body["data"]!.AsObject();
+        Assert.Equal(Tenant, data["tenantId"]!.GetValue<string>());
+        Assert.Equal("active", data["state"]!.GetValue<string>());
+        Assert.Equal("trialing", data["previousState"]!.GetValue<string>());
+        Assert.Equal($"{_paidThrough:yyyy-MM-dd}", data["paidThrough"]!.GetValue<string>());
+        Assert.Equal($"{_paidThrough.AddDays(1):yyyy-MM-dd}T00:00:00.000Z", data["nextAt"]!.GetValue<string>());
+        Assert.Equal(request.ExpectedSignature(Encoding.UTF8.GetBytes(EventsKey)), request.Headers["webhook-signature"]);
+    }
+
+    [Fact]
+    public async Task A_clock_run_that_moves_an_active_subscription_to_past_due_delivers_one_state_event_with_both_states_and_the_new_next_date()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        var receiver = new ReceiverStub(HttpStatusCode.OK);
+        var paidThrough = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        var id = await SeedAsync(Tenant, "active", paidThrough: paidThrough);
+        var options = new ControlPlaneOptions
+        {
+            TenantDomain = _controlPlane.TenantDomain,
+            PublicUrl = _controlPlane.PublicUrl,
+            MailFrom = _controlPlane.MailFrom,
+            BillingEvents = new ControlPlaneBillingEventsOptions { Url = EventsUrl, Secret = _eventsSecret },
+        };
+        var clock = new SubscriptionClock(_dataSource, _dataSource, _clients, EmailTemplates.LoadEmbedded(), options, TimeProvider.System, _loggers.CreateLogger<SubscriptionClock>());
+        var handler = new SendBillingEventJobHandler(_dataSource, options, new StubHttpClientFactory(receiver), TimeProvider.System);
+        var runner = new JobRunner(_dataSource, [handler], new JobRunnerOptions { BaseDelay = TimeSpan.Zero }, _loggers.CreateLogger<JobRunner>());
+
+        await clock.RunAsync(new ClaimedJob(Guid.NewGuid(), SubscriptionClock.JobKind, [], 1), cancellation);
+        while (await runner.RunOnceAsync(cancellation))
+        {
+        }
+
+        Assert.Equal("pastDue", await StateAsync(id));
+        var request = Assert.Single(receiver.Requests);
+        var body = JsonNode.Parse(request.Body)!.AsObject();
+        Assert.Equal("subscription.stateChanged", body["type"]!.GetValue<string>());
+        var data = body["data"]!.AsObject();
+        Assert.Equal(Tenant, data["tenantId"]!.GetValue<string>());
+        Assert.Equal("pastDue", data["state"]!.GetValue<string>());
+        Assert.Equal("active", data["previousState"]!.GetValue<string>());
+        Assert.Equal($"{paidThrough:yyyy-MM-dd}", data["paidThrough"]!.GetValue<string>());
+        var nextAt = await TextAsync($"SELECT to_char(next_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') FROM control_plane.subscriptions WHERE id = '{id}'");
+        Assert.Equal(nextAt, data["nextAt"]!.GetValue<string>());
+        Assert.Equal(request.ExpectedSignature(Encoding.UTF8.GetBytes(EventsKey)), request.Headers["webhook-signature"]);
+    }
+
+    [Fact]
+    public async Task A_plan_call_a_paid_through_call_on_an_active_subscription_and_a_call_without_a_token_queue_no_state_event()
+    {
+        var receiver = new ReceiverStub(HttpStatusCode.OK);
+        using var factory = EventsFactory(receiver);
+        using var client = factory.CreateClient();
+        var trialing = await SeedAsync(Tenant, "trialing");
+        var active = await SeedAsync(OtherTenant, "active");
+        var paidThrough = $$"""{"paidThrough":"{{_paidThrough:yyyy-MM-dd}}"}""";
+
+        var plan = await PutAsync(Tenant, "plan:event", Team(1), Token(), "plan", client);
+        Assert.Equal(HttpStatusCode.OK, plan.StatusCode);
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendBillingEvent'"));
+
+        var kept = await PutAsync(OtherTenant, "paid-through:kept", paidThrough, Token(), client: client);
+        Assert.Equal(HttpStatusCode.OK, kept.StatusCode);
+        Assert.Equal("active", await StateAsync(active));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendBillingEvent'"));
+
+        var refused = await PutAsync(Tenant, "paid-through:none", paidThrough, null, client: client);
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+        Assert.Equal("trialing", await StateAsync(trialing));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendBillingEvent'"));
+        Assert.Empty(receiver.Requests);
+    }
+
+    [Fact]
+    public async Task Ending_an_active_subscription_queues_one_state_event_from_active_to_cancelled()
+    {
+        var receiver = new ReceiverStub(HttpStatusCode.OK);
+        using var factory = EventsFactory(receiver);
+        using var client = factory.CreateClient();
+        await SeedAsync(Tenant, "active", paidThrough: _paidThrough);
+
+        var response = await PostAsync(Tenant, "end:event", Token(), client);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await WaitAsync(async () => await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendBillingEvent' AND state = 'succeeded'") == 1);
+        var data = JsonNode.Parse(Assert.Single(receiver.Requests).Body)!["data"]!.AsObject();
+        Assert.Equal(("cancelled", "active"), (data["state"]!.GetValue<string>(), data["previousState"]!.GetValue<string>()));
+        Assert.Equal($"{_paidThrough:yyyy-MM-dd}", data["paidThrough"]!.GetValue<string>());
+        Assert.Equal(1L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendBillingEvent'"));
+    }
+
     private async Task AssertPlanUnchangedAsync(Guid id, string state)
     {
         Assert.Equal(state, await StateAsync(id));
@@ -940,7 +1052,7 @@ public sealed class BillingApiTests : IAsyncLifetime
         Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
     }
 
-    private async Task<HttpResponseMessage> PutAsync(string tenant, string? key, string body, string? token, string route = "paid-through")
+    private async Task<HttpResponseMessage> PutAsync(string tenant, string? key, string body, string? token, string route = "paid-through", HttpClient? client = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, $"/api/billing/v1/tenants/{tenant}/subscription/{route}")
         {
@@ -956,10 +1068,10 @@ public sealed class BillingApiTests : IAsyncLifetime
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
-        return await _http.SendAsync(request, TestContext.Current.CancellationToken);
+        return await (client ?? _http).SendAsync(request, TestContext.Current.CancellationToken);
     }
 
-    private async Task<HttpResponseMessage> PostAsync(string tenant, string? key, string? token)
+    private async Task<HttpResponseMessage> PostAsync(string tenant, string? key, string? token, HttpClient? client = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/billing/v1/tenants/{tenant}/subscription/end");
         if (key is not null)
@@ -972,7 +1084,7 @@ public sealed class BillingApiTests : IAsyncLifetime
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
-        return await _http.SendAsync(request, TestContext.Current.CancellationToken);
+        return await (client ?? _http).SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> GetAsync(string tenant, string? token)
@@ -1003,6 +1115,30 @@ public sealed class BillingApiTests : IAsyncLifetime
             Claims = claims,
             SigningCredentials = new SigningCredentials(new RsaSecurityKey(signedWith ?? _key) { KeyId = IdentityProvider.KeyId }, SecurityAlgorithms.RsaSha256),
         });
+    }
+
+    // The host with the billing events address set, sending to the stub receiver. It polls fast, so a test waits only for the event job. The other
+    // tests keep the address unset, so their job counts stay exact.
+    private WebApplicationFactory<Program> EventsFactory(ReceiverStub receiver) =>
+        _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("ControlPlane:BillingEvents:Url", EventsUrl);
+            builder.UseSetting("ControlPlane:BillingEvents:Secret", _eventsSecret);
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton(new JobRunnerOptions { PollInterval = TimeSpan.FromMilliseconds(20) });
+                services.AddHttpClient(SendBillingEventJobHandler.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => receiver);
+            });
+        });
+
+    private static async Task WaitAsync(Func<Task<bool>> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        while (!await condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "The condition did not hold within 60 seconds.");
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
     }
 
     private async Task DrainAsync()

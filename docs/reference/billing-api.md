@@ -298,11 +298,10 @@ the event is sent, and every attempt sends the same ones.
 
 ### Subscription state changed
 
-_(planned for M34)_
-
 `subscription.stateChanged` is written with every move that writes a `subscription.<state>` audit record,
 see [audit records](#audit-records). A plan call, or a paid-through call that leaves the state as it was,
-writes none.
+writes none. `paidThrough` and `nextAt` are as the move leaves them, and `null` when the subscription has none,
+as a trial has no paid-through date and a deleted subscription no next date.
 
 ```json
 {
