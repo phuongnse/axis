@@ -2672,6 +2672,8 @@
   "shell.studio.aiRequest.guide.working": "AI is working on it",
   "shell.studio.aiRequest.guide.accepted": "Accepted. Live once published",
   "shell.studio.aiRequest.guide.dropped": "Dropped. Nothing changed",
+  "shell.studio.aiRequest.guide.failed": "AI could not finish",
+  "shell.studio.aiRequest.sendAgain": "Send again",
   "shell.studio.aiRequest.approve": "Approve plan",
   "shell.studio.aiRequest.guide.ready": "Checks and review passed",
   "shell.studio.aiRequest.guide.readyOther": "Waiting for its author to accept",

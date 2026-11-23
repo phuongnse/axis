@@ -1108,6 +1108,46 @@ describe('StudioPage', () => {
     expect(screen.getByTestId('studio-ai-request')).toHaveTextContent('Add a supplier field.')
   })
 
+  it('opens the request panel from the Ask AI of an unknown request, when studioAi is on', async () => {
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    const requestPath = '/api/studio/apps/PurchaseRequests/authoring-requests/r9'
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === '/api/me') {
+        return json({ id: 'author', studio: true, studioAi: true })
+      }
+      if (input === requestPath) {
+        return new Response(null, { status: 404 })
+      }
+      return base(input, init)
+    })
+    renderPage('/studio?app=PurchaseRequests&view=requests&request=r9')
+
+    const notFound = await screen.findByTestId('studio-ai-request-not-found')
+    await userEvent.click(await within(notFound).findByRole('button', { name: 'Ask AI' }))
+
+    expect(within(screen.getByTestId('aside')).getByTestId('studio-ask-ai-panel')).toBeInTheDocument()
+  })
+
+  it('shows no Ask AI on an unknown request when /api/me does not answer studioAi', async () => {
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    const requestPath = '/api/studio/apps/PurchaseRequests/authoring-requests/r9'
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === '/api/me') {
+        return json({ id: 'author', studio: true })
+      }
+      if (input === requestPath) {
+        return new Response(null, { status: 404 })
+      }
+      return base(input, init)
+    })
+    renderPage('/studio?app=PurchaseRequests&view=requests&request=r9')
+
+    const notFound = await screen.findByTestId('studio-ai-request-not-found')
+    expect(within(notFound).queryByRole('button', { name: 'Ask AI' })).toBeNull()
+  })
+
   it('shows only the kind of the address in its list, and drops the kind when a resource is picked', async () => {
     stubServer()
     renderPage('/studio?app=PurchaseRequests&kind=entity')
