@@ -430,6 +430,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("user_id");
 
+                    b.Property<DateTimeOffset?>("ClearedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cleared_at");
+
                     b.Property<DateTimeOffset>("ReadAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")

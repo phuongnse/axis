@@ -364,6 +364,204 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
     }
 
     [Fact]
+    public async Task Clearing_answers_204_on_both_sets_of_routes_and_404_for_an_id_the_caller_does_not_see()
+    {
+        await ClearAsync();
+        var id = await InsertAsync(TenantA, ("role", "finance"));
+        var notice = await InsertTenantNoticeAsync();
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using var otto = fixture.CreateClient().SignedInAs("otto");
+
+        foreach (var _ in new[] { 1, 2 })
+        {
+            using var cleared = await PostAsync(maria, $"{Notifications}/{id:D}/clear");
+            Assert.Equal(HttpStatusCode.NoContent, cleared.StatusCode);
+            Assert.Equal(0, cleared.Content.Headers.ContentLength ?? 0);
+        }
+
+        using (var all = await PostAsync(maria, $"{Notifications}/clear-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, all.StatusCode);
+        }
+
+        foreach (var unknown in new[] { "not-an-id", Guid.NewGuid().ToString("D"), id.ToString("D") })
+        {
+            using var response = await PostAsync(otto, $"{Notifications}/{unknown}/clear");
+            using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.NotFound);
+            Assert.Equal("No notification exists with this id.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        using (var otherAll = await PostAsync(otto, $"{Notifications}/clear-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, otherAll.StatusCode);
+        }
+
+        Assert.Equal(0L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads WHERE user_id = 'otto'"));
+
+        await using var factory = AdministratorFactory();
+        using var admin = factory.CreateClient().SignedInAs("maria");
+        using var nobody = factory.CreateClient().SignedInAs("otto");
+        foreach (var _ in new[] { 1, 2 })
+        {
+            using var cleared = await PostAsync(admin, $"{TenantNotices}/{notice:D}/clear");
+            Assert.Equal(HttpStatusCode.NoContent, cleared.StatusCode);
+            Assert.Equal(0, cleared.Content.Headers.ContentLength ?? 0);
+        }
+
+        using (var all = await PostAsync(admin, $"{TenantNotices}/clear-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, all.StatusCode);
+        }
+
+        foreach (var unknown in new[] { "not-an-id", Guid.NewGuid().ToString("D") })
+        {
+            using var response = await PostAsync(admin, $"{TenantNotices}/{unknown}/clear");
+            using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.NotFound);
+            Assert.Equal("No notification exists with this id.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        using (var denied = await PostAsync(nobody, $"{TenantNotices}/{notice:D}/clear"))
+        {
+            using var problem = await RecordApiFixture.ReadProblemAsync(denied, HttpStatusCode.NotFound);
+            Assert.Equal("No notification exists with this id.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        using (var deniedAll = await PostAsync(nobody, $"{TenantNotices}/clear-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, deniedAll.StatusCode);
+        }
+
+        Assert.Equal(0L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads WHERE user_id = 'otto'"));
+    }
+
+    [Fact]
+    public async Task Clear_all_keeps_the_action_notifications_not_yet_done_and_a_clear_hides_one_only_for_the_clearer()
+    {
+        await ClearAsync();
+        var info = await InsertAsync(TenantA, DateTimeOffset.UtcNow.AddMinutes(-3), "info", ("role", "finance"));
+        var warning = await InsertAsync(TenantA, DateTimeOffset.UtcNow.AddMinutes(-2), "warning", ("role", "finance"));
+        var action = await InsertAsync(TenantA, DateTimeOffset.UtcNow.AddMinutes(-1), "action", ("role", "finance"));
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using var fiona = fixture.CreateClient().SignedInAs("fiona");
+
+        using (var all = await PostAsync(maria, $"{Notifications}/clear-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, all.StatusCode);
+        }
+
+        using (var list = await GetJsonAsync(maria, Notifications))
+        {
+            Assert.Equal([action], Ids(list));
+            Assert.Equal(1, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(1, list.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        using (var list = await GetJsonAsync(fiona, Notifications))
+        {
+            Assert.Equal([action, warning, info], Ids(list));
+            Assert.Equal(3, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(3, list.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        using (var cleared = await PostAsync(maria, $"{Notifications}/{action:D}/clear"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, cleared.StatusCode);
+        }
+
+        using (var list = await GetJsonAsync(maria, Notifications))
+        {
+            Assert.Empty(Ids(list));
+            Assert.Equal(0, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(0, list.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        using (var list = await GetJsonAsync(fiona, Notifications))
+        {
+            Assert.Equal(3, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(3, list.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        Assert.Equal(
+            3L,
+            await fixture.ScalarAsync(
+                TenantA, "SELECT count(*) FROM axis.notification_reads WHERE user_id = 'maria' AND cleared_at IS NOT NULL AND read_at IS NOT NULL"));
+        Assert.Equal(0L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads WHERE user_id = 'fiona'"));
+
+        // A tenant notice follows the same rule.
+        var noticeAction = await InsertTenantNoticeAsync("action");
+        await InsertTenantNoticeAsync("warning");
+        await using var factory = AdministratorFactory();
+        using var admin = factory.CreateClient().SignedInAs("maria");
+        using (var all = await PostAsync(admin, $"{TenantNotices}/clear-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, all.StatusCode);
+        }
+
+        using (var list = await GetJsonAsync(admin, TenantNotices))
+        {
+            Assert.Equal([noticeAction], Ids(list));
+            Assert.Equal(1, list.RootElement.GetProperty("totalCount").GetInt32());
+        }
+    }
+
+    [Fact]
+    public async Task Needs_action_lists_only_the_action_notifications_not_yet_done_on_both_lists()
+    {
+        await ClearAsync();
+        await InsertAsync(TenantA, DateTimeOffset.UtcNow.AddMinutes(-4), "info", ("user", "maria"));
+        var action = await InsertAsync(TenantA, DateTimeOffset.UtcNow.AddMinutes(-3), "action", ("user", "maria"));
+        var cleared = await InsertAsync(TenantA, DateTimeOffset.UtcNow.AddMinutes(-2), "action", ("user", "maria"));
+        var warning = await InsertAsync(TenantA, DateTimeOffset.UtcNow.AddMinutes(-1), "warning", ("user", "maria"));
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using (var response = await PostAsync(maria, $"{Notifications}/{cleared:D}/clear"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        }
+
+        using (var list = await GetJsonAsync(maria, $"{Notifications}?needsAction=true"))
+        {
+            Assert.Equal([action], Ids(list));
+            Assert.Equal(1, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(3, list.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        using (var list = await GetJsonAsync(maria, $"{Notifications}?needsAction=false"))
+        {
+            Assert.Equal(3, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Contains(warning, Ids(list));
+        }
+
+        using (var bad = await SendAsync(maria, $"{Notifications}?needsAction=maybe"))
+        {
+            using var problem = await RecordApiFixture.ReadProblemAsync(bad, HttpStatusCode.BadRequest);
+            Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty("needsAction", out _));
+        }
+
+        var noticeAction = await InsertTenantNoticeAsync("action");
+        await InsertTenantNoticeAsync("warning");
+        var noticeCleared = await InsertTenantNoticeAsync("action");
+        await using var factory = AdministratorFactory();
+        using var admin = factory.CreateClient().SignedInAs("maria");
+        using (var response = await PostAsync(admin, $"{TenantNotices}/{noticeCleared:D}/clear"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        }
+
+        using (var list = await GetJsonAsync(admin, $"{TenantNotices}?needsAction=true"))
+        {
+            Assert.Equal([noticeAction], Ids(list));
+            Assert.Equal(1, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(2, list.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        using (var bad = await SendAsync(admin, $"{TenantNotices}?needsAction=maybe"))
+        {
+            using var problem = await RecordApiFixture.ReadProblemAsync(bad, HttpStatusCode.BadRequest);
+            Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty("needsAction", out _));
+        }
+    }
+
+    [Fact]
     public async Task The_list_pages_and_names_every_bad_query_parameter()
     {
         await ClearAsync();
@@ -406,7 +604,7 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
             Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
         }
 
-        foreach (var path in new[] { $"{Notifications}/{id:D}/read", $"{Notifications}/read-all" })
+        foreach (var path in new[] { $"{Notifications}/{id:D}/read", $"{Notifications}/read-all", $"{Notifications}/{id:D}/clear", $"{Notifications}/clear-all" })
         {
             using var response = await PostAsync(anonymous, path);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Unauthorized);
@@ -414,7 +612,7 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
         }
 
         using var maria = fixture.CreateClient().SignedInAs("maria");
-        foreach (var path in new[] { $"{Notifications}/{id:D}/read", $"{Notifications}/read-all" })
+        foreach (var path in new[] { $"{Notifications}/{id:D}/read", $"{Notifications}/read-all", $"{Notifications}/{id:D}/clear", $"{Notifications}/clear-all" })
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
             request.Headers.Host = Host(TenantA);
@@ -545,7 +743,7 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
             Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
         }
 
-        foreach (var path in new[] { $"{TenantNotices}/{id:D}/read", $"{TenantNotices}/read-all" })
+        foreach (var path in new[] { $"{TenantNotices}/{id:D}/read", $"{TenantNotices}/read-all", $"{TenantNotices}/{id:D}/clear", $"{TenantNotices}/clear-all" })
         {
             using var response = await PostAsync(anonymous, path);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Unauthorized);
@@ -553,7 +751,7 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
         }
 
         using var maria = factory.CreateClient().SignedInAs("maria");
-        foreach (var path in new[] { $"{TenantNotices}/{id:D}/read", $"{TenantNotices}/read-all" })
+        foreach (var path in new[] { $"{TenantNotices}/{id:D}/read", $"{TenantNotices}/read-all", $"{TenantNotices}/{id:D}/clear", $"{TenantNotices}/clear-all" })
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
             request.Headers.Host = Host(TenantA);

@@ -10,19 +10,23 @@ using Axis.Server.Users;
 namespace Axis.Server.Processes;
 
 /// <summary>
-/// The platform endpoints that list the tenant notices for the current user and mark them read. A tenant notice is a notification
+/// The platform endpoints that list the tenant notices for the current user, mark them read and clear them. A tenant notice is a notification
 /// that belongs to no application. The current user is the session user. A user sees a notice addressed to the administrators only
 /// while they hold the role that <c>Users:AdministratorRole</c> names. Anyone else gets an empty list with zero counts, and marking
-/// a notice they do not see is a 404. The answers have the shape of the application notification routes, with <c>releaseId</c> and
-/// <c>open</c> always null. A request is checked in order: signed-in user (401), then for a list the paging and <c>unread</c> (400,
-/// every bad parameter in one problem), and for a read the notice id and whether the user sees the notice (404).
+/// a notice they do not see is a 404, and their clear-all writes nothing. The answers have the shape of the application notification routes, with <c>releaseId</c> and
+/// <c>open</c> always null. A request is checked in order: signed-in user (401), then for a list the paging, <c>unread</c> and <c>needsAction</c>
+/// (400, every bad parameter in one problem), and for a read or a clear the notice id and whether the user sees the notice (404).
+/// <c>needsAction=true</c> lists only the <c>action</c> notices that are not cleared, which are the ones not yet done.
 /// A list is newest first. Its subject and body come from the platform texts in the locale of the user's profile, otherwise from
 /// the English texts. A locale matches by its whole tag, ignoring letter case. A placeholder is filled with its stored value
 /// formatted by <see cref="NotificationValues"/>: numbers in the conventions of the user's profile locale, or of the chosen texts
 /// when the profile has none, and a date-time in UTC, because a notice has no release time zone. A text key the locale does not
 /// have shows as the key itself.
 /// The read routes write a read row for the session user only, and answer 204 with no body, also for a notice that is already read.
-/// Read-all marks the notices the user sees now. The routes are served on the tenant's platform host only. The problem titles
+/// Read-all marks the notices the user sees now.
+/// The clear routes write a clear for the session user only, and answer 204 with no body, also for a notice that is already cleared.
+/// Clear-all clears the notices the user sees now, except the <c>action</c> ones not yet done, see
+/// <c>docs/reference/notifications.md#tenant-notices</c>. The routes are served on the tenant's platform host only. The problem titles
 /// never contain text from the request.
 /// </summary>
 internal static class TenantNoticeEndpoints
@@ -35,6 +39,8 @@ internal static class TenantNoticeEndpoints
         notices.MapGet("", ListAsync);
         notices.MapPost("/read-all", ReadAllAsync);
         notices.MapPost("/{id}/read", ReadAsync);
+        notices.MapPost("/clear-all", ClearAllAsync);
+        notices.MapPost("/{id}/clear", ClearAsync);
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -42,6 +48,7 @@ internal static class TenantNoticeEndpoints
         string? page,
         string? pageSize,
         string? unread,
+        string? needsAction,
         HttpContext httpContext,
         UsersSettings users,
         ITextResourceProvider platformTexts,
@@ -55,11 +62,7 @@ internal static class TenantNoticeEndpoints
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         var paging = PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
-        var unreadOnly = false;
-        if (unread is not null && !bool.TryParse(unread, out unreadOnly))
-        {
-            errors["unread"] = ["Must be true or false."];
-        }
+        NotificationEndpoints.ReadFilters(unread, needsAction, errors, out var unreadOnly, out var needsActionOnly);
 
         if (!paging || errors.Count > 0)
         {
@@ -68,7 +71,7 @@ internal static class TenantNoticeEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         var result = await NotificationQueries.ListTenantNoticesAsync(
-            connection, user.Id, PlatformRoleKinds(users, user), unreadOnly, pageNumber, size, cancellationToken);
+            connection, user.Id, PlatformRoleKinds(users, user), unreadOnly, needsActionOnly, pageNumber, size, cancellationToken);
 
         var locale = result.Items.Count == 0 ? null : await UserProfiles.FindLocaleAsync(connection, user.Id, cancellationToken);
         var texts = (locale is null ? null : platformTexts.GetTexts(locale)) ?? platformTexts.GetTexts(FallbackLocale);
@@ -129,6 +132,46 @@ internal static class TenantNoticeEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         await NotificationQueries.MarkAllTenantNoticesReadAsync(connection, user.Id, PlatformRoleKinds(users, user), cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> ClearAsync(
+        string id,
+        HttpContext httpContext,
+        UsersSettings users,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        if (!NotificationEndpoints.TryParseId(id, out var noticeId))
+        {
+            return NotificationEndpoints.NotificationNotFound();
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        return await NotificationQueries.ClearTenantNoticeAsync(
+            connection, user.Id, PlatformRoleKinds(users, user), noticeId, cancellationToken)
+            ? Results.NoContent()
+            : NotificationEndpoints.NotificationNotFound();
+    }
+
+    private static async Task<IResult> ClearAllAsync(
+        HttpContext httpContext,
+        UsersSettings users,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await NotificationQueries.ClearAllTenantNoticesAsync(connection, user.Id, PlatformRoleKinds(users, user), cancellationToken);
         return Results.NoContent();
     }
 

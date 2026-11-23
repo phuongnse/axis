@@ -13,12 +13,13 @@ using Axis.Server.Users;
 namespace Axis.Server.Processes;
 
 /// <summary>
-/// The notification API endpoints that list the current user's in-app notifications and mark them read. The current
+/// The notification API endpoints that list the current user's in-app notifications, mark them read and clear them. The current
 /// user is the session user. A user sees the notifications addressed to their id, and those addressed to a role they
 /// hold that the active release declares, so a user whose role the active release drops no longer sees the
 /// notifications of that role. A notification addressed both ways is listed once. A request is checked in order:
-/// signed-in user (401), application (404), then for a list the paging and <c>unread</c> (400, every bad parameter in
-/// one problem), and for a read the notification id and whether the user sees the notification (404).
+/// signed-in user (401), application (404), then for a list the paging, <c>unread</c> and <c>needsAction</c> (400, every bad
+/// parameter in one problem), and for a read or a clear the notification id and whether the user sees the notification (404).
+/// <c>needsAction=true</c> lists only the <c>action</c> notifications that are not cleared, which are the ones not yet done.
 /// A list is newest first. Its subject and body come from the texts of the release each notification was stored with,
 /// in the locale of the user's profile when that release has texts for it, otherwise its first locale in ordinal order.
 /// A placeholder is filled with its stored value formatted by <see cref="NotificationValues"/>: numbers in the conventions of
@@ -27,6 +28,9 @@ namespace Axis.Server.Processes;
 /// A text key the locale does not have shows as the key itself.
 /// The read routes write a read row for the session user only, never for another user, and answer 204 with no body,
 /// also for a notification that is already read. Read-all marks the notifications the user sees now.
+/// The clear routes write a clear for the session user only, and answer 204 with no body, also for a notification that is already
+/// cleared. A cleared notification leaves only the session user's list and counts. Clear-all clears the notifications the user sees
+/// now, except the <c>action</c> ones not yet done, see <c>docs/reference/notifications.md#notification-routes</c>.
 /// The problem titles never contain text from the request.
 /// </summary>
 internal static class NotificationEndpoints
@@ -37,6 +41,8 @@ internal static class NotificationEndpoints
         notifications.MapGet("", ListAsync);
         notifications.MapPost("/read-all", ReadAllAsync);
         notifications.MapPost("/{id}/read", ReadAsync);
+        notifications.MapPost("/clear-all", ClearAllAsync);
+        notifications.MapPost("/{id}/clear", ClearAsync);
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -45,6 +51,7 @@ internal static class NotificationEndpoints
         string? page,
         string? pageSize,
         string? unread,
+        string? needsAction,
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
@@ -62,11 +69,7 @@ internal static class NotificationEndpoints
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         var paging = PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
-        var unreadOnly = false;
-        if (unread is not null && !bool.TryParse(unread, out unreadOnly))
-        {
-            errors["unread"] = ["Must be true or false."];
-        }
+        ReadFilters(unread, needsAction, errors, out var unreadOnly, out var needsActionOnly);
 
         if (!paging || errors.Count > 0)
         {
@@ -76,7 +79,7 @@ internal static class NotificationEndpoints
         var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
         var connection = await database.GetConnectionAsync(cancellationToken);
         var result = await NotificationQueries.ListAsync(
-            connection, active.Model.Manifest.Id, user.Id, roles, unreadOnly, pageNumber, size, cancellationToken);
+            connection, active.Model.Manifest.Id, user.Id, roles, unreadOnly, needsActionOnly, pageNumber, size, cancellationToken);
 
         var locale = result.Items.Count == 0 ? null : await UserProfiles.FindLocaleAsync(connection, user.Id, cancellationToken);
         var releases = new Dictionary<Guid, (ApplicationModel Release, TextResource? Texts)>();
@@ -163,6 +166,77 @@ internal static class NotificationEndpoints
         var connection = await database.GetConnectionAsync(cancellationToken);
         await NotificationQueries.MarkAllReadAsync(connection, active.Model.Manifest.Id, user.Id, roles, cancellationToken);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> ClearAsync(
+        string app,
+        string id,
+        HttpContext httpContext,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
+        {
+            return ApplicationNotFound();
+        }
+
+        if (!TryParseId(id, out var notificationId))
+        {
+            return NotificationNotFound();
+        }
+
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        return await NotificationQueries.ClearAsync(
+            connection, active.Model.Manifest.Id, user.Id, roles, notificationId, cancellationToken)
+            ? Results.NoContent()
+            : NotificationNotFound();
+    }
+
+    private static async Task<IResult> ClearAllAsync(
+        string app,
+        HttpContext httpContext,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
+        {
+            return ApplicationNotFound();
+        }
+
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await NotificationQueries.ClearAllAsync(connection, active.Model.Manifest.Id, user.Id, roles, cancellationToken);
+        return Results.NoContent();
+    }
+
+    /// <summary>Reads the <c>unread</c> and <c>needsAction</c> filters of a list. A value other than <c>true</c> or <c>false</c> is added to <paramref name="errors"/>, and the filter is off.</summary>
+    internal static void ReadFilters(
+        string? unread, string? needsAction, IDictionary<string, string[]> errors, out bool unreadOnly, out bool needsActionOnly)
+    {
+        unreadOnly = false;
+        if (unread is not null && !bool.TryParse(unread, out unreadOnly))
+        {
+            errors["unread"] = ["Must be true or false."];
+        }
+
+        needsActionOnly = false;
+        if (needsAction is not null && !bool.TryParse(needsAction, out needsActionOnly))
+        {
+            errors["needsAction"] = ["Must be true or false."];
+        }
     }
 
     private static JsonElement ParseParameters(string? json)

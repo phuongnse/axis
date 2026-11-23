@@ -135,7 +135,7 @@ public sealed class TaskInboxPerformanceTests(ProcessStepFixture fixture) : ICla
 
         var page = await BestOfAsync(
             "notification list",
-            () => NotificationQueries.ListAsync(connection, application, "requester", roles, unreadOnly: false, 1, PageSize, CancellationToken));
+            () => NotificationQueries.ListAsync(connection, application, "requester", roles, unreadOnly: false, needsActionOnly: false, 1, PageSize, CancellationToken));
 
         Assert.Equal(Notifications, page.TotalCount);
         Assert.Equal(Notifications / 2, page.UnreadCount);
@@ -148,6 +148,7 @@ public sealed class TaskInboxPerformanceTests(ProcessStepFixture fixture) : ICla
                 {
                     TaskQueries.AddMayActParameters(command, application, "requester", roles);
                     command.Parameters.AddWithValue("unread", false);
+                    command.Parameters.AddWithValue("needsAction", false);
                 },
                 CancellationToken),
             "ix_notifications_application_id_recipient_created_at",

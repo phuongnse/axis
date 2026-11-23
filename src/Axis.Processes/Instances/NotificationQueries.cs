@@ -7,11 +7,12 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Reads the in-app notifications of an application, and the tenant notices for administrators, over a connection to a
-/// tenant database, and marks them read. A user sees the notifications addressed to their id, and those addressed to a role they hold. The caller gives the
+/// tenant database, and marks them read or clears them. A user sees the notifications addressed to their id, and those addressed to a role they hold. The caller gives the
 /// roles the active release declares, so a role it no longer declares shows nothing. A notification addressed to a user
 /// both ways is one notification. A tenant notice has no application. The user sees the ones addressed to a platform role
 /// kind the caller says the user holds. A user does not see the sources they turned off in the application, and tenant
-/// notices ignore the preferences, see <c>docs/reference/notifications.md#notification-preferences</c>. Read state is kept per user. Ids and role names match exactly, including letter case.
+/// notices ignore the preferences, see <c>docs/reference/notifications.md#notification-preferences</c>. Read and clear state are kept per user, and a cleared notification leaves only the list of the user who cleared it,
+/// see <c>docs/reference/notifications.md#in-app-notifications</c>. Ids and role names match exactly, including letter case.
 /// </summary>
 public static class NotificationQueries
 {
@@ -45,17 +46,21 @@ public static class NotificationQueries
     private const string VisibleCteEnd =
         """
 
+              AND NOT EXISTS (SELECT 1 FROM axis.notification_reads c WHERE c.notification_id = n.id AND c.user_id = @user AND c.cleared_at IS NOT NULL)
             ORDER BY n.id
         )
         """;
 
     private const string VisibleCte = $"{VisibleCteStart} {VisibleWhere}{VisibleCteEnd}";
 
-    /// <summary>Counts the notifications a user sees and the unread ones among them.</summary>
+    // The list filters: only the unread ones, and only the action ones, which are not done while they are listed.
+    private const string ListFilter = $"(NOT @unread OR NOT is_read) AND (NOT @needsAction OR kind = '{NotificationKinds.Action}')";
+
+    /// <summary>Counts the notifications a user sees that the list filters match, and the unread ones among those the user sees.</summary>
     internal const string CountsSql =
         $"""
         {VisibleCte}
-        SELECT count(*) FILTER (WHERE NOT @unread OR NOT is_read), count(*) FILTER (WHERE NOT is_read) FROM visible
+        SELECT count(*) FILTER (WHERE {ListFilter}), count(*) FILTER (WHERE NOT is_read) FROM visible
         """;
 
     private static readonly Statements _application = new(VisibleWhere);
@@ -65,7 +70,8 @@ public static class NotificationQueries
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> notifications of the application that
     /// <paramref name="userId"/> sees, newest first and then by id, and counts them. With <paramref name="unreadOnly"/>
-    /// the page and <see cref="NotificationPage.TotalCount"/> have only the unread ones.
+    /// the page and <see cref="NotificationPage.TotalCount"/> have only the unread ones, and with <paramref name="needsActionOnly"/>
+    /// only the <c>action</c> ones, which are not done while they are listed.
     /// <see cref="NotificationPage.UnreadCount"/> counts every unread one. A page past the last one has no items.
     /// </summary>
     public static Task<NotificationPage> ListAsync(
@@ -74,13 +80,14 @@ public static class NotificationQueries
         string userId,
         IReadOnlyCollection<string> roles,
         bool unreadOnly,
+        bool needsActionOnly,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(roles);
         return ListAsync(
-            _application, connection, command => AddVisibleParameters(command, applicationId, userId, roles), userId, unreadOnly, page, pageSize, cancellationToken);
+            _application, connection, command => AddVisibleParameters(command, applicationId, userId, roles), userId, unreadOnly, needsActionOnly, page, pageSize, cancellationToken);
     }
 
     /// <summary>
@@ -93,13 +100,14 @@ public static class NotificationQueries
         string userId,
         IReadOnlyCollection<string> platformRoles,
         bool unreadOnly,
+        bool needsActionOnly,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(platformRoles);
         return ListAsync(
-            _tenant, connection, command => AddTenantParameters(command, userId, platformRoles), userId, unreadOnly, page, pageSize, cancellationToken);
+            _tenant, connection, command => AddTenantParameters(command, userId, platformRoles), userId, unreadOnly, needsActionOnly, page, pageSize, cancellationToken);
     }
 
     /// <summary>
@@ -160,12 +168,72 @@ public static class NotificationQueries
         return MarkAllReadAsync(_tenant, connection, command => AddTenantParameters(command, userId, platformRoles), userId, cancellationToken);
     }
 
+    /// <summary>
+    /// Clears the notification <paramref name="id"/> for <paramref name="userId"/>, and marks it read when it is not. Returns
+    /// false, and writes nothing, when the user does not see a notification with that id in the application. Clearing one
+    /// that is already cleared changes nothing and returns true.
+    /// </summary>
+    public static Task<bool> ClearAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        string userId,
+        IReadOnlyCollection<string> roles,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+        return ClearAsync(_application, connection, command => AddVisibleParameters(command, applicationId, userId, roles), userId, id, cancellationToken);
+    }
+
+    /// <summary>
+    /// Clears the tenant notice <paramref name="id"/> for <paramref name="userId"/>, like <see cref="ClearAsync"/> does for an
+    /// application. Returns false, and writes nothing, when the user does not see a tenant notice with that id.
+    /// </summary>
+    public static Task<bool> ClearTenantNoticeAsync(
+        NpgsqlConnection connection,
+        string userId,
+        IReadOnlyCollection<string> platformRoles,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(platformRoles);
+        return ClearAsync(_tenant, connection, command => AddTenantParameters(command, userId, platformRoles), userId, id, cancellationToken);
+    }
+
+    /// <summary>
+    /// Clears every notification of the application that <paramref name="userId"/> sees now, except the <c>action</c>
+    /// notifications not yet done, which leave the list only when they are cleared on their own. A notification the user
+    /// does not see gets no row.
+    /// </summary>
+    public static Task ClearAllAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        string userId,
+        IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+        return ClearAllAsync(_application, connection, command => AddVisibleParameters(command, applicationId, userId, roles), userId, cancellationToken);
+    }
+
+    /// <summary>Clears every tenant notice that <paramref name="userId"/> sees now, except the <c>action</c> notices not yet done. A notice the user does not see gets no row.</summary>
+    public static Task ClearAllTenantNoticesAsync(
+        NpgsqlConnection connection,
+        string userId,
+        IReadOnlyCollection<string> platformRoles,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(platformRoles);
+        return ClearAllAsync(_tenant, connection, command => AddTenantParameters(command, userId, platformRoles), userId, cancellationToken);
+    }
+
     private static async Task<NotificationPage> ListAsync(
         Statements statements,
         NpgsqlConnection connection,
         Action<NpgsqlCommand> addVisibleParameters,
         string userId,
         bool unreadOnly,
+        bool needsActionOnly,
         int page,
         int pageSize,
         CancellationToken cancellationToken)
@@ -181,6 +249,7 @@ public static class NotificationQueries
         {
             addVisibleParameters(counts);
             counts.Parameters.AddWithValue("unread", unreadOnly);
+            counts.Parameters.AddWithValue("needsAction", needsActionOnly);
             await using var countReader = await counts.ExecuteReaderAsync(cancellationToken);
             await countReader.ReadAsync(cancellationToken);
             totalCount = countReader.GetInt64(0);
@@ -190,6 +259,7 @@ public static class NotificationQueries
         await using var command = new NpgsqlCommand(statements.Page, connection);
         addVisibleParameters(command);
         command.Parameters.AddWithValue("unread", unreadOnly);
+        command.Parameters.AddWithValue("needsAction", needsActionOnly);
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
@@ -248,6 +318,38 @@ public static class NotificationQueries
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private static async Task<bool> ClearAsync(
+        Statements statements,
+        NpgsqlConnection connection,
+        Action<NpgsqlCommand> addVisibleParameters,
+        string userId,
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(userId);
+
+        await using var command = new NpgsqlCommand(statements.Clear, connection);
+        addVisibleParameters(command);
+        command.Parameters.AddWithValue("id", id);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    private static async Task ClearAllAsync(
+        Statements statements,
+        NpgsqlConnection connection,
+        Action<NpgsqlCommand> addVisibleParameters,
+        string userId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(userId);
+
+        await using var command = new NpgsqlCommand(statements.ClearAll, connection);
+        addVisibleParameters(command);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static void AddVisibleParameters(NpgsqlCommand command, Guid applicationId, string userId, IReadOnlyCollection<string> roles) =>
         TaskQueries.AddMayActParameters(command, applicationId, userId, roles);
 
@@ -257,7 +359,7 @@ public static class NotificationQueries
         command.Parameters.Add(new NpgsqlParameter("roles", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = platformRoles.ToArray() });
     }
 
-    // The four statements for one rule of which rows a user sees.
+    // The statements for one rule of which rows a user sees.
     private sealed class Statements(string visibleWhere)
     {
         private readonly string _cte = $"{VisibleCteStart} {visibleWhere}{VisibleCteEnd}";
@@ -265,7 +367,7 @@ public static class NotificationQueries
         public string Counts =>
             $"""
             {_cte}
-            SELECT count(*) FILTER (WHERE NOT @unread OR NOT is_read), count(*) FILTER (WHERE NOT is_read) FROM visible
+            SELECT count(*) FILTER (WHERE {ListFilter}), count(*) FILTER (WHERE NOT is_read) FROM visible
             """;
 
         public string Page =>
@@ -274,7 +376,7 @@ public static class NotificationQueries
             SELECT id, release_id, subject_key, body_key, "values", value_types, open_page, open_parameters, created_at, is_read,
                 source, kind, kind <> '{NotificationKinds.Action}' AS done
             FROM visible
-            WHERE NOT @unread OR NOT is_read
+            WHERE {ListFilter}
             ORDER BY created_at DESC, id DESC
             LIMIT @limit OFFSET @offset
             """;
@@ -296,6 +398,30 @@ public static class NotificationQueries
             INSERT INTO axis.notification_reads (notification_id, user_id)
             SELECT DISTINCT n.id, @user FROM axis.notifications n WHERE {visibleWhere}
             ON CONFLICT DO NOTHING
+            """;
+
+        // A clear keeps the first time a notification was cleared. The read time takes its default on insert.
+        public string Clear =>
+            $"""
+            WITH visible AS (
+                SELECT DISTINCT n.id FROM axis.notifications n WHERE n.id = @id AND {visibleWhere}
+            ), cleared AS (
+                INSERT INTO axis.notification_reads (notification_id, user_id, cleared_at)
+                SELECT id, @user, now() FROM visible
+                ON CONFLICT (notification_id, user_id) DO UPDATE
+                SET cleared_at = COALESCE(axis.notification_reads.cleared_at, excluded.cleared_at)
+            )
+            SELECT EXISTS (SELECT 1 FROM visible)
+            """;
+
+        // DISTINCT, because ON CONFLICT DO UPDATE cannot change one row twice.
+        public string ClearAll =>
+            $"""
+            INSERT INTO axis.notification_reads (notification_id, user_id, cleared_at)
+            SELECT DISTINCT n.id, @user, now() FROM axis.notifications n
+            WHERE {visibleWhere} AND n.kind <> '{NotificationKinds.Action}'
+            ON CONFLICT (notification_id, user_id) DO UPDATE
+            SET cleared_at = COALESCE(axis.notification_reads.cleared_at, excluded.cleared_at)
             """;
     }
 }
@@ -319,7 +445,7 @@ public sealed record NotificationPage(IReadOnlyList<NotificationItem> Items, lon
 /// <param name="Read">Whether the user has read it.</param>
 /// <param name="Source">The source of the notification, <c>process</c> or <c>quota</c>.</param>
 /// <param name="Kind">The kind of the notification, one of <see cref="NotificationKinds"/>.</param>
-/// <param name="Done">Whether nothing is left to do for it. Only an <c>action</c> notification is not done, as clearing one is not built yet, see <c>docs/reference/notifications.md#in-app-notifications</c>.</param>
+/// <param name="Done">Whether nothing is left to do for it. Only an <c>action</c> notification is not done, and a listed one is not done, because a cleared one is no longer listed, see <c>docs/reference/notifications.md#in-app-notifications</c>.</param>
 public sealed record NotificationItem(
     Guid Id,
     Guid? ReleaseId,

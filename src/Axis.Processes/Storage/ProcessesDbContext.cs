@@ -348,6 +348,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             read.Property(r => r.NotificationId).HasColumnName("notification_id");
             read.Property(r => r.UserId).HasColumnName("user_id");
             read.Property(r => r.ReadAt).HasColumnName("read_at").HasDefaultValueSql("now()");
+            read.Property(r => r.ClearedAt).HasColumnName("cleared_at");
         });
 
         modelBuilder.Entity<EmailOutboxRow>(email =>
