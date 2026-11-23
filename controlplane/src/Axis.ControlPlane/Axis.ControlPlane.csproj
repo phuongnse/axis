@@ -40,6 +40,11 @@
     <Compile Include="..\..\..\src\Axis.Tenancy\QuotaKeys.cs" Link="Tenancy\%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- The platform's webhook signature, compiled from the platform's own file so the billing events and the platform's webhooks are signed the same way. -->
+  <ItemGroup>
+    <Compile Include="..\..\..\src\Axis.Processes\Instances\WebhookSignature.cs" Link="BillingEvents\%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Axis.ControlPlane.Tests" />
     <InternalsVisibleTo Include="Axis.ControlPlane.Integration.Tests" />

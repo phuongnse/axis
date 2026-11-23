@@ -251,10 +251,11 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   [sign-up limits](sign-up.md#bots-and-abuse) see the client address. Without them it sees the proxy's address
   for every client.
 - **Secrets as files.** The connection strings, the mail password, the cells' secrets, the DNS key,
-  and the sign-up challenge key may also come from the key-per-file secrets
+  the sign-up challenge key and the billing events secret may also come from the key-per-file secrets
   `/run/secrets/ControlPlane__ConnectionString`, `/run/secrets/ControlPlane__DirectoryConnectionString`,
   `/run/secrets/ControlPlane__Mail__Password`, `/run/secrets/ControlPlane__CellSecrets__<cell id>`,
-  `/run/secrets/ControlPlane__Dns__Key` and `/run/secrets/ControlPlane__SignUp__ChallengeKey`.
+  `/run/secrets/ControlPlane__Dns__Key`, `/run/secrets/ControlPlane__SignUp__ChallengeKey` and
+  `/run/secrets/ControlPlane__BillingEvents__Secret`.
 - **Plans.** `ControlPlane:` settings also hold the [plans](plans.md#the-catalogue).
 
 | Setting | Meaning | Start check |
@@ -286,6 +287,8 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Billing:Authority` | The issuer URL of the operator's identity provider, which signs the billing client's tokens, see [signing in](billing-api.md#signing-in). Optional. Without the three `ControlPlane:Billing` settings every billing route answers `401` | An absolute `https` URL, when any `ControlPlane:Billing` setting is set |
 | `ControlPlane:Billing:Audience` | The audience that the billing client's token carries | Not empty, when any `ControlPlane:Billing` setting is set |
 | `ControlPlane:Billing:ClientId` | The id of the billing client, as the token's `client_id` or `azp` claim names it. It is the actor of the billing audit records | Not empty, when any `ControlPlane:Billing` setting is set |
+| `ControlPlane:BillingEvents:Url` | The address of the operator's billing system's receiver, which gets the signed [events](billing-api.md#events). Optional. Without it no event is written | An absolute `https` URL, when set |
+| `ControlPlane:BillingEvents:Secret` | The signing secret of the events, from the secret `ControlPlane__BillingEvents__Secret`. It may hold two secrets separated by a space, so the operator can rotate it. Ignored without the address | Not empty, when the URL is set. A secret that starts with `whsec_` is followed by base64. The value never appears in a setting file or a message |
 | `ControlPlane:SignUp:Applications:<n>:Id` | The id of a built-in application that the [sign-up page](sign-up.md#the-page) offers, such as `approvals`. Optional | Not empty and unique |
 | `ControlPlane:SignUp:Applications:<n>:Titles:en` | The English title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |

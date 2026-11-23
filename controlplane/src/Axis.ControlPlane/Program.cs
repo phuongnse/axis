@@ -1,5 +1,6 @@
 using Axis.ControlPlane;
 using Axis.ControlPlane.BillingApi;
+using Axis.ControlPlane.BillingEvents;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Emails;
@@ -89,6 +90,16 @@ if (options.SignUp.DisposableDomains.IsComplete)
 
     // Known lists are about 100 KB, so the cap only stops a wrong address from filling the replica's memory.
     builder.Services.AddHttpClient(DisposableDomainRefresh.HttpClientName, client => client.MaxResponseContentBufferSize = 10 * 1024 * 1024);
+}
+
+// The delivery of the signed events to the operator's billing system, registered only when the address is set, see docs/reference/billing-api.md#events.
+// The client follows no redirect, as a redirect could send a signed body to another host, and gives up after 10 seconds.
+if (options.BillingEvents.IsSet)
+{
+    builder.Services.AddSingleton<IJobHandler, SendBillingEventJobHandler>();
+    builder.Services
+        .AddHttpClient(SendBillingEventJobHandler.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(10))
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
 }
 
 // The correction of the directory from the cells' tenant lists, queued every 5 minutes. It needs the directory and a cell to read.
