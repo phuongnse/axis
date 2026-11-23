@@ -72,9 +72,9 @@ What Axis keeps of the commercial life of a tenant:
 - **Axis sends signed events** to the operator's billing system: a tenant is created, a subscription
   changes state, and each tenant's daily usage. Deliveries retry, and each event has an id that stays
   the same on every retry. See [events](../reference/billing-api.md#events).
-- **A tenant administrator sees** the plan, each quota with its use, the subscription's state and its
-  next date in the tenant's administration. A link leads to the operator's billing page, which is a
-  setting.
+- **A tenant administrator sees** _(planned for M34)_ the plan, each quota with its use, the
+  subscription's state and its next date in the tenant's administration. A link leads to the
+  operator's billing page, which is a setting.
 - **A tenant administrator accepts a new version** of the terms or of the data processing agreement in
   the shell, before anything else, and Axis records it as at sign-up.
 - **Axis drops** prices, currencies, proration, billing invoices, the ledger, payments, payment
