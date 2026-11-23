@@ -3301,5 +3301,13 @@
   "notices.packagesHeld.subject": "Các lệnh gọi gói mở rộng còn lại sẽ chạy vào ngày mai",
   "notices.packagesHeld.body": "Đã dùng đủ {limit} giây chạy gói mở rộng, mức tối đa của hôm nay. Các lệnh gọi còn lại sẽ chạy sau 00:00 UTC.",
   "notices.emailDigest.subject": "Email tổng hợp hằng ngày của bạn",
-  "notices.emailDigest.body": "Các thông báo này được giữ lại để gửi trong email tổng hợp hằng ngày của bạn."
+  "notices.emailDigest.body": "Các thông báo này được giữ lại để gửi trong email tổng hợp hằng ngày của bạn.",
+  "notices.authoringPlanReady.subject": "Kế hoạch đang chờ bạn duyệt",
+  "notices.authoringPlanReady.body": "Kế hoạch cho yêu cầu của bạn trong {application} đã sẵn sàng. Hãy xem rồi duyệt, hoặc yêu cầu kế hoạch khác.",
+  "notices.authoringDraftReady.subject": "Bản nháp đang chờ bạn chấp nhận",
+  "notices.authoringDraftReady.body": "Bản nháp cho yêu cầu của bạn trong {application} đã qua kiểm tra và đánh giá. Hãy chấp nhận hoặc bỏ bản nháp.",
+  "notices.authoringAccepted.subject": "Bản nháp đã được chấp nhận",
+  "notices.authoringAccepted.body": "AI đã chấp nhận bản nháp cho yêu cầu của bạn trong {application}. Thay đổi có hiệu lực khi có người phát hành.",
+  "notices.authoringFailed.subject": "Yêu cầu đã dừng",
+  "notices.authoringFailed.body": "Yêu cầu của bạn trong {application} đã dừng trước khi xong. Hãy mở yêu cầu để xem lý do."
 }

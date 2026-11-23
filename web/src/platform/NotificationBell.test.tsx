@@ -244,4 +244,10 @@ describe('notificationAddress', () => {
     expect(notificationAddress('e2e', { page: 'Notes', parameters: { note: null } })).toBe('/e2e/notes')
     expect(notificationAddress('e2e', { page: 'Notes', parameters: {} })).toBe('/e2e/notes')
   })
+
+  it('opens a page of the platform site at its root', () => {
+    expect(
+      notificationAddress('/', { page: 'studio', parameters: { app: 'crm', view: 'requests', request: noteId } }),
+    ).toBe(`/studio?app=crm&view=requests&request=${noteId}`)
+  })
 })

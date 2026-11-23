@@ -118,9 +118,9 @@ period.
   role they hold that the active release declares, checked when read, as a role task is. They do not
   see a source they turned off in the application, see [notification preferences](#notification-preferences).
 - **Read state.** `axis.notification_reads` holds one row per notification and user who read it.
-- **Source.** Each row keeps its source. It is `process` for a `notify` step or a task escalation, and `quota` for a quota notice.
+- **Source.** Each row keeps its source. It is `process` for a `notify` step or a task escalation, `quota` for a quota notice, and `authoringRequest` for an AI request notice.
 - **Kind**. Each row keeps its kind. A `notify` step or a task escalation gives the kind its step gives, see [the `notify` operation](#notify-operation). A quota notice is a `warning`. A notification stored before kinds existed reads as `info`, except a quota notice, which reads as `warning`.
-- **Read is not done**. Reading a notification marks nothing done. An `info` or `warning` notification is always done. A process's `action` notification is done only when it is cleared, because Axis cannot tell whether its action was taken.
+- **Read is not done**. Reading a notification marks nothing done. An `info` or `warning` notification is always done. A process's `action` notification is done only when it is cleared, because Axis cannot tell whether its action was taken. An AI request's `action` notification is also done by its request's state, or by a newer notice of the same request, see [tenant notices](#tenant-notices).
 - **Clearing**. A clear sets `cleared_at` on the caller's read row, and sets `read_at` too when it is missing. A cleared notification is no longer listed or counted for that caller. Other recipients see no change, and nothing is deleted before the retention period ends.
 - **Kept for.** The worker deletes the notifications whose `created_at` is older than
   `Notifications:RetentionDays`, a [worker setting](process-execution.md#worker-settings) of 90 days
@@ -154,7 +154,7 @@ The routes list a user's notifications of one application and mark them read. Th
 - **Item.** An item has `id`, `releaseId`, `subject`, `body`, `open`, `read` and `createdAt`. `open` is
   `{ "page", "parameters" }` with the stored raw parameters, or null when the notification opens no
   page.
-- **Item fields**. An item also has `source`, the row's source (`process` or `quota`), `kind`, the row's kind, and `done`. `done` is true once the notification is done, see [in-app notifications](#in-app-notifications).
+- **Item fields**. An item also has `source`, the row's source (`process`, `quota` or `authoringRequest`), `kind`, the row's kind, and `done`. `done` is true once the notification is done, see [in-app notifications](#in-app-notifications).
 - **Texts.** Texts come from the notification's release, in the user's profile locale when that release
   has texts for it, otherwise its first locale in ordinal order, as for [email](#email). Each `{name}`
   is filled with the stored value formatted as [placeholders](#placeholders) says: a number, a date and
@@ -169,9 +169,9 @@ The routes list a user's notifications of one application and mark them read. Th
 
 ### Tenant notices
 
-A tenant notice is an in-app notification, in `axis.notifications`, that the worker stores for the
-tenant's administrators. It has no application and no release, uses platform text keys and the
-recipient kind `platformRole`, and no application lists it.
+A tenant notice is an in-app notification, in `axis.notifications`, that Axis stores for the
+tenant's administrators, or for one person. It has no application and no release, uses platform text
+keys and the recipient kind `platformRole` or `platformUser`, and no application lists it.
 
 | Route                                                    | What it does                                                                                                                 |
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -185,13 +185,14 @@ recipient kind `platformRole`, and no application lists it.
   `POST /api/notifications/{id}/read`, `POST /api/notifications/read-all`,
   `POST /api/notifications/{id}/clear` and `POST /api/notifications/clear-all` list tenant notices,
   mark them read and clear them. They answer in the
-  same shape as the [application routes](#notification-routes), with `releaseId` and `open` always
-  null. They are served on the tenant's platform host only, need a session (`401`), and the POSTs
+  same shape as the [application routes](#notification-routes), with `releaseId` always null and
+  `open` null except for an AI request notice. They are served on the tenant's platform host only, need a session (`401`), and the POSTs
   follow the CSRF rule.
 - **Who sees one.** A user sees a notice for the `administrator` kind only while they hold the role
-  that `Users:AdministratorRole` names. Anyone else gets an empty list with zero counts and a `404`
-  when marking a notice read or clearing it, and read-all and clear-all write nothing for them.
-- **To one person** _(planned for M35)_. A tenant notice may go to one person. Its recipient kind is `platformUser`, and its recipient is the person's user id. Only that user sees it, and only on the platform host.
+  that `Users:AdministratorRole` names. Anyone else sees only the notices sent to them, see To one
+  person. Without such a notice they get an empty list with zero counts and a `404` when marking a
+  notice read or clearing it, and read-all and clear-all write nothing for them.
+- **To one person**. A tenant notice may go to one person. Its recipient kind is `platformUser`, and its recipient is the person's user id. Only that user sees it, and only on the platform host. An administrator does not see another person's notice.
 - **Texts.** The texts are platform texts in the user's profile locale, matched by the whole tag
   ignoring letter case, with `en` as the fallback, so `vi-VN` shows `en`. Numbers are formatted in the
   profile locale, and a `date-time` shows in UTC, because a notice has no release time zone.
@@ -203,8 +204,8 @@ recipient kind `platformRole`, and no application lists it.
 
   The values are `application`, the application's name, and `request`. The states are in [authoring requests](authoring-requests.md#states).
 - **Preferences and email** _(planned for M43)_. AI request notices follow the person's `authoringRequest` preference. With `application` off they are not in the bell or its counts. With `email` on, the commit that stores the notice also stages one email in `axis.email_outbox` to the person's profile address. The email has the notice's subject and body in platform texts of the profile locale, as Texts above says, and a link to the request in Studio on the tenant's platform host. It is sent as [email](#email) says, now or in the digest. A person with no profile email gets none.
-- **Read and done** _(planned for M35)_. A notice is read when its person opens it from the bell or marks it read. An `action` notice is done when its request leaves the state it waits on, whether it is read or not. Plan ready waits on `awaitingApproval`, and draft ready waits on `ready`.
-- **Open** _(planned for M35)_. An AI request notice opens its request in Studio, with `{ "page": "studio", "parameters": { "app", "view", "request" } }`. The bell opens `/studio?app=<name>&view=requests&request=<id>`, see [AI authoring in Studio](ai-authoring-in-studio.md#the-request-panel).
+- **Read and done**. A notice is read when its person opens it from the bell or marks it read. An `action` notice is done when its request leaves the state it waits on, whether it is read or not. Plan ready waits on `awaitingApproval`, and draft ready waits on `ready`. It is also done once a newer notice of the same request goes to the same person, because a request can come back to that state. A done notice is not under `needsAction=true`, and `clear-all` clears it.
+- **Open**. An AI request notice opens its request in Studio, with `{ "page": "studio", "parameters": { "app", "view", "request" } }`. The bell opens `/studio?app=<name>&view=requests&request=<id>`, see [AI authoring in Studio](ai-authoring-in-studio.md#the-request-panel).
 
 ### The bell
 

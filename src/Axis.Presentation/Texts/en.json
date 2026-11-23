@@ -3301,5 +3301,13 @@
   "notices.packagesHeld.subject": "Extension package calls are held until tomorrow",
   "notices.packagesHeld.body": "Today's limit of {limit} seconds of extension package run time is reached. The other extension package calls wait until 00:00 UTC.",
   "notices.emailDigest.subject": "Your daily digest",
-  "notices.emailDigest.body": "These notifications waited for your daily digest."
+  "notices.emailDigest.body": "These notifications waited for your daily digest.",
+  "notices.authoringPlanReady.subject": "Plan ready to approve",
+  "notices.authoringPlanReady.body": "Read the plan for your request in {application} and approve it or ask for another.",
+  "notices.authoringDraftReady.subject": "Draft ready to accept",
+  "notices.authoringDraftReady.body": "The draft for your request in {application} passed its checks and review. Accept or drop it.",
+  "notices.authoringAccepted.subject": "Draft accepted",
+  "notices.authoringAccepted.body": "AI accepted the draft for your request in {application}. It goes live when someone publishes it.",
+  "notices.authoringFailed.subject": "Request stopped",
+  "notices.authoringFailed.body": "Your request in {application} stopped before it was done. Open it to see why."
 }

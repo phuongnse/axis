@@ -239,7 +239,7 @@ internal static class NotificationEndpoints
         }
     }
 
-    private static JsonElement ParseParameters(string? json)
+    internal static JsonElement ParseParameters(string? json)
     {
         using var document = JsonDocument.Parse(json ?? "{}");
         return document.RootElement.Clone();
