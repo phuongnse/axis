@@ -269,10 +269,10 @@ describe('studioActiveEntry', () => {
     expect(studioActiveEntry(new URLSearchParams(`app=${application}`), [], [])).toBe('overview')
   })
 
-  it('marks no entry for a request page, so Overview is not marked for it', () => {
+  it('marks no entry for the AI requests table or a request page, so Overview is not marked for them', () => {
     expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=requests&request=r1`), [], [])).toBe(
       'requests',
     )
-    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=requests`), [], [])).toBe('overview')
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=requests`), [], [])).toBe('requests')
   })
 })

@@ -90,7 +90,7 @@ an accept, which [accepting](#accepting) describes.
 | Route                                                                                             | What it does                                                                                               |
 | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `POST /api/studio/apps/{application}/authoring-requests`                                          | Stores a request in `planning` and answers `202` with it and a `Location` for the read route               |
-| `GET /api/studio/apps/{application}/authoring-requests`                                           | Lists the newest 100 requests of the application, newest first                                             |
+| `GET /api/studio/apps/{application}/authoring-requests`                                           | Lists one page of the requests of the application, newest first unless `sort` says otherwise               |
 | `GET /api/studio/apps/{application}/authoring-requests/{id}`                                      | Reads one request with its steps in order                                                                  |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/approve`                             | Moves a request from `awaitingApproval` to `working`                                                       |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/change-plan`                         | Moves a request from `awaitingApproval` back to `planning` and keeps the comment as a `planChange` step    |
@@ -138,13 +138,15 @@ an accept, which [accepting](#accepting) describes.
   `checks` is the results of a `check` step or the review of a `review` step, and null on any other step.
   `resource` is `{ kind, id, name }` on a `write` step and null on any other step, and the `summary` of a `write`
   step is the name of its tool.
-- **Paging the list** _(planned for M35)_. The list route takes the record API's `page`, `pageSize`, `sort`, `search`
-  and `filter`, as [paging and sorting](record-api.md#paging-and-sorting) defines them. The columns are `title` and
-  `author` (the author's name), which are text, `sentAt`, which is a date, and `state`, an enum column whose values are the state names. `state` sorts in the order a request goes through its states. The order is newest
-  first unless `sort` says otherwise, and `search` keeps the requests whose `title` or `text` contains the text. It
-  answers `{ items, page, pageSize, totalCount }` through the [shared list query](shared-widgets.md#which-widget),
-  and a parameter that is invalid is `400`, as [the revision list](authoring-revisions.md#list) answers. It replaces
-  the newest 100.
+- **Paging the list**. The list route takes the record API's `page`, `pageSize`, `sort`, `search` and `filter`, as
+  [paging and sorting](record-api.md#paging-and-sorting) defines them. The columns are `title` and `text`, which are text
+  and which `search` looks in, `author`, which is text, and `sentAt`, which is a date. `state` is an enum column whose values
+  are the state names, and it sorts in the order a request goes through its states. A filter on `state` reads `fixing` as
+  `working`, so its values are the other nine states. `author` is the author's display name from their profile, or their
+  user id when the profile has none. The order is newest first unless `sort` says otherwise. `search` keeps the requests
+  whose `title` or `text` contains the text. The route answers `{ items, page, pageSize, totalCount }` through the
+  [shared list query](shared-widgets.md#which-widget), and a parameter that is invalid is `400`, as
+  [the revision list](authoring-revisions.md#list) answers.
 - **Requesting changes.** Only the author of the request (`403` to anyone else) takes `{ comment }`
   of 1 to 2,000 characters. The route answers `409` unless the request is `ready`, and while the draft has an
   accept queued or running, so an accept cannot commit a draft that AI is changing. It keeps the draft, sets `round`

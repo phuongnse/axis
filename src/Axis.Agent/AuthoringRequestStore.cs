@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Axis.Configuration.Storage;
 using Axis.Data.Records;
 using Axis.Data.Storage;
 using Axis.Tenancy;
@@ -43,8 +44,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
     public static readonly IReadOnlyList<string> StatesNeedingWork = ["planning", "working", "checking", "reviewing", "fixing", "ready"];
 
     /// <summary>Every state of a request, see <c>docs/reference/authoring-requests.md#states</c>.</summary>
-    public static readonly IReadOnlyList<string> States =
-        ["planning", "awaitingApproval", "working", "checking", "reviewing", "fixing", "ready", "accepted", "dropped", "failed"];
+    public static readonly IReadOnlyList<string> States = AuthoringRequest.States;
 
     // The columns of a listed or claimed request, in the order of ReadRequest. The findings are those of the newest review step after the newest check step.
     private const string RequestColumns =

@@ -126,8 +126,8 @@ export function studioActiveEntry(
   if (view === 'releases' || view === 'history' || view === 'policies' || view === 'packages') {
     return view
   }
-  // A request's page has no entry of its own, so no entry is marked for it, not even Overview.
-  if (view === 'requests' && params.get('request') !== null) {
+  // The AI requests table and a request's page have no entry of their own, so no entry is marked for them, not even Overview.
+  if (view === 'requests') {
     return 'requests'
   }
   return 'overview'

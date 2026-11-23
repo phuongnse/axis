@@ -4,11 +4,13 @@ using System.Text.Json.Serialization;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Storage;
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Data.Storage;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Studio;
@@ -56,8 +58,6 @@ internal static class StudioAuthoringRequestEndpoints
 
     private const int MaxComment = 2000;
 
-    private const int MaxListed = 100;
-
     // The pg_advisory_xact_lock key that serializes the count and the insert of the sends in one tenant database.
     private const long SendLockKey = 0x4158_4953_4155_5448; // "AXISAUTH" in ASCII.
 
@@ -67,6 +67,32 @@ internal static class StudioAuthoringRequestEndpoints
 
     private const string Columns =
         "id, author, text, title, state, plan::text, round, tokens, auto_accept, sent_at, approved_at, finished_at";
+
+    // The states in the order a request goes through them, as a SQL array, so a sort on state follows that order.
+    private static readonly string _stateOrder =
+        $"array_position(ARRAY[{string.Join(", ", AuthoringRequest.States.Select(state => $"'{state}'"))}]::text[], state)";
+
+    // The columns a list's search, filter and sort can name, see docs/reference/authoring-requests.md#routes. A fixing request is
+    // working for a filter, and the author is their profile's name, or their user id when there is no profile, as ListAsync's subquery gives it.
+    private static readonly IReadOnlyList<ListColumn<Row>> _listColumns =
+    [
+        new("title", ListColumnKind.Text, row => row.Title, Searchable: true, Sql: "title"),
+        new("text", ListColumnKind.Text, row => row.Text, Searchable: true, Sql: "text"),
+        new("author", ListColumnKind.Text, row => row.Author, Sql: "author_name"),
+        new(
+            "sentAt",
+            ListColumnKind.Date,
+            row => DateOnly.FromDateTime(row.SentAt.UtcDateTime),
+            Sql: "(sent_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "sent_at"),
+        new(
+            "state",
+            ListColumnKind.Enum,
+            row => row.State,
+            Values: [.. AuthoringRequest.States.Where(state => state != "fixing")],
+            Sql: "CASE state WHEN 'fixing' THEN 'working' ELSE state END",
+            OrderSql: _stateOrder),
+    ];
 
     private enum Action
     {
@@ -228,33 +254,67 @@ internal static class StudioAuthoringRequestEndpoints
             return refusal!;
         }
 
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var list = ListQuery<Row>.Read(httpContext.Request, _listColumns, errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
         if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })
         {
-            return Results.Ok(new AuthoringRequestListResponse([]));
+            return Results.Ok(new AuthoringRequestListResponse([], list.Page, list.PageSize, 0));
         }
 
         var cancellationToken = httpContext.RequestAborted;
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var rows = new List<Row>();
-        await using (var command = new NpgsqlCommand(
-            $"""
-            SELECT {Columns} FROM axis.authoring_requests
-            WHERE application_id = @application
-            ORDER BY sent_at DESC, id DESC
-            LIMIT {MaxListed}
-            """,
-            connection))
+        var (rows, totalCount) = await ReadListAsync(connection, applicationId, list.Sql(), list.Page, list.PageSize, cancellationToken);
+        var names = await UserProfiles.FindDisplayNamesAsync(connection, [.. rows.Select(row => row.Author).Distinct(StringComparer.Ordinal)], cancellationToken);
+        return Results.Ok(new AuthoringRequestListResponse(
+            [.. rows.Select(row => row.ToResponse(application, names.GetValueOrDefault(row.Author)))], list.Page, list.PageSize, totalCount));
+    }
+
+    // The rows come from a subquery that adds the author's name, so the column expressions of the list name plain columns. Each
+    // reader is disposed before the next command, because Npgsql allows one open reader per connection.
+    private static async Task<(List<Row> Rows, long TotalCount)> ReadListAsync(
+        NpgsqlConnection connection, Guid applicationId, ListSql list, int page, int size, CancellationToken cancellationToken)
+    {
+        const string source =
+            """
+            (SELECT r.*, coalesce(p.display_name, r.author) AS author_name
+            FROM axis.authoring_requests r LEFT JOIN axis.user_profiles p ON p.user_id = r.author
+            WHERE r.application_id = @application) a
+            """;
+        var where = $"WHERE {list.Condition}";
+
+        long totalCount;
+        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {source} {where}", connection))
         {
-            command.Parameters.AddWithValue("application", applicationId);
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                rows.Add(ReadRow(reader));
-            }
+            count.Parameters.AddWithValue("application", applicationId);
+            list.AddTo(count);
+            totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
-        var names = await UserProfiles.FindDisplayNamesAsync(connection, [.. rows.Select(row => row.Author).Distinct(StringComparer.Ordinal)], cancellationToken);
-        return Results.Ok(new AuthoringRequestListResponse([.. rows.Select(row => row.ToResponse(application, names.GetValueOrDefault(row.Author)))]));
+        var order = list.Order is null ? "sent_at DESC, id DESC" : $"{list.Order}, sent_at DESC, id DESC";
+        var rows = new List<Row>();
+        await using var command = new NpgsqlCommand(
+            $"""
+            SELECT {Columns} FROM {source} {where}
+            ORDER BY {order}
+            LIMIT @limit OFFSET @offset
+            """,
+            connection);
+        command.Parameters.AddWithValue("application", applicationId);
+        list.AddTo(command);
+        command.Parameters.AddWithValue("limit", size);
+        command.Parameters.AddWithValue("offset", (long)(page - 1) * size);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(ReadRow(reader));
+        }
+
+        return (rows, totalCount);
     }
 
     private static async Task<IResult> GetAsync(
@@ -888,8 +948,11 @@ internal sealed record AuthoringRequestStepResponse(
     JsonElement? Checks,
     JsonElement? Resource);
 
-/// <summary>The newest requests of an application, newest first.</summary>
-internal sealed record AuthoringRequestListResponse(IReadOnlyList<AuthoringRequestResponse> Items);
+/// <summary>
+/// One page of the requests of an application, with the number that matched in all. The list pages, sorts, searches and filters, newest
+/// first unless <c>sort</c> says otherwise, see <c>docs/reference/authoring-requests.md#routes</c>.
+/// </summary>
+internal sealed record AuthoringRequestListResponse(IReadOnlyList<AuthoringRequestResponse> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>One file an accepted request's revision changed, as <see cref="StudioRevisionChange"/> gives it, with the resource's label in each locale, or null when it has none, and its <c>module</c> when it is a layer file.</summary>
 internal sealed record AuthoringRequestDiffEntry(

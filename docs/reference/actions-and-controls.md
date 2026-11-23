@@ -396,7 +396,8 @@ be kept right.
     measure column of a grouped data source. [Its filter](table-widget.md#filter) gives the reasons.
   - **A list column.** A list column can have no filter, such as the Steps column of a cell job table.
   - **A column of a table with a view.** The Event column of the webhook deliveries and the Task column of the
-    task inbox have no Filter. [The task inbox](task-inbox-widget.md) names the columns it filters on.
+    task inbox have no Filter. [The task inbox](task-inbox-widget.md) names the columns it filters on. The Request
+    column of the [AI requests table](ai-authoring-in-studio.md#the-request-panel) has no Filter either.
   - **A table with no Filter.** A child collection on a [form or detail](form-widget.md#child-collections) and a
     list of objects in a [Studio form](studio-form-editors.md) have none. So do the publishing releases table of the
     [operator console](operator-console.md#views), and the Hosts and Usage tables of the

@@ -35,7 +35,7 @@ request opens its own page.
   - **With an AI app you already pay for.** The second way follows under a rule. "An AI app that supports
     MCP works on your applications with its own subscription, once your administrator allows it. Give it
     this address:" The [address](#connected-apps) follows, with its copy button.
-- **The AI requests page** _(planned for M35)_. The page lists every request of the application, newest
+- **The AI requests page**. The page lists every request of the application, newest
   first, in one [table](actions-and-controls.md#tables) with four columns:
   - **Request** is the request's name, as the link to its page. Until AI names it, the name is the first
     sentence of its words, cut at 80 characters with an ellipsis. It has no sort.
@@ -45,7 +45,7 @@ request opens its own page.
   - **Sent** is the time the request was sent.
 
   The table has the full toolbar of a table whose rows grow: Search, which matches a request's name and
-  words; Filter on State, Sent by and Sent; Columns; a sort on State, Sent by and Sent, where State sorts in
+  words; Filter on State, Sent by and Sent; Columns and Views; a sort on State, Sent by and Sent, where State sorts in
   the order a request goes through its states; paging such as "1–7 of 7", with a page size; and Refresh.
   Search, filters, sort and paging all live in the address. The page has no control of its own, so Ask AI
   stays on the band.

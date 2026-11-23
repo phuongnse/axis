@@ -514,6 +514,74 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_list_pages_sorts_searches_and_filters_and_answers_400_for_a_bad_parameter()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("authoring_requests_query", CancellationToken);
+        await using var factory = NewFactory(folder.Path, connectionString);
+        using var author = factory.CreateClient().SignedInAs("author");
+
+        var ready = await SendRequestAsync(author);
+        var planning = await SendRequestAsync(author);
+        var fixing = await SendRequestAsync(author);
+        await SetStateAsync(connectionString, ready, "ready");
+        await SetStateAsync(connectionString, fixing, "fixing");
+        await PostgreSqlServer.AdminScalarAsync(connectionString, $"UPDATE axis.authoring_requests SET title = 'Cost centre report' WHERE id = '{ready}'", CancellationToken);
+
+        static string[] Ids(JsonDocument document) =>
+            document.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()!).ToArray();
+
+        // Newest first, and a page holds the rows of its page size and the number that matched in all.
+        using (var first = await StudioPublishTests.GetJsonAsync(author, $"{Url}?pageSize=2", Host))
+        {
+            Assert.Equal(new[] { fixing, planning }, Ids(first));
+            Assert.Equal(1, first.RootElement.GetProperty("page").GetInt32());
+            Assert.Equal(2, first.RootElement.GetProperty("pageSize").GetInt32());
+            Assert.Equal(3L, first.RootElement.GetProperty("totalCount").GetInt64());
+        }
+
+        using (var second = await StudioPublishTests.GetJsonAsync(author, $"{Url}?pageSize=2&page=2", Host))
+        {
+            Assert.Equal(new[] { ready }, Ids(second));
+        }
+
+        // A state sorts in the order a request goes through its states, and a minus sign reverses it.
+        using (var ascending = await StudioPublishTests.GetJsonAsync(author, $"{Url}?sort=state", Host))
+        {
+            Assert.Equal(new[] { planning, fixing, ready }, Ids(ascending));
+        }
+
+        using (var descending = await StudioPublishTests.GetJsonAsync(author, $"{Url}?sort=-state", Host))
+        {
+            Assert.Equal(new[] { ready, fixing, planning }, Ids(descending));
+        }
+
+        // A search looks in a title, and in the words of the text that every request has.
+        using (var byTitle = await StudioPublishTests.GetJsonAsync(author, $"{Url}?search=report", Host))
+        {
+            Assert.Equal(new[] { ready }, Ids(byTitle));
+        }
+
+        using (var byWords = await StudioPublishTests.GetJsonAsync(author, $"{Url}?search=purchase", Host))
+        {
+            Assert.Equal(3L, byWords.RootElement.GetProperty("totalCount").GetInt64());
+        }
+
+        // A fixing request is working, so a filter on working finds it.
+        var working = Uri.EscapeDataString("""{"all":[{"field":"state","op":"eq","value":"working"}]}""");
+        using (var filtered = await StudioPublishTests.GetJsonAsync(author, $"{Url}?filter={working}", Host))
+        {
+            Assert.Equal(new[] { fixing }, Ids(filtered));
+        }
+
+        foreach (var query in new[] { "?sort=nope", "?filter=notjson", "?pageSize=0" })
+        {
+            using var refused = await StudioPublishTests.SendAsync(author, HttpMethod.Get, $"{Url}{query}", Host);
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        }
+    }
+
+    [Fact]
     public async Task A_stored_refresh_token_is_encrypted_never_answered_and_erased_by_a_drop()
     {
         const string token = "refresh-token-of-the-author-7f3a9c";
