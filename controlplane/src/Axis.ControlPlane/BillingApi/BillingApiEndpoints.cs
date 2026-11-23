@@ -64,6 +64,7 @@ internal static partial class BillingApiEndpoints
         string tenantId,
         HttpContext httpContext,
         NpgsqlDataSource controlPlane,
+        ControlPlaneOptions options,
         TimeProvider clock,
         CancellationToken cancellationToken) =>
         HandleAsync(
@@ -89,7 +90,7 @@ internal static partial class BillingApiEndpoints
                     return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "The subscription pins no plan. Set the plan first.");
                 }
 
-                return await SubscriptionPaidThrough.SetAsync(move.Transaction, move.SubscriptionId, move.Body.PaidThrough, AuditActorKind.Billing, move.Client, cancellationToken)
+                return await SubscriptionPaidThrough.SetAsync(move.Transaction, move.SubscriptionId, move.Body.PaidThrough, AuditActorKind.Billing, move.Client, options, clock.GetUtcNow(), cancellationToken)
                     ? null
                     : Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "The subscription's state does not take a paid-through date.");
             },
@@ -176,6 +177,8 @@ internal static partial class BillingApiEndpoints
         string tenantId,
         HttpContext httpContext,
         NpgsqlDataSource controlPlane,
+        ControlPlaneOptions options,
+        TimeProvider clock,
         CancellationToken cancellationToken) =>
         HandleAsync(
             EndKind,
@@ -196,7 +199,7 @@ internal static partial class BillingApiEndpoints
                     return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Only an active subscription can be ended.");
                 }
 
-                return await SubscriptionCancel.CancelAsync(move.Transaction, move.SubscriptionId, AuditActorKind.Billing, move.Client, cancellationToken)
+                return await SubscriptionCancel.CancelAsync(move.Transaction, move.SubscriptionId, AuditActorKind.Billing, move.Client, options, clock.GetUtcNow(), cancellationToken)
                     ? null
                     : Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Only an active subscription can be ended.");
             },

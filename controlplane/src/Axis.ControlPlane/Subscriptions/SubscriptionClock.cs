@@ -1,4 +1,5 @@
 using Axis.ControlPlane.Audit;
+using Axis.ControlPlane.BillingEvents;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
@@ -25,6 +26,7 @@ namespace Axis.ControlPlane.Subscriptions;
 /// at its next date, the day after its paid-through date, and becomes <c>pastDue</c> with no cell call, so the tenant keeps working. A
 /// <c>pastDue</c> one becomes <c>readOnly</c> after <see cref="PastDueGrace"/> and a <c>cancelled</c> one at its next date, each with one
 /// read-only cell call. A paid tenant stays <c>readOnly</c> for <see cref="PaidReadOnlyWait"/> before it is <c>deleting</c>.
+/// Each move also queues one <c>subscription.stateChanged</c> event in its transaction, see <see cref="BillingEventQueue.EnqueueStateChangedAsync"/>.
 /// </summary>
 internal sealed partial class SubscriptionClock(
     NpgsqlDataSource controlPlane,
@@ -230,6 +232,7 @@ internal sealed partial class SubscriptionClock(
         }
 
         await AuditRecords.AppendAsync(transaction, AuditActorKind.Job, job.Id.ToString(), $"subscription.{to}", id.ToString(), cancellationToken);
+        await BillingEventQueue.EnqueueStateChangedAsync(transaction, options, id, from, clock.GetUtcNow(), cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 

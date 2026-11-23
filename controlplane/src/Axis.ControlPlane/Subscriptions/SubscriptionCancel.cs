@@ -1,4 +1,5 @@
 using Axis.ControlPlane.Audit;
+using Axis.ControlPlane.BillingEvents;
 using Npgsql;
 
 namespace Axis.ControlPlane.Subscriptions;
@@ -11,14 +12,16 @@ namespace Axis.ControlPlane.Subscriptions;
 internal static class SubscriptionCancel
 {
     /// <summary>
-    /// Makes the subscription <c>cancelled</c> in <paramref name="transaction"/> and writes the record <c>subscription.cancelled</c>. Returns false when the
-    /// subscription is not <c>active</c>, and then changes nothing.
+    /// Makes the subscription <c>cancelled</c> in <paramref name="transaction"/>, writes the record <c>subscription.cancelled</c> and queues the
+    /// <c>subscription.stateChanged</c> event at <paramref name="timestamp"/>. Returns false when the subscription is not <c>active</c>, and then changes nothing.
     /// </summary>
     public static async Task<bool> CancelAsync(
         NpgsqlTransaction transaction,
         Guid subscriptionId,
         AuditActorKind actorKind,
         string actor,
+        ControlPlaneOptions options,
+        DateTimeOffset timestamp,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transaction);
@@ -36,6 +39,7 @@ internal static class SubscriptionCancel
         }
 
         await AuditRecords.AppendAsync(transaction, actorKind, actor, "subscription.cancelled", subscriptionId.ToString(), cancellationToken);
+        await BillingEventQueue.EnqueueStateChangedAsync(transaction, options, subscriptionId, "active", timestamp, cancellationToken);
         return true;
     }
 }

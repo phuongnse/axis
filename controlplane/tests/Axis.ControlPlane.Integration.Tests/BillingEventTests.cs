@@ -87,12 +87,7 @@ public sealed class BillingEventTests(MailpitFixture mailpit) : IAsyncLifetime
 
         // The signature is recomputed here from the Standard Webhooks text, with each of the two secrets, and not with the code under test.
         var unixSeconds = request.Headers["webhook-timestamp"];
-        var signed = Encoding.UTF8.GetBytes($"{id}.{unixSeconds}.{request.Body}");
-        var expected = string.Join(
-            ' ',
-            new[] { Encoding.UTF8.GetBytes(FirstKey), Encoding.UTF8.GetBytes(SecondSecret) }
-                .Select(key => "v1," + Convert.ToBase64String(HMACSHA256.HashData(key, signed))));
-        Assert.Equal(expected, request.Headers["webhook-signature"]);
+        Assert.Equal(request.ExpectedSignature(Encoding.UTF8.GetBytes(FirstKey), Encoding.UTF8.GetBytes(SecondSecret)), request.Headers["webhook-signature"]);
         Assert.True(long.TryParse(unixSeconds, CultureInfo.InvariantCulture, out var sent));
         Assert.InRange(sent, DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 60, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
@@ -264,21 +259,6 @@ public sealed class BillingEventTests(MailpitFixture mailpit) : IAsyncLifetime
         {
             Assert.True(DateTime.UtcNow < deadline, "The condition did not hold within 60 seconds.");
             await Task.Delay(50, cancellationToken);
-        }
-    }
-
-    private sealed record ReceivedRequest(HttpMethod Method, string? Uri, IReadOnlyDictionary<string, string> Headers, string Body);
-
-    // Stands in for the billing system's receiver: it records each request and answers the status it is given.
-    private sealed class ReceiverStub(HttpStatusCode status) : HttpMessageHandler
-    {
-        public ConcurrentQueue<ReceivedRequest> Requests { get; } = new();
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var headers = request.Headers.ToDictionary(header => header.Key, header => string.Join(',', header.Value), StringComparer.OrdinalIgnoreCase);
-            Requests.Enqueue(new ReceivedRequest(request.Method, request.RequestUri?.ToString(), headers, await request.Content!.ReadAsStringAsync(cancellationToken)));
-            return new HttpResponseMessage(status);
         }
     }
 }

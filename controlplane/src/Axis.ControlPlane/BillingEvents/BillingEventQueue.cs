@@ -17,6 +17,8 @@ internal static class BillingEventQueue
 
     public const string UsageDaily = "usage.daily";
 
+    public const string SubscriptionStateChanged = "subscription.stateChanged";
+
     /// <summary>
     /// Queues an event in <paramref name="transaction"/>, so the event exists exactly when the change that caused it does. It writes nothing when
     /// <c>ControlPlane:BillingEvents:Url</c> is not set. The payload fixes the event's id, type, timestamp and <paramref name="data"/>, so every
@@ -55,6 +57,55 @@ internal static class BillingEventQueue
         }
 
         await JobQueue.EnqueueAsync(transaction.Connection!, transaction, JobKind, payload, null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Queues <c>subscription.stateChanged</c> for a move of a subscription's state, see <c>docs/reference/billing-api.md#subscription-state-changed</c>.
+    /// Call it in the move's transaction, after the update, so the event holds what the move left. It reads the subscription's row and writes nothing
+    /// when <c>ControlPlane:BillingEvents:Url</c> is not set. <paramref name="timestamp"/> is the time of the move.
+    /// </summary>
+    public static async Task EnqueueStateChangedAsync(
+        NpgsqlTransaction transaction,
+        ControlPlaneOptions options,
+        Guid subscriptionId,
+        string previousState,
+        DateTimeOffset timestamp,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(options);
+        if (!options.BillingEvents.IsSet)
+        {
+            return;
+        }
+
+        string tenantId;
+        string state;
+        DateOnly? paidThrough;
+        DateTimeOffset? nextAt;
+        await using (var select = new NpgsqlCommand(
+            "SELECT tenant_id, state, paid_through, next_at FROM control_plane.subscriptions WHERE id = @id",
+            transaction.Connection,
+            transaction))
+        {
+            select.Parameters.AddWithValue("id", subscriptionId);
+            await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+            await reader.ReadAsync(cancellationToken);
+            tenantId = reader.GetString(0);
+            state = reader.GetString(1);
+            paidThrough = reader.IsDBNull(2) ? null : reader.GetFieldValue<DateOnly>(2);
+            nextAt = reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3);
+        }
+
+        var data = new JsonObject
+        {
+            ["tenantId"] = tenantId,
+            ["state"] = state,
+            ["previousState"] = previousState,
+            ["paidThrough"] = paidThrough?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["nextAt"] = nextAt is { } next ? Timestamp(next) : null,
+        };
+        await EnqueueAsync(transaction, options, SubscriptionStateChanged, timestamp, data, null, cancellationToken);
     }
 
     /// <summary>The ISO 8601 text of a time in UTC, as the events carry it.</summary>

@@ -6,7 +6,7 @@ namespace Axis.ControlPlane.Subscriptions;
 /// <summary>
 /// Sets the date a subscription is paid through, see <c>docs/reference/billing-api.md#setting-the-paid-through-date</c>. A <c>trialing</c>, <c>pastDue</c>,
 /// <c>readOnly</c> or <c>cancelled</c> subscription becomes <c>active</c> with a new step id, and <see cref="SubscriptionActivation"/> writes its records and
-/// queues its jobs. An <c>active</c> subscription keeps its state and step id and takes the new date. The tenant is paid through the end of the day, so the
+/// queues its jobs. An <c>active</c> subscription keeps its state and step id, takes the new date and sends no state event. The tenant is paid through the end of the day, so the
 /// next date is the start of the following day in UTC, which is when the clock moves an <c>active</c> subscription to <c>pastDue</c>.
 /// The caller has locked the subscription's row and has checked its state.
 /// </summary>
@@ -22,6 +22,8 @@ internal static class SubscriptionPaidThrough
         DateOnly paidThrough,
         AuditActorKind actorKind,
         string actor,
+        ControlPlaneOptions options,
+        DateTimeOffset timestamp,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transaction);
@@ -78,7 +80,7 @@ internal static class SubscriptionPaidThrough
             }
         }
 
-        await SubscriptionActivation.QueueAsync(transaction, subscriptionId, state, newStep, actorKind, actor, cancellationToken);
+        await SubscriptionActivation.QueueAsync(transaction, subscriptionId, state, newStep, actorKind, actor, options, timestamp, cancellationToken);
         return true;
     }
 }

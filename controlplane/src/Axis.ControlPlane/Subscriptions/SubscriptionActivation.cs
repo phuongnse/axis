@@ -1,4 +1,5 @@
 using Axis.ControlPlane.Audit;
+using Axis.ControlPlane.BillingEvents;
 using Npgsql;
 
 namespace Axis.ControlPlane.Subscriptions;
@@ -10,8 +11,9 @@ namespace Axis.ControlPlane.Subscriptions;
 internal static class SubscriptionActivation
 {
     /// <summary>
-    /// Appends the audit record <c>subscription.active</c>, queues <c>writeQuotas</c> and, when the subscription was <c>pastDue</c> or <c>readOnly</c>,
-    /// queues <c>resumeTenant</c> with <paramref name="newStep"/>, the step id that the move gave the subscription.
+    /// Appends the audit record <c>subscription.active</c>, queues the <c>subscription.stateChanged</c> event at <paramref name="timestamp"/>, queues
+    /// <c>writeQuotas</c> and, when the subscription was <c>pastDue</c> or <c>readOnly</c>, queues <c>resumeTenant</c> with <paramref name="newStep"/>, the step
+    /// id that the move gave the subscription.
     /// </summary>
     public static async Task QueueAsync(
         NpgsqlTransaction transaction,
@@ -20,11 +22,14 @@ internal static class SubscriptionActivation
         Guid newStep,
         AuditActorKind actorKind,
         string actor,
+        ControlPlaneOptions options,
+        DateTimeOffset timestamp,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transaction);
         var connection = transaction.Connection!;
         await AuditRecords.AppendAsync(transaction, actorKind, actor, "subscription.active", subscriptionId.ToString(), cancellationToken);
+        await BillingEventQueue.EnqueueStateChangedAsync(transaction, options, subscriptionId, fromState, timestamp, cancellationToken);
         await SubscriptionQuotas.EnqueueAsync(connection, transaction, subscriptionId, cancellationToken);
         if (fromState is "pastDue" or "readOnly")
         {
