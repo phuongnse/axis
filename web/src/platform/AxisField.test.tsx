@@ -7,7 +7,8 @@ import { AxisField, type AxisFieldStatus } from './AxisField'
 import { requiredMark } from './requiredMark'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
-import { chooseOption, formItem, hasFieldError, hasFieldWarning, isRequiredLabel } from '../test/antd'
+import { withAntdStyles } from '../test/antdStyles'
+import { chooseOption, formItem, formMessages, hasFieldError, hasFieldWarning, isRequiredLabel } from '../test/antd'
 
 const texts = {}
 const catalogs = [{ texts, fallbackTexts: texts }]
@@ -227,6 +228,38 @@ describe('AxisField', () => {
         <Input />
       </AxisField>,
     ).toBeDefined()
+  })
+})
+
+describe('AxisField message look', () => {
+  withAntdStyles()
+
+  async function renderEmptyRequired() {
+    renderForm(
+      <AxisField label="Name" help="Letters and digits." name="name" requiredMessage="Enter a name.">
+        <Input />
+      </AxisField>,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    return { input: screen.getByRole('textbox', { name: 'Name' }), message: await screen.findByText('Enter a name.') }
+  }
+
+  it('draws a rule error after its input, 4px under it, in a 14px font on a 20px line', async () => {
+    const { input, message } = await renderEmptyRequired()
+
+    expect(formMessages(input)).toHaveStyle({ marginTop: '4px', fontSize: '14px', lineHeight: '20px' })
+    expect(formMessages(input).contains(message)).toBe(true)
+    expect(input.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('grows an item with an error: it keeps no bottom margin and nothing cancels the message height', async () => {
+    const { input } = await renderEmptyRequired()
+
+    const item = formItem(input)
+    expect(getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
+    for (const element of [item, ...item.querySelectorAll<HTMLElement>('*')]) {
+      expect(Number.parseFloat(getComputedStyle(element).marginBottom || '0')).not.toBeLessThan(0)
+    }
   })
 })
 

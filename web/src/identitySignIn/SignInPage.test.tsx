@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { identityFrameTexts, identityLegal } from '../designSystem/fixtures'
 import { designTokensFor } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
+import { formMessages } from '../test/antd'
+import { withAntdStyles } from '../test/antdStyles'
 import { SignInPage } from './SignInPage'
 import type { SignInContext } from './signInContext'
 
@@ -240,5 +242,22 @@ describe('SignInPage', () => {
 
     expect(await screen.findByText('Enter your password.')).toBeInTheDocument()
     expect(submit).not.toHaveBeenCalled()
+  })
+})
+
+describe('SignInPage message look', () => {
+  withAntdStyles()
+
+  it('draws a required message 4px under its input, in a 14px font on a 20px line', async () => {
+    render(<SignInPage context={context} />, { wrapper: ThemeModeProvider })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await screen.findByText('Enter your password.')
+    expect(formMessages(screen.getByLabelText('Password'))).toHaveStyle({
+      marginTop: '4px',
+      fontSize: '14px',
+      lineHeight: '20px',
+    })
   })
 })

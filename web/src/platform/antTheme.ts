@@ -162,8 +162,9 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
 /**
  * The props every Axis `ConfigProvider` gets, see docs/reference/actions-and-controls.md#dialogs: the theme; every
  * dialog centred, no taller or wider than the window less its `spacing-xl` margins, with a scrolling body and its
- * buttons `spacing-lg` below the body; checkboxes and radios that sit at the top of their box, level with the first
- * line of a label that wraps; and every dropdown menu at least `menu` wide, see
+ * buttons `spacing-lg` below the body; every form's messages 4px under their control, see
+ * docs/reference/actions-and-controls.md#fields; checkboxes and radios that sit at the top of their box, level with
+ * the first line of a label that wraps; and every dropdown menu at least `menu` wide, see
  * docs/reference/actions-and-controls.md#menus.
  * See docs/reference/actions-and-controls.md#dialogs.
  */
@@ -202,6 +203,9 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
       styles: { icon: { alignSelf: 'flex-start', marginTop: firstLineOffset(token.controlInteractiveSize) } },
     },
     radio: { styles: { icon: { alignSelf: 'flex-start', marginTop: firstLineOffset(token.fontSizeLG) } } },
+    // A field's message sits 4px under its control in a 14px font on a 20px line, see
+    // docs/reference/actions-and-controls.md#fields. The form's `help` part is the box that holds every message.
+    form: { styles: { help: { marginTop: 4, fontSize: token.fontSize, lineHeight: '20px' } } },
   }
 }
 
@@ -225,22 +229,19 @@ const fieldParents = [`.${fieldClass}`, `.${fieldClass} .ant-form-item-control-i
 
 /**
  * The CSS every Axis form and message shares, rendered once beside each provider's ConfigProvider. Ant Design has no
- * token for the gap under a message or for an unticked box's error border, so these rules carry them. The border takes
- * the mode's text colour: a page with two modes would give it one colour. An input of an `AxisField` fills the field's
+ * token for an unticked box's error border, so a rule carries it. The border takes the mode's text colour: a page with
+ * two modes would give it one colour. An input of an `AxisField` fills the field's
  * width, and a select joined with its action fills it together with the action, see docs/reference/shell.md#layout. A
  * subtle button, which Ant Design draws as a text button, takes the light fill on keyboard focus that it takes on hover,
  * see docs/reference/actions-and-controls.md#buttons.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
-  const { colour, type } = designTokensFor(mode, page)
+  const { colour } = designTokensFor(mode, page)
   const hoverFill = theme.getDesignToken(antThemeFor(mode, page)).colorBgTextHover
   const fieldWidth = fieldParents.flatMap((parent) => fieldInputs.map((input) => `${parent} > ${input}`)).join(', ')
   return [
     // An input fills its field, and a select joined with its action fills it too, see docs/reference/shell.md#layout.
     `${fieldWidth} { width: 100%; }`,
-    // A message sits 4px under its control. The gap under the message is the form's.
-    `.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: ${type.fontSize}px; line-height: 20px; }`,
-    '.ant-form-item-margin-offset { display: none; }',
     `.ant-btn-variant-text:not(:disabled):focus-visible { background: ${hoverFill}; }`,
     `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,
   ].join('\n')
