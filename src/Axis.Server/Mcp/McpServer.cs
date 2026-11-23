@@ -79,6 +79,10 @@ internal static partial class McpServer
     private static readonly ToolProperty _contentInput = new("content", "The full content of the resource, a JSON object with its id and kind.", true, "object");
     private static readonly ToolProperty _pathInput = new("path", "The JSON Pointer of the string in the resource that holds the expression, such as /condition.", true);
     private static readonly ToolProperty _expressionInput = new("expression", "The expression text to check at the path.", true);
+    internal static readonly ToolProperty PageCursor = new(
+        "cursor",
+        "The cursor that the previous page of this tool's output answered, sent with the same input. Leave it out to read the first page.",
+        false);
     private static readonly ToolProperty _cursorInput = new(
         "cursor", "The cursor that the previous page of the diff answered. Leave it out to read the first page.", false);
     private static readonly ToolProperty _namesInput = new(
@@ -107,7 +111,8 @@ internal static partial class McpServer
             ReadReferenceTool,
             "Answers the JSON Schema of a resource kind and the text of the reference pages that describe it, from the installed version of Axis. "
             + $"The topics are the resource kinds: {string.Join(", ", McpReference.Pages.Keys)}.",
-            [_topicInput]),
+            [_topicInput],
+            Paged: true),
         new(
             ListResourcesTool,
             "Lists the resources of an application: each one's id, kind, name, file, version, titles and how many references use it. "
@@ -116,12 +121,14 @@ internal static partial class McpServer
         new(
             ReadResourceTool,
             "Reads one resource of an application by its id: its content and version. Reads the working folder, or your draft when you name one.",
-            [_applicationInput, _idInput, _draftInput]),
+            [_applicationInput, _idInput, _draftInput],
+            Paged: true),
         new(
             ReadModuleResourceTool,
             "Reads one resource of the module version the application pins, with the application's customization layer applied, "
             + "and tells which layer applied and what it added, changed and removed.",
-            [_applicationInput, _moduleInput, _idInput]),
+            [_applicationInput, _moduleInput, _idInput],
+            Paged: true),
         new(
             ReadNamesTool,
             "Lists every name the application defines, module names included. Reads the working folder, or your draft when you name one.",
@@ -179,7 +186,8 @@ internal static partial class McpServer
         new(
             ReadPackageFileTool,
             "Reads one package file of the application: its text and version. Reads the working folder, or your draft when you name one.",
-            [_applicationInput, _packageInput, _filePathInput, _draftInput]),
+            [_applicationInput, _packageInput, _filePathInput, _draftInput],
+            Paged: true),
         new(
             WritePackageFileTool,
             "Creates or replaces one package file in your draft, by the checks of the authoring API, and answers its version and the draft's diagnostics. "
@@ -378,9 +386,10 @@ internal static partial class McpServer
 
     /// <summary>
     /// Runs one tool. A call that names no tool is the JSON-RPC error <c>-32602</c>. An unknown tool, input that breaks the tool's
-    /// input schema and a refused call are a tool error, a result marked <c>isError</c> whose text is a problem title of the
-    /// authoring API or a fixed one. Each call writes one log entry, which names the tool only when it is known, never the input
-    /// or the output.
+    /// input schema, a refused call and a cursor that a paged tool's output did not give are a tool error, a result marked
+    /// <c>isError</c> whose text is a problem title of the authoring API or a fixed one. The output of a paged tool over 1 MiB is
+    /// answered as one page, see <see href="docs/reference/mcp-server.md#limits">limits</see>. Each call writes one log entry, which
+    /// names the tool only when it is known, never the input or the output.
     /// </summary>
     private static async Task<IResult> CallToolAsync(JsonNode? parameters, JsonNode? id, McpToolContext context, ILogger logger, CancellationToken ct)
     {
@@ -400,7 +409,7 @@ internal static partial class McpServer
         if (definition.Read(call["arguments"]) is not { } arguments)
         {
             LogToolCall(logger, tool, clientId, "tool error");
-            return ToolError(id, definition.Properties.Count == 0 ? "The tool takes no input." : InputMismatch);
+            return ToolError(id, definition.Inputs.Count == 0 ? "The tool takes no input." : InputMismatch);
         }
 
         var (output, error) = await RunAsync(tool, arguments, context, ct);
@@ -411,6 +420,18 @@ internal static partial class McpServer
         }
 
         var node = JsonSerializer.SerializeToNode(output, JsonSerializerOptions.Web);
+        if (definition.Paged)
+        {
+            var (page, pageError) = McpOutputPages.Page(node!.ToJsonString(), arguments.GetValueOrDefault(PageCursor.Name));
+            if (pageError is not null)
+            {
+                LogToolCall(logger, tool, clientId, "tool error");
+                return ToolError(id, pageError);
+            }
+
+            node = page ?? node;
+        }
+
         LogToolCall(logger, tool, clientId, "succeeded");
         return Result(id, new JsonObject
         {
@@ -578,14 +599,25 @@ internal sealed class McpMetadataRoute
 /// </summary>
 internal sealed record ToolProperty(string Name, string Description, bool Required, string Type = "string");
 
-/// <summary>A tool of the MCP server: its name, its description and the properties of its input.</summary>
-internal sealed record ToolDefinition(string Name, string Description, IReadOnlyList<ToolProperty> Properties)
+/// <summary>
+/// A tool of the MCP server: its name, its description and the properties of its input. A <paramref name="Paged"/> tool answers an
+/// output over 1 MiB in pages, see <see href="docs/reference/mcp-server.md#limits">limits</see>, so it also takes the optional
+/// <c>cursor</c> input that its description explains.
+/// </summary>
+internal sealed record ToolDefinition(string Name, string Description, IReadOnlyList<ToolProperty> Properties, bool Paged = false)
 {
-    /// <summary>The <c>tools/list</c> entry: the name, the description and an input schema that lists exactly the properties.</summary>
+    private const string PagedDescription =
+        " An output over 1 MiB comes in pages of part and cursor: join the parts in order, and call again with the same input and the cursor for the next page. "
+        + "The last page's cursor is null.";
+
+    /// <summary>The properties of the tool's input: its own and, for a paged tool, the <c>cursor</c>.</summary>
+    public IReadOnlyList<ToolProperty> Inputs => Paged ? [.. Properties, McpServer.PageCursor] : Properties;
+
+    /// <summary>The <c>tools/list</c> entry: the name, the description and an input schema that lists exactly the inputs.</summary>
     public JsonObject Describe()
     {
         var properties = new JsonObject();
-        foreach (var property in Properties)
+        foreach (var property in Inputs)
         {
             var described = new JsonObject { ["type"] = property.Type, ["description"] = property.Description };
             if (property.Type == "array")
@@ -599,12 +631,12 @@ internal sealed record ToolDefinition(string Name, string Description, IReadOnly
         return new JsonObject
         {
             ["name"] = Name,
-            ["description"] = Description,
+            ["description"] = Paged ? Description + PagedDescription : Description,
             ["inputSchema"] = new JsonObject
             {
                 ["type"] = "object",
                 ["properties"] = properties,
-                ["required"] = new JsonArray([.. Properties.Where(property => property.Required).Select(property => (JsonNode)property.Name)]),
+                ["required"] = new JsonArray([.. Inputs.Where(property => property.Required).Select(property => (JsonNode)property.Name)]),
                 ["additionalProperties"] = false,
             },
         };
@@ -625,7 +657,7 @@ internal sealed record ToolDefinition(string Name, string Description, IReadOnly
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (key, value) in arguments?.AsObject() ?? [])
         {
-            if (Properties.FirstOrDefault(property => property.Name == key) is not { } property || ReadValue(property, value) is not { } content)
+            if (Inputs.FirstOrDefault(property => property.Name == key) is not { } property || ReadValue(property, value) is not { } content)
             {
                 return null;
             }
@@ -633,7 +665,7 @@ internal sealed record ToolDefinition(string Name, string Description, IReadOnly
             values[key] = content;
         }
 
-        return Properties.All(property => !property.Required || values.ContainsKey(property.Name)) ? values : null;
+        return Inputs.All(property => !property.Required || values.ContainsKey(property.Name)) ? values : null;
     }
 
     private static string? ReadValue(ToolProperty property, JsonNode? value) => property.Type switch

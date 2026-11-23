@@ -34,6 +34,7 @@ public sealed class McpPackageFileToolTests(KeycloakFixture keycloak, PostgreSql
     private const string NoPackageFile = "The application has no package file at this path.";
     private const string NoDeveloper = "You do not hold the developer role.";
     private const string SwitchOff = "Application packages are off in this tenant.";
+    private const string ForeignCursor = "The cursor is not one this output gave.";
     private const string Adapter = "packages/x/adapter.py";
 
     private readonly string _applications = Directory.CreateTempSubdirectory("axis-mcp-package-files-").FullName;
@@ -185,6 +186,54 @@ public sealed class McpPackageFileToolTests(KeycloakFixture keycloak, PostgreSql
     }
 
     [Fact]
+    public async Task A_package_file_over_one_mebibyte_is_read_page_by_page_and_a_changed_file_refuses_the_cursor()
+    {
+        await StartAsync(developerRole: "publisher", switchOn: true);
+        var text = string.Concat(Enumerable.Repeat("print(\"big\") # <file> Tiếng Việt, é and 😀\n", 30_000));
+        var path = Path.Combine(Folder, "packages", "x", "big.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, text, CancellationToken);
+        var arguments = Arguments(null, "x", "big.txt");
+
+        var parts = new List<string>();
+        string? cursor = null;
+        string? firstCursor = null;
+        do
+        {
+            var page = await CallAsync("read_package_file", cursor is null ? arguments : WithCursor(arguments, cursor));
+            Assert.False(page.IsError, page.Error);
+            Assert.True(Encoding.UTF8.GetByteCount(page.Output!.ToJsonString()) <= StudioDiffPages.PageBytes);
+            parts.Add(page.Output["part"]!.GetValue<string>());
+            cursor = page.Output["cursor"]?.GetValue<string>();
+            firstCursor ??= cursor;
+            Assert.True(parts.Count <= 10, "The pages do not end.");
+        }
+        while (cursor is not null);
+
+        Assert.True(parts.Count > 1);
+        var whole = JsonNode.Parse(string.Concat(parts))!;
+        Assert.Equal(text, whole["content"]!.GetValue<string>());
+        Assert.Equal(Hash(text), whole["version"]!.GetValue<string>());
+
+        // A cursor of the file as it was is refused once the file has changed, and so is one that no page gave.
+        await File.WriteAllTextAsync(path, text + "print('changed')\n", CancellationToken);
+        Assert.Equal(ForeignCursor, (await CallAsync("read_package_file", WithCursor(arguments, firstCursor!))).Error);
+        Assert.Equal(ForeignCursor, (await CallAsync("read_package_file", WithCursor(arguments, "garbage"))).Error);
+    }
+
+    [Fact]
+    public async Task A_cursor_on_a_package_file_that_gave_none_is_refused()
+    {
+        await StartAsync(developerRole: "publisher", switchOn: true);
+        var path = Path.Combine(Folder, "packages", "x", "small.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, "small\n", CancellationToken);
+
+        Assert.Equal(ForeignCursor, (await CallAsync("read_package_file", WithCursor(Arguments(null, "x", "small.txt"), "garbage"))).Error);
+        Assert.Equal("small\n", (await CallAsync("read_package_file", Arguments(null, "x", "small.txt"))).Output!["content"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Another_persons_draft_or_an_unknown_draft_answers_no_draft_and_nothing_changes()
     {
         await StartAsync(developerRole: "publisher", switchOn: true);
@@ -294,6 +343,13 @@ public sealed class McpPackageFileToolTests(KeycloakFixture keycloak, PostgreSql
             ["path"] = path,
             ["content"] = content,
         }.Where(pair => pair.Value is not null).Select(pair => new KeyValuePair<string, JsonNode?>(pair.Key, pair.Value))).ToJsonString();
+
+    private static string WithCursor(string arguments, string cursor)
+    {
+        var withCursor = JsonNode.Parse(arguments)!.AsObject();
+        withCursor["cursor"] = cursor;
+        return withCursor.ToJsonString();
+    }
 
     private static string Hash(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 
