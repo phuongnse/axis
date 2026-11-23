@@ -64,7 +64,7 @@ test.describe('author runs the test scenarios of the purchase request sample fro
     })
     const failed = page.locator('[data-testid="studio-test-result"][data-outcome="failed"]')
     await expect(failed).toHaveCount(1)
-    await expect(failed).toContainText('Step 6')
+    await expect(failed).toContainText('Failed at step 6')
 
     await failed.getByRole('link', { name: 'ApprovalBelowThreshold', exact: true }).click()
     await expect(page).toHaveURL(/path=%2Fsteps%2F5/)

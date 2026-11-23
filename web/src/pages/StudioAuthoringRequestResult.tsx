@@ -17,6 +17,7 @@ import {
   type StudioRequest,
   type StudioResourceItem,
 } from '../platform/studio'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -49,11 +50,11 @@ async function allDiffEntries(
 /**
  * The body of the Result item of a ready, failed or accepted request: the Checks and Review lines with their verdicts,
  * then the request's changes, folded resource by resource. Show the checks opens the compile's problems and the scenario
- * results. The changes are read again when the request moves on, and a failed read shows no changes. A ready request's author
- * sees Preview the draft after the changes when `previewHost` is set. It sends the draft's preview route and follows the
- * request with `fetchStudioRequest`, kept in memory for this visit, and is off while it runs. Its status line ends with a link to
- * each of `sites` on the preview host, as the band's Preview does. See docs/reference/ai-authoring-in-studio.md#the-diff and
- * #preview-the-draft.
+ * results, whose names link to Studio. The changes are read again when the request moves on, and a failed read shows no
+ * changes. A ready request's author sees Preview the draft after the changes when `previewHost` is set. It sends the draft's
+ * preview route and follows the request with `fetchStudioRequest`, kept in memory for this visit, and is off while it runs.
+ * Its status line ends with a link to each of `sites` on the preview host, as the band's Preview does. See
+ * docs/reference/ai-authoring-in-studio.md#the-diff and #preview-the-draft.
  */
 export function StudioAuthoringRequestResult({
   application,
@@ -192,6 +193,7 @@ export function StudioAuthoringRequestResult({
                     status: checks.checks.scenarios.outcome === 'passed' ? 'succeeded' : 'failed',
                     scenarios: checks.checks.scenarios.items,
                   }}
+                  scenarioAddressOf={(id, path) => studioResourceAddress(application, id, path)}
                 />
               )}
             </Flex>

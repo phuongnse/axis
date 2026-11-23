@@ -1343,6 +1343,31 @@ describe('StudioAuthoringRequestPage Result item', () => {
     expect(within(layer).getByTestId('json-diff-after')).toHaveTextContent('"supplier"')
   })
 
+  it("links each scenario's name to its Studio address in the checks, and leaves a skipped scenario's name as text", async () => {
+    const skipped = {
+      name: 'department-budgets/X',
+      file: 'scenarios/x.json',
+      outcome: 'skipped',
+      point: 'Budget/effects/decisionRecorded',
+    }
+    const checks = { ...passedChecks, scenarios: { ...passedChecks.scenarios, items: [scenario, skipped] } }
+    const server = serverOf(request({ state: 'ready', author: 'u1', steps: [checkStep(checks, 'passed')] }))
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ userId: 'u1' })
+
+    const summary = await screen.findByTestId('studio-ai-request-checks')
+    await userEvent.click(within(summary).getByRole('button', { name: 'Show the checks' }))
+    const [passed, muted] = within(screen.getByTestId('studio-ai-request-checks-detail')).getAllByTestId(
+      'studio-test-result',
+    )
+    expect(within(passed).getByRole('link', { name: 'ApprovalBelowThreshold' })).toHaveAttribute(
+      'href',
+      studioResourceAddress(application, 'r1'),
+    )
+    expect(within(muted).getByText('department-budgets/X')).toBeVisible()
+    expect(within(muted).queryByRole('link')).not.toBeInTheDocument()
+  })
+
   it('shows a failed request with its reason, its failed checks with both problems, and no review line', async () => {
     const server = serverOf(
       request({ state: 'failed', author: 'u1', round: 1, steps: [checkStep(failedCompile, 'failed')] }),

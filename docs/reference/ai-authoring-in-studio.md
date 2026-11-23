@@ -300,7 +300,7 @@ line's summary sits under it, across the columns and flush with the name.
 
 The checks' detail folds in under its line, inside it and indented `spacing-md`. It shows the compile's
 problems through [`StudioProblemList`](shared-widgets.md#which-widget), then the results of the scenarios,
-see [scenario results](#scenario-results). The problems and the scenarios are plain rows for now.
+see [scenario results](#scenario-results). Each scenario's name links to it. The problems are plain rows for now.
 `spacing-xs` parts the lines of one group, and `spacing-sm` parts the review from the checks.
 
 ### What the review found
@@ -355,8 +355,6 @@ name, its kind and its change. The block starts closed behind **Show the diff** 
   [`ResourceReference`](shared-widgets.md#which-widget) reads.
 
 ### Scenario results
-
-_(planned for M35)_
 
 Each scenario result has its outcome as a status tag in a column of its own: Passed (`success`), Failed (`danger`)
 or Skipped (`muted`). Then come its name, its kind and its time. The name is a link, and the kind and the time are
