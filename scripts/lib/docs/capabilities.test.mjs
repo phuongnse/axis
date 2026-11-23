@@ -29,14 +29,20 @@ describe('capability map', () => {
     assert.deepEqual(messages(), [])
   })
 
-  test('passes a row whose cell is only a planned marker with no milestone', () => {
-    writePage(['| Choose one path | [Steps](reference/processes.md#steps) |', '| Run later | _(planned)_ |'])
+  test('passes a row whose cell is only a planned marker with an issue and no milestone', () => {
+    writePage(['| Choose one path | [Steps](reference/processes.md#steps) |', '| Run later | _(planned, #12)_ |'])
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('passes a row whose cell is a planned marker for a listed milestone with an issue', () => {
+    writePage(['| Choose one path | [Steps](reference/processes.md#steps) |', '| Run two paths at once | _(planned for M38, #12)_ |'])
 
     assert.deepEqual(messages(), [])
   })
 
   test('reports a planned marker with no milestone that shares its cell with other words', () => {
-    const text = writePage(['| Run later | Later, _(planned)_ |'])
+    const text = writePage(['| Run later | Later, _(planned, #12)_ |'])
 
     assert.deepEqual(messages(), [
       `${page}:${lineOf(text, 'Run later')}: 'Run later' has no home: link the doc section that holds its rule, or put a planned marker alone in the cell`,
@@ -81,6 +87,12 @@ describe('capability map', () => {
 
   test('reports a milestone the roadmap does not list', () => {
     const text = writePage(['| Run two paths at once | _(planned for M99)_ |'])
+
+    assert.deepEqual(messages(), [`${page}:${lineOf(text, 'Run two')}: 'Run two paths at once' is planned for M99, which the roadmap does not list`])
+  })
+
+  test('reports a milestone the roadmap does not list when the marker also names an issue', () => {
+    const text = writePage(['| Run two paths at once | _(planned for M99, #12)_ |'])
 
     assert.deepEqual(messages(), [`${page}:${lineOf(text, 'Run two')}: 'Run two paths at once' is planned for M99, which the roadmap does not list`])
   })

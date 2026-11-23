@@ -32,11 +32,11 @@ opens the same view.
 - **The AI requests table** _(planned for M35)_. `&view=requests` shows the [AI requests](ai-authoring-in-studio.md#the-request-panel) table.
 - **A field.** `&field=<name>` opens a field's [side panel](entity-designer.md#field-drawer) on an entity's page. Opening and
   closing add a history entry, a rename replaces the name, and a name no field has opens nothing and is dropped.
-- **A validation** _(planned)_. `&validation=<name>` opens a validation's side panel on an entity's page, and follows
+- **A validation** _(planned, #5049)_. `&validation=<name>` opens a validation's side panel on an entity's page, and follows
   the rules of `&field`.
-- **An index** _(planned)_. `&index=<name>` opens an index's side panel on an entity's page, and follows the rules of
+- **An index** _(planned, #5049)_. `&index=<name>` opens an index's side panel on an entity's page, and follows the rules of
   `&field`.
-- **A list's item** _(planned)_. `&item=<pointer>`, such as `&item=/modules/0`, opens that item of a
+- **A list's item** _(planned, #5059)_. `&item=<pointer>`, such as `&item=/modules/0`, opens that item of a
   [list of objects](studio-resource-form.md#lists-of-objects) in the side panel, and follows the rules of `&field`.
 - **A package file at its line.** `&view=packages&package=<id>&file=<path>&line=<n>` opens the file, with `<path>` its
   path in the package, in the [Packages entry](studio-packages.md#the-packages-entry). Its cursor sits at the start of
@@ -368,7 +368,7 @@ resource, and Undo steps through it.
   resource's title does, so a table and a picker never name one resource two ways. The label editor's own
   rule, a box in the author's language or else the application's first, is about which language is
   edited, and stays.
-- **Texts held by a side panel** _(planned)_. Texts typed in a side panel are written into the draft only by the
+- **Texts held by a side panel** _(planned, #5049)_. Texts typed in a side panel are written into the draft only by the
   panel's main action, such as Done or Add field. Cancel drops them, so a cancelled new item leaves no text behind.
 
 ## Expression editor

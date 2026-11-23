@@ -8,8 +8,8 @@ const tableHeader = /^\|\s*Job\s*\|\s*Shared widget\s*\|/
 const identifier = /`([A-Za-z]\w*)`/g
 /** A name that Ant Design's own API has, such as Ant Design's `Button`. */
 const antDesignName = /Ant Design's `\w+`/g
-/** A row with this marker names work that the code does not have yet, a planned marker of a milestone or a bare one. */
-const plannedMarker = /_\(planned(?: for M\w+)?\)_/
+/** A row with this marker names work that the code does not have yet: a planned marker with a milestone, an issue number or both, see docs/writing-docs.md#planned-work. */
+const plannedMarker = /_\(planned(?: for [^)#]+?)?(?:, #\d+)?\)_/
 /** A row that names a source path is about the server, which the SPA does not hold. */
 const serverPath = /`src\/Axis\./
 /** An export of a function, a constant, a let, a class or the default. */
@@ -65,10 +65,11 @@ describe('the Which widget table', () => {
   it('names the widgets of a row without a planned marker as required', () => {
     const { all, required } = documentedNames([
       "| A thing | `KeptThing`, never Ant Design's `Button` |",
-      '| A planned thing | `PlannedThing` _(planned for Mx)_ |',
+      '| A planned thing | `PlannedThing` _(planned, #12)_ |',
+      '| A milestone thing | `MilestoneThing` _(planned for Mx, #12)_ |',
     ])
     expect(required).toEqual(new Set(['KeptThing']))
-    expect(all).toEqual(new Set(['KeptThing', 'Button', 'PlannedThing']))
+    expect(all).toEqual(new Set(['KeptThing', 'Button', 'PlannedThing', 'MilestoneThing']))
   })
 
   it("does not require a lowercase prop, a name after Ant Design's or a server row", () => {

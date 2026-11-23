@@ -34,7 +34,7 @@ The legal line closes every page with the copyright and the legal links.
 
 - **One line in two places.** Every page of the identity provider ends in it, under the card and as wide as the card,
   and so does the shell's footer, see [layout](shell.md#layout).
-- **Under the card** _(planned)_. The line ends every page that signs a person in or up, under its card: the identity
+- **Under the card** _(planned, #5065)_. The line ends every page that signs a person in or up, under its card: the identity
   provider's pages, the sign-up pages and the shell's [sign-in card](shell.md#the-sign-in-card).
 - **The sign-up pages**. Every page of [sign-up](sign-up.md#the-page) ends in the line
   too, in the page's language. Its Privacy, Terms and Licences addresses come from the control plane, see
@@ -46,7 +46,7 @@ The legal line closes every page with the copyright and the legal links.
   Licences opens keeps its full title.
 - **Not in the account menu**. The account menu holds no legal line, because the footer holds it on
   every page.
-- **In the account menu** _(planned)_. A signed-in person finds Privacy, Terms and Licences in the account menu's
+- **In the account menu** _(planned, #5065)_. A signed-in person finds Privacy, Terms and Licences in the account menu's
   Legal group, without the copyright, see [account button](shell.md#account-button).
 
 ## Open source licences
@@ -67,7 +67,7 @@ Axis lists the licence of everything it ships on a page that anyone can open.
   weaknesses to try. A search box filters both by name or licence. A licence that is one SPDX identifier links its
   text on spdx.org, and one that is an `https` address links that address. Any other licence, such as an expression,
   a file name or `UNKNOWN`, shows as plain text.
-- **The version Axis runs** _(planned)_. A signed-in person also sees the server's version on this page, from
+- **The version Axis runs** _(planned, #5065)_. A signed-in person also sees the server's version on this page, from
   [`GET /api/about`](shell.md#endpoints), beside Axis's licence and source, as the shell shows no version. An
   anonymous visitor does not see it, for the same reason.
 - **Filter on each list.** Each list has its own Filter on Package, Licence and, for a signed-in person, Version,

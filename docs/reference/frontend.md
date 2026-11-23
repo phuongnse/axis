@@ -52,11 +52,11 @@ component holds a number of its own.
   held to the 3:1 of a control's edge. Each tone's words reach 4.5:1 on its fill, on `surface` and on `canvas` in both
   modes. The tints come from the Ant Design theme in use, through `useStatusTints()` in `antTheme.ts`, see
   [which widget](shared-widgets.md#which-widget).
-- **Rules on a flush page** _(planned)_. `borderSubtle` stands apart from `surface` about as much in light mode as in
+- **Rules on a flush page** _(planned, #5134)_. `borderSubtle` stands apart from `surface` about as much in light mode as in
   dark, because on a flush page a rule is all that parts two areas. `border` stays for controls.
 - **One meaning, one sign**. A sign means one thing and looks one way. The same icon for the same meaning
   has one shape, size and colour on every screen, whichever widget draws it.
-- **One chevron** _(planned)_. Every chevron is Ant Design's `DownOutlined` at 12 px in `textMuted`, turned to point
+- **One chevron** _(planned, #5122)_. Every chevron is Ant Design's `DownOutlined` at 12 px in `textMuted`, turned to point
   down for open or a menu below, right for closed and up for a panel that opens upwards, and left for a previous
   arrow and right for a next arrow of a pagination or a date panel: a select's arrow, a caret, a fold and a panel's
   collapse. `Chevron` draws it.
@@ -151,7 +151,7 @@ A value reads the same in every widget: in an input, a read-only field, a table 
   KPI's dash carries a visually hidden `shell.kpi.empty` ("No value") for assistive technology. Words go where fields
   are read one by one, and a dash where values are read at a glance or compared. What tells an empty value from a
   typed one is the styling, in which no value is ever drawn, never the words.
-- **When something happened** _(planned)_. A record in time, such as a timeline's run, a history's entry or a
+- **When something happened** _(planned, #5132)_. A record in time, such as a timeline's run, a history's entry or a
   notification, reads within a week as how long ago, in the locale's words, such as "5 minutes ago". Its exact date and
   time is its tooltip, read after the words, and the words move on once a minute. After a week it reads its date and
   time, as above. A date or a time that is data, such as a field, a due date or an instance's Started, keeps its format.
@@ -533,7 +533,7 @@ below answers `200`.
   a new address opens at the top. A change that stays on the same page keeps the position: a table's search, filter,
   sort, page or page size, or a tab. Pages load their rows after they open, so after Back the page keeps the height it
   had until its content is that tall again, and the position still fits.
-- **Scroll kept in the page's frame** _(planned)_. The page's frame, not the window, keeps its scroll position for each
+- **Scroll kept in the page's frame** _(planned, #5065)_. The page's frame, not the window, keeps its scroll position for each
   history entry. A new address opens at the top of the frame, and Back and Forward bring the frame back to where the
   person left it.
 
@@ -595,7 +595,7 @@ below answers `200`.
   `{page}` is the label of the first navigation entry. No save bar and no record action shows. Such a page is mostly
   opened from an email, a bookmark or a shared link, so no entry is marked, and at narrow width the sidebar is hidden,
   so the link stays.
-- **A missing task or instance** _(planned)_. A task page whose well-formed task id the task API answers `404` for
+- **A missing task or instance**. A task page whose well-formed task id the task API answers `404` for
   shows the same line under its inbox page's heading, see [task page](task-inbox-widget.md#task-page). An instance page
   whose well-formed id the inspection API answers `404` for shows the same line under its heading, see
   [instance page](process-inspector-widget.md#instance-page).
