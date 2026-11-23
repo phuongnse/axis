@@ -568,6 +568,84 @@ public sealed class BillingApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_downgrade_that_the_use_does_not_fit_answers_409_names_each_quota_over_and_changes_nothing_and_the_same_key_acts_once_the_use_fits()
+    {
+        var id = await SeedAsync(Tenant, "active");
+        await Execute($"UPDATE control_plane.subscriptions SET plan_version = 2 WHERE id = '{id}'");
+        await Execute($"INSERT INTO control_plane.subscription_add_ons (subscription_id, add_on_code, quantity) VALUES ('{id}', 'users-10', 2)");
+        _cell.Usage = new
+        {
+            storage = new { limit = 21_474_836_480L, used = 16_106_127_360L },
+            users = new { limit = 45L, used = 32L },
+            applications = new { limit = 5L, used = 5L },
+            emailsPerDay = new { limit = 2000L, used = 2000L },
+        };
+
+        var refused = await PutPlanAsync(Tenant, "plan:down", Team(1), Token());
+
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        using (var problem = JsonDocument.Parse(await refused.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)))
+        {
+            var quotas = problem.RootElement.GetProperty("quotas").EnumerateArray().ToDictionary(item => item.GetProperty("quota").GetString()!);
+            Assert.Equal(["storage", "users"], quotas.Keys.Order());
+            Assert.Equal((10_737_418_240L, 16_106_127_360L, 5_368_709_120L), LimitUsedOver(quotas["storage"]));
+            Assert.Equal((25L, 32L, 7L), LimitUsedOver(quotas["users"]));
+        }
+
+        Assert.Equal(2, await ScalarAsync<int>($"SELECT plan_version FROM control_plane.subscriptions WHERE id = '{id}'"));
+        Assert.Equal("users-10:2", await TextAsync($"SELECT add_on_code || ':' || quantity FROM control_plane.subscription_add_ons WHERE subscription_id = '{id}'"));
+        Assert.Empty(await AuditAsync(id.ToString()));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs"));
+        Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
+        Assert.Empty(_cell.Puts);
+
+        _cell.Usage = new
+        {
+            storage = new { limit = 21_474_836_480L, used = 1_048_576L },
+            users = new { limit = 45L, used = 20L },
+            applications = new { limit = 5L, used = 5L },
+            emailsPerDay = new { limit = 2000L, used = 2000L },
+        };
+
+        var retried = await PutPlanAsync(Tenant, "plan:down", Team(1), Token());
+
+        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
+        Assert.Equal(1, await ScalarAsync<int>($"SELECT plan_version FROM control_plane.subscriptions WHERE id = '{id}'"));
+        Assert.Equal("subscription.planSet", Assert.Single(await AuditAsync(id.ToString())).Action);
+    }
+
+    [Fact]
+    public async Task A_plan_that_raises_the_quota_the_tenant_is_already_over_answers_200_and_queues_the_quotas()
+    {
+        await SeedAsync(Tenant, "active");
+        _cell.Usage = new
+        {
+            storage = new { limit = 10_737_418_240L, used = 16_106_127_360L },
+            users = new { limit = 25L, used = 12L },
+            applications = new { limit = 5L, used = 1L },
+            emailsPerDay = new { limit = 2000L, used = 40L },
+        };
+
+        var response = await PutPlanAsync(Tenant, "plan:up", Team(2), Token());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1L, await ScalarAsync<long>($"SELECT count(*) FROM control_plane.jobs WHERE kind = '{SubscriptionQuotas.JobKind}'"));
+    }
+
+    [Fact]
+    public async Task A_plan_call_whose_cell_read_fails_answers_502_and_changes_nothing()
+    {
+        var id = await SeedAsync(Tenant, "active");
+        _cell.FailReads = true;
+
+        var response = await PutPlanAsync(Tenant, "plan:unreadable", Team(2), Token());
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        await AssertPlanUnchangedAsync(id, "active");
+        Assert.Empty(_cell.Puts);
+    }
+
+    [Fact]
     public async Task The_same_key_and_body_twice_on_the_plan_call_answer_the_same_and_write_one_record_and_one_job_and_the_same_key_on_another_route_answers_422()
     {
         var id = await SeedAsync(Tenant, "active");
@@ -844,6 +922,9 @@ public sealed class BillingApiTests : IAsyncLifetime
         Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs"));
         Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.billing_requests"));
     }
+
+    private static (long Limit, long Used, long Over) LimitUsedOver(JsonElement quota) =>
+        (quota.GetProperty("limit").GetInt64(), quota.GetProperty("used").GetInt64(), quota.GetProperty("over").GetInt64());
 
     private static string Team(int version, params (string Code, int Quantity)[] addOns) =>
         JsonSerializer.Serialize(new { code = "team", version, addOns = addOns.Select(a => new { code = a.Code, quantity = a.Quantity }) });

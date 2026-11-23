@@ -64,7 +64,8 @@ internal sealed partial class SubscriptionQuotas(
                 return;
             }
 
-            set = await BuildAsync(connection, id, pinned.Plan, cancellationToken);
+            var addOns = await SubscriptionPlans.ReadAddOnsAsync(connection, null, id, pinned.Plan, cancellationToken);
+            set = await ComputeAsync(connection, null, id, pinned.Plan, addOns, clock.GetUtcNow(), cancellationToken);
         }
 
         var cellId = await TenantCells.FindCellIdAsync(directory, tenantId, cancellationToken);
@@ -86,21 +87,32 @@ internal sealed partial class SubscriptionQuotas(
         }
     }
 
-    // The plan's quotas, users from the included users and the add-on packs, and then the overrides that have not ended.
-    private async Task<Dictionary<string, long>> BuildAsync(NpgsqlConnection connection, Guid id, PlanVersion plan, CancellationToken cancellationToken)
+    /// <summary>
+    /// The quotas that a subscription gets: the plan's quotas, <c>users</c> from the included users and the add-on packs, and then the overrides that have not ended at
+    /// <paramref name="now"/>. The job writes this set to the cell, and the billing API's plan call compares it with the tenant's use, see
+    /// <c>docs/reference/billing-api.md#setting-the-plan-and-add-ons</c>. It reads the overrides in the <paramref name="transaction"/> when one is given.
+    /// </summary>
+    public static async Task<Dictionary<string, long>> ComputeAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        Guid subscriptionId,
+        PlanVersion plan,
+        IEnumerable<(PlanAddOn AddOn, int Quantity)> addOns,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
         var set = new Dictionary<string, long>(plan.Quotas, StringComparer.Ordinal);
         var users = plan.IncludedUsers;
-        foreach (var (addOn, quantity) in await SubscriptionPlans.ReadAddOnsAsync(connection, null, id, plan, cancellationToken))
+        foreach (var (addOn, quantity) in addOns)
         {
             users = checked(users + (addOn.Users * quantity));
         }
 
         set[QuotaKeys.Users] = users;
 
-        await using var overrides = new NpgsqlCommand("SELECT quota, value FROM control_plane.quota_overrides WHERE subscription_id = $1 AND until > $2", connection);
-        overrides.Parameters.AddWithValue(id);
-        overrides.Parameters.AddWithValue(clock.GetUtcNow());
+        await using var overrides = new NpgsqlCommand("SELECT quota, value FROM control_plane.quota_overrides WHERE subscription_id = $1 AND until > $2", connection, transaction);
+        overrides.Parameters.AddWithValue(subscriptionId);
+        overrides.Parameters.AddWithValue(now);
         await using var overrideReader = await overrides.ExecuteReaderAsync(cancellationToken);
         while (await overrideReader.ReadAsync(cancellationToken))
         {
