@@ -194,8 +194,6 @@ Open threats, which no issue closes yet, see [threat model method](threat-model-
 
 ### Billing events
 
-_(planned for M34)_
-
 The control plane sends the operator's billing system signed [events](billing-api.md#events) as jobs on its
 queue. They flow outward, the opposite way to the billing API's calls.
 
