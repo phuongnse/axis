@@ -118,31 +118,30 @@ export function StudioPublishPage({
 
   return (
     <PageLayout title={t('shell.studio.publish.title')} line={line}>
-      <AxisFieldGroup title={t('shell.studio.publish.release')} help="">
-        <Flex vertical gap="middle">
-          <AxisField label={t('shell.studio.publish.label')} help={t('shell.studio.publish.labelHelp')}>
-            <Input maxLength={100} value={label} onChange={(event) => setLabel(event.target.value)} />
-          </AxisField>
-          <AxisField label={t('shell.studio.publish.note')} help={t('shell.studio.publish.noteHelp')}>
-            <Input.TextArea
-              maxLength={2000}
-              autoSize={{ minRows: 3, maxRows: 8 }}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
-          </AxisField>
-        </Flex>
-      </AxisFieldGroup>
-      {changes !== null && changes.diff.resources.length > 0 && (
-        <SectionParts>
+      {/* Proposed: the release and its changes are parts of one column, a rule apart, see #4623. */}
+      <SectionParts>
+        <SectionPart testName="publish-release">
+          <AxisFieldGroup title={t('shell.studio.publish.release')} help="">
+            <Flex vertical gap="middle">
+              <AxisField label={t('shell.studio.publish.label')} help={t('shell.studio.publish.labelHelp')}>
+                <Input maxLength={100} value={label} onChange={(event) => setLabel(event.target.value)} />
+              </AxisField>
+              <AxisField label={t('shell.studio.publish.note')} help={t('shell.studio.publish.noteHelp')}>
+                <Input.TextArea
+                  maxLength={2000}
+                  autoSize={{ minRows: 3, maxRows: 8 }}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                />
+              </AxisField>
+            </Flex>
+          </AxisFieldGroup>
+        </SectionPart>
+        {changes !== null && changes.diff.resources.length > 0 && (
           <SectionPart
             testName="publish-changes"
-            heading={{
-              title:
-                changes.diff.resources.length === 1
-                  ? t('shell.studio.publish.changes.one')
-                  : fillText(t('shell.studio.publish.changes.many'), { count: changes.diff.resources.length }),
-            }}
+            // Proposed: one heading whatever the number of files, as each file's block says what changed, see #4623.
+            heading={{ title: t('shell.studio.publish.changes') }}
           >
             {/* Proposed: the files fold at first, as the page lists every file since the live release, see #4623. */}
             <StudioChanges
@@ -155,8 +154,8 @@ export function StudioPublishPage({
               }}
             />
           </SectionPart>
-        </SectionParts>
-      )}
+        )}
+      </SectionParts>
       <ActionBar
         start={
           loaded === null || allLive ? undefined : (
