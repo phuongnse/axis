@@ -97,7 +97,7 @@ an accept, which [accepting](#accepting) describes.
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/drop`                                | Moves a request to `dropped` from any state but `accepted` and `dropped`                                   |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/accept`                              | Stores an `accept` publish request for the draft of a `ready` request and answers `202` with it            |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/retry` _(planned for M35)_           | Moves a `ready` request whose accept met a conflict back to `working` with no draft                        |
-| `POST /api/studio/apps/{application}/authoring-requests/{id}/request-changes` _(planned for M35)_ | Moves a request from `ready` back to `working` and keeps the comment as a `changeRequest` step             |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/request-changes`                     | Moves a request from `ready` back to `working` and keeps the comment as a `changeRequest` step             |
 | `GET /api/studio/apps/{application}/authoring-requests/{id}/diff`                                 | Reads the changes of the request, as the [draft diff](authoring-revisions.md#draft-diff) shows them        |
 | `GET /api/studio/ai` _(planned for M35)_                                                          | Tells the session's author whether their AI is connected, and the address of the MCP server                |
 | `POST /api/studio/apps/{application}/drafts/{draft}/preview` _(planned for M35)_                  | Tries the draft on the preview tenant, see [the draft preview](#routes)                                    |
@@ -111,10 +111,11 @@ an accept, which [accepting](#accepting) describes.
   writes a row or an audit record, and a bad body never calls the realm. Just before the insert it
   counts the quota again under a lock, so sends at the same time cannot pass it together. The other
   routes check the session, the author role and the application, then answer `404` for an `id` that is
-  not a UUID of this application. Approve, change plan, drop and accept then answer `403` to anyone but
+  not a UUID of this application. Approve, change plan, request changes, drop and accept then answer `403` to anyone but
   the author of the request, and last answer `409` for a request in a state the action does not accept.
   Accept answers `409` for a request that is not `ready` or has no draft, and for a draft that already
-  has an accept queued or running. A refused accept stores nothing. In a cell, an accept over the
+  has an accept queued or running. A refused accept stores nothing. Request changes answers `409` for a
+  request that is not `ready` and for a draft that has an accept queued or running, and it stores nothing then. In a cell, an accept over the
   [`storage` quota](tenant-quotas.md#refusals) is refused with the quota's `403` before these checks,
   as a save is, because it writes the draft as a revision. A drop is not, so the author can still end
   the request.
@@ -124,9 +125,9 @@ an accept, which [accepting](#accepting) describes.
   request's binding needs a key and the author has none. Only then does it get the agent host's
   [token](#acting-for-the-author). No quota is checked.
 - **Who.** Any author lists and reads the requests of an application. Only the author of a request
-  approves its plan, changes it, drops it or accepts its draft.
+  approves its plan, changes it, asks for other changes to its draft, drops it or accepts its draft.
 - **Body.** A send takes `{ text, autoAccept? }` with a `text` of 1 to 4,000 characters. A change of
-  plan takes `{ comment }` of 1 to 2,000 characters. The other routes take no body.
+  plan or a request for changes takes `{ comment }` of 1 to 2,000 characters. The other routes take no body.
 - **Answer.** Accept answers `202` with the queued publish request, in the shape of
   `GET /api/studio/apps/{application}/requests/{id}`, and a `Location` for that route. The other
   routes answer a request, which has its `id`, `application`, `author`, `authorName`, `text`, `title`, `state`, `plan`,
@@ -141,9 +142,11 @@ an accept, which [accepting](#accepting) describes.
   answers `{ items, page, pageSize, totalCount }` through the [shared list query](shared-widgets.md#which-widget),
   and a parameter that is invalid is `400`, as [the revision list](authoring-revisions.md#list) answers. It replaces
   the newest 100.
-- **Requesting changes** _(planned for M35)_. Only the author of the request (`403` to anyone else) takes `{ comment }`
-  of 1 to 2,000 characters. The route answers `409` unless the request is `ready`. It keeps the draft, sets `round`
-  back to 0 and moves the request to `working`. `Ai:RequestTimeout` counts from the `changeRequest` step, and the
+- **Requesting changes.** Only the author of the request (`403` to anyone else) takes `{ comment }`
+  of 1 to 2,000 characters. The route answers `409` unless the request is `ready`, and while the draft has an
+  accept queued or running, so an accept cannot commit a draft that AI is changing. It keeps the draft, sets `round`
+  back to 0, clears the agent host's claim, as a drop does, and moves the request to `working`. It answers the request
+  as it now is. `Ai:RequestTimeout` counts from the `changeRequest` step, and the
   token budget goes on. Without a restart, a request that used up its rounds could never be changed, see
   [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 - **Retrying a conflict as the author** _(planned for M35)_. Only the author of the request (`403` to anyone else)
@@ -281,9 +284,10 @@ the checks, an independent review and fix rounds.
 - **The frame** _(planned for M35)_. Every request, from Studio or from an outside app, follows the same six
   steps: Plan (`planning`), Approval (`awaitingApproval`), Change (`working` and `fixing`), Checks (`checking`),
   Review (`reviewing`) and Ready (`ready`). `accepted`, `dropped` or `failed` ends it.
-- **Requesting changes** _(planned for M35)_. A `ready` request goes back to `working` when its author requests
-  changes, see [routes](#routes). The next working step sees the open findings of the review and every
+- **Requesting changes.** A `ready` request goes back to `working` when its author requests
+  changes, see [routes](#routes). The next working step works in the same draft and sees every
   `changeRequest` comment, oldest first.
+- **Requesting changes and the review** _(planned for M35)_. The next working step also sees the open findings of the review.
 - **The plan's shape**. The plan is an object, and `title` is stored beside it:
 
   ```
@@ -389,7 +393,8 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
   call of the request, review included, 2,000,000 by default. A call is not made when the tokens used so
   far, the last call's input in the step and the binding's `MaxOutputTokens` together would pass the
   budget. The request then stops as `failed` with the outcome `overBudget` and keeps its draft.
-- **Time.** At most `Ai:RequestTimeout` from the plan's approval, 30 minutes by default. A request past
+- **Time.** At most `Ai:RequestTimeout` from the plan's approval or from the newest `changeRequest` step, whichever is
+  later, 30 minutes by default. A request past
   it stops as `failed` with the outcome `timedOut` before its next step, and a step still running at that
   time is cancelled and stops the request the same way. The draft is kept.
 - **Quota** _(planned for M35)_. A request counts toward no quota, because the author's own key pays for it,

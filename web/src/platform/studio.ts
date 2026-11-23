@@ -2181,13 +2181,13 @@ export async function fetchAuthoringRequestDiff(
 }
 
 /**
- * Posts an action on one authoring request, `approve`, `change-plan` or `drop`, and answers the request. A 401 shows the
+ * Posts an action on one authoring request, `approve`, `change-plan`, `request-changes` or `drop`, and answers the request. A 401 shows the
  * sign-in prompt and throws, as any other failed status does.
  */
 async function postAuthoringRequestAction(
   application: string,
   id: string,
-  action: 'approve' | 'change-plan' | 'drop',
+  action: 'approve' | 'change-plan' | 'request-changes' | 'drop',
   body?: { comment: string },
 ): Promise<AuthoringRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}/${action}`
@@ -2213,6 +2213,18 @@ export function changeAuthoringRequestPlan(
   comment: string,
 ): Promise<AuthoringRequest> {
   return postAuthoringRequestAction(application, id, 'change-plan', { comment })
+}
+
+/**
+ * Asks AI for other changes to the ready draft of a request with the author's `comment` (1 to 2,000 characters), which moves
+ * the request back to `working` with its round at 0.
+ */
+export function requestAuthoringRequestChanges(
+  application: string,
+  id: string,
+  comment: string,
+): Promise<AuthoringRequest> {
+  return postAuthoringRequestAction(application, id, 'request-changes', { comment })
 }
 
 /** Drops a request, which ends it as `dropped`. */
