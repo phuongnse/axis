@@ -336,13 +336,16 @@ The reasons are in [D152](../decisions/d152-every-screen-says-where-things-stand
 
 ## Layout shows structure
 
-_(planned for M35)_
-
 How a list is drawn shows what it is: its items, its groups and its order.
 
 - **A list is drawn as a list.** Items that a person reads one by one sit in a list, not in a line joined
   by a middle dot, as [text](#text) says.
-- **Bulleted lists use one component.** `useBulletList` draws every bulleted list, so each keeps one look.
+- **Bulleted lists use one style.** `useBulletList` draws every bulleted list, so each keeps one look. An item
+  that is a sentence gets a filled bullet in the `text` colour, at any depth. The bullets sit about `spacing-md` in
+  from the start of the line above, the words start at `spacing-xl`, and a wrapped line sits under the words. An item
+  led by a mark of its own, such as a problem's severity tag, keeps its bullet, and the mark follows it. A list of
+  rows that are not sentences, such as notices, links or an outline, draws no bullet, as indenting alone never makes
+  something an item of a list.
 - **Order.** A list keeps the order that [list order](#list-order) gives it.
 
 ## Tables

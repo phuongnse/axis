@@ -7,7 +7,7 @@ import type { FieldMetadata } from '../platform/site'
 import type { ExpressionReading as Reading, StudioNames } from '../platform/studio'
 import { labelText } from '../platform/studioNames'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
+import { useBulletList } from '../platform/useBulletList'
 
 /** What a reading needs to name its fields and format its values: the application's names and the author's language. */
 interface Labels {
@@ -29,7 +29,7 @@ export function ExpressionReading({ reading, names, locale }: ExpressionReadingP
 
 function ReadingNode({ node, ...labels }: Labels & { node: Reading }) {
   const t = useText()
-  const tokens = useDesignTokens()
+  const bullets = useBulletList()
 
   switch (node.kind) {
     case 'phrase': {
@@ -53,9 +53,9 @@ function ReadingNode({ node, ...labels }: Labels & { node: Reading }) {
       return (
         <div>
           <Typography.Text>{t(`shell.studio.expression.reads.group.${node.kind}`)}</Typography.Text>
-          <ul style={{ margin: 0, paddingInlineStart: tokens.spacing.lg }}>
+          <ul style={bullets.list}>
             {node.items.map((item, index) => (
-              <li key={index}>
+              <li key={index} style={bullets.item}>
                 <ReadingNode node={item} {...labels} />
               </li>
             ))}

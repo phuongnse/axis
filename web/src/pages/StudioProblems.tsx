@@ -5,6 +5,7 @@ import { StatusTag } from '../platform/StatusTag'
 import { severityText, severityTone, type StudioDiagnostic, type StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useBulletList } from '../platform/useBulletList'
 import { problemsPanelId } from './StudioBand'
 import { FileAtLine } from './FileAtLine'
 import { ResourceReference } from './ResourceReference'
@@ -55,8 +56,8 @@ export function StudioProblems({
 }
 
 /**
- * The problems of a draft or a check, errors first, then warnings, each with its severity, code, message and resource. The
- * severity tag stands apart from the text, which is a column of its own, so a long message wraps under itself. The resource
+ * The problems of a draft or a check, errors first, then warnings, each a bullet of `useBulletList` with its severity, code,
+ * message and resource after it. The severity tag follows the bullet and stands apart from the text, which is a column of its own, so a long message wraps under itself. The resource
  * follows the message on its line. A problem's resource is a link when `addressOf` is given, see {@link ResourceReference},
  * and `addressOf` gives the address of that resource at the problem's path. Without `addressOf`, the resource is plain text.
  * A problem that names no resource shows its file, see {@link FileAtLine}. With `fileAddressOf` it also shows the line, and
@@ -75,14 +76,15 @@ export function StudioProblemList({
   addressOf?: (resourceId: string, path: string) => string
   fileAddressOf?: (file: string, line?: number) => string | undefined
 }) {
+  const bullets = useBulletList()
   const ordered = [
     ...diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
     ...diagnostics.filter((diagnostic) => diagnostic.severity !== 'error'),
   ]
   return (
-    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+    <ul style={bullets.list}>
       {ordered.map((diagnostic, index) => (
-        <li key={index}>
+        <li key={index} style={bullets.item}>
           <DiagnosticRow
             diagnostic={diagnostic}
             resources={resources}
@@ -112,7 +114,7 @@ function DiagnosticRow({
   const resourceId = diagnostic.resourceId
   const resource = resourceId === null ? undefined : resources?.find((item) => item.id === resourceId)
   return (
-    <div style={{ padding: '4px 15px' }}>
+    <div style={{ paddingBlock: 4 }}>
       <Flex gap={spacing.xs} align="baseline">
         <StatusTag tone={severityTone(diagnostic.severity)}>{severityText(t, diagnostic.severity)}</StatusTag>
         <div data-testid="studio-problem-text" style={{ flex: 1, minWidth: 0, whiteSpace: 'normal' }}>

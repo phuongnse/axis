@@ -36,6 +36,7 @@ import {
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useBulletList } from '../platform/useBulletList'
 import { useFollowJob } from '../platform/useFollowJob'
 import { PlatformContext } from './context'
 import { ResourceReference } from './ResourceReference'
@@ -665,6 +666,7 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
   const { spacing } = useDesignTokens()
   const [toggled, setToggled] = useState<boolean>()
   const open = toggled ?? request.state === 'awaitingApproval'
+  const bullets = useBulletList()
   const summary = request.plan?.summary ?? ''
   const [notesOpen, setNotesOpen] = useState(false)
   const plan = request.plan
@@ -676,9 +678,11 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
     </Flex>
   )
   const list = (items: ReactNode[]) => (
-    <ul style={{ margin: 0 }}>
+    <ul style={bullets.list}>
       {items.map((item, index) => (
-        <li key={index}>{item}</li>
+        <li key={index} style={bullets.item}>
+          {item}
+        </li>
       ))}
     </ul>
   )
@@ -720,13 +724,13 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
                   group(
                     'questions',
                     'shell.studio.aiRequest.plan.questions',
-                    <ul style={{ margin: 0 }}>
+                    <ul style={bullets.list}>
                       {plan.questions.map((question, index) => (
-                        <li key={index}>
+                        <li key={index} style={bullets.item}>
                           {question.question}
-                          <ul>
+                          <ul style={bullets.list}>
                             {question.options.map((option, position) => (
-                              <li key={position}>
+                              <li key={position} style={bullets.item}>
                                 {question.recommended === position + 1
                                   ? fillText(t('shell.studio.aiRequest.plan.recommended'), { option })
                                   : option}
@@ -794,6 +798,7 @@ function AcceptConflict({
   resources: StudioResourceItem[]
 }) {
   const t = useText()
+  const bullets = useBulletList()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   return (
     <AxisAlert
@@ -801,7 +806,7 @@ function AcceptConflict({
       data-testid="studio-ai-request-conflict"
       message={t('shell.studio.aiRequest.conflict')}
       description={
-        <ul style={{ margin: 0 }}>
+        <ul style={bullets.list}>
           {conflicts.map((conflict) => {
             const resource = resources.find((item) => item.id === conflict.resourceId)
             const name = (
@@ -822,7 +827,11 @@ function AcceptConflict({
               { locale, text: t },
             )
             return (
-              <li key={`${conflict.resourceId ?? ''}|${conflict.file}`} data-testid="studio-ai-request-conflict-item">
+              <li
+                key={`${conflict.resourceId ?? ''}|${conflict.file}`}
+                data-testid="studio-ai-request-conflict-item"
+                style={bullets.item}
+              >
                 {conflict.changedBy ? (
                   <FilledText
                     text={t('shell.studio.aiRequest.conflict.item')}

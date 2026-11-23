@@ -11,14 +11,11 @@ import { SectionPart } from '../platform/SectionParts'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import { layerMarks, markOf } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
-import { StatusTag } from '../platform/StatusTag'
 import {
   fetchStudioModuleResource,
   patchStudioResource,
   saveStudioModuleResource,
   ServerUnreachableError,
-  severityText,
-  severityTone,
   type StudioDiagnostic,
   type StudioModuleLayer,
   type StudioModuleResource,
@@ -45,6 +42,7 @@ import {
   unrelaxedManifest,
 } from './relaxEntries'
 import { DialogFooter } from '../platform/DialogFooter'
+import { StudioProblemList } from './StudioProblems'
 
 const StudioContractLifecycle = lazy(() => import('./StudioContractLifecycle'))
 
@@ -866,14 +864,9 @@ export function StudioModuleContract({
         {layerDiagnostics.length > 0 && (
           <Flex vertical gap="small">
             <Typography.Text strong>{t('shell.studio.contract.diagnostics')}</Typography.Text>
-            <ul data-testid="studio-contract-diagnostics" style={{ margin: 0 }}>
-              {layerDiagnostics.map((diagnostic, index) => (
-                <li key={`${diagnostic.code}-${diagnostic.path}-${index}`}>
-                  <StatusTag tone={severityTone(diagnostic.severity)}>{severityText(t, diagnostic.severity)}</StatusTag>{' '}
-                  <Typography.Text strong>{diagnostic.code}</Typography.Text> {diagnostic.message}
-                </li>
-              ))}
-            </ul>
+            <div data-testid="studio-contract-diagnostics">
+              <StudioProblemList diagnostics={layerDiagnostics} />
+            </div>
           </Flex>
         )}
         <ContractTable

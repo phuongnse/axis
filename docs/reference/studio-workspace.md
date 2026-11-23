@@ -112,7 +112,8 @@ end, as [scroll areas](actions-and-controls.md#scroll-areas) say. A package's wo
 same list in its output panel, where a package file's problem is a link that opens the file in the workspace, see
 [a package's files](studio-packages.md#a-packages-files).
 
-- **A problem's row**. Its severity is a status tag in words, Error in `danger` or Warning in `attention`, from the
+- **A problem's row**. Each problem is a bullet, see [layout shows structure](actions-and-controls.md#layout-shows-structure),
+  and its severity is a status tag in words, Error in `danger` or Warning in `attention`, from the
   texts `shell.studio.problems.severity.error` and `shell.studio.problems.severity.warning`. The tag sits `spacing-xs`
   from a text column of its own, which holds the code and message, so a long message wraps under itself. The
   resource or file follows the message on its line, and goes to the next line only when the line is full.

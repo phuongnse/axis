@@ -33,6 +33,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { useText, useTextCatalogs } from '../platform/texts'
 import { TextProvider } from '../platform/TextProvider'
 import { useDesignTokens } from '../platform/themeMode'
+import { useBulletList } from '../platform/useBulletList'
 import { NarrowWidthOverride } from '../platform/useNarrowWidth'
 import { WidgetTree } from '../platform/WidgetTree'
 import { PlatformContext } from './context'
@@ -458,6 +459,7 @@ function PlaceholderBox({
   diagnostics: StudioDiagnostic[]
 }) {
   const t = useText()
+  const bullets = useBulletList()
   const draftWidget = getAt(draft, widget.path)
   // The widgets inside are not drawn, but the author can still drop into the lists the draft has.
   const lists = isContent(draftWidget) ? childLists(draftWidget, widget.path) : []
@@ -469,9 +471,9 @@ function PlaceholderBox({
           {widget.type}
         </Typography.Text>
       )}
-      <ul>
+      <ul style={bullets.list}>
         {diagnostics.map((diagnostic, index) => (
-          <li key={index} data-testid="studio-canvas-placeholder-diagnostic">
+          <li key={index} data-testid="studio-canvas-placeholder-diagnostic" style={bullets.item}>
             {`${diagnostic.code}: ${diagnostic.message}`}
           </li>
         ))}
