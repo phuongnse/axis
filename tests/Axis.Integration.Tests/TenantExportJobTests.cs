@@ -363,7 +363,19 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         using var s3 = minio.NewClient();
         var bucket = await NewBucketAsync(s3);
         var storage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
-        var kinds = Kinds(JobSetting<CellBackupStorage>.Of(storage), CellDefaults(("Quotas:Defaults:concurrentImports", "1")));
+        var first = 1;
+
+        // The step runs only after the lease is taken, so the first call is the first round after the import's lease is freed.
+        // The throw stands in for a MinIO request that fails, as it does at times in CI.
+        var kinds = Kinds(
+            JobSetting<CellBackupStorage>.Of(storage),
+            CellDefaults(("Quotas:Defaults:concurrentImports", "1")),
+            step => step with
+            {
+                RunAsync = (id, tenant, input, cancellationToken) => Interlocked.Exchange(ref first, 0) == 1
+                    ? throw new AmazonS3Exception("The upload failed.")
+                    : step.RunAsync(id, tenant, input, cancellationToken),
+            });
         var job = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, kinds, "export", fixture.TenantId, "operator-1", null, null, CancellationToken);
         var runner = new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease, TimeSpan.Zero);
         using var output = new StringWriter();
@@ -382,11 +394,17 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         Assert.Equal((4, 0), await ClaimsAsync(job));
 
         await import.DisposeAsync();
-        Assert.True(await runner.RunNextAsync(output, CancellationToken));
+        Assert.Equal(0, await LeaseCountAsync(fixture.TenantId));
 
-        Assert.Equal("succeeded", await StateAsync(job));
+        await ProvisioningJobRounds.RunAsync(runner, fixture.Scenario.Platform, job, output, CancellationToken);
+
+        var text = output.ToString();
+        var failed = text.IndexOf($"{fixture.TenantId} export failed: AmazonS3Exception", StringComparison.Ordinal);
+        var released = text.IndexOf("job released", StringComparison.Ordinal);
+        var done = text.IndexOf($"{fixture.TenantId} export ok", StringComparison.Ordinal);
+        Assert.True(failed >= 0 && released > failed && done > released, text);
+        Assert.True(await StateAsync(job) == "succeeded", text);
         Assert.Equal([$"exports/{fixture.TenantId}/{job:D}.zip"], await KeysAsync(s3, bucket));
-        Assert.Contains($"{fixture.TenantId} export ok", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

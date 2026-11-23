@@ -41,7 +41,7 @@ A tutorial is a guided first project. Its steps are checked by a journey test, s
 
 ## Reference
 
-Detailed behaviour, one topic per file. Pages are grouped by the area a reader works in, and the files all stay in `reference/`. Sections marked `_(planned for Mx)_` or `_(planned)_` are not built yet.
+Detailed behaviour, one topic per file. Pages are grouped by the area a reader works in, and the files all stay in `reference/`. Sections marked `_(planned for Mx)_` or `_(planned, #<n>)_` are not built yet.
 
 ### Authoring
 

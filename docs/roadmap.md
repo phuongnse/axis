@@ -29,8 +29,8 @@ phases, and each phase lists its milestones in the order they run. The
 [direction](#direction) says why.
 
 A milestone is **Planned** until it is broken into issues, **In progress** while it has open issues,
-and **Done** once the owner closes it on GitHub. Breaking a milestone down sets In progress, and its
-docs sweep sets Done.
+and **Done** once its docs sweep sets it. The owner closes it on GitHub only after that, as
+[the life of a milestone](delivery.md#the-life-of-a-milestone) says. Breaking a milestone down sets In progress.
 
 ### Done
 

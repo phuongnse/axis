@@ -89,11 +89,13 @@ marks between issues, in NexKit's `request` skill.
    label, not `on-hold`, as
    [hand-made pull requests](../../../docs/delivery.md#hand-made-pull-requests)
    says.
-5. Before you change an issue's criteria, check for an open pull request that closes it. List the
-   pull requests that close it with `gh issue view <n> --json closedByPullRequestsReferences`, then
-   check each one's state with `gh pr view <number> --json state`. When one is open, follow the rule
-   for an issue with an open pull request in
-   [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue).
+5. When you edit the body or the title of an issue that has a NexKit plan, comment the change on the
+   issue in the same step, one line for each change, as
+   [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue) says. Before you change an
+   issue's criteria, check for an open pull request that closes it. List the pull requests that close
+   it with `gh issue view <n> --json closedByPullRequestsReferences`, then check each one's state with
+   `gh pr view <number> --json state`. When one is open, follow the rule for an issue with an open pull
+   request in [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue).
 
 ## Breaking down a milestone
 

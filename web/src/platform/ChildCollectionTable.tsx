@@ -1,4 +1,4 @@
-import { CloseOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons'
+import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
 import { Form, Input, Space } from 'antd'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { AxisButton } from './AxisButton'
@@ -259,8 +259,7 @@ export function ChildCollectionTable({
                     {
                       key: 'remove',
                       labelKey: 'shell.form.removeRow',
-                      icon: <DeleteOutlined />,
-                      destructive: true,
+                      meaning: 'remove',
                       onClick: () => remove(index),
                     },
                   ]

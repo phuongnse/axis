@@ -14,6 +14,7 @@ import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lin
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
 import { useSelectedItemTint } from '../platform/antTheme'
 import { addedMark, changeTint, removedMark } from '../platform/changeTint'
+import { Chevron } from '../platform/Chevron'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
@@ -118,12 +119,14 @@ export default function CodeEditor({
   const { mode } = useThemeMode()
   const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
+  const foldIcons = useRef<HTMLSpanElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [compartments] = useState(() => ({
     theme: new Compartment(),
     language: new Compartment(),
     readOnly: new Compartment(),
     phrases: new Compartment(),
+    foldMarks: new Compartment(),
   }))
   // A removed file shows the text it had, each line marked removed, see lineDiff.
   const removedFile = original !== undefined && original !== '' && value === ''
@@ -134,7 +137,8 @@ export default function CodeEditor({
   const shownLanguage: FileLanguage = removedFile ? 'plain' : language
   const selectedTint = useSelectedItemTint()
   const theme = editorTheme(tokens, mode, selectedTint, !grow ? 'scroll' : readOnly ? 'grow' : 'growEditable')
-  const phrases = useMemo(() => codePhrases(t), [t])
+  const texts = useMemo(() => codeTexts(t), [t])
+  const phrases = useMemo(() => EditorState.phrases.of(texts), [texts])
   const findTexts = useMemo(
     () => ({
       field: t('shell.studio.json.findField'),
@@ -153,6 +157,7 @@ export default function CodeEditor({
     whole,
     onDiffCounts,
     readOnly,
+    texts,
     phrases,
     lint,
     onProblems,
@@ -170,6 +175,7 @@ export default function CodeEditor({
       whole,
       onDiffCounts,
       readOnly,
+      texts,
       phrases,
       lint,
       onProblems,
@@ -191,7 +197,7 @@ export default function CodeEditor({
         doc: initial.value,
         extensions: [
           lineNumbers(),
-          foldGutter(),
+          compartments.foldMarks.of(foldMarks(foldIcons.current!, initial.texts)),
           codeFolding(),
           bracketMatching(),
           closeBrackets(),
@@ -272,6 +278,11 @@ export default function CodeEditor({
     viewRef.current?.dispatch({ effects: compartments.phrases.reconfigure(phrases) })
   }, [compartments, phrases])
 
+  // The marks copy the chevrons as they are drawn now, so they follow the mode and the texts.
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: compartments.foldMarks.reconfigure(foldMarks(foldIcons.current!, texts)) })
+  }, [compartments, texts, tokens])
+
   useEffect(() => {
     const view = viewRef.current
     if (view && view.state.doc.toString() !== text) {
@@ -314,11 +325,29 @@ export default function CodeEditor({
   const height = useFillHeight(hostRef, fill && !grow, { boundary })
 
   return (
-    <div
-      ref={hostRef}
-      style={grow ? { display: 'flex', flexDirection: 'column', flex: '1 0 auto' } : fill ? { height } : undefined}
-    />
+    <>
+      <div
+        ref={hostRef}
+        style={grow ? { display: 'flex', flexDirection: 'column', flex: '1 0 auto' } : fill ? { height } : undefined}
+      />
+      <span hidden ref={foldIcons}>
+        <Chevron point="down" />
+        <Chevron point="right" />
+      </span>
+    </>
   )
+}
+
+/** The fold gutter, whose marks are copies of the one chevron, see docs/reference/frontend.md#design-tokens-and-previews. */
+function foldMarks(icons: HTMLElement, texts: Record<string, string>) {
+  return foldGutter({
+    markerDOM(open) {
+      const mark = document.createElement('span')
+      mark.title = texts[open ? 'Fold line' : 'Unfold line']
+      mark.append(icons.children[open ? 0 : 1].cloneNode(true))
+      return mark
+    },
+  })
 }
 
 function languageExtension(language: FileLanguage) {
@@ -336,9 +365,9 @@ function readOnlyExtension(readOnly: boolean) {
     : []
 }
 
-/** CodeMirror's own English phrases that can reach the screen, in the texts of Axis. */
-function codePhrases(t: (key: string) => string) {
-  return EditorState.phrases.of({
+/** CodeMirror's own English phrases that can reach the screen, in the texts of Axis, and the names of the fold marks. */
+function codeTexts(t: (key: string) => string): Record<string, string> {
+  return {
     'Fold line': t('shell.studio.code.fold'),
     'Unfold line': t('shell.studio.code.unfold'),
     'folded code': t('shell.studio.code.folded'),
@@ -348,7 +377,7 @@ function codePhrases(t: (key: string) => string) {
     to: t('shell.studio.code.to'),
     Completions: t('shell.studio.code.completions'),
     '$ unchanged lines': t('shell.studio.code.unchangedLines'),
-  })
+  }
 }
 
 /** Proposed: the underline of the words that changed inside a changed line, in a state's text colour, see #4623. */

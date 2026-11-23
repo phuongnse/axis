@@ -121,6 +121,13 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cel
     builder.Services.AddSingleton<IJobHandler, SubscriptionResume>();
     builder.Services.AddSingleton<IJobHandler, QuotaSync>();
     builder.Services.AddSingleton(new RecurringJob(QuotaSync.JobKind, TimeSpan.FromDays(1)));
+
+    // The queue of each tenant's finished day of usage as a usage.daily event, every hour, only when the billing events address is set, see docs/reference/billing-api.md#daily-usage.
+    if (options.BillingEvents.IsSet)
+    {
+        builder.Services.AddSingleton<IJobHandler, DailyUsageEvents>();
+        builder.Services.AddSingleton(new RecurringJob(DailyUsageEvents.JobKind, TimeSpan.FromHours(1)));
+    }
 }
 
 // The schedule that queues the recurring jobs above. It is idle when there are none.

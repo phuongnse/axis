@@ -193,6 +193,20 @@ describe('SeedGrid', () => {
     expect(onChange).toHaveBeenLastCalledWith('/records/1', undefined)
   })
 
+  it('draws each Delete as the trash icon named by its tooltip, in the actions column', async () => {
+    const user = userEvent.setup()
+    renderGrid()
+
+    const row = screen.getAllByTestId('studio-seed-row')[0]
+    const button = within(row).getByRole('button', { name: 'Delete' })
+    expect(button.querySelector('.anticon-delete')).not.toBeNull()
+    expect(within(row).getAllByRole('cell').at(-1)).toContainElement(button)
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
+
+    await user.hover(button)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Delete$/)
+  })
+
   it('puts Add record on the right of the heading and nowhere else in the part', () => {
     renderGrid()
 

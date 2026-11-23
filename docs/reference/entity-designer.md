@@ -27,40 +27,40 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 - **The table.** The fields are the [standard table](actions-and-controls.md#tables), one row per field,
   in the file's order. An entity's field order is its order everywhere else: the file, the default form
   and the lists that name fields in the entity's field order.
-- **Reordering** _(planned)_. Each row starts with a handle named Drag to reorder. Dragging it moves the
+- **Reordering** _(planned, #5049)_. Each row starts with a handle named Drag to reorder. Dragging it moves the
   row to its place, and the rows between make room. The keyboard uses the same handle: Space picks the row
   up, the arrow keys move it, Space drops it and Escape cancels, as [tables](actions-and-controls.md#tables)
   say. While a search or a filter hides rows, the handles are off, and their tooltip says "Clear the search
   and the filter to reorder". The table has no sort.
-- **Row menu** _(planned)_. Each row's "…" menu holds Move up, Move down and Delete, the way to move a row
+- **Row menu** _(planned, #5049)_. Each row's "…" menu holds Move up, Move down and Delete, the way to move a row
   without a drag. Move up is off on the first row and Move down on the last, and Delete is destructive.
   Each entry replaces the `fields` array. A read-only designer has no menu.
 - **Name.** The Name cell is a real link to the field's drawer, at `&field=<name>`, with the field's layer mark
   beside it. A plain click opens the drawer in place. Ctrl+click opens a new tab, and the address can be copied.
   A field with no name has no address, so its name reads "Unnamed field" as a subtle button that opens the drawer.
-- **Label** _(planned)_. The Label cell is the label in the author's language, else in English, read from the
+- **Label** _(planned, #5049)_. The Label cell is the label in the author's language, else in English, read from the
   draft's texts, so a label put in by Done shows before Save writes it. The dash shows where the field has no
   label. The table has no input.
-- **Columns** _(planned)_. Its columns are Name, Label, Type, Required, Unique and Source. It has a search, and
+- **Columns** _(planned, #5049)_. Its columns are Name, Label, Type, Required, Unique and Source. It has a search, and
   Add field sits in the section's heading. Add field opens a new field in the side panel, as
   [the field panel](#field-drawer) says.
-- **Source** _(planned)_. The Source column shows where a field's value comes from, in the panel's words: Input,
+- **Source** _(planned, #5049)_. The Source column shows where a field's value comes from, in the panel's words: Input,
   Computed, Sequence, Creator or Matched. Every field shows one, so a value people enter reads Input and not
   the dash. The column is filtered by the same ways.
-- **Filter** _(planned)_. The table has a Filter on Name, Label, Type, Required, Unique and Source. Name and Label
+- **Filter** _(planned, #5049)_. The table has a Filter on Name, Label, Type, Required, Unique and Source. Name and Label
   filter as text, Label as its cell shows it. Type filters as a choice of the field types, Person among them. Required
   and Unique filter as a choice of Yes and No, and Source as a choice of its ways. A field whose type does not take
   the setting counts as empty. The filter lives in the address as `fields.filter`. It only hides rows: every row
   shows on one page with no pager, and an edit to a hidden row stays in the draft. A field whose origin is new, one
   added since the last save, stays shown. The table has no sort or Columns.
-- **Search** _(planned)_. The search box looks in the name and in the label as the Label cell shows it. It lives in
+- **Search**. The search box looks in the name and in the label as the Label cell shows it. It lives in
   the address as `fields.search`. It hides rows as the filter does, except that a field added since the last save
   is not kept, so a search can hide it until its name or label matches.
 - **Type in words.** The cell reads the type's name, and for a reference, references or child collection the entity
   it points to, by its label, as "Reference to Department" or "Child collection of Line item". The name shows only
   where that entity has no label. Enum and every other type read as their name alone, with no count. A reference with
   no target yet reads "Reference to" and the dash in place of the target.
-- **Person** _(planned)_. A `text` field with `userId` reads Person, in the Type cell and in the Type filter, as the
+- **Person** _(planned, #5049)_. A `text` field with `userId` reads Person, in the Type cell and in the Type filter, as the
   [Type list](#settings) says.
 - **The target is a link.** In the Type cell the target's label is a link that opens the entity, and a module's entity
   at its module view. The field's name stays the control that opens the panel.
@@ -74,7 +74,7 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 
 ## Field drawer
 
-_(planned)_
+_(planned, #5049)_
 
 A field's settings open in a side panel, `SidePanel`, in the shell's right column beside the page, so the table
 stays in sight and clickable, see [one side panel frame](shell.md#layout). The panel is titled by the field's name,
@@ -113,7 +113,7 @@ type's settings, Value, Validations, and Search and privacy, see [the drawer and
 
 ### The drawer and its groups
 
-_(planned)_
+_(planned, #5049)_
 
 A field's settings are in groups. Each group is a `SectionPart`, with a heading and a line under it, and a
 `borderSubtle` rule runs between the groups from the panel's edge to its scrollbar. Fields in a group sit
@@ -154,12 +154,12 @@ These settings take a control of their own:
 | `expression`        | The expression editor                                                                                                                                                                     |
 | `min` and `max`     | A number input on integer, decimal and money fields, a date picker that writes `yyyy-MM-dd` on date fields, and a date-time picker that writes an RFC 3339 UTC string on date-time fields |
 | `minLength` and `maxLength` | A number input, on text fields                                                                                                                                                    |
-| `searchable`        | _(planned)_ A checkbox with its label on the right and its help under the label, on text fields                                                                                          |
+| `searchable`        | _(planned, #5049)_ A checkbox with its label on the right and its help under the label, on text fields                                                                                          |
 | `maxSize`, `accept` | On a `file` field, the largest size in bytes and a list of media types                                                                                                                    |
 | Currency            | On a `money` field, a choice between a fixed `currency` code and a `currencyField`, picked from the entity's `enum` and `text` fields, through `AxisChoiceField`                           |
 | `valueLabels`       | On an `enum` field, rows of a value and its label, each label typed as [label texts](studio.md#label-texts) under "Label of {value}"                                                      |
 
-- **The Type list** _(planned)_. Each type shows its name in words, with a short line of help under it, such as
+- **The Type list** _(planned, #5049)_. Each type shows its name in words, with a short line of help under it, such as
   "Whole numbers, for counting." under Whole number and "Links to one record of another entity." under Reference.
   The list is in this order: Text, Whole number, Decimal, Money, Yes or no, Date, Date and time, Enum, Person,
   Reference, References, Child collection and File. It can be searched by name. The types include every
@@ -167,10 +167,10 @@ These settings take a control of their own:
   child entity's fields may be `reference`. A `references` field has the same target picker as a `reference` field.
   A test compares the field types and settings of the designer with `entity.schema.json`, so a setting added to the
   schema cannot be left out of the designer by mistake.
-- **Person** _(planned)_. Person is "Someone who uses the application, picked by name". It writes a `text` field with
+- **Person** _(planned, #5049)_. Person is "Someone who uses the application, picked by name". It writes a `text` field with
   `userId: true` and no `maxLength`, `minLength` or `searchable`, and the panel has no Text settings for it. Choosing
   another type drops `userId`.
-- **Source** _(planned)_. The Source select has a line of help under each way: Input, Computed, Sequence, Creator and,
+- **Source** _(planned, #5049)_. The Source select has a line of help under each way: Input, Computed, Sequence, Creator and,
   for a reference, Matched. The compiler refuses two ways together (`AXC0013`), so one way is chosen, and only its
   settings follow, at full width. Input shows Required, Unique and `default`. Computed shows the `expression`, Sequence
   the `sequence`, and Matched Find by and From, see below. A Person's Source offers Input and Creator, and a text
@@ -184,10 +184,10 @@ These settings take a control of their own:
   allows (`AXC0362`): for a reference, the same target too, and never the field itself or a sensitive, matched or
   computed field. Both show the required mark. They are plain boxes until the names have loaded, and From offers
   nothing while Find by names no unique field of the target.
-- **Maximum length is the type's** _(planned)_. `maxLength` is the size of the stored text, which a value the server
+- **Maximum length is the type's**. `maxLength` is the size of the stored text, which a value the server
   sets keeps too, so it is under Text settings, as precision and scale are of a number. Only the checks on an entered
   value are Value's, and they show only for Input.
-- **Label and help text** _(planned)_. Both are label texts, typed in words in the author's language, with the
+- **Label and help text** _(planned, #5049)_. Both are label texts, typed in words in the author's language, with the
   Translations button inside the box, as the entity's own label is. Studio shows words and never a text key, see
   [names](studio-workspace.md#names).
 - **A default has no record in scope,** so its editor offers rules and functions but no field names and
@@ -214,14 +214,14 @@ an index's fields, and a validation's expression and message. So do the target o
 field of a money field, the chosen way's expression and sequence, and a matched reference's Find by and From,
 which cannot be emptied.
 
-- **Names and labels** _(planned)_. The name of an index or a validation is typed in its panel and shows the
+- **Names and labels** _(planned, #5049)_. The name of an index or a validation is typed in its panel and shows the
   required mark, as do a field's label, a validation's message and an index's fields. A validation's `field` is
   optional, so it shows no mark. A field's name and type, which the schema requires, show it in the
   [field panel](#field-drawer).
 
 ## Indexes
 
-_(planned)_
+_(planned, #5049)_
 
 The Indexes section, after Validations, is a table of the entity's `indexes`. Its columns are Name, Fields, by their
 labels in the index's order, and Unique, Yes or No. Rows are ordered by dragging, as [the Fields table](#fields) is,
@@ -239,7 +239,7 @@ the whole `indexes` array, and deleting the last index removes the key.
 
 ## Validations
 
-_(planned)_
+_(planned, #5049)_
 
 The Validations section is a table of the entity's validations, after Fields. Its columns are Name, Message, in the
 author's language, else in English, and Field, by its label. A validation of the whole record has no field, so its
@@ -264,10 +264,10 @@ name and a message. Cancel and Close add nothing.
 Every input keeps its `studio-field-<pointer>` id, and each row has the id of its field, so a diagnostic
 opens at its input, or at the row when the row does not show the setting.
 
-- **In a field** _(planned)_. A diagnostic at a setting inside a field, such as `/fields/2/maxLength`, opens that
+- **In a field** _(planned, #5049)_. A diagnostic at a setting inside a field, such as `/fields/2/maxLength`, opens that
   field's [side panel](#field-drawer) with focus at the setting. A focus path inside the folded Search and privacy
   opens that group first. When the panel does not show the setting, focus goes to the panel.
-- **In a validation or an index** _(planned)_. A diagnostic inside `/validations/{i}` or `/indexes/{i}` opens that
+- **In a validation or an index** _(planned, #5049)_. A diagnostic inside `/validations/{i}` or `/indexes/{i}` opens that
   item's panel at the setting, as a field's diagnostic opens its panel.
 
 ## Migrations

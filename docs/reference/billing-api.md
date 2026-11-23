@@ -298,11 +298,10 @@ the event is sent, and every attempt sends the same ones.
 
 ### Subscription state changed
 
-_(planned for M34)_
-
 `subscription.stateChanged` is written with every move that writes a `subscription.<state>` audit record,
 see [audit records](#audit-records). A plan call, or a paid-through call that leaves the state as it was,
-writes none.
+writes none. `paidThrough` and `nextAt` are as the move leaves them, and `null` when the subscription has none,
+as a trial has no paid-through date and a deleted subscription no next date.
 
 ```json
 {
@@ -322,11 +321,21 @@ writes none.
 
 ### Daily usage
 
-_(planned for M34)_
+`usage.daily` is written once for each tenant that is not `deleted` and each finished UTC day. It reads the
+row from the cell's [usage days](tenant-lifecycle.md#routes) route, and [usage](tenant-quotas.md#usage)
+explains its columns.
 
-`usage.daily` is written once for each tenant that is not `deleted` and each finished UTC day, once the day's
-row is final. It reads the row from the cell's [usage days](tenant-lifecycle.md#routes) route, and
-[usage](tenant-quotas.md#usage) explains its columns. A second run for the same tenant and day writes none.
+- **When.** The control plane looks every hour. From 02:00 UTC it writes yesterday's event, because a day's row is
+  final only after the cell's first hourly sample of the next day. A day that was missed is not written later.
+- **The timestamp.** `timestamp` is the end of the day, which is midnight UTC of the next day.
+- **Once.** The control plane records each subscription's day in the transaction that writes the event, so a second
+  run, a retry or another replica writes none. A record is kept for 30 days.
+- **No row.** A tenant that has no row in the region directory, a cell that does not know it and a cell that has
+  no row for the day give no event that hour. The next hour asks again.
+- **No count.** `users` and `applications` are `null` when the cell's row holds none, never `0`.
+- **A cell that cannot be read.** A failed call, a bad answer or a cell that is not one of the region's skips that
+  tenant. The other tenants still get their events, and the job then fails, so the queue retries it and writes
+  only the events that are still missing.
 
 ```json
 {

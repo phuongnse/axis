@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { beforeEach, describe, test } from 'node:test'
+import { plannedMilestoneMarkers, roadmapStatuses } from './helpers.mjs'
 import { checkPlannedMarkers } from './planned-markers.mjs'
 import { useTempRoot } from './testing.mjs'
 
@@ -52,20 +53,42 @@ describe('planned markers', () => {
     assert.deepEqual(messages(), [])
   })
 
-  test('passes a bare planned marker under a heading, after a bold lead-in and in a table row', () => {
+  test('passes a numbered planned marker under a heading, after a bold lead-in and in a table row', () => {
     write(
       'docs/reference/guide.md',
-      ['# Guide', '', '## Rules', '', '_(planned)_', '', '- **A rule** _(planned)_. Text.', '', '| Row | _(planned)_ |', ''].join('\n'),
+      ['# Guide', '', '## Rules', '', '_(planned, #12)_', '', '- **A rule** _(planned for M35, #12)_. Text.', '', '| Row | _(planned, #12)_ |', ''].join('\n'),
     )
 
     assert.deepEqual(messages(), [])
   })
 
-  test('reports a bare planned marker in a sentence', () => {
+  test('reports a bare planned marker after a bold lead-in and in a table row, with its file and line', () => {
+    write(
+      'docs/reference/guide.md',
+      ['# Guide', '', '## Rules', '', '- **A rule** _(planned)_. Text.', '', '| Row | _(planned)_ |', ''].join('\n'),
+    )
+
+    assert.deepEqual(messages(), [
+      'docs/reference/guide.md:5: _(planned)_ names no issue: write _(planned, #<n>)_ with the open issue that builds the rule',
+      'docs/reference/guide.md:7: _(planned)_ names no issue: write _(planned, #<n>)_ with the open issue that builds the rule',
+    ])
+  })
+
+  test('ignores a bare planned marker in a code span or a fence', () => {
+    write(
+      'docs/reference/guide.md',
+      ['# Guide', '', 'Write `_(planned)_` for agreed work.', '', '```', 'Text _(planned)_ here.', '```', ''].join('\n'),
+    )
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('reports a bare planned marker in a sentence, as a sentence and as naming no issue', () => {
     write('docs/reference/guide.md', '# Guide\n\nText _(planned)_ here.\n')
 
     assert.deepEqual(messages(), [
       'docs/reference/guide.md:3: _(planned)_ sits in a sentence: put it on a line of its own under the heading of a planned section, or right after the bold lead-in of a planned rule',
+      'docs/reference/guide.md:3: _(planned)_ names no issue: write _(planned, #<n>)_ with the open issue that builds the rule',
     ])
   })
 
@@ -84,6 +107,29 @@ describe('planned markers', () => {
     assert.deepEqual(messages(), [
       'docs/reference/guide.md:5: planned for M1, which the roadmap calls Done: remove the marker, or move it to the milestone that builds the rest',
       'docs/reference/guide.md:7: planned for M1, which the roadmap calls Done: remove the marker, or move it to the milestone that builds the rest',
+    ])
+  })
+})
+
+describe('roadmap statuses and planned milestone markers', () => {
+  test('gives the trimmed status of each milestone row of the roadmap, keyed by the milestone', () => {
+    write(
+      'docs/roadmap.md',
+      ['| Milestone | Name | Status | Delivers |', '| --- | --- | --- | --- |', '| **M1** | Walking skeleton | Done | Entities. |', '| **M2** | Data and rules |  In progress  | Rules. |', ''].join('\n'),
+    )
+
+    assert.deepEqual([...roadmapStatuses(fixture.root())], [
+      ['M1', 'Done'],
+      ['M2', 'In progress'],
+    ])
+  })
+
+  test('lists each milestone that a marker names, with the marker file from the root and its line', () => {
+    write('docs/reference/guide.md', '# Guide\n\n_(planned for M2 and M1)_\n\nText _(planned)_ here.\n')
+
+    assert.deepEqual(plannedMilestoneMarkers(fixture.root()), [
+      { file: 'docs/reference/guide.md', line: 3, milestone: 'M2' },
+      { file: 'docs/reference/guide.md', line: 3, milestone: 'M1' },
     ])
   })
 })

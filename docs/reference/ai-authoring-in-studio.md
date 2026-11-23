@@ -473,7 +473,7 @@ changed what and can undo it.
   be read names the person who accepted it instead. A file that no revision changed since the release has no
   Changed by line. The list comes from the [live diff](authoring-revisions.md#live-diff). The page is described
   in [publishing](studio.md#publishing).
-- **The reader in Changed by** _(planned)_. Changed by names the reader as [a person's name](actions-and-controls.md#text)
+- **The reader in Changed by** _(planned, #5132)_. Changed by names the reader as [a person's name](actions-and-controls.md#text)
   is, followed by "(you)".
 
 ## Connected apps

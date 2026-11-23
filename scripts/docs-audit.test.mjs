@@ -10,6 +10,7 @@ import {
   homesArgs,
   issuesFrom,
   maxIssues,
+  milestoneFindings,
   pagesFor,
   parseAnswer,
   parseHomes,
@@ -410,5 +411,79 @@ describe('split issues', () => {
       leftOut.map((f) => [f.page, f.kind, f.statement]),
       [['docs/big.md', 'split', `${splitIssueWords + 1} words, past ${splitIssueWords}`]],
     )
+  })
+})
+
+describe('milestone issues', () => {
+  const statuses = new Map([
+    ['M35', 'In progress'],
+    ['M36', 'Done'],
+    ['M37', 'Planned'],
+  ])
+  const titleOf = (milestone) => `The roadmap and the docs of ${milestone} match its close on GitHub`
+  const markers = [
+    { file: 'docs/a.md', line: 3, milestone: 'M37' },
+    { file: 'docs/b.md', line: 9, milestone: 'M37' },
+  ]
+
+  test('opens a milestone issue for a milestone closed while its roadmap row is not Done, and none when the row reads Done', () => {
+    const found = milestoneFindings(
+      statuses,
+      [
+        { title: 'M35 Shipping', state: 'closed', open_issues: 0 },
+        { title: 'M36 Done', state: 'closed', open_issues: 0 },
+      ],
+      [],
+    )
+    const { issues } = issuesFrom([], [], 1, [], found)
+    assert.deepEqual(
+      issues.map((i) => [i.title, i.labels]),
+      [[titleOf('M35'), ['documentation', 'docs-audit']]],
+    )
+    assert.match(issues[0].body, /closed on GitHub, but its roadmap row says In progress/)
+  })
+
+  test('opens a milestone issue for planned markers that name a milestone with no open issue, linking each marker', () => {
+    const found = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'open', open_issues: 0 }], markers)
+    const { issues } = issuesFrom([], [], 1, [], found)
+    assert.deepEqual(
+      issues.map((i) => i.title),
+      [titleOf('M37')],
+    )
+    assert.match(issues[0].body, /\[docs\/a\.md:3\]\(https:\/\/github\.com\/phuongnse\/axis\/blob\/main\/docs\/a\.md#L3\)/)
+    assert.match(issues[0].body, /\[docs\/b\.md:9\]/)
+  })
+
+  test('opens no milestone issue for planned markers of a milestone that still has an open issue', () => {
+    const found = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'open', open_issues: 2 }], markers)
+    assert.deepEqual(issuesFrom([], [], 1, [], found), { issues: [], leftOut: [] })
+  })
+
+  test('leaves out a milestone that an open issue already covers by its marker, closed or named by markers', () => {
+    const closed = milestoneFindings(statuses, [{ title: 'M35 Shipping', state: 'closed', open_issues: 0 }], [])
+    const named = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'open', open_issues: 0 }], markers)
+    assert.deepEqual(issuesFrom([], ['text\n<!-- docs-audit milestone M35 -->'], 1, [], closed), { issues: [], leftOut: [] })
+    assert.deepEqual(issuesFrom([], ['text\n<!-- docs-audit milestone M37 -->'], 1, [], named), { issues: [], leftOut: [] })
+  })
+
+  test('opens the milestone issues before the code and test issues', () => {
+    const found = milestoneFindings(statuses, [{ title: 'M35 Shipping', state: 'closed', open_issues: 0 }], [])
+    const { issues } = issuesFrom([finding('docs/a.md', 5, 'unbuilt')], [], 1, [], found)
+    assert.deepEqual(
+      issues.map((i) => i.title),
+      [titleOf('M35'), 'The code follows the rule at docs/a.md:5'],
+    )
+  })
+
+  test('skips a GitHub milestone whose title does not start with M and a number', () => {
+    const found = milestoneFindings(
+      statuses,
+      [
+        { title: 'Launch', state: 'closed', open_issues: 0 },
+        { title: 'Beta M35', state: 'closed', open_issues: 0 },
+      ],
+      [{ file: 'docs/a.md', line: 3, milestone: 'M35' }],
+    )
+    assert.deepEqual(found, [])
   })
 })

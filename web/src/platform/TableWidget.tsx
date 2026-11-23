@@ -1,4 +1,3 @@
-import { DeleteOutlined } from '@ant-design/icons'
 import { Dropdown, Modal } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -573,8 +572,8 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
         labelKey: action.labelKey,
         disabled: action.type !== 'navigate' && (starting || deleting),
         attributes: canvas.props(`rowActions/${index}`),
-        // The platform knows what a delete means, so it is a red trash icon. A configured action keeps its text.
-        ...(action.type === 'delete' ? { icon: <DeleteOutlined />, destructive: true } : {}),
+        // The platform knows what a delete means, so `RowActions` draws its trash icon. A configured action keeps its text.
+        ...(action.type === 'delete' ? { meaning: 'remove' as const } : {}),
       }
       // The canvas draws every action, also one that the site would hide.
       if (canvas.active) {

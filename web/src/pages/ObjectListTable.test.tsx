@@ -212,6 +212,7 @@ describe('the list of objects', () => {
   it('writes nothing at the item on Remove', async () => {
     const onChange = renderList()
 
+    expect(screen.getByRole('button', { name: 'Remove 2' }).querySelector('.anticon-delete')).not.toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Remove 2' }))
 
     expect(onChange).toHaveBeenCalledWith('/modules/1', undefined)
