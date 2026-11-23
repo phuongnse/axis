@@ -225,7 +225,7 @@ A bell in the header shows the signed-in user's unread count and opens their not
   its subject, body and time. Unread rows are marked, and a Mark all read button sits at the top.
 - **Popover** _(planned for M35)_. The bell opens a popover list of the notifications, newest first. Its filters are All, Unread and Needs action, and Needs action lists the `action` notifications not yet done. Two buttons sit on it: Mark all read and Clear all.
 - **Rows.** A row opens its page, if it has one, with its parameters and marks the notification read.
-  A row without a page, such as a tenant notice, only marks it read.
+  A row without a page, such as a quota notice, only marks it read.
 - **Row details** _(planned for M35)_. Each row shows its subject, its body and how long ago it arrived, such as "5 minutes ago", in the person's locale. An unread row is marked, and each row has a Clear button. A screen reader names the row by its subject. Its description reads "Unread" and "Needs action" when they apply, then the body and the full date and time.
 - **Reloads.** The count reloads when the site loads, on every page navigation, when the panel opens
   and after any mark read. There is no timer. A failure to read the list hides the bell and never
