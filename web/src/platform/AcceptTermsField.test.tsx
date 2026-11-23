@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AcceptTermsField } from './AcceptTermsField'
+import { designTokensFor } from './designTokens'
 import { ThemeModeProvider } from './theme'
 
 function renderField(documents: Parameters<typeof AcceptTermsField>[0]['documents'], finish = vi.fn()) {
@@ -49,6 +50,21 @@ describe('AcceptTermsField', () => {
     await waitFor(() => expect(screen.getByText('Accept the terms to continue.')).toBeInTheDocument())
     expect(container.querySelector('.ant-form-item-has-error')).toBeInTheDocument()
     expect(finish).not.toHaveBeenCalled()
+  })
+
+  it('draws the unticked box in dangerText after a refused submit, level with the first line', async () => {
+    renderField(both)
+    const box = screen.getByRole('checkbox').closest<HTMLElement>('.ant-checkbox')
+    expect(box?.style.borderColor).toBe('')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(box).toHaveStyle({ borderColor: designTokensFor('light').colour.dangerText }))
+    expect(box).toHaveStyle({ alignSelf: 'flex-start' })
+
+    await userEvent.click(screen.getByRole('checkbox'))
+
+    await waitFor(() => expect(box?.style.borderColor).toBe(''))
   })
 
   it('finishes the form once ticked', async () => {

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AxisCheckboxField } from './AxisCheckboxField'
+import { designTokensFor } from './designTokens'
 import { requiredMark } from './requiredMark'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
@@ -183,5 +184,44 @@ describe('AxisCheckboxField', () => {
     const toggle = screen.getByRole('switch', { name: 'Mentions: In the application' })
     expect(toggle).toBeChecked()
     expect(screen.getByText('Mentions: In the application')).toHaveStyle({ position: 'absolute', width: '1px' })
+  })
+
+  it('draws an unticked box in a field with an error in dangerText, level with the first line, until it is ticked', async () => {
+    renderForm(
+      <AxisCheckboxField
+        label="Active"
+        help="An inactive item is hidden."
+        name="active"
+        requiredMessage="Tick Active."
+      />,
+    )
+    const box = screen.getByRole('checkbox', { name: 'Active' })
+    const icon = box.closest<HTMLElement>('.ant-checkbox')
+    expect(icon?.style.borderColor).toBe('')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+    await waitFor(() => expect(icon).toHaveStyle({ borderColor: designTokensFor('light').colour.dangerText }))
+    expect(icon).toHaveStyle({ alignSelf: 'flex-start' })
+
+    await userEvent.click(box)
+
+    await waitFor(() => expect(icon?.style.borderColor).toBe(''))
+  })
+
+  it('keeps the own look of a ticked box in a field the server refused', () => {
+    renderForm(
+      <AxisCheckboxField
+        label="Active"
+        help=""
+        name="active"
+        initialValue
+        status={{ state: 'refused', message: 'Refused.' }}
+      />,
+    )
+
+    expect(
+      screen.getByRole('checkbox', { name: 'Active' }).closest<HTMLElement>('.ant-checkbox')?.style.borderColor,
+    ).toBe('')
   })
 })

@@ -1,6 +1,7 @@
 import { Checkbox, DatePicker, Input, Select, Space } from 'antd'
 import dayjs from 'dayjs'
 import type { CSSProperties, KeyboardEvent } from 'react'
+import { useErrorBoxStyles } from './antTheme'
 import { datePickerChevrons } from './datePickerChevrons'
 import { FileInput } from './FileInput'
 import { datePattern, enumLabel, timePattern } from './formatValue'
@@ -79,6 +80,7 @@ export function FieldInput({
   ariaInvalid,
 }: FieldInputProps) {
   const t = useText()
+  const boxStyles = useErrorBoxStyles()
   const text = (event: { target: { value: string } }) => onChange(event.target.value || null)
   switch (field.type) {
     case 'text':
@@ -151,8 +153,11 @@ export function FieldInput({
       )
     }
     case 'boolean':
+      // Its form-item callers (`useRecordForm`, `ChildCollectionTable`) set `ariaInvalid` exactly when the item shows an
+      // error. It is also drawn outside form items, where `Form.Item.useStatus()` warns.
       return (
         <Checkbox
+          styles={boxStyles(ariaInvalid === true, value === true)}
           id={id}
           aria-label={ariaLabel}
           aria-invalid={ariaInvalid || undefined}
