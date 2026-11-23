@@ -38,7 +38,7 @@ async function allDiffEntries(
 }
 
 /**
- * The Result part of a ready, failed or accepted request, after its Plan: the Checks and Review lines with their verdicts,
+ * The body of the Result item of a ready, failed or accepted request: the Checks and Review lines with their verdicts,
  * then the request's changes, folded resource by resource. Show the checks opens the compile's problems and the scenario
  * results. The changes are read again when the request moves on, and a failed read shows no changes. See
  * docs/reference/ai-authoring-in-studio.md#the-diff.
@@ -99,7 +99,6 @@ export function StudioAuthoringRequestResult({
   const reviewSummary = review === null ? null : review.summaryKey === null ? review.findings : t(review.summaryKey)
   return (
     <Flex vertical gap={spacing.sm} data-testid="studio-ai-request-result">
-      <Typography.Text strong>{t('shell.studio.aiRequest.result')}</Typography.Text>
       {checks !== null && (
         <div data-testid="studio-ai-request-checks" style={grid}>
           <Typography.Text strong>{t('shell.studio.aiRequest.checks')}</Typography.Text>

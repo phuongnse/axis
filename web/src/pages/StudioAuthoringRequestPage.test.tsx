@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { formatValue } from '../platform/formatValue'
+import { formatDuration, formatValue } from '../platform/formatValue'
 import type {
   AuthoringRequest,
   AuthoringRequestDiff,
@@ -495,6 +495,276 @@ describe('the plan and the guide', () => {
   })
 })
 
+describe('the feed', () => {
+  const plan = 'Add a supplier field.'
+  const approvedAt = '2026-11-18T09:05:00Z'
+  const approved = { author: 'u1', plan, approvedAt }
+  const ready = checkStep(passedChecks, 'passed')
+
+  const cases: [string, Partial<AuthoringRequest>, [string, string][]][] = [
+    ['planning', { state: 'planning' }, [['Plan', 'In progress']]],
+    ['awaitingApproval', { author: 'u1', state: 'awaitingApproval', plan }, [['Plan', 'Waiting']]],
+    [
+      'working',
+      { ...approved, state: 'working' },
+      [
+        ['Plan', 'Done'],
+        ['Work', 'In progress'],
+      ],
+    ],
+    [
+      'ready',
+      { ...approved, state: 'ready', steps: [ready] },
+      [
+        ['Plan', 'Done'],
+        ['Work', 'Done'],
+        ['Result', 'Waiting'],
+      ],
+    ],
+    [
+      'accepted',
+      { ...approved, state: 'accepted', steps: [ready] },
+      [
+        ['Plan', 'Done'],
+        ['Work', 'Done'],
+        ['Result', 'Done'],
+      ],
+    ],
+    [
+      'failed after approval',
+      { ...approved, state: 'failed', steps: [checkStep(failedCompile, 'failed')] },
+      [
+        ['Plan', 'Done'],
+        ['Work', 'Stopped'],
+        ['Result', 'Not reached'],
+      ],
+    ],
+    ['failed before approval', { author: 'u1', state: 'failed' }, [['Plan', 'Stopped']]],
+    [
+      'dropped before approval',
+      { author: 'u1', state: 'dropped', plan },
+      [
+        ['Plan', 'Not reached'],
+        ['Dropped', 'Not reached'],
+      ],
+    ],
+    [
+      'dropped after approval',
+      { ...approved, state: 'dropped', finishedAt: '2026-11-18T10:00:00Z' },
+      [
+        ['Plan', 'Done'],
+        ['Work', 'Not reached'],
+        ['Dropped', 'Not reached'],
+      ],
+    ],
+  ]
+
+  it.each(cases)('reads a %s request as one feed with the marks of its items', async (_, overrides, expected) => {
+    vi.stubGlobal('fetch', serverOf(request(overrides)).fetch)
+    renderPage()
+
+    const bar = await screen.findByTestId('steps-bar')
+    const items = Array.from(bar.children) as HTMLElement[]
+    expect(
+      items.map(
+        (item) => within(item).getAllByRole('img', { name: /^(Done|In progress|Waiting|Stopped|Not reached)$/ }).length,
+      ),
+    ).toEqual(expected.map(() => 1))
+    expected.forEach(([title, mark], index) => {
+      expect(within(items[index]).getByText(title, { exact: true })).toBeVisible()
+      expect(within(items[index]).getByRole('img', { name: mark })).toBeVisible()
+    })
+    expect(items).toHaveLength(expected.length)
+    expect(screen.getAllByTestId('steps-bar')).toHaveLength(1)
+    expect(screen.getByTestId('studio-ai-request-feed')).toContainElement(bar)
+    expect(screen.queryByRole('tablist')).toBeNull()
+  })
+
+  it('shows when a dropped request was dropped, as the standing of its Dropped item', async () => {
+    const finishedAt = '2026-11-18T10:00:00Z'
+    vi.stubGlobal('fetch', serverOf(request({ state: 'dropped', finishedAt, plan })).fetch)
+    renderPage()
+
+    const items = Array.from((await screen.findByTestId('steps-bar')).children) as HTMLElement[]
+    const time = formatValue(
+      { name: 'finishedAt', type: 'date-time' },
+      finishedAt,
+      {},
+      { locale: 'en', text: (key) => key },
+    )
+    expect(within(items[1]).getByText(time)).toBeVisible()
+  })
+
+  it('shows the failure of a request that failed after its plan was approved inside the Work item, as one alert line', async () => {
+    const steps = [checkStep(failedCompile, 'failed')]
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'failed', steps })).fetch)
+    renderPage()
+
+    const items = Array.from((await screen.findByTestId('steps-bar')).children) as HTMLElement[]
+    expect(within(items[0]).queryByTestId('studio-ai-request-failure')).toBeNull()
+    expect(within(items[1]).getByTestId('studio-ai-request-failure')).toBeVisible()
+    expect(screen.getAllByTestId('studio-ai-request-failure')).toHaveLength(1)
+  })
+
+  it('shows the failure of a request that failed before its plan was approved inside the Plan item', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'failed' })).fetch)
+    renderPage()
+
+    const items = Array.from((await screen.findByTestId('steps-bar')).children) as HTMLElement[]
+    expect(items).toHaveLength(1)
+    expect(within(items[0]).getByTestId('studio-ai-request-failure')).toHaveTextContent(
+      'AI could not finish this request. A step did not finish.',
+    )
+  })
+
+  it('shows the accept the page follows, and its conflict, at the end of the Result item', async () => {
+    const server = serverOf(request({ ...approved, state: 'ready', steps: [ready] }))
+    server.accept = ['failed']
+    server.acceptDiagnostics = [{ ...problem('AXC0377'), message: 'Changed.', resourceId: 'e2' }]
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Accept' }))
+
+    const conflict = await screen.findByTestId('studio-ai-request-conflict')
+    const items = Array.from(screen.getByTestId('steps-bar').children) as HTMLElement[]
+    expect(items[2]).toContainElement(conflict)
+  })
+})
+
+describe('the Work item', () => {
+  const approvedAt = '2026-11-18T09:05:00Z'
+  const approved = { author: 'u1', plan: 'Add a supplier field.', approvedAt }
+  const work = async () => {
+    const items = Array.from((await screen.findByTestId('steps-bar')).children) as HTMLElement[]
+    return items[1]
+  }
+
+  it.each([
+    ['working', 'Changing the draft'],
+    ['fixing', 'Fixing the draft'],
+    ['checking', 'Checking the draft'],
+    ['reviewing', 'Reviewing the draft'],
+  ] as const)('reads what runs now while the request is %s', async (state, line) => {
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state })).fetch)
+    renderPage()
+
+    expect(within(await work()).getByText(line)).toBeVisible()
+  })
+
+  it('reads the count of its steps and their duration once the request is ready, and nothing beside its title', async () => {
+    const timed = (kind: string, from: string, to: string): AuthoringRequestStep => ({
+      ...checkStep(passedChecks, 'passed'),
+      kind,
+      checks: kind === 'check' ? (passedChecks as unknown as AuthoringRequestStep['checks']) : null,
+      startedAt: `2026-11-18T${from}Z`,
+      finishedAt: `2026-11-18T${to}Z`,
+    })
+    const steps = [
+      timed('work', '09:06:00', '09:07:00'),
+      timed('check', '09:07:00', '09:08:00'),
+      timed('review', '09:08:00', '09:09:30'),
+    ]
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps })).fetch)
+    renderPage()
+
+    const item = await work()
+    const duration = formatDuration(210_000, 'en', (key) => platformEnglish[key as keyof typeof platformEnglish])
+    expect(within(item).getByText(`3 steps in ${duration}`)).toBeVisible()
+    expect(within(item).queryByText(/Fix round/)).toBeNull()
+  })
+
+  it('reads "Fix round 2" beside its title while AI fixes', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'fixing', round: 2 })).fetch)
+    renderPage()
+
+    const item = await work()
+    const standing = within(item).getByText('Fix round 2')
+    expect(standing).toBeVisible()
+    expect(within(item).getByText('Work').closest('.ant-typography')?.parentElement).toContainElement(standing)
+  })
+})
+
+describe('the Plan item of an approved plan', () => {
+  const approvedAt = '2026-11-18T09:05:00Z'
+  const plan = 'Add a supplier field.\n\nShow it on the form.'
+  const asked = (comment: string): AuthoringRequestStep => ({
+    kind: 'planChange',
+    summary: comment,
+    outcome: null,
+    tokens: 0,
+    startedAt: sentAt,
+    finishedAt: sentAt,
+    checks: null,
+  })
+  const planItem = async () => (Array.from((await screen.findByTestId('steps-bar')).children) as HTMLElement[])[0]
+
+  it('reads "Approved on <time>", folds the plan under its first paragraph and shows the rest with Show the plan', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'working', plan, approvedAt })).fetch)
+    renderPage()
+
+    const item = await planItem()
+    const time = formatValue(
+      { name: 'approvedAt', type: 'date-time' },
+      approvedAt,
+      {},
+      { locale: 'en', text: (key) => key },
+    )
+    expect(within(item).getByText(`Approved on ${time}`)).toBeVisible()
+    expect(within(item).getByText('Add a supplier field.')).toBeVisible()
+    expect(within(item).queryByText('Show it on the form.')).toBeNull()
+    const show = within(item).getByRole('button', { name: 'Show the plan' })
+    expect(show).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.click(show)
+
+    expect(within(item).getByText('Show it on the form.')).toBeVisible()
+    const hide = within(item).getByRole('button', { name: 'Hide the plan' })
+    expect(hide).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(hide)
+    expect(within(item).queryByText('Show it on the form.')).toBeNull()
+  })
+
+  it('shows the comments that asked for another plan first, oldest first, as words to read', async () => {
+    const steps = [asked('Add the cost centre.'), asked('Also add it to the form.')]
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'working', plan, approvedAt, steps })).fetch)
+    renderPage()
+
+    const item = await planItem()
+    const comments = within(item).getAllByText(/^Asked for another plan: /)
+    expect(comments.map((comment) => comment.textContent)).toEqual([
+      'Asked for another plan: “Add the cost centre.”',
+      'Asked for another plan: “Also add it to the form.”',
+    ])
+    const summary = within(item).getByText('Add a supplier field.')
+    for (const comment of comments) {
+      expect(comment.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+  })
+
+  it('shows the whole plan open while it waits for its author, with no standing beside its title', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'awaitingApproval', plan })).fetch)
+    renderPage()
+
+    const item = await planItem()
+    expect(within(item).getByText('Show it on the form.')).toBeVisible()
+    expect(within(item).getByRole('button', { name: 'Hide the plan' })).toHaveAttribute('aria-expanded', 'true')
+    expect(within(item).queryByText(/^Approved on/)).toBeNull()
+  })
+
+  it('shows no Show the plan for a plan of one paragraph', async () => {
+    vi.stubGlobal(
+      'fetch',
+      serverOf(request({ author: 'u1', state: 'working', plan: 'Add a field.', approvedAt })).fetch,
+    )
+    renderPage()
+
+    const item = await planItem()
+    expect(within(item).getByText('Add a field.')).toBeVisible()
+    expect(within(item).queryByRole('button')).toBeNull()
+  })
+})
+
 describe('requestName', () => {
   it('takes the first sentence and keeps its mark', () => {
     expect(requestName('  Add a field. Then test it!  ')).toBe('Add a field.')
@@ -517,7 +787,7 @@ describe('requestName', () => {
   })
 })
 
-describe('StudioAuthoringRequestPage Result part', () => {
+describe('StudioAuthoringRequestPage Result item', () => {
   it('shows a ready request with its checks passed and its review not run, to its author', async () => {
     const server = serverOf(request({ state: 'ready', author: 'u1', steps: [checkStep(passedChecks, 'passed')] }))
     vi.stubGlobal('fetch', server.fetch)
@@ -576,8 +846,10 @@ describe('StudioAuthoringRequestPage Result part', () => {
     renderPage({ userId: 'u1' })
 
     const alert = await screen.findByTestId('studio-ai-request-failure')
-    expect(within(alert).getByText('AI could not finish this request.')).toBeVisible()
-    expect(within(alert).getByText('The checks still failed after the last fix round.')).toBeVisible()
+    expect(alert).toHaveTextContent(
+      'AI could not finish this request. The checks still failed after the last fix round.',
+    )
+    expect(alert.querySelector('.ant-alert-description')).toBeNull()
 
     const checks = screen.getByTestId('studio-ai-request-checks')
     expect(within(checks).getByText('Failed')).toBeVisible()

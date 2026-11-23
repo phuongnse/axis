@@ -150,6 +150,12 @@ public sealed class MinioFixture : IAsyncLifetime
             {
                 return true;
             }
+
+            // The SDK may keep neither the code nor the status when the body of MinIO's answer is cut, and only the words stay.
+            if (current is AmazonS3Exception && current.Message.StartsWith("Client disconnected", StringComparison.Ordinal))
+            {
+                return true;
+            }
         }
 
         return false;

@@ -1,3 +1,4 @@
+import type { StepMark } from '../platform/StepsBar'
 import type { StatusTone } from '../platform/StatusTag'
 import type {
   AuthoringRequest,
@@ -69,7 +70,7 @@ export interface ReviewResult {
   findings: string | null
 }
 
-/** What the Result part of a request shows, see docs/reference/ai-authoring-in-studio.md#checks-and-review. */
+/** What the Result item of a request shows, see docs/reference/ai-authoring-in-studio.md#checks-and-review. */
 export interface RequestResult {
   checks: ChecksResult | null
   review: ReviewResult | null
@@ -177,7 +178,7 @@ function failureKeyOf(request: AuthoringRequest, steps: AuthoringRequestStep[]):
 }
 
 /**
- * What the Result part of a request shows, from its steps. The Checks line is the newest `check` step that has checks, and
+ * What the Result item of a request shows, from its steps. The Checks line is the newest `check` step that has checks, and
  * the Review line is the newest review after it. `isAuthor` picks the text of a review that was not reviewed. See
  * docs/reference/ai-authoring-in-studio.md#checks-and-review.
  */
@@ -190,4 +191,105 @@ export function requestResult(request: AuthoringRequest, isAuthor: boolean): Req
     review: reviewResult(request, isAuthor, steps.slice(checkIndex + 1)),
     failureKey: failureKeyOf(request, steps),
   }
+}
+
+/** An item of a request's feed, see docs/reference/ai-authoring-in-studio.md#the-feed. */
+export interface FeedEntry {
+  key: 'plan' | 'work' | 'result' | 'dropped'
+  mark: StepMark
+}
+
+const runningStates: ReadonlySet<AuthoringRequestState> = new Set<AuthoringRequestState>([
+  'working',
+  'fixing',
+  'checking',
+  'reviewing',
+])
+
+/** The kinds of the steps that make up a request's work. The plan, a changed plan and the accept are not part of it. */
+const workKinds: ReadonlySet<string> = new Set(['work', 'write', 'fix', 'check', 'review'])
+
+/** The mark of the Plan item, from the request's state and whether its plan was approved. */
+function planMark(request: AuthoringRequest): StepMark {
+  if (request.state === 'planning') return 'now'
+  if (request.state === 'awaitingApproval') return 'waiting'
+  if (request.approvedAt !== null) return 'done'
+  return request.state === 'failed' ? 'stopped' : 'idle'
+}
+
+/** The mark of the Work item, which shows once the plan is approved. */
+function workMark(request: AuthoringRequest): StepMark {
+  if (runningStates.has(request.state)) return 'now'
+  if (request.state === 'ready' || request.state === 'accepted') return 'done'
+  return request.state === 'failed' ? 'stopped' : 'idle'
+}
+
+/**
+ * The items of a request's feed in order, each with its mark, see
+ * docs/reference/ai-authoring-in-studio.md#the-feed. Plan shows while AI writes it, once it exists and when the request
+ * failed before it was approved. Work shows once the plan is approved. Result shows on an accepted request and on a ready
+ * or failed one that has checks. Dropped shows on a dropped request.
+ */
+export function requestFeed(request: AuthoringRequest): FeedEntry[] {
+  const feed: FeedEntry[] = []
+  const approved = request.approvedAt !== null
+  if (request.state === 'planning' || request.plan !== null || (request.state === 'failed' && !approved)) {
+    feed.push({ key: 'plan', mark: planMark(request) })
+  }
+  if (approved) {
+    feed.push({ key: 'work', mark: workMark(request) })
+  }
+  const hasChecks =
+    (request.state === 'ready' || request.state === 'failed') && requestResult(request, false).checks !== null
+  if (request.state === 'accepted' || hasChecks) {
+    feed.push({
+      key: 'result',
+      mark: request.state === 'ready' ? 'waiting' : request.state === 'accepted' ? 'done' : 'idle',
+    })
+  }
+  if (request.state === 'dropped') {
+    feed.push({ key: 'dropped', mark: 'idle' })
+  }
+  return feed
+}
+
+/**
+ * The line of the Work item, see docs/reference/ai-authoring-in-studio.md#the-work-item. While a step runs it is the key
+ * of what runs now, in present words. Otherwise it is the count of the work's steps and their duration in milliseconds,
+ * from the first start to the last finish, and null when the request has no such step.
+ */
+export type WorkLine = { key: string } | { count: number; ms: number } | null
+
+export function workLine(request: AuthoringRequest): WorkLine {
+  if (runningStates.has(request.state)) {
+    return { key: `shell.studio.aiRequest.work.${request.state}` }
+  }
+  const steps = (request.steps ?? []).filter((step) => workKinds.has(step.kind))
+  if (steps.length === 0) {
+    return null
+  }
+  const starts = steps.map((step) => Date.parse(step.startedAt))
+  const finishes = steps.flatMap((step) => (step.finishedAt === null ? [] : [Date.parse(step.finishedAt)]))
+  const ms = finishes.length === 0 ? 0 : Math.max(0, Math.max(...finishes) - Math.min(...starts))
+  return { count: steps.length, ms }
+}
+
+/** The comments that asked for another plan, oldest first: the summary of each `planChange` step. */
+export function planChanges(request: AuthoringRequest): string[] {
+  return (request.steps ?? []).flatMap((step) =>
+    step.kind === 'planChange' && step.summary !== null && step.summary !== '' ? [step.summary] : [],
+  )
+}
+
+/**
+ * The summary of a plan that is still plain text, its first paragraph, and the rest after the first blank line. This holds
+ * until the plan has its own shape, see docs/reference/ai-authoring-in-studio.md#the-plan.
+ */
+export function planSummary(plan: string): { summary: string; rest: string } {
+  const text = plan.trim()
+  const blank = /\r?\n[ \t]*\r?\n/.exec(text)
+  if (blank === null) {
+    return { summary: text, rest: '' }
+  }
+  return { summary: text.slice(0, blank.index).trimEnd(), rest: text.slice(blank.index + blank[0].length).trim() }
 }
