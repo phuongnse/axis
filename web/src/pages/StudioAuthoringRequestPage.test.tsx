@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formatDuration, formatValue } from '../platform/formatValue'
@@ -223,6 +223,10 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
       if (refuse.includes(action)) {
         return new Response(null, { status: 500 })
       }
+      // Send again posts a new request, which the server answers in planning.
+      if (action === 'authoring-requests') {
+        return json({ ...server.current, id: 'r2', state: 'planning' }, 201)
+      }
       if (action === 'accept') {
         return json(acceptRequest('queued'), 202)
       }
@@ -243,13 +247,19 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
   return server
 }
 
+/** Shows the address the router is at, so a test can read where an action opened. */
+function Location() {
+  const location = useLocation()
+  return <output data-testid="location">{location.pathname + location.search}</output>
+}
+
 function renderPage(
   props: { onAskAi?: () => void; userId?: string; resources?: StudioResourceItem[]; previewHost?: string | null } = {},
 ) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[`/studio?app=${application}&view=requests&request=r1`]}>
           <StudioAuthoringRequestPage
             application={application}
             requestId="r1"
@@ -258,6 +268,7 @@ function renderPage(
             resources={props.resources}
             previewHost={props.previewHost ?? null}
           />
+          <Location />
         </MemoryRouter>
       </TextProvider>
     </ThemeModeProvider>,
@@ -465,12 +476,52 @@ describe('the plan and the guide', () => {
     expect(button('Drop…') !== null).toBe(drop)
   })
 
-  it('draws no guide yet for a failed request', async () => {
+  it('gives the author of a failed request the words "AI could not finish", with Send again and Drop…', async () => {
     vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'failed', plan })).fetch)
     renderPage()
 
-    await screen.findByTestId('studio-ai-request-state')
-    expect(screen.queryByTestId('studio-ai-request-guide')).toBeNull()
+    const guide = await screen.findByTestId('studio-ai-request-guide')
+    expect(within(guide).getByText('AI could not finish')).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Send again' })).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Drop…' })).toBeVisible()
+  })
+
+  it("sends a failed request's words and auto-accept choice as a new request, and opens its page", async () => {
+    const server = serverOf(request({ author: 'u1', state: 'failed', plan, autoAccept: true }))
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Send again' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location').textContent).toBe(`/studio?app=${application}&view=requests&request=r2`),
+    )
+    expect(server.calls).toEqual([
+      { action: 'authoring-requests', body: { text: 'Add a supplier field.', autoAccept: true } },
+    ])
+  })
+
+  it('shows another reader the words of a failed request, with no Send again and no Drop…', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u2', state: 'failed', plan })).fetch)
+    renderPage()
+
+    const guide = await screen.findByTestId('studio-ai-request-guide')
+    expect(within(guide).getByText('AI could not finish')).toBeVisible()
+    expect(button('Send again')).toBeNull()
+    expect(button('Drop…')).toBeNull()
+  })
+
+  it('shows "That did not work. Try again." when Send again is refused, and stays on the failed request', async () => {
+    const server = serverOf(request({ author: 'u1', state: 'failed', plan }), ['authoring-requests'])
+    vi.stubGlobal('fetch', server.fetch)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Send again' }))
+
+    expect(await screen.findByTestId('studio-ai-request-error')).toHaveTextContent('That did not work. Try again.')
+    expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Failed')
+    expect(screen.getByTestId('location').textContent).toBe(`/studio?app=${application}&view=requests&request=r1`)
   })
 
   it('approves the plan and shows the request as Working', async () => {

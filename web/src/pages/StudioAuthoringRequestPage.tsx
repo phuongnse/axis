@@ -1,5 +1,6 @@
 import { Flex, Modal, Spin, Typography } from 'antd'
 import { type ReactNode, useContext, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, type AxisFoldAction } from '../platform/AxisButton'
@@ -14,7 +15,7 @@ import { ReasonDialog } from '../platform/ReasonDialog'
 import { ShellBarSlot } from '../platform/shellBarSlot'
 import { StatusTag } from '../platform/StatusTag'
 import { StepsBar, type StepsBarItem } from '../platform/StepsBar'
-import { studioResourceAddress } from '../platform/studioAddress'
+import { studioRequestAddress, studioResourceAddress } from '../platform/studioAddress'
 import { useStudioConnection } from '../platform/studioConnection'
 import {
   acceptAuthoringRequest,
@@ -27,6 +28,7 @@ import {
   fetchStudioRequest,
   requestAuthoringRequestChanges,
   retryAuthoringRequest,
+  sendAuthoringRequest,
   ServerUnreachableError,
   type StudioDiagnostic,
   type StudioRequest,
@@ -74,10 +76,10 @@ const feedTitles: Record<FeedEntry['key'], string> = {
 }
 
 /**
- * The words of the guide bar for a state, or `null` while the bar is not built for it yet, see
- * docs/reference/ai-authoring-in-studio.md#the-guide. `accepting` is true while the author's accept is queued or running,
- * or has succeeded and the request still reads ready. `conflicted` is true when the accept the page follows met a conflict.
- * `questions` is how many questions the plan has, which the author's words count while the plan waits.
+ * The words of the guide bar for a state, see docs/reference/ai-authoring-in-studio.md#the-guide. `accepting` is true while
+ * the author's accept is queued or running, or has succeeded and the request still reads ready. `conflicted` is true when
+ * the accept the page follows met a conflict. `questions` is how many questions the plan has, which the author's words
+ * count while the plan waits.
  */
 function guideWords(
   state: AuthoringRequestState,
@@ -85,7 +87,7 @@ function guideWords(
   accepting: boolean,
   conflicted: boolean,
   questions: number,
-): string | null {
+): string {
   if (state === 'planning') return 'shell.studio.aiRequest.guide.planning'
   if (state === 'awaitingApproval') {
     if (!isAuthor) return 'shell.studio.aiRequest.guide.awaitingApprovalOther'
@@ -100,7 +102,7 @@ function guideWords(
   }
   if (state === 'accepted') return 'shell.studio.aiRequest.guide.accepted'
   if (state === 'dropped') return 'shell.studio.aiRequest.guide.dropped'
-  return null
+  return 'shell.studio.aiRequest.guide.failed'
 }
 
 /**
@@ -117,7 +119,9 @@ function guideWords(
  * `fetchStudioRequest`, kept in memory for this visit, and reads the request again when the accept ends. An accept that
  * met conflicts shows a warning in place of its status, which names each changed resource with who changed it and when,
  * and the bar offers Make the change again and Drop…. Make the change again sends the retry route, which clears the
- * draft and sends the request back to work, and the page forgets that accept.
+ * draft and sends the request back to work, and the page forgets that accept. A failed request's bar gives its author Send
+ * again and Drop…, and gives every other reader the words "AI could not finish" with no actions. Send again posts the
+ * request's words and its auto-accept choice as a new request, and opens that request's address.
  * Until the request waits for its author or ends, the page asks for it every second and keeps the last answer when a read
  * fails. A request that does not exist shows its line and, when `onAskAi` is given, an Ask AI link that opens the request
  * panel. `resources` is the application's resource list, which names the resources of a conflict and holds the sites that Preview the
@@ -144,6 +148,7 @@ export function StudioAuthoringRequestPage({
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { colour, size, spacing } = useDesignTokens()
   const { generation, lost } = useStudioConnection()
+  const navigate = useNavigate()
   const [loaded, setLoaded] = useState<{ requestId: string; value: AuthoringRequest | null }>()
   // Counts the actions that changed the request, so the page follows the request again after each one.
   const [round, setRound] = useState(0)
@@ -339,6 +344,7 @@ export function StudioAuthoringRequestPage({
     (request.state === 'planning' ||
       request.state === 'awaitingApproval' ||
       workingStates.has(request.state) ||
+      request.state === 'failed' ||
       (request.state === 'ready' && !accepting))
   ) {
     fold.push({
@@ -367,67 +373,79 @@ export function StudioAuthoringRequestPage({
         <div data-testid="studio-ai-request-feed">
           <StepsBar vertical titles={feed.map((entry) => t(feedTitles[entry.key]))} items={feed.map(feedItem)} />
         </div>
-        {words !== null && (
-          <ShellBarSlot>
-            <ActionBar
-              data-testid="studio-ai-request-guide"
-              start={<span>{fillText(t(words), { count: questions })}</span>}
-              fold={fold}
-              end={
-                asking ? (
-                  <AxisButton
-                    role="finish"
-                    data-testid="studio-ai-request-answer"
-                    disabled={acting}
-                    onClick={() => setAnswerOpen(true)}
-                  >
-                    {t('shell.studio.aiRequest.answer')}
-                  </AxisButton>
-                ) : isAuthor && request.state === 'awaitingApproval' ? (
-                  <AxisButton
-                    role="finish"
-                    data-testid="studio-ai-request-approve"
-                    disabled={acting}
-                    onClick={() => void act(() => approveAuthoringRequest(application, requestId), adopt)}
-                  >
-                    {t('shell.studio.aiRequest.approve')}
-                  </AxisButton>
-                ) : isAuthor && request.state === 'ready' && !accepting && !conflicted ? (
-                  <AxisButton
-                    role="finish"
-                    data-testid="studio-ai-request-accept"
-                    disabled={acting}
-                    onClick={() =>
-                      void act(
-                        () => acceptAuthoringRequest(application, requestId),
-                        (sent) => setAccept({ requestId, value: sent }),
-                      )
-                    }
-                  >
-                    {t('shell.studio.aiRequest.accept')}
-                  </AxisButton>
-                ) : isAuthor && request.state === 'ready' && conflicted ? (
-                  <AxisButton
-                    role="finish"
-                    data-testid="studio-ai-request-retry"
-                    disabled={acting}
-                    onClick={() =>
-                      void act(
-                        () => retryAuthoringRequest(application, requestId),
-                        (answered) => {
-                          setAccept(undefined)
-                          adopt(answered)
-                        },
-                      )
-                    }
-                  >
-                    {t('shell.studio.aiRequest.retry')}
-                  </AxisButton>
-                ) : undefined
-              }
-            />
-          </ShellBarSlot>
-        )}
+        <ShellBarSlot>
+          <ActionBar
+            data-testid="studio-ai-request-guide"
+            start={<span>{fillText(t(words), { count: questions })}</span>}
+            fold={fold}
+            end={
+              asking ? (
+                <AxisButton
+                  role="finish"
+                  data-testid="studio-ai-request-answer"
+                  disabled={acting}
+                  onClick={() => setAnswerOpen(true)}
+                >
+                  {t('shell.studio.aiRequest.answer')}
+                </AxisButton>
+              ) : isAuthor && request.state === 'awaitingApproval' ? (
+                <AxisButton
+                  role="finish"
+                  data-testid="studio-ai-request-approve"
+                  disabled={acting}
+                  onClick={() => void act(() => approveAuthoringRequest(application, requestId), adopt)}
+                >
+                  {t('shell.studio.aiRequest.approve')}
+                </AxisButton>
+              ) : isAuthor && request.state === 'ready' && !accepting && !conflicted ? (
+                <AxisButton
+                  role="finish"
+                  data-testid="studio-ai-request-accept"
+                  disabled={acting}
+                  onClick={() =>
+                    void act(
+                      () => acceptAuthoringRequest(application, requestId),
+                      (sent) => setAccept({ requestId, value: sent }),
+                    )
+                  }
+                >
+                  {t('shell.studio.aiRequest.accept')}
+                </AxisButton>
+              ) : isAuthor && request.state === 'ready' && conflicted ? (
+                <AxisButton
+                  role="finish"
+                  data-testid="studio-ai-request-retry"
+                  disabled={acting}
+                  onClick={() =>
+                    void act(
+                      () => retryAuthoringRequest(application, requestId),
+                      (answered) => {
+                        setAccept(undefined)
+                        adopt(answered)
+                      },
+                    )
+                  }
+                >
+                  {t('shell.studio.aiRequest.retry')}
+                </AxisButton>
+              ) : isAuthor && request.state === 'failed' ? (
+                <AxisButton
+                  role="finish"
+                  data-testid="studio-ai-request-send-again"
+                  disabled={acting}
+                  onClick={() =>
+                    void act(
+                      () => sendAuthoringRequest(application, { text: request.text, autoAccept: request.autoAccept }),
+                      (sent) => navigate(studioRequestAddress(application, sent.id)),
+                    )
+                  }
+                >
+                  {t('shell.studio.aiRequest.sendAgain')}
+                </AxisButton>
+              ) : undefined
+            }
+          />
+        </ShellBarSlot>
         {changePlanOpen && (
           <ReasonDialog
             size="medium"
