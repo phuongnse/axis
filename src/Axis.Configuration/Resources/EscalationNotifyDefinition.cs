@@ -7,6 +7,8 @@ public sealed record EscalationNotifyDefinition
 
     public required IReadOnlyList<string> Channels { get; init; }
 
+    public string? Kind { get; init; }
+
     public required NotifyMessageDefinition Message { get; init; }
 
     public NotifyOpenDefinition? Open { get; init; }

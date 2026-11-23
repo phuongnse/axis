@@ -128,7 +128,8 @@ public sealed record TaskEscalationNotifyModel(
     TextReference Subject,
     TextReference Body,
     IReadOnlyList<NotifyValueModel> Values,
-    NotifyOpenModel? Open) : INotificationModel;
+    NotifyOpenModel? Open,
+    string Kind = NotificationKinds.Info) : INotificationModel;
 
 /// <summary>
 /// The shape that a <c>notify</c> step and a task escalation's <c>notify</c> share: who is notified,
@@ -153,6 +154,26 @@ public interface INotificationModel
 
     /// <summary>The page the notification opens, or null.</summary>
     NotifyOpenModel? Open { get; }
+
+    /// <summary>The kind of the notification, one of <see cref="NotificationKinds"/>.</summary>
+    string Kind { get; }
+}
+
+/// <summary>
+/// The kinds of an in-app notification: <c>info</c> is only for the reader to know, <c>warning</c>
+/// warns them and <c>action</c> asks them to do something, see
+/// docs/reference/notifications.md#in-app-notifications.
+/// </summary>
+public static class NotificationKinds
+{
+    /// <summary>The notification is only for the reader to know.</summary>
+    public const string Info = "info";
+
+    /// <summary>The notification warns the reader.</summary>
+    public const string Warning = "warning";
+
+    /// <summary>The notification asks the reader to do something.</summary>
+    public const string Action = "action";
 }
 
 /// <summary>
@@ -290,6 +311,7 @@ public sealed record EventPayloadModel(string Field, ExpressionModel Value);
 /// notification's subject and body are the texts <see cref="Subject"/> and <see cref="Body"/> name, and
 /// each <c>{name}</c> placeholder in them takes the value <see cref="Values"/> gives. The values are
 /// in ordinal order of their names. <see cref="Open"/> is the page the notification opens, or null.
+/// <see cref="Kind"/> is the kind of the notification, <c>info</c> when the step sets none.
 /// </summary>
 public sealed record NotifyStepModel(
     string Name,
@@ -299,7 +321,8 @@ public sealed record NotifyStepModel(
     TextReference Body,
     IReadOnlyList<NotifyValueModel> Values,
     NotifyOpenModel? Open,
-    string Next) : ProcessStepModel(Name), INotificationModel;
+    string Next,
+    string Kind = NotificationKinds.Info) : ProcessStepModel(Name), INotificationModel;
 
 /// <summary>
 /// A recipient of a <c>notify</c> step: exactly one of <see cref="User"/>, a <c>text</c> expression

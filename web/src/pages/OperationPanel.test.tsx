@@ -429,6 +429,47 @@ describe('A notify step', () => {
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/to', [{ user: '' }])
   })
 
+  it('draws the kind as a radio group of Information, Warning and Needs action, each option with its help', () => {
+    const text = (path: string) =>
+      (platformEnglish as Record<string, string>)[`shell.studio.field.process.steps.${path}`]
+    render()
+
+    const group = field('/steps/0/kind').getByRole('radiogroup', { name: text('kind') })
+    expect(group).toHaveAccessibleDescription(text('kind.help'))
+    expect(within(group).getByRole('radio', { name: /^Information/ })).toBeChecked()
+    for (const [option, name] of [
+      ['info', 'Information'],
+      ['warning', 'Warning'],
+      ['action', 'Needs action'],
+    ]) {
+      const radio = within(group).getByRole('radio', { name: new RegExp(`^${name}`) })
+      expect(radio).toHaveAccessibleDescription(text(`kind.${option}.help`))
+    }
+  })
+
+  it('writes the kind, and removes it for Information', async () => {
+    const onChange = render()
+
+    const pick = (name: RegExp) =>
+      userEvent.click(field('/steps/0/kind').getByRole('radio', { name }).closest('label')!)
+    await pick(/^Needs action/)
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/kind', 'action')
+    await pick(/^Warning/)
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/kind', 'warning')
+  })
+
+  it('removes the kind when Information is picked on a step that has one', async () => {
+    const onChange = render({ ...notify, kind: 'action' })
+
+    expect(field('/steps/0/kind').getByRole('radio', { name: /^Needs action/ })).toBeChecked()
+    await userEvent.click(
+      field('/steps/0/kind')
+        .getByRole('radio', { name: /^Information/ })
+        .closest('label')!,
+    )
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/kind', undefined)
+  })
+
   it('writes the channels in a fixed order and keeps an empty list', async () => {
     const onChange = render()
 
@@ -474,9 +515,9 @@ describe('A notify step', () => {
   })
 
   it('points to the JSON view for a value of the wrong shape', () => {
-    render({ ...notify, to: 'x', channels: 'x', message: 'x', open: 'x' })
+    render({ ...notify, to: 'x', channels: 'x', kind: 1, message: 'x', open: 'x' })
 
-    for (const key of ['to', 'channels', 'message', 'open']) {
+    for (const key of ['to', 'channels', 'kind', 'message', 'open']) {
       expect(field(`/steps/0/${key}`).getByTestId('studio-json-only')).toBeVisible()
     }
   })
@@ -547,14 +588,14 @@ describe('A notify step', () => {
   })
 
   it('removes the notify keys and keeps next when the operation is changed to updateRecord', async () => {
-    const onChange = render()
+    const onChange = render({ ...notify, kind: 'action' })
 
     await userEvent.click(step(0).getByRole('combobox', { name: 'Operation' }))
     await chooseOption('updateRecord')
 
     const [pointer, next] = onChange.mock.lastCall as [string, Record<string, unknown>]
     expect(pointer).toBe('/steps/0')
-    for (const key of ['to', 'channels', 'message', 'open']) {
+    for (const key of ['to', 'channels', 'kind', 'message', 'open']) {
       expect(next).not.toHaveProperty(key)
     }
     expect(next).toEqual({ name: 'tell', type: 'operation', operation: 'updateRecord', next: 'done' })

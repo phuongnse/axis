@@ -331,6 +331,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             notification.Property(n => n.OpenPage).HasColumnName("open_page");
             notification.Property(n => n.OpenParameters).HasColumnName("open_parameters").HasColumnType("jsonb");
             notification.Property(n => n.Source).HasColumnName("source").HasDefaultValue("process");
+            notification.Property(n => n.Kind).HasColumnName("kind").HasDefaultValue("info");
             notification.Property(n => n.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             notification.HasIndex(n => new { n.ApplicationId, n.RecipientKind, n.Recipient, n.CreatedAt })
                 .HasDatabaseName("ix_notifications_application_id_recipient_created_at");

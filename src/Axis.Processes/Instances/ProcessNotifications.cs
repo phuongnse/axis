@@ -141,7 +141,8 @@ internal static class ProcessNotifications
             openParameters,
             [.. recipients.Distinct()],
             addresses,
-            to);
+            to,
+            notification.Kind);
     }
 
     // A user or role that an earlier recipient already named is listed once, as Recipients lists it.
@@ -215,14 +216,15 @@ internal static class ProcessNotifications
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.notifications
-                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, open_page, open_parameters, source, created_at)
-            SELECT @id, @application, @release, recipient.kind, recipient.name, @subject, @body, @values, @valueTypes, @page, @parameters, @source, now()
+                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, open_page, open_parameters, source, kind, created_at)
+            SELECT @id, @application, @release, recipient.kind, recipient.name, @subject, @body, @values, @valueTypes, @page, @parameters, @source, @notificationKind, now()
             FROM unnest(@kinds, @recipients) AS recipient(kind, name)
             """,
             transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
             transaction);
         command.Parameters.AddWithValue("id", notification.Id);
         command.Parameters.AddWithValue("source", ProcessSource);
+        command.Parameters.AddWithValue("notificationKind", notification.Kind);
         command.Parameters.AddWithValue("application", notification.ApplicationId);
         command.Parameters.AddWithValue("release", notification.ReleaseId);
         command.Parameters.AddWithValue("subject", notification.SubjectKey);
@@ -249,6 +251,7 @@ internal static class ProcessNotifications
 /// <param name="Recipients">The distinct user and role recipients, each by kind and by user id or role name.</param>
 /// <param name="EmailAddresses">The addresses the <c>email</c> recipients gave, in order. It is empty unless the step has the <c>email</c> channel.</param>
 /// <param name="To">Every recipient the step reached in the order the step lists them, whatever the channel, for the step history's <c>notified</c> column.</param>
+/// <param name="Kind">The notification's kind, one of <see cref="NotificationKinds"/>. Every recipient's row has it.</param>
 internal sealed record NewNotification(
     Guid Id,
     Guid ApplicationId,
@@ -261,7 +264,8 @@ internal sealed record NewNotification(
     JsonObject? OpenParameters,
     IReadOnlyList<(string Kind, string Recipient)> Recipients,
     IReadOnlyList<string> EmailAddresses,
-    IReadOnlyList<NotifiedRecipient> To);
+    IReadOnlyList<NotifiedRecipient> To,
+    string Kind);
 
 /// <summary>A recipient a notification reached: a user id, a role name or an email address.</summary>
 /// <param name="Kind"><c>user</c>, <c>role</c> or <c>email</c>.</param>

@@ -37,7 +37,7 @@ It is a step of the [process resource](processes.md), and it looks like this:
   `/steps/{i}/to/{j}/email`.
 - **`channels`** lists `inApp`, `email` or both. Any other channel is `AXC0004`, and an empty list is `AXC0269` at `/steps/{i}/channels`. A
   channel named twice is a schema violation (`AXC0004`).
-- **`kind`** _(planned for M35)_. It is `info`, `warning` or `action`, and `info` when it is left out. Any other value is a schema violation (`AXC0004`) at `/steps/{i}/kind`. An `action` notification waits in Needs action until it is done, see [in-app notifications](#in-app-notifications). A task escalation's `notify` takes it too.
+- **`kind`**. It is `info`, `warning` or `action`, and `info` when it is left out. Any other value is a schema violation (`AXC0004`) at `/steps/{i}/kind`. An `action` notification waits in Needs action until it is done, see [in-app notifications](#in-app-notifications). A task escalation's `notify` takes it too.
 - **No role by email.** A `role` recipient with the `email` channel is `AXC0270` at
   `/steps/{i}/to/{j}/role`, because Axis has no directory to expand a role into addresses.
 - **`message`.** `message.subject` and `message.body` are text keys, checked as a label is at
@@ -119,8 +119,8 @@ period.
   see a source they turned off in the application, see [notification preferences](#notification-preferences).
 - **Read state.** `axis.notification_reads` holds one row per notification and user who read it.
 - **Source.** Each row keeps its source. It is `process` for a `notify` step or a task escalation, and `quota` for a quota notice.
-- **Kind** _(planned for M35)_. Each row keeps its kind. A `notify` step or a task escalation gives the kind its step gives, see [the `notify` operation](#notify-operation). A quota notice is a `warning`. An AI request notice gives the source `authoringRequest`, see [tenant notices](#tenant-notices).
-- **Read is not done** _(planned for M35)_. Reading a notification marks nothing done. An `info` or `warning` notification is always done. A process's `action` notification is done only when it is cleared, because Axis cannot tell whether its action was taken. An AI request's `action` notice is done when its request leaves the state it waits on, see [tenant notices](#tenant-notices).
+- **Kind**. Each row keeps its kind. A `notify` step or a task escalation gives the kind its step gives, see [the `notify` operation](#notify-operation). A quota notice is a `warning`. A notification stored before kinds existed reads as `info`, except a quota notice, which reads as `warning`.
+- **Read is not done**. Reading a notification marks nothing done. An `info` or `warning` notification is always done. A process's `action` notification is done only when it is cleared, because Axis cannot tell whether its action was taken.
 - **Clearing** _(planned for M35)_. A clear sets `cleared_at` on the caller's read row, and sets `read_at` too when it is missing. A cleared notification is no longer listed or counted for that caller. Other recipients see no change, and nothing is deleted before the retention period ends.
 - **Kept for.** The worker deletes the notifications whose `created_at` is older than
   `Notifications:RetentionDays`, a [worker setting](process-execution.md#worker-settings) of 90 days
@@ -154,7 +154,7 @@ The routes list a user's notifications of one application and mark them read. Th
 - **Item.** An item has `id`, `releaseId`, `subject`, `body`, `open`, `read` and `createdAt`. `open` is
   `{ "page", "parameters" }` with the stored raw parameters, or null when the notification opens no
   page.
-- **Item fields** _(planned for M35)_. An item also has `source`, `kind` and `done`. `done` is true once the notification is done, see [in-app notifications](#in-app-notifications).
+- **Item fields**. An item also has `source`, the row's source (`process` or `quota`), `kind`, the row's kind, and `done`. `done` is true once the notification is done, see [in-app notifications](#in-app-notifications).
 - **Texts.** Texts come from the notification's release, in the user's profile locale when that release
   has texts for it, otherwise its first locale in ordinal order, as for [email](#email). Each `{name}`
   is filled with the stored value formatted as [placeholders](#placeholders) says: a number, a date and
@@ -193,7 +193,7 @@ recipient kind `platformRole`, and no application lists it.
 - **Texts.** The texts are platform texts in the user's profile locale, matched by the whole tag
   ignoring letter case, with `en` as the fallback, so `vi-VN` shows `en`. Numbers are formatted in the
   profile locale, and a `date-time` shows in UTC, because a notice has no release time zone.
-- **AI request notices** _(planned for M35)_. The author of an [authoring request](authoring-requests.md) gets four notices. Each is stored in the same commit as the move of the request that it names:
+- **AI request notices** _(planned for M35)_. The author of an [authoring request](authoring-requests.md) gets four notices. Each has the source `authoringRequest`, and each is stored in the same commit as the move of the request that it names:
   - **Plan ready** on a move to `awaitingApproval`. The kind is `action`. The text key `notices.authoringPlanReady` gives the subject "Plan ready to approve" and the body "Read the plan for your request in {application} and approve it or ask for another."
   - **Draft ready** on a move to `ready` when the request did not ask for auto-accept, or after the agent's accept is `refused`. The kind is `action`. The text key `notices.authoringDraftReady` gives "Draft ready to accept" and "The draft for your request in {application} passed its checks and review. Accept or drop it."
   - **Draft accepted** when the agent's accept succeeds. The kind is `info`. The text key `notices.authoringAccepted` gives "Draft accepted" and "AI accepted the draft for your request in {application}. It goes live when someone publishes it."

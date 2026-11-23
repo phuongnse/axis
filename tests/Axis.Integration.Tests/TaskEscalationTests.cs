@@ -163,6 +163,9 @@ public sealed class TaskEscalationTests(TaskApiFixture fixture) : IClassFixture<
         var notification = await NotificationAsync(subject);
         Assert.Equal(("role", "reviewer", "request.notice.subject", "request.notice.body", "Tasks"), (notification.Kind, notification.Recipient, notification.Subject, notification.Body, notification.Page));
         Assert.Equal(fixture.ReleaseId(TenantA), notification.Release);
+
+        // The escalation gives no kind, so its notification is information.
+        Assert.Equal("info", await fixture.ScalarAsync(TenantA, "SELECT kind FROM axis.notifications WHERE id = @id", ("id", notification.Id)));
         Assert.True(JsonNode.DeepEquals(
             JsonNode.Parse($$"""{ "title": "{{RequestTitle(subject)}}", "amount": null }"""),
             JsonNode.Parse(notification.Values)));

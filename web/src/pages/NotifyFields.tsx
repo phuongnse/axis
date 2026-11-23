@@ -21,6 +21,8 @@ const channelOptions = ['inApp', 'email'] as const
 
 const recipientKinds = ['user', 'role', 'email'] as const
 
+const notificationKinds = ['info', 'warning', 'action'] as const
+
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -43,8 +45,8 @@ function JsonOnly({ pointer, title, help }: { pointer: string; title: string; he
 }
 
 /**
- * The editor of a notification: its recipients, channels, subject and body, placeholder values and an optional page
- * to open. `pointer` is the object that holds the `to`, `channels`, `message` and `open` keys, and the editor never
+ * The editor of a notification: its recipients, channels, kind, subject and body, placeholder values and an optional
+ * page to open. `pointer` is the object that holds the `to`, `channels`, `kind`, `message` and `open` keys, and the editor never
  * shows the `next` of a step that holds them, so a task's escalation can use it too. `path` is that object's path in the
  * process, from the root, which names the texts of its fields and groups, see docs/reference/studio-resource-form.md#fields.
  * Each value is edited through its own pointer, and an empty list stays in the draft for the compiler to report.
@@ -64,6 +66,7 @@ export function NotifyFields({
     <>
       <Recipients pointer={`${pointer}/to`} path={path} value={value.to} onChange={onChange} />
       <Channels pointer={`${pointer}/channels`} path={path} value={value.channels} onChange={onChange} />
+      <Kind pointer={`${pointer}/kind`} path={path} value={value.kind} onChange={onChange} />
       <Message pointer={`${pointer}/message`} path={path} value={value.message} onChange={onChange} />
       <OpenPage pointer={`${pointer}/open`} path={path} value={value.open} onChange={onChange} />
     </>
@@ -202,6 +205,38 @@ function Channels({
           }
         />
       </AxisFieldGroup>
+    </div>
+  )
+}
+
+/**
+ * The kind as a choice of Information, Warning and Needs action, each with its help line. Information removes `kind`,
+ * so the file keeps no default key, see docs/reference/process-designer.md#notify.
+ */
+function Kind({
+  pointer,
+  path,
+  value,
+  onChange,
+}: {
+  pointer: string
+  path: string
+  value: unknown
+  onChange: ChangeHandler
+}) {
+  const { field, group } = useFieldTexts('process')
+  if (value !== undefined && typeof value !== 'string') {
+    return <JsonOnly pointer={pointer} {...group(`${path}.kind`)} />
+  }
+
+  return (
+    <div data-testid={`studio-field-${pointer}`}>
+      <AxisChoiceField
+        {...field(`${path}.kind`)}
+        value={value ?? 'info'}
+        options={notificationKinds.map((option) => ({ value: option, ...field(`${path}.kind.${option}`) }))}
+        onChange={(next) => onChange(pointer, next === 'info' ? undefined : next)}
+      />
     </div>
   )
 }

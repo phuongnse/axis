@@ -49,6 +49,52 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
     }
 
     [Fact]
+    public async Task An_item_answers_its_source_kind_and_done_and_only_an_action_is_not_done()
+    {
+        await ClearAsync();
+        var action = await InsertAsync(TenantA, DateTimeOffset.UtcNow.AddMinutes(-2), "action", ("user", "maria"));
+        var warning = await InsertAsync(TenantA, DateTimeOffset.UtcNow.AddMinutes(-1), "warning", ("user", "maria"));
+        var info = await InsertAsync(TenantA, DateTimeOffset.UtcNow, ("user", "maria"));
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var list = await GetJsonAsync(maria, Notifications);
+
+        Assert.Equal(
+            [(info, "process", "info", true), (warning, "process", "warning", true), (action, "process", "action", false)],
+            list.RootElement.GetProperty("items").EnumerateArray().Select(item => (
+                item.GetProperty("id").GetGuid(),
+                item.GetProperty("source").GetString(),
+                item.GetProperty("kind").GetString(),
+                item.GetProperty("done").GetBoolean())));
+    }
+
+    [Fact]
+    public async Task A_tenant_notice_answers_its_source_kind_and_done()
+    {
+        await ClearAsync();
+        var warning = await InsertTenantNoticeAsync();
+        await using var factory = AdministratorFactory();
+        using var maria = factory.CreateClient().SignedInAs("maria");
+
+        using var list = await GetJsonAsync(maria, TenantNotices);
+
+        var item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(
+            (warning, "quota", "warning", true),
+            (item.GetProperty("id").GetGuid(), item.GetProperty("source").GetString(), item.GetProperty("kind").GetString(), item.GetProperty("done").GetBoolean()));
+
+        await ClearAsync();
+        var action = await InsertTenantNoticeAsync("action");
+
+        using var actionList = await GetJsonAsync(maria, TenantNotices);
+
+        var actionItem = Assert.Single(actionList.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(
+            (action, "action", false),
+            (actionItem.GetProperty("id").GetGuid(), actionItem.GetProperty("kind").GetString(), actionItem.GetProperty("done").GetBoolean()));
+    }
+
+    [Fact]
     public async Task A_person_who_turned_the_process_source_off_in_the_application_does_not_see_its_notifications_while_others_do()
     {
         await ClearAsync();
@@ -523,18 +569,19 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
         fixture.Factory.WithWebHostBuilder(builder => builder.UseSetting("Users:AdministratorRole", "finance"));
 
     // The notice the worker stores when the tenant has used its emails of the day, for the administrators.
-    private async Task<Guid> InsertTenantNoticeAsync()
+    private async Task<Guid> InsertTenantNoticeAsync(string notificationKind = "warning")
     {
         var id = Guid.NewGuid();
         await fixture.ExecuteAsync(
             TenantA,
             """
             INSERT INTO axis.notifications
-                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, source, created_at)
+                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, source, kind, created_at)
             VALUES (@id, NULL, NULL, 'platformRole', 'administrator', 'notices.emailsHeld.subject', 'notices.emailsHeld.body',
-                    '{"limit":2}'::jsonb, '{"limit":"integer"}'::jsonb, 'quota', now())
+                    '{"limit":2}'::jsonb, '{"limit":"integer"}'::jsonb, 'quota', @notificationKind, now())
             """,
-            ("id", id));
+            ("id", id),
+            ("notificationKind", notificationKind));
         return id;
     }
 
@@ -563,10 +610,13 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
     }
 
     private Task<Guid> InsertAsync(string tenant, params (string Kind, string Recipient)[] recipients) =>
-        InsertAsync(tenant, DateTimeOffset.UtcNow, recipients);
+        InsertAsync(tenant, DateTimeOffset.UtcNow, "info", recipients);
 
-    // One notification of the StepApp texts "request.notice.*", with one row for each recipient.
-    private async Task<Guid> InsertAsync(string tenant, DateTimeOffset createdAt, params (string Kind, string Recipient)[] recipients)
+    private Task<Guid> InsertAsync(string tenant, DateTimeOffset createdAt, params (string Kind, string Recipient)[] recipients) =>
+        InsertAsync(tenant, createdAt, "info", recipients);
+
+    // One notification of the StepApp texts "request.notice.*" and of the given kind, with one row for each recipient.
+    private async Task<Guid> InsertAsync(string tenant, DateTimeOffset createdAt, string notificationKind, params (string Kind, string Recipient)[] recipients)
     {
         var id = Guid.NewGuid();
         foreach (var (kind, recipient) in recipients)
@@ -575,9 +625,9 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
                 tenant,
                 """
                 INSERT INTO axis.notifications
-                    (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", created_at)
+                    (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", kind, created_at)
                 VALUES (@id, @application, @release, @kind, @recipient, 'request.notice.subject', 'request.notice.body',
-                        @values::jsonb, @createdAt)
+                        @values::jsonb, @notificationKind, @createdAt)
                 """,
                 ("id", id),
                 ("application", fixture.Model.Manifest.Id),
@@ -585,6 +635,7 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
                 ("kind", kind),
                 ("recipient", recipient),
                 ("values", """{"title":"T","amount":500}"""),
+                ("notificationKind", notificationKind),
                 ("createdAt", createdAt));
         }
 

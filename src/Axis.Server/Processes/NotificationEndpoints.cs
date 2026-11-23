@@ -102,7 +102,10 @@ internal static class NotificationEndpoints
                     ? new NotificationOpen(openPage, ParseParameters(item.OpenParameters))
                     : null,
                 item.Read,
-                item.CreatedAt.UtcDateTime));
+                item.CreatedAt.UtcDateTime,
+                item.Source,
+                item.Kind,
+                item.Done));
         }
 
         return Results.Ok(new NotificationListResponse(items, pageNumber, size, result.TotalCount, result.UnreadCount));
@@ -184,6 +187,9 @@ internal sealed record NotificationListResponse(IReadOnlyList<NotificationListIt
 /// <summary>
 /// A notification as a list shows it, with the texts rendered from <see cref="ReleaseId"/>. <see cref="ReleaseId"/> is null for a
 /// tenant notice, which has platform texts. <see cref="Open"/> is null when the notification opens no page.
+/// <see cref="Source"/> is the stored source, <c>process</c> or <c>quota</c>, and <see cref="Kind"/> is <c>info</c>,
+/// <c>warning</c> or <c>action</c>. <see cref="Done"/> is false only for an <c>action</c> notification, see
+/// docs/reference/notifications.md#notification-routes.
 /// </summary>
 internal sealed record NotificationListItem(
     Guid Id,
@@ -192,7 +198,10 @@ internal sealed record NotificationListItem(
     string Body,
     NotificationOpen? Open,
     bool Read,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    string Source,
+    string Kind,
+    bool Done);
 
 /// <summary>The page a notification opens, by its declared name, with the raw page parameters.</summary>
 internal sealed record NotificationOpen(string Page, JsonElement Parameters);

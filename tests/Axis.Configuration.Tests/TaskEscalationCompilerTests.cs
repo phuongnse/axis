@@ -40,6 +40,7 @@ public sealed class TaskEscalationCompilerTests
         Assert.Equal(("notice.subject", "notice.body"), (first.Notify.Subject.TextKey, first.Notify.Body.TextKey));
         Assert.Equal([("number", "number")], first.Notify.Values.Select(value => (value.Name, value.Value.Expression)));
         Assert.Null(first.Notify.Open);
+        Assert.Equal(NotificationKinds.Info, first.Notify.Kind);
 
         var second = task.Escalations[1];
         Assert.Equal(TimeSpan.FromDays(1), second.After);
@@ -173,6 +174,32 @@ public sealed class TaskEscalationCompilerTests
             (DiagnosticCodes.SensitiveNotifyValue, "processes/ticket-task.json", "/steps/0/escalations/0/notify/message/values/number"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains("Ticket.requester", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_escalation_notify_takes_a_kind()
+    {
+        var notify = ValidNotify.Replace("\"channels\"", "\"kind\": \"action\", \"channels\"", StringComparison.Ordinal);
+        using var folder = Folder($$"""[ { "name": "escalation1", "after": "PT4H", "notify": {{notify}} } ]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var task = Assert.IsType<TaskStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal(NotificationKinds.Action, Assert.Single(task.Escalations).Notify!.Kind);
+    }
+
+    [Fact]
+    public void An_escalation_notify_with_another_kind_is_a_schema_violation()
+    {
+        var notify = ValidNotify.Replace("\"channels\"", "\"kind\": \"problem\", \"channels\"", StringComparison.Ordinal);
+        using var folder = Folder($$"""[ { "name": "escalation1", "after": "PT4H", "notify": {{notify}} } ]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(DiagnosticCodes.SchemaViolation, Assert.Single(result.Diagnostics).Code);
         Assert.Null(result.Model);
     }
 

@@ -45,6 +45,7 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
             Assert.Equal("text", types["title"]!.GetValue<string>());
             Assert.Equal("decimal", types["amount"]!.GetValue<string>());
             Assert.Equal("{}", row.OpenParameters);
+            Assert.Equal("action", row.NotificationKind);
         });
         Assert.Equal(
             0L,
@@ -328,7 +329,7 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
     {
         await using var command = fixture.DataSource.CreateCommand(
             """
-            SELECT application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values"::text, value_types::text, open_page, open_parameters::text
+            SELECT application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values"::text, value_types::text, open_page, open_parameters::text, kind
             FROM axis.notifications WHERE id = @id ORDER BY recipient_kind, recipient
             """);
         command.Parameters.AddWithValue("id", id);
@@ -346,7 +347,8 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
                 reader.GetString(6),
                 reader.GetString(7),
                 reader.IsDBNull(8) ? null : reader.GetString(8),
-                reader.IsDBNull(9) ? null : reader.GetString(9)));
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.GetString(10)));
         }
 
         return rows;
@@ -362,5 +364,6 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
         string Values,
         string ValueTypes,
         string? OpenPage,
-        string? OpenParameters);
+        string? OpenParameters,
+        string NotificationKind);
 }

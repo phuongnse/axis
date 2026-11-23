@@ -136,6 +136,7 @@
           "uniqueItems": true,
           "items": { "enum": ["inApp", "email"] }
         },
+        "kind": { "$ref": "#/$defs/notificationKind" },
         "message": { "$ref": "#/$defs/notifyMessage" },
         "open": { "$ref": "#/$defs/notifyOpen" },
         "process": { "$ref": "#/$defs/qualifiedName" },
@@ -200,6 +201,7 @@
               "entity": false,
               "fields": false,
               "to": false,
+              "kind": false,
               "channels": false,
               "message": false,
               "open": false,
@@ -237,6 +239,7 @@
               "entity": false,
               "fields": false,
               "to": false,
+              "kind": false,
               "channels": false,
               "message": false,
               "open": false,
@@ -288,6 +291,7 @@
               "entity": false,
               "fields": false,
               "to": false,
+              "kind": false,
               "channels": false,
               "message": false,
               "open": false,
@@ -323,6 +327,7 @@
               "entity": false,
               "fields": false,
               "to": false,
+              "kind": false,
               "channels": false,
               "message": false,
               "open": false,
@@ -360,6 +365,7 @@
               "entity": false,
               "fields": false,
               "to": false,
+              "kind": false,
               "channels": false,
               "message": false,
               "open": false,
@@ -393,6 +399,7 @@
               "entity": false,
               "fields": false,
               "to": false,
+              "kind": false,
               "channels": false,
               "message": false,
               "open": false,
@@ -423,6 +430,7 @@
               "entity": false,
               "fields": false,
               "to": false,
+              "kind": false,
               "channels": false,
               "message": false,
               "open": false
@@ -444,6 +452,7 @@
               "event": false,
               "fields": false,
               "to": false,
+              "kind": false,
               "channels": false,
               "message": false,
               "open": false
@@ -457,7 +466,7 @@
           },
           "then": {
             "required": ["connector", "input"],
-            "properties": { "set": false, "event": false, "entity": false, "fields": false, "to": false, "channels": false, "message": false, "open": false }
+            "properties": { "set": false, "event": false, "entity": false, "fields": false, "to": false, "kind": false, "channels": false, "message": false, "open": false }
           }
         },
         {
@@ -475,6 +484,7 @@
               "retry": false,
               "entity": false,
               "to": false,
+              "kind": false,
               "channels": false,
               "message": false,
               "open": false
@@ -488,7 +498,7 @@
           },
           "then": {
             "required": ["input"],
-            "properties": { "set": false, "connector": false, "event": false, "entity": false, "fields": false, "to": false, "channels": false, "message": false, "open": false }
+            "properties": { "set": false, "connector": false, "event": false, "entity": false, "fields": false, "to": false, "kind": false, "channels": false, "message": false, "open": false }
           }
         },
         {
@@ -576,10 +586,12 @@
           "uniqueItems": true,
           "items": { "enum": ["inApp", "email"] }
         },
+        "kind": { "$ref": "#/$defs/notificationKind" },
         "message": { "$ref": "#/$defs/notifyMessage" },
         "open": { "$ref": "#/$defs/notifyOpen" }
       }
     },
+    "notificationKind": { "enum": ["info", "warning", "action"] },
     "recipient": {
       "type": "object",
       "additionalProperties": false,

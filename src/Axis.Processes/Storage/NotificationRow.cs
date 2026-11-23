@@ -45,6 +45,9 @@ public sealed class NotificationRow
     /// <summary>The source of the notification: <c>process</c> for a <c>notify</c> step or a task escalation, or <c>quota</c> for a quota notice to administrators.</summary>
     public string Source { get; init; } = "process";
 
+    /// <summary>The kind of the notification: <c>info</c>, <c>warning</c> or <c>action</c>. A quota notice is a <c>warning</c>.</summary>
+    public string Kind { get; init; } = "info";
+
     /// <summary>The start of the storing step's transaction.</summary>
     public DateTimeOffset CreatedAt { get; init; }
 }

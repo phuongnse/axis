@@ -83,7 +83,10 @@ internal static class TenantNoticeEndpoints
                 Render(texts, item.BodyKey, values),
                 null,
                 item.Read,
-                item.CreatedAt.UtcDateTime));
+                item.CreatedAt.UtcDateTime,
+                item.Source,
+                item.Kind,
+                item.Done));
         }
 
         return Results.Ok(new NotificationListResponse(items, pageNumber, size, result.TotalCount, result.UnreadCount));

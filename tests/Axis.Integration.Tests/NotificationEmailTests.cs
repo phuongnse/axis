@@ -612,7 +612,7 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         var notice = Assert.Single(await NoticesAsync());
         Assert.Equal(("platformRole", "administrator", true, "2"), (notice.RecipientKind, notice.Recipient, notice.ReleaseIdIsNull, notice.Limit));
         Assert.Equal(("notices.emailsHeld.subject", "notices.emailsHeld.body", "integer"), (notice.SubjectKey, notice.BodyKey, notice.LimitType));
-        Assert.Equal("quota", notice.Source);
+        Assert.Equal(("quota", "warning"), (notice.Source, notice.NotificationKind));
         Assert.Equal(1L, await NoticeCounterAsync(platform, day));
 
         // The next day the two held emails go out, so only the three new ones count against the quota of two.
@@ -627,7 +627,7 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
 
         var notices = await NoticesAsync();
         Assert.Equal(2, notices.Count);
-        Assert.All(notices, held => Assert.Equal("quota", held.Source));
+        Assert.All(notices, held => Assert.Equal(("quota", "warning"), (held.Source, held.NotificationKind)));
         Assert.Equal(1L, await NoticeCounterAsync(platform, clock.Today));
         Assert.Equal(1L, await NoticeCounterAsync(platform, day));
     }
@@ -944,7 +944,7 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
     {
         await using var command = fixture.DataSource.CreateCommand(
             """
-            SELECT recipient_kind, recipient, release_id IS NULL, subject_key, body_key, "values"->>'limit', value_types->>'limit', source
+            SELECT recipient_kind, recipient, release_id IS NULL, subject_key, body_key, "values"->>'limit', value_types->>'limit', source, kind
             FROM axis.notifications
             WHERE application_id IS NULL
             ORDER BY created_at
@@ -953,7 +953,7 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         var rows = new List<TenantNotice>();
         while (await reader.ReadAsync(CancellationToken))
         {
-            rows.Add(new TenantNotice(reader.GetString(0), reader.GetString(1), reader.GetBoolean(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7)));
+            rows.Add(new TenantNotice(reader.GetString(0), reader.GetString(1), reader.GetBoolean(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8)));
         }
 
         return rows;
@@ -1003,7 +1003,7 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         return rows;
     }
 
-    private sealed record TenantNotice(string RecipientKind, string Recipient, bool ReleaseIdIsNull, string SubjectKey, string BodyKey, string Limit, string LimitType, string Source);
+    private sealed record TenantNotice(string RecipientKind, string Recipient, bool ReleaseIdIsNull, string SubjectKey, string BodyKey, string Limit, string LimitType, string Source, string NotificationKind);
 
     private sealed record StagedEmail(Guid Id, string MessageId, string State, DateTimeOffset? SentAt);
 

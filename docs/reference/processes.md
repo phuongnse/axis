@@ -401,7 +401,7 @@ codes that a process reports are on the page of their topic.
   [Sub-process step](process-flow.md#sub-process-step), and a task's `deadline` and `escalations` in
   [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
 - A step has the properties of its type and no others, as the table below says (`AXC0004`). `to`,
-  `channels`, `message` and `open` are on a `notify` step only, `process`, `subject` and `parameters`
+  `channels`, `kind`, `message` and `open` are on a `notify` step only, `process`, `subject` and `parameters`
   on a `subProcess` step only, the task properties are `assignee`, `form`, `dueIn` and
   `outcomes`, and `label` is a property of every step.
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at `/steps/{i}/assignee`). A
@@ -457,7 +457,7 @@ codes that a process reports are on the page of their topic.
 | `raiseEvent`                | `event` and `fields`                             | `set`, `connector`, `input`, `output`, `retry`, `entity`                                                                                 |
 | `createRecord`              | `entity` and a `set` with at least one field     | `connector`, `input`, `output`, `retry`, `event`, `fields`                                                                               |
 | `notify`                    | `to`, `channels` and `message`                   | `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`                                                              |
-| `decision`                  | `branches` and `otherwise`                       | `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `to`, `channels`, `message`, `open`, `next` and the task properties |
+| `decision`                  | `branches` and `otherwise`                       | `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `to`, `channels`, `kind`, `message`, `open`, `next` and the task properties |
 | `task`                      | `label`, `assignee`, `form` and at least one outcome | `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `next`                |
 | `end`                       | Nothing more                                     | `next`, `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `wait`, `until` and the task properties |
 | `timer`                     | `next`                                           | `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` and the task properties |
