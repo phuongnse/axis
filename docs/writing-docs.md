@@ -309,8 +309,9 @@ agrees.
    quarter of the pages each run, in turn. The pages are every Markdown page under `docs/`, every Markdown file of a
    skill under `.claude/skills/` and AGENTS.md. It reads them as the
    [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md) says. Its model only reads; a
-   job with no model opens at most ten NexKit issues a run, code and test fixes before docs fixes and split
-   issues last, and a finding that the cap leaves out is reported again by its page's next run. A docs fix
+   job with no model opens at most ten NexKit issues a run, milestone issues first, as
+   [the skill's milestones](../.claude/skills/axis-docs-audit/milestones.md) say, then code and test fixes
+   before docs fixes and split issues last, and a finding that the cap leaves out is reported again by its page's next run. A docs fix
    that holds a *wrong* finding is labelled `bug`, so it runs before the milestones' features: a wrong page
    misleads every agent that reads it. The same job counts the words of every doc under `docs/` each run,
    with the size check's word count. It opens one issue to split each doc past 9,000 words by topic, as
