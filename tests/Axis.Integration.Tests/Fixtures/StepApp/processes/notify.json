@@ -13,6 +13,7 @@
       "operation": "notify",
       "to": [{ "user": "title" }, { "role": "reviewer" }, { "user": "comment" }],
       "channels": ["inApp"],
+      "kind": "action",
       "message": {
         "subject": { "textKey": "request.notice.subject" },
         "body": { "textKey": "request.notice.body" },

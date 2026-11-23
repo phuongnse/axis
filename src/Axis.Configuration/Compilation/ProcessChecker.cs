@@ -811,7 +811,8 @@ internal static class ProcessChecker
                     definition.Message.Subject,
                     definition.Message.Body,
                     values,
-                    open);
+                    open,
+                    definition.Kind ?? NotificationKinds.Info);
             }
 
             return new TaskEscalationModel(after, escalation.Reassign is { } reassign ? BuildAssignee(reassign) : null, notify);
@@ -984,7 +985,8 @@ internal static class ProcessChecker
                 step.Message.Body,
                 values,
                 open,
-                Resolve(step.Next!));
+                Resolve(step.Next!),
+                step.Kind ?? NotificationKinds.Info);
         }
 
         return new ProcessModel

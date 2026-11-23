@@ -195,9 +195,9 @@ its subject and body go through the label editor, so the author writes the texts
 `values` are rows of a typed placeholder name and an expression. An Open a page checkbox adds `open` with
 a page picker and the page's parameters as rows, keyed by the parameters of the picked page.
 
-- **Kind** _(planned for M35)_. The panel has a Kind choice with Information, Warning and Needs action. Information removes `kind`, so the file keeps no default key. Switching a step from `notify` to another operation removes `kind` too.
+- **Kind**. The panel has a Kind choice with Information, Warning and Needs action. Information removes `kind`, so the file keeps no default key. Switching a step from `notify` to another operation removes `kind` too.
 
-Switching a step from `notify` to another operation removes `to`, `channels`, `message` and `open`, and
+Switching a step from `notify` to another operation removes `to`, `channels`, `message`, `kind` and `open`, and
 adds no empty key. The editor takes the pointer of the object that holds these keys and never shows
 `next`, so the escalations of a task use it too.
 

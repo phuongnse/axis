@@ -471,6 +471,13 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("info")
+                        .HasColumnName("kind");
+
                     b.Property<string>("OpenPage")
                         .HasColumnType("text")
                         .HasColumnName("open_page");

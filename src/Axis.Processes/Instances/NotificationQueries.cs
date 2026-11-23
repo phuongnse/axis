@@ -1,3 +1,4 @@
+using Axis.Configuration.Model;
 using Axis.Data.Storage;
 using Npgsql;
 using NpgsqlTypes;
@@ -35,7 +36,7 @@ public static class NotificationQueries
         WITH visible AS (
             SELECT DISTINCT ON (n.id)
                 n.id, n.release_id, n.subject_key, n.body_key, n."values"::text AS "values", n.value_types::text AS value_types, n.open_page,
-                n.open_parameters::text AS open_parameters, n.created_at,
+                n.open_parameters::text AS open_parameters, n.created_at, n.source, n.kind,
                 EXISTS (SELECT 1 FROM axis.notification_reads r WHERE r.notification_id = n.id AND r.user_id = @user) AS is_read
             FROM axis.notifications n
             WHERE
@@ -206,7 +207,10 @@ public static class NotificationQueries
                 reader.IsDBNull(6) ? null : reader.GetString(6),
                 reader.IsDBNull(7) ? null : reader.GetString(7),
                 reader.GetFieldValue<DateTimeOffset>(8),
-                reader.GetBoolean(9)));
+                reader.GetBoolean(9),
+                reader.GetString(10),
+                reader.GetString(11),
+                reader.GetBoolean(12)));
         }
 
         return new NotificationPage(items, totalCount, unreadCount);
@@ -267,7 +271,8 @@ public static class NotificationQueries
         public string Page =>
             $"""
             {_cte}
-            SELECT id, release_id, subject_key, body_key, "values", value_types, open_page, open_parameters, created_at, is_read
+            SELECT id, release_id, subject_key, body_key, "values", value_types, open_page, open_parameters, created_at, is_read,
+                source, kind, kind <> '{NotificationKinds.Action}' AS done
             FROM visible
             WHERE NOT @unread OR NOT is_read
             ORDER BY created_at DESC, id DESC
@@ -312,6 +317,9 @@ public sealed record NotificationPage(IReadOnlyList<NotificationItem> Items, lon
 /// <param name="OpenParameters">The raw page parameters, a JSON object, or null when there is no page.</param>
 /// <param name="CreatedAt">When the notification was stored.</param>
 /// <param name="Read">Whether the user has read it.</param>
+/// <param name="Source">The source of the notification, <c>process</c> or <c>quota</c>.</param>
+/// <param name="Kind">The kind of the notification, one of <see cref="NotificationKinds"/>.</param>
+/// <param name="Done">Whether nothing is left to do for it. Only an <c>action</c> notification is not done, as clearing one is not built yet, see <c>docs/reference/notifications.md#in-app-notifications</c>.</param>
 public sealed record NotificationItem(
     Guid Id,
     Guid? ReleaseId,
@@ -322,4 +330,7 @@ public sealed record NotificationItem(
     string? OpenPage,
     string? OpenParameters,
     DateTimeOffset CreatedAt,
-    bool Read);
+    bool Read,
+    string Source,
+    string Kind,
+    bool Done);

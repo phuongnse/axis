@@ -1,3 +1,4 @@
+using Axis.Configuration.Model;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -35,13 +36,14 @@ internal static class TenantNotices
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.notifications
-                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, source, created_at)
-            VALUES (@id, NULL, NULL, @kind, @recipient, @subject, @body, @values, @valueTypes, @source, now())
+                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, source, kind, created_at)
+            VALUES (@id, NULL, NULL, @kind, @recipient, @subject, @body, @values, @valueTypes, @source, @notificationKind, now())
             """,
             transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
             transaction);
         command.Parameters.AddWithValue("id", Guid.CreateVersion7());
         command.Parameters.AddWithValue("source", QuotaSource);
+        command.Parameters.AddWithValue("notificationKind", NotificationKinds.Warning);
         command.Parameters.AddWithValue("kind", PlatformRoleRecipient);
         command.Parameters.AddWithValue("recipient", AdministratorRole);
         command.Parameters.AddWithValue("subject", subjectKey);

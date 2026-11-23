@@ -49,6 +49,61 @@ public sealed class NotifyStepCompilerTests
         Assert.Equal(("ticket", "number"), (parameter.Parameter, parameter.Value.Expression));
     }
 
+    [Theory]
+    [InlineData("info")]
+    [InlineData("warning")]
+    [InlineData("action")]
+    public void A_notify_step_takes_each_kind(string kind)
+    {
+        using var folder = Folder(kind: kind);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var notify = Assert.IsType<NotifyStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal(kind, notify.Kind);
+    }
+
+    [Fact]
+    public void A_notify_step_without_a_kind_is_info()
+    {
+        using var folder = Folder();
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var notify = Assert.IsType<NotifyStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal(NotificationKinds.Info, notify.Kind);
+    }
+
+    [Theory]
+    [InlineData("problem")]
+    [InlineData("")]
+    [InlineData("Action")]
+    public void Any_other_kind_is_a_schema_violation(string kind)
+    {
+        using var folder = Folder(kind: kind);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_kind_on_another_operation_is_a_schema_violation()
+    {
+        using var folder = Folder(operation: "updateRecord", kind: "action");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.SchemaViolation);
+        Assert.Null(result.Model);
+    }
+
     [Fact]
     public void The_channels_of_a_notify_step_keep_their_file_order()
     {
@@ -372,12 +427,14 @@ public sealed class NotifyStepCompilerTests
         string enSubject = "Ticket {number}",
         string enBody = "Resolution: {resolution}",
         string viSubject = "Phiếu {number}",
-        string viBody = "Giải pháp: {resolution}")
+        string viBody = "Giải pháp: {resolution}",
+        string? kind = null)
     {
         var process = $$"""
             { "id": "{{ProcessId}}", "kind": "process", "name": "TicketNotice", "title": { "textKey": "ticket.title" }, "formatVersion": 1,
               "entity": "Ticket", "start": "tell", "steps": [
                 { "name": "tell", "type": "operation", "operation": "{{operation}}", "to": {{to}}, "channels": {{channels}},
+                  {{(kind is null ? "" : $"\"kind\": \"{kind}\",")}}
                   "message": { "subject": { "textKey": "{{subjectKey}}" }, "body": { "textKey": "notice.body" }, "values": {{values}} },
                   {{(open is null ? "" : $"\"open\": {open},")}} "next": "done" },
                 { "name": "done", "type": "end" }

@@ -98,6 +98,9 @@ public sealed record ProcessStepDefinition
     /// <summary>The channels a <c>notify</c> step sends on, <c>inApp</c> or <c>email</c>, in file order, or null for any other step.</summary>
     public IReadOnlyList<string>? Channels { get; init; }
 
+    /// <summary>The kind of a <c>notify</c> step's notification, <c>info</c>, <c>warning</c> or <c>action</c>, or null for <c>info</c> and for any other step.</summary>
+    public string? Kind { get; init; }
+
     /// <summary>The subject, body and placeholder values of a <c>notify</c> step, or null for any other step.</summary>
     public NotifyMessageDefinition? Message { get; init; }
 
