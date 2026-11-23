@@ -7,6 +7,9 @@ import { useFillHeight } from '../pages/jsonViewHeight'
 import { PageTheme } from './PageTheme'
 import { catalogs, chooseFixtures, stateSlug, type PreviewState } from './previews'
 
+/** The class of the State control, whose options row the style below lets wrap. */
+const stateControlClass = 'axis-state-control'
+
 function Canvas({ children }: { children: ReactNode }) {
   const { colour, spacing } = useDesignTokens()
   return (
@@ -88,10 +91,12 @@ function Chooser({ states }: { states: readonly PreviewState[] }) {
   })
   return (
     <>
-      <style>{'[data-state] .ant-segmented-group { flex-wrap: wrap; }'}</style>
-      <div data-state style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
+      {/* The options sit in the row under the control, which wraps them, see docs/reference/widget-previews.md#the-bundle. */}
+      <style>{`.${stateControlClass} > * { flex-wrap: wrap; }`}</style>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
         <span style={{ color: colour.textMuted }}>State</span>
         <Segmented
+          className={stateControlClass}
           aria-label="State"
           style={{ maxWidth: '100%' }}
           options={states.map(({ caption }) => caption)}

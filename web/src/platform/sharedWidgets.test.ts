@@ -1,4 +1,4 @@
-// Holds the table in docs/reference/shared-widgets.md#which-widget to the SPA's exports.
+// Holds the table in docs/reference/shared-widgets.md#which-widget to the SPA's exports, and the SPA's sources to Ant Design's documented API.
 import { describe, expect, it } from 'vitest'
 import { docsTables, tablesIn } from '../test/docTables'
 
@@ -110,6 +110,18 @@ const spaSources = import.meta.glob(['../**/*.{ts,tsx}', '!../**/*.test.{ts,tsx}
   eager: true,
 }) as Record<string, string>
 
+/** A selector on one of Ant Design's own class names, such as `.ant-table-content`, see docs/reference/shared-widgets.md#the-rule. */
+const antClassSelector = /\.ant-[a-z]/
+
+/** Each line of the sources that names an Ant Design class, as `path:line: text`. */
+function antClassSelectors(sources: Record<string, string>): string[] {
+  return Object.entries(sources).flatMap(([path, text]) =>
+    text
+      .split('\n')
+      .flatMap((line, index) => (antClassSelector.test(line) ? [`${path}:${index + 1}: ${line.trim()}`] : [])),
+  )
+}
+
 /** A `<ul>` opening tag, which may span lines. */
 const listTag = /<ul\b[^>]*>/g
 
@@ -129,6 +141,28 @@ function rawBulletLists(sources: Record<string, string>): string[] {
   }
   return refused
 }
+
+describe("Ant Design's class names", () => {
+  it('refuses a selector on one of its class names, with the line that names it', () => {
+    expect(antClassSelectors({ 'a.tsx': "x.querySelector('.ant-table-content')" })).toEqual([
+      "a.tsx:1: x.querySelector('.ant-table-content')",
+    ])
+  })
+
+  it('accepts an import from its icons package, a CSS variable and an Axis class', () => {
+    expect(
+      antClassSelectors({
+        'a.tsx': "import { X } from '@ant-design/icons'",
+        'b.ts': 'color: var(--ant-color-text)',
+        'c.ts': "'.axis-field'",
+      }),
+    ).toEqual([])
+  })
+
+  it('finds no Ant Design class name in the SPA sources', () => {
+    expect(antClassSelectors(spaSources)).toEqual([])
+  })
+})
 
 describe('bulleted lists', () => {
   const hook = 'const bullets = useBulletList()\n'
