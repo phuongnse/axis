@@ -1,7 +1,8 @@
-import { Checkbox, Form, Radio, Switch, Upload, type FormItemProps } from 'antd'
+import { Form, type FormItemProps } from 'antd'
 import { cloneElement, forwardRef, useId, type ReactElement, type ReactNode, type Ref } from 'react'
 import { Announcement } from './Announcement'
 import { fieldClass, fieldInputClass } from './antTheme'
+import { hasOwnWidth } from './ownWidth'
 import { requiredMark } from './requiredMark'
 import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
@@ -231,9 +232,6 @@ type HelpedInputProps = {
   onChange?: (...args: never[]) => void
 }
 
-// A checkbox, a switch, an upload and a radio group keep their own width, see docs/reference/shell.md#layout.
-const ownWidth = [Checkbox, Radio.Group, Switch, Upload]
-
 /** The wrapper `fieldRules` sizes round an input that fills its field. An input that keeps its own width gets none. */
 function FieldInputFrame({ own, children }: { own: boolean; children: ReactNode }) {
   return own ? children : <div className={fieldInputClass}>{children}</div>
@@ -273,7 +271,7 @@ const HelpedInput = forwardRef(function HelpedInput(
           {help}
         </div>
       )}
-      <FieldInputFrame own={ownWidth.includes(input.type as never)}>
+      <FieldInputFrame own={hasOwnWidth(input.type)}>
         {cloneElement(input, {
           ...control,
           ref,
