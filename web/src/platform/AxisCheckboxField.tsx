@@ -1,5 +1,6 @@
-import { Checkbox, Switch, type FormItemProps } from 'antd'
+import { Checkbox, Form, Switch, type CheckboxProps, type FormItemProps } from 'antd'
 import { AxisField, type AxisFieldStatus } from './AxisField'
+import { useErrorBoxStyles } from './antTheme'
 
 type Shared = {
   label: string
@@ -44,6 +45,16 @@ function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
 }
 
 /**
+ * A checkbox inside a form item, which draws its border in `dangerText` while unticked and the item shows an error, see
+ * docs/reference/actions-and-controls.md#fields. The item injects `checked` and `onChange`.
+ */
+export function FormItemCheckbox(props: CheckboxProps) {
+  const { status } = Form.Item.useStatus()
+  const boxStyles = useErrorBoxStyles()
+  return <Checkbox {...props} styles={boxStyles(status === 'error', props.checked === true)} />
+}
+
+/**
  * A yes-or-no field of a platform screen, a checkbox or a switch: its label above, its help under the label, then
  * the input, see docs/reference/actions-and-controls.md#fields. The field label names the input, so the input has no
  * text of its own. Like {@link AxisField}, it has two modes. With a `name` it belongs inside a vertical form, and a
@@ -75,7 +86,7 @@ export function AxisCheckboxField(props: FormMode | OwnMode) {
       status={status}
       valuePropName="checked"
     >
-      {kind === 'switch' ? <Switch disabled={disabled} /> : <Checkbox disabled={disabled} />}
+      {kind === 'switch' ? <Switch disabled={disabled} /> : <FormItemCheckbox disabled={disabled} />}
     </AxisField>
   )
 }

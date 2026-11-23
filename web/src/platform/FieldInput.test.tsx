@@ -1,10 +1,12 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FieldInput } from './FieldInput'
 import type { FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
+import { ThemeModeProvider } from './theme'
+import { designTokensFor } from './designTokens'
 
 const catalogs = [{ texts: {}, fallbackTexts: {} }]
 
@@ -336,5 +338,35 @@ describe('FieldInput user picker', () => {
 
     expect(picker.closest('.ant-select')!.querySelector('.ant-select-clear')).toBeNull()
     expect(picker).toHaveAttribute('aria-required', 'true')
+  })
+})
+
+describe('FieldInput boolean box in a field with an error', () => {
+  function renderBox(value: boolean, ariaInvalid: boolean) {
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <FieldInput
+            field={field('boolean', {})}
+            value={value}
+            onChange={() => undefined}
+            ariaLabel="limited"
+            locale="en"
+            ariaInvalid={ariaInvalid}
+          />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+    return screen.getByRole('checkbox', { name: 'limited' }).closest<HTMLElement>('.ant-checkbox')
+  }
+
+  it('draws an unticked box in dangerText', () => {
+    expect(renderBox(false, true)).toHaveStyle({ borderColor: designTokensFor('light').colour.dangerText })
+  })
+
+  it('leaves a ticked box and a box with no error as they are', () => {
+    expect(renderBox(true, true)?.style.borderColor).toBe('')
+    cleanup()
+    expect(renderBox(false, false)?.style.borderColor).toBe('')
   })
 })

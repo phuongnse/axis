@@ -1,7 +1,7 @@
 import { theme } from 'antd'
 import type { CSSProperties } from 'react'
 import { describe, expect, it } from 'vitest'
-import { antConfigFor, antThemeFor, fieldRules, tableTheme } from './antTheme'
+import { antConfigFor, antThemeFor, fieldRules, tableTheme, textButtonClass } from './antTheme'
 import {
   colourTokens,
   designTokensFor,
@@ -219,17 +219,13 @@ describe.each(['light', 'dark'] as const)('the shared field rules in %s mode', (
     expect(rules).toContain('.ant-form-item-margin-offset { display: none; }')
   })
 
-  it('gives a subtle button the light fill of its hover on keyboard focus', () => {
+  it('gives a text button of AxisButton the light fill of its hover on keyboard focus', () => {
     const hoverFill = theme.getDesignToken(antThemeFor(mode)).colorBgTextHover
-    expect(fieldRules(mode)).toContain(
-      `.ant-btn-variant-text:not(:disabled):focus-visible { background: ${hoverFill}; }`,
-    )
+    expect(fieldRules(mode)).toContain(`.${textButtonClass}:not(:disabled):focus-visible { background: ${hoverFill}; }`)
   })
 
-  it('draws an unticked checkbox or radio in a field with an error in dangerText', () => {
-    expect(fieldRules(mode)).toContain(
-      `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,
-    )
+  it('names no Ant Design button, checkbox or radio class', () => {
+    expect(fieldRules(mode)).not.toMatch(/\.ant-(btn|checkbox|radio)/)
   })
 })
 
