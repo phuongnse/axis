@@ -428,17 +428,20 @@ const editorTheme = sharedTheme((tokens, mode, selectedTint: string, height: Edi
       '&.cm-merge-b .cm-changedLine::before, .cm-deletedLine::before': {
         position: 'absolute',
         insetInlineStart: `${spacing.sm}px`,
-        color: colour.text,
       },
-      '&.cm-merge-b .cm-changedLine::before': { content: `"${addedMark}"` },
-      '&.cm-removedFile .cm-changedLine::before, .cm-deletedLine::before': { content: `"${removedMark}"` },
+      // Proposed: each mark in its state's text colour, as a sign beside the tint, see #4623.
+      '&.cm-merge-b .cm-changedLine::before': { content: `"${addedMark}"`, color: colour.successText },
+      '&.cm-removedFile .cm-changedLine::before, .cm-deletedLine::before': {
+        content: `"${removedMark}"`,
+        color: colour.dangerText,
+      },
       // The changed words of a changed line are underlined in the state's text colour, as a stronger tint under coloured
       // code falls below 4.5:1.
       '&.cm-merge-b .cm-changedText': { background: changedWords(colour.successText) },
       '.cm-deletedChunk': { backgroundColor: changeTint(colour.danger), paddingLeft: 0 },
       '.cm-deletedChunk .cm-deletedText': { background: changedWords(colour.dangerText) },
-      // A line added or removed whole shows no underline: every word of it changed.
-      '.cm-wholeLineChange .cm-changedText, .cm-wholeLineChange.cm-deletedLine .cm-deletedText': { background: 'none' },
+      // A line added or removed whole, or changed only in its spaces, shows no underline, see lineDiff.ts.
+      '.cm-noChangedWords .cm-changedText, .cm-noChangedWords.cm-deletedLine .cm-deletedText': { background: 'none' },
       '.cm-collapsedLines': {
         color: colour.textMuted,
         background: colour.fillSubtle,

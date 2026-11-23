@@ -15,7 +15,8 @@ import {
  * text after the change, and `original` the text before. It draws no accept or reject buttons and no change gutter, as
  * the "−" and "+" marks and the tints of the editor's theme show each change. Two columns number the lines: the text
  * before's numbers, then the text after's, and a removed line has only the first, an added line only the second. The
- * changed words are underlined only in a line that changed in part: a line added or removed whole is not. A file added
+ * changed words are underlined only in a line whose words changed in part: a line added or removed whole is not, nor a
+ * line whose change is only spaces. A file added
  * or removed whole, whose `original` is empty, is drawn as its lines, each marked, with no diff and one column of
  * numbers: a removed file is its own text, each line drawn removed.
  */
@@ -67,7 +68,7 @@ function changedFile(original: string): Extension {
     }),
     // The text before's numbers come before the line numbers of the editor.
     Prec.high(beforeLineNumbers()),
-    wholeLineChanges,
+    lineWordMarks,
   ]
 }
 
@@ -166,36 +167,41 @@ function beforeLineNumbers(): Extension {
 }
 
 /**
- * The indexes of the lines of `text` whose whole text lies inside `ranges`, which are sorted and relative to its start.
- * An empty line has no words, so it is never one of them.
+ * The indexes of the lines of `text` that show no changed words: a line whose whole text lies inside `ranges`, as a line
+ * added or removed whole, and a line whose changed text is only spaces, such as the indent before a bracket the diff kept.
+ * `ranges` are sorted, apart and relative to the text's start. An empty line has no words, so it is never one of them.
  */
-function wholeLines(text: string, ranges: readonly { from: number; to: number }[]): number[] {
-  const whole: number[] = []
+function linesWithoutChangedWords(text: string, ranges: readonly { from: number; to: number }[]): number[] {
+  const lines: number[] = []
   let start = 0
   text.split('\n').forEach((line, index) => {
     const end = start + line.length
-    let covered = start
+    let covered = 0
+    let words = false
     for (const range of ranges) {
-      if (range.from <= covered && range.to > covered) {
-        covered = range.to
+      const from = Math.max(range.from, start)
+      const to = Math.min(range.to, end)
+      if (from < to) {
+        covered += to - from
+        words ||= /\S/.test(text.slice(from, to))
       }
     }
-    if (line.length > 0 && covered >= end) {
-      whole.push(index)
+    if (line.length > 0 && (covered >= line.length || (covered > 0 && !words))) {
+      lines.push(index)
     }
     start = end + 1
   })
-  return whole
+  return lines
 }
 
-const wholeLineChange = Decoration.line({ class: 'cm-wholeLineChange' })
+const noChangedWords = Decoration.line({ class: 'cm-noChangedWords' })
 
 /**
- * Marks each line that a change added or removed whole with `cm-wholeLineChange`, so its words are not underlined. An
+ * Marks each line that shows no changed words with `cm-noChangedWords`, so nothing on it is underlined. An
  * added line takes a line decoration. A removed line is drawn by the merge view's own block, so the class goes on its
  * element once the block is drawn.
  */
-const wholeLineChanges = ViewPlugin.fromClass(
+const lineWordMarks = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
 
@@ -223,9 +229,9 @@ const wholeLineChanges = ViewPlugin.fromClass(
         const text = doc.sliceString(chunk.fromB, Math.min(chunk.endB, doc.length))
         const ranges = chunk.changes.map((change) => ({ from: change.fromB, to: change.toB }))
         const first = doc.lineAt(chunk.fromB).number
-        for (const index of wholeLines(text, ranges)) {
+        for (const index of linesWithoutChangedWords(text, ranges)) {
           const line = doc.line(first + index)
-          builder.add(line.from, line.from, wholeLineChange)
+          builder.add(line.from, line.from, noChangedWords)
         }
       }
       return builder.finish()
@@ -234,7 +240,7 @@ const wholeLineChanges = ViewPlugin.fromClass(
   { decorations: (plugin) => plugin.decorations },
 )
 
-/** Puts `cm-wholeLineChange` on each drawn removed line that a change removed whole. */
+/** Puts `cm-noChangedWords` on each drawn removed line that shows no changed words. */
 function markRemovedLines(view: EditorView) {
   const before = getOriginalDoc(view.state)
   const chunks = chunksOf(view)
@@ -246,13 +252,13 @@ function markRemovedLines(view: EditorView) {
     }
     const text = before.sliceString(chunk.fromA, Math.min(chunk.endA, before.length))
     const whole = new Set(
-      wholeLines(
+      linesWithoutChangedWords(
         text,
         chunk.changes.map((change) => ({ from: change.fromA, to: change.toA })),
       ),
     )
     block.querySelectorAll(':scope > .cm-deletedLine').forEach((line, index) => {
-      line.classList.toggle('cm-wholeLineChange', whole.has(index))
+      line.classList.toggle('cm-noChangedWords', whole.has(index))
     })
   }
 }

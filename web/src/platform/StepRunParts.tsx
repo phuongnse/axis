@@ -158,8 +158,12 @@ function ChangeDiff({ change }: { change: RunChange }) {
   return (
     <div>
       <span style={visuallyHidden}>{fillText(t('shell.inspector.run.changedFrom'), { before, after })}</span>
-      <div aria-hidden style={{ ...line, background: changeTint(colour.danger) }}>{`${removedMark} ${before}`}</div>
-      <div aria-hidden style={{ ...line, background: changeTint(colour.success) }}>{`${addedMark} ${after}`}</div>
+      <div aria-hidden style={{ ...line, background: changeTint(colour.danger) }}>
+        <span style={{ color: colour.dangerText }}>{removedMark}</span> {before}
+      </div>
+      <div aria-hidden style={{ ...line, background: changeTint(colour.success) }}>
+        <span style={{ color: colour.successText }}>{addedMark}</span> {after}
+      </div>
     </div>
   )
 }
