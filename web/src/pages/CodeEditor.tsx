@@ -19,7 +19,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { indentFolding, languageSupport, type FileLanguage } from './fileLanguage'
-import { findPanel } from './jsonFindPanel'
+import { findPanel, type FindTexts } from './jsonFindPanel'
 import { useFillHeight } from './jsonViewHeight'
 import { diffCounts, diffText, lineDiff, type DiffCounts } from './lineDiff'
 
@@ -139,18 +139,9 @@ export default function CodeEditor({
   const theme = editorTheme(tokens, mode, selectedTint, !grow ? 'scroll' : readOnly ? 'grow' : 'growEditable')
   const texts = useMemo(() => codeTexts(t), [t])
   const phrases = useMemo(() => EditorState.phrases.of(texts), [texts])
-  const findTexts = useMemo(
-    () => ({
-      field: t('shell.studio.json.findField'),
-      count: t('shell.studio.json.findCount'),
-      none: t('shell.studio.json.findNone'),
-    }),
-    [t],
-  )
   const latest = useRef({
     onChange,
     value: text,
-    findTexts,
     theme,
     language: shownLanguage,
     original,
@@ -168,7 +159,6 @@ export default function CodeEditor({
     latest.current = {
       onChange,
       value: text,
-      findTexts,
       theme,
       language: shownLanguage,
       original,
@@ -210,7 +200,7 @@ export default function CodeEditor({
           compartments.readOnly.of(readOnlyExtension(initial.readOnly)),
           compartments.phrases.of(initial.phrases),
           history(),
-          search({ top: true, createPanel: findPanel(() => latest.current.findTexts) }),
+          search({ top: true, createPanel: findPanel(() => findTextsOf(latest.current.texts)) }),
           // Go to line opens a dialog with CodeMirror's own English text, so the editor leaves it out.
           keymap.of([
             ...closeBracketsKeymap,
@@ -377,7 +367,20 @@ function codeTexts(t: (key: string) => string): Record<string, string> {
     to: t('shell.studio.code.to'),
     Completions: t('shell.studio.code.completions'),
     '$ unchanged lines': t('shell.studio.code.unchangedLines'),
+    [findField]: t('shell.studio.json.findField'),
+    [findCount]: t('shell.studio.json.findCount'),
+    [findNone]: t('shell.studio.json.findNone'),
   }
+}
+
+/** The keys of the find bar's texts among the editor's texts, which no CodeMirror phrase uses. */
+const findField = 'Axis find field'
+const findCount = 'Axis find count'
+const findNone = 'Axis find none'
+
+/** The find bar's texts, from the editor's texts. */
+function findTextsOf(texts: Record<string, string>): FindTexts {
+  return { field: texts[findField], count: texts[findCount], none: texts[findNone] }
 }
 
 /** Proposed: the underline of the words that changed inside a changed line, in a state's text colour, see #4623. */

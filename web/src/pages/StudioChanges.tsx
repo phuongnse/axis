@@ -18,6 +18,7 @@ import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { addedMark, removedMark } from '../platform/changeTint'
+import { FocusRingStyle } from '../platform/FocusRingStyle'
 import { FoldButton } from '../platform/FoldButton'
 import { visuallyHidden } from '../platform/visuallyHidden'
 import { PlatformContext } from './context'
@@ -160,13 +161,10 @@ function LayerMarks({ module }: { module: AuthoringRequestLayerChange }) {
 
 /**
  * Proposed: the focus ring of a file's block, round the whole file while its diff has focus, as a CSS rule since inline
- * styles cannot reach focus, as `TileFocusStyle` draws a tile's; the diff draws no ring of its own, see #4623.
+ * styles cannot reach focus, through the one `FocusRingStyle`; the diff draws no ring of its own, see #4623.
  */
 function DiffFocusStyle() {
-  const { colour } = useDesignTokens()
-  return (
-    <style>{`[data-diff-file]:has(.cm-focused) { outline: 2px solid ${colour.focusRing}; outline-offset: -1px; }`}</style>
-  )
+  return <FocusRingStyle selector="[data-diff-file]:has(.cm-focused)" offset={-1} />
 }
 
 /**

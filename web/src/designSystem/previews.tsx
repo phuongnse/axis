@@ -76,6 +76,7 @@ import {
   taskId,
   taskInboxWidget,
   wizardFormRoutes,
+  routes,
   wizardRequestForm,
 } from './fixtures'
 
@@ -541,20 +542,17 @@ export function chooseFixtures(state: PreviewState): void {
 
 /**
  * The fixture paths that states answer for themselves, each answered by the chosen state. A path the chosen state lacks
- * takes its answer from `base`, the answers every preview shares, so a state can change one shared answer, such as the
+ * takes its answer from `routes`, the answers every preview shares, so a state can change one shared answer, such as the
  * signed-in person's rights. Proposed for #4623. A path that neither has is logged as a missing fixture and answered
  * with a 404, as a path with no route is.
  */
-export function chosenRoutes(
-  all: Record<string, readonly PreviewState[]>,
-  base: Record<string, FixtureRoute> = {},
-): Record<string, FixtureRoute> {
+export function chosenRoutes(all: Record<string, readonly PreviewState[]>): Record<string, FixtureRoute> {
   const paths = Object.values(all).flatMap((states) => states.flatMap((state) => Object.keys(state.fixtures ?? {})))
   return Object.fromEntries(
     paths.map((path) => [
       path,
       (init) => {
-        const answer = chosen[path] ?? base[path]
+        const answer = chosen[path] ?? routes[path]
         if (answer) {
           return answer(init)
         }

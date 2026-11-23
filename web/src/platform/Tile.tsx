@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router'
+import { FocusRingStyle } from './FocusRingStyle'
 import { PartBoundary } from './SectionParts'
 import { useDesignTokens } from './themeMode'
 
@@ -8,8 +9,7 @@ import { useDesignTokens } from './themeMode'
  * See docs/reference/shell.md#signed-in.
  */
 export function TileFocusStyle() {
-  const { colour } = useDesignTokens()
-  return <style>{`[data-tile]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: 2px; }`}</style>
+  return <FocusRingStyle selector="[data-tile]:focus-visible" offset={2} />
 }
 
 /**

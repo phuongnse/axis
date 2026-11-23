@@ -6,6 +6,7 @@ import { ShellAside } from './shellAside'
 import { useSidePanelWidth } from './sidePanelWidth'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { FocusRingStyle } from './FocusRingStyle'
 
 /** What a panel the person opens has: a close button named by `closeNameKey`. The process designer's step panel has none. */
 type Closing =
@@ -78,7 +79,7 @@ export function SidePanel({
           padding: spacing.sm,
         }}
       >
-        <style>{`[data-side-panel-handle]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: -2px; }`}</style>
+        <FocusRingStyle selector="[data-side-panel-handle]:focus-visible" offset={-2} />
         <div
           role="separator"
           aria-orientation="vertical"
