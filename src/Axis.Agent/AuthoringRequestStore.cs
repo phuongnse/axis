@@ -10,8 +10,9 @@ namespace Axis.Agent;
 /// <summary>
 /// A request whose state needs work, as the agent host lists it: the application it is about, its text, its current plan and binding, the
 /// comments of every change of plan, oldest first, the draft the request works in, once the working step has made it, the <c>checks</c> of its newest
-/// <c>check</c> step as JSON, once a check has stored them, the tokens its steps have used, when its plan was approved, its <c>round</c>, and the
-/// findings of its newest <c>review</c> step after that check, if the review had any.
+/// <c>check</c> step as JSON, once a check has stored them, the tokens its steps have used, when the time limit starts, its <c>round</c>, the
+/// findings of its newest <c>review</c> step after that check, if the review had any, and the comments of every <c>changeRequest</c> step, oldest first.
+/// The time limit starts at the later of the approval of the plan and the newest change request, see <c>docs/reference/authoring-requests.md#budgets</c>.
 /// </summary>
 public sealed record AuthoringRequestToWork(
     Guid Id,
@@ -25,9 +26,10 @@ public sealed record AuthoringRequestToWork(
     Guid? DraftId,
     string? LatestChecks,
     long Tokens,
-    DateTimeOffset? ApprovedAt,
+    DateTimeOffset? TimeLimitFrom,
     int Round = 0,
-    string? LatestFindings = null);
+    string? LatestFindings = null,
+    IReadOnlyList<string>? ChangeRequests = null);
 
 /// <summary>
 /// The agent host's reads and writes of <c>axis.authoring_requests</c> and <c>axis.authoring_request_steps</c> in a tenant database, see
@@ -53,12 +55,16 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         a.draft_id,
         (SELECT s.checks::text FROM axis.authoring_request_steps s
               WHERE s.request_id = a.id AND s.kind = 'check' AND s.checks IS NOT NULL ORDER BY s.ordinal DESC LIMIT 1),
-        a.tokens, a.approved_at, a.round,
+        a.tokens,
+        greatest(a.approved_at, (SELECT max(s.finished_at) FROM axis.authoring_request_steps s WHERE s.request_id = a.id AND s.kind = 'changeRequest')),
+        a.round,
         (SELECT r.checks->'review'->>'findings' FROM axis.authoring_request_steps r
               WHERE r.request_id = a.id AND r.kind = 'review' AND r.checks IS NOT NULL
                 AND r.ordinal > coalesce((SELECT max(c.ordinal) FROM axis.authoring_request_steps c
                                           WHERE c.request_id = a.id AND c.kind = 'check' AND c.checks IS NOT NULL), 0)
-              ORDER BY r.ordinal DESC LIMIT 1)
+              ORDER BY r.ordinal DESC LIMIT 1),
+        ARRAY(SELECT s.input_summary FROM axis.authoring_request_steps s
+              WHERE s.request_id = a.id AND s.kind = 'changeRequest' AND s.input_summary IS NOT NULL ORDER BY s.ordinal)
         """;
 
     // The condition under which a request of one of the states needs work. A ready request needs it only when it asked for auto-accept, has a draft and no
@@ -377,7 +383,8 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             reader.GetInt64(10),
             reader.IsDBNull(11) ? null : reader.GetFieldValue<DateTimeOffset>(11),
             reader.GetInt32(12),
-            reader.IsDBNull(13) ? null : reader.GetString(13));
+            reader.IsDBNull(13) ? null : reader.GetString(13),
+            reader.GetFieldValue<string?[]>(14).OfType<string>().ToList());
 
     // Locks the request's row when the host still holds the claim, so a drop or a claim by another host waits for the transaction.
     private static async Task<bool> LockClaimAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid requestId, string claimedBy, CancellationToken cancellationToken)

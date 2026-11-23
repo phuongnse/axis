@@ -191,7 +191,9 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
       if (action === 'accept') {
         return json(acceptRequest('queued'), 202)
       }
-      const next = { approve: 'working', 'change-plan': 'planning', drop: 'dropped' }[action] as AuthoringRequestState
+      const next = { approve: 'working', 'change-plan': 'planning', 'request-changes': 'working', drop: 'dropped' }[
+        action
+      ] as AuthoringRequestState
       server.current = { ...server.current, state: next }
       return answer(server.current)
     }),
@@ -919,6 +921,32 @@ describe('accepting a ready request', () => {
     expect(within(guide).getByText('Waiting for its author to accept')).toBeVisible()
     expect(within(guide).queryByRole('button')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
+  })
+
+  it('asks for other changes with a comment of 2,000 characters and shows the request as working', async () => {
+    const server = serverOf(ready())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+    const comment = 'a'.repeat(2000)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Ask for other changes…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Ask for other changes' })
+    expect(within(dialog).getByText(/AI works on the same draft with your comment/)).toBeVisible()
+    await userEvent.click(within(dialog).getByRole('textbox', { name: 'What should AI change?' }))
+    await userEvent.paste(comment)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ask AI to change it' }))
+
+    expect(await within(screen.getByTestId('studio-ai-request-guide')).findByText('AI is working on it')).toBeVisible()
+    expect(server.calls).toEqual([{ action: 'request-changes', body: { comment } }])
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('shows another reader no way to ask for other changes', async () => {
+    vi.stubGlobal('fetch', serverOf(ready({ author: 'u2' })).fetch)
+    renderPage()
+
+    await screen.findByTestId('studio-ai-request-guide')
+    expect(screen.queryByRole('button', { name: 'Ask for other changes…' })).toBeNull()
   })
 
   it('shows "Accepting the draft" with no buttons while the accept is queued', async () => {
