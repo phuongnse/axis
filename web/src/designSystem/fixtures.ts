@@ -2,6 +2,7 @@ import type { ChartKind } from '../platform/chartOption'
 import type { CurrentUser } from '../platform/currentUser'
 import type { LegalLinks } from '../platform/LegalLine'
 import type { NotificationPage } from '../platform/notifications'
+import type { OwnAi } from '../platform/ownAi'
 import type { OwnAuthenticators } from '../platform/ownAuthenticators'
 import type { OwnNotificationPreferences } from '../platform/ownNotificationPreferences'
 import type { OwnSessions } from '../platform/ownSessions'
@@ -1213,6 +1214,39 @@ const ownAuthenticators: OwnAuthenticators = {
     { id: '7a1f0c2e-3b4d-4e5f-8a6b-7c8d9e0f1a2b', label: 'Phone', createdAt: '2026-10-02T09:15:00Z' },
     { id: '8b2e1d3f-4c5a-4f6b-9b7c-8d9e0f1a2b3c', label: 'Tablet', createdAt: '2026-11-04T14:30:00Z' },
   ],
+}
+
+/**
+ * Proposed (#3926): the account page's AI, as `GET /api/me/ai` would answer it. No API gives it yet, and the authoring
+ * eval's supported models list is still empty, so the models are examples. A `PUT` connects the AI, so the next read
+ * shows it, as the server would once the agent host has tested the key.
+ */
+export function ownAiRoute(): FixtureRoute {
+  let ai: OwnAi = {
+    providers: [
+      {
+        id: 'anthropic',
+        name: 'Anthropic',
+        models: [
+          { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+          { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+        ],
+      },
+    ],
+    connection: null,
+  }
+  return (init) => {
+    if (init?.method === 'PUT') {
+      const { provider, model, sealedKey } = JSON.parse(String(init.body)) as {
+        provider: string
+        model: string
+        sealedKey: string
+      }
+      ai = { ...ai, connection: { provider, model, ending: sealedKey.slice(-4) } }
+      return new Response(null, { status: 204 })
+    }
+    return ai
+  }
 }
 
 const ownSessions: OwnSessions = {

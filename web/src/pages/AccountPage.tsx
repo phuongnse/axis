@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { accountActionUrl, reauthenticateUrl } from '../platform/api'
 import { AxisTable } from '../platform/AxisTable'
 import { assignLocation } from '../platform/navigation'
@@ -20,6 +21,7 @@ import { StatusTag } from '../platform/StatusTag'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
+import { AccountAi } from './AccountAi'
 import { AccountNotifications } from './AccountNotifications'
 import { usePlatform } from './context'
 
@@ -36,8 +38,8 @@ const sessionFields = [
 ] as const
 
 /**
- * The person's account page, titled Your account, with a Security tab, which opens first, and a Notifications tab, see
- * {@link AccountNotifications}. On Security, for an account of the tenant's realm, Change password and the
+ * The person's account page, titled Your account, with a Security tab, which opens first, a Notifications tab, see
+ * {@link AccountNotifications}, and an AI tab, see {@link AccountAi}. On Security, for an account of the tenant's realm, Change password and the
  * authenticators come first: each button sends the browser to the identity provider's own step
  * through the sign-in route, which returns here. Remove is disabled on the only authenticator. A
  * brokered user sees neither. Below come the person's live sessions, with an End button on every
@@ -66,6 +68,9 @@ export function AccountPage() {
     'authenticators.',
   )
   const sessionsView = useTableView(sessionFields, recordPageSize, noParameters, false, true, false, 'sessions.')
+  // Proposed (#3926): the open tab is in the address as `tab`, so Studio's Connect your AI opens `/account?tab=ai`.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = searchParams.get('tab') ?? 'security'
 
   useEffect(() => {
     const controller = new AbortController()
@@ -118,7 +123,21 @@ export function AccountPage() {
   return (
     <PageLayout title={t('shell.account.title')} band>
       <Tabs
-        defaultActiveKey="security"
+        activeKey={tab}
+        onChange={(next) =>
+          setSearchParams(
+            (current) => {
+              const params = new URLSearchParams(current)
+              if (next === 'security') {
+                params.delete('tab')
+              } else {
+                params.set('tab', next)
+              }
+              return params
+            },
+            { replace: true },
+          )
+        }
         items={[
           {
             key: 'security',
@@ -299,6 +318,7 @@ export function AccountPage() {
             ),
           },
           { key: 'notifications', label: t('shell.account.tabs.notifications'), children: <AccountNotifications /> },
+          { key: 'ai', label: t('shell.account.tabs.ai'), children: <AccountAi /> },
         ]}
       />
     </PageLayout>

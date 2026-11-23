@@ -42,6 +42,7 @@ import {
   emptyTaskInboxWidget,
   failingRoutes,
   failingTableWidget,
+  ownAiRoute,
   fields,
   invalidFormRoutes,
   invalidRequestForm,
@@ -364,6 +365,25 @@ export const previews: Record<string, readonly PreviewState[]> = {
       ),
       entry: '/account',
       frameHeight: shellFrameHeight,
+    },
+    // Proposed (#3926): the account page's AI tab, with no AI connected, and its Connect your AI dialog.
+    {
+      caption: 'Account AI',
+      draw: () => <ShellPreview />,
+      entry: '/account?tab=ai',
+      frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiRoute() },
+    },
+    {
+      caption: 'Account AI connect',
+      draw: () => (
+        <ClickOnMount selector='[data-testid="account-ai-connect"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
+      entry: '/account?tab=ai',
+      frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiRoute() },
     },
     { caption: 'Users page', draw: () => <ShellPreview />, entry: '/users', frameHeight: shellFrameHeight },
     {
