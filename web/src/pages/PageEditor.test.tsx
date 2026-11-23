@@ -1948,7 +1948,7 @@ describe('PageEditor container panels', () => {
     })
     expect(collapsed).not.toBeChecked()
     expect(collapsed).toHaveAccessibleDescription(
-      'Whether the section starts collapsed, with its widgets hidden until a person opens it.',
+      'Turn on so the section starts collapsed, with its widgets hidden until a person opens it.',
     )
     await userEvent.click(collapsed)
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/collapsed', true)

@@ -659,6 +659,36 @@ describe('SchemaForm lists of objects', () => {
     expect(screen.getByRole('table').compareDocumentPosition(removed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('draws the actions, record filter and fields of a grant with the texts that the policy matrix draws', async () => {
+    renderForm((await loadKindSchema('policy'))!, {
+      name: 'Shop',
+      roles: ['Approver'],
+      grants: [{ name: 'Read orders', entity: 'Order', actions: ['read'] }],
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Read orders' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit grant' })
+
+    expect(
+      within(dialog).getByRole('textbox', {
+        name: english['shell.studio.field.policy.grants.filter'],
+        description: english['shell.studio.field.policy.grants.filter.help'],
+      }),
+    ).toBeVisible()
+    expect(
+      within(dialog).getByRole('group', {
+        name: english['shell.studio.field.policy.grants.fields'],
+        description: english['shell.studio.field.policy.grants.fields.help'],
+      }),
+    ).toBeVisible()
+    expect(
+      within(dialog).getByRole('group', {
+        name: english['shell.studio.field.policy.grants.actions'],
+        description: english['shell.studio.field.policy.grants.actions.help'],
+      }),
+    ).toBeVisible()
+  })
+
   it('names the item of a list with no item text as item in Add… and the dialog titles', async () => {
     renderForm(listSchema, { kind: 'example', rows: [{ name: 'budget' }] })
 

@@ -278,7 +278,9 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(grants).toHaveLength(2)
     for (const grant of grants) {
       expect(within(grant).getByText('Record filter').tagName).toBe('LABEL')
-      expect(within(grant).getByText(platformEnglish['shell.studio.matrix.filter.help'])).toBeInTheDocument()
+      expect(
+        within(grant).getByText(platformEnglish['shell.studio.field.policy.grants.filter.help']),
+      ).toBeInTheDocument()
     }
   })
 
@@ -291,13 +293,13 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     for (const grant of screen.getAllByTestId('studio-matrix-own-grant')) {
       const group = within(grant).getByRole('group', {
         name: 'Actions',
-        description: platformEnglish['shell.studio.matrix.actions.help'],
+        description: platformEnglish['shell.studio.field.policy.grants.actions.help'],
       })
       expect(within(group).getByRole('checkbox', { name: 'read' })).toBeInTheDocument()
       expect(
         within(grant).getByRole('combobox', {
           name: 'Fields',
-          description: platformEnglish['shell.studio.matrix.fields.help'],
+          description: platformEnglish['shell.studio.field.policy.grants.fields.help'],
         }),
       ).toBeInTheDocument()
     }

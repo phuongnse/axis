@@ -501,7 +501,7 @@ describe('the Design tab of a form', () => {
     const canvas = await openDesign()
     await userEvent.click(await within(canvas).findByRole('group', { name: 'title' }, slow))
     const width = within(screen.getByTestId('studio-design-panel')).getByRole('spinbutton', {
-      name: 'Width',
+      name: 'Width (of 12)',
     })
     await userEvent.type(width, '8')
 
@@ -526,7 +526,7 @@ describe('the Design tab of a form', () => {
     await userEvent.click(await within(canvas).findByRole('group', { name: 'title' }, slow))
     await userEvent.type(
       within(screen.getByTestId('studio-design-panel')).getByRole('spinbutton', {
-        name: 'Width',
+        name: 'Width (of 12)',
       }),
       '8',
     )
