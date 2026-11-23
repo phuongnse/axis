@@ -104,11 +104,13 @@ async function renderList(
     </ThemeModeProvider>,
   )
   if (overrides.wait !== false) {
-    await waitFor(() =>
+    // The empty placeholder shows while the list loads, so wait until the table is no longer busy.
+    await waitFor(() => {
+      expect(document.querySelector('[aria-busy="true"]')).toBeNull()
       expect(
         screen.queryAllByTestId('studio-release-row').length + screen.queryAllByText('No release yet.').length,
-      ).toBeGreaterThan(0),
-    )
+      ).toBeGreaterThan(0)
+    })
   }
   return onActivate
 }

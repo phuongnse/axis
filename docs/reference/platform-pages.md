@@ -29,7 +29,8 @@ of a brokered provider, and the page shows the sessions only.
 - **Change password and Authenticators.** Above the sessions, two actions start the identity
   provider's own steps, as application-initiated actions through a sign-in with `kc_action`. Change
   password starts `UPDATE_PASSWORD`. Authenticators lists the person's authenticators with Add, which
-  starts `CONFIGURE_TOTP`, and Remove for each, which starts `delete_credential:<id>`. Their pages are
+  starts `CONFIGURE_TOTP`, and for each authenticator a Remove, which is the trash icon named by its tooltip and
+  starts `delete_credential:<id>`. Their pages are
   Axis pages, see [theme](identity-provider.md#theme), and Cancel on them returns to the account page
   with nothing changed.
 - **The last authenticator stays.** Remove is off on a person's only authenticator, because every
@@ -42,13 +43,13 @@ of a brokered provider, and the page shows the sessions only.
 The page lists the person's live sessions on the tenant's own hosts from `GET /api/me/sessions`, newest
 sign-in first. A signed-out visit shows the sign-in prompt, because the list call is not exempt.
 
-- **Rows.** A row shows Signed in and Last active, in the current locale. A This session `StatusTag` in `neutral` marks the
-  session in use now. It has no End button, because the person ends it with Sign out, which also ends
-  the identity provider's session.
+- **Rows.** A row shows Signed in and Last active, in the current locale. A This session `StatusTag` in `neutral` sits in
+  the row's Signed in cell and marks the session in use now. The row has no End action, because the person ends it
+  with Sign out, which also ends the identity provider's session.
 - **Filter.** The sessions table has Filter on Signed in and Last active, each by the day in the person's
   own time zone. The filter is kept in the address as `sessions.filter` and narrows the rows the page
   already holds, with no new request.
-- **Ending sessions.** Every other row has an End button (`DELETE /api/me/sessions/{id}`). End all
+- **Ending sessions.** Every other row has End as a row action in the destructive tone (`DELETE /api/me/sessions/{id}`). End all
   other sessions (`DELETE /api/me/sessions`) is disabled when no other session exists. After a `204` or
   a `403`, the page loads the list again, and any other answer shows an error message.
 - **Sign in again.** When `endAllowed` is `false`, both kinds of button are disabled, and a message

@@ -320,16 +320,18 @@ export function SeedGrid({
                   )
                 },
               })),
-              {
-                key: 'remove',
-                kind: 'fixed',
-                render: (_, row) => (
-                  <AxisButton role="secondary" destructive onClick={() => onChange(`/records/${row.index}`, undefined)}>
-                    {t('shell.studio.seed.removeRecord')}
-                  </AxisButton>
-                ),
-              },
             ]}
+            rowActions={{
+              configured: 1,
+              actions: (row) => [
+                {
+                  key: 'remove',
+                  labelKey: 'shell.studio.seed.removeRecord',
+                  meaning: 'remove',
+                  onClick: () => onChange(`/records/${row.index}`, undefined),
+                },
+              ],
+            }}
           />
           <RemovedRows layer={layer} list="/records" />
         </Flex>
