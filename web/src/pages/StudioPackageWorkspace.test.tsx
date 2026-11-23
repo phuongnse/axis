@@ -1361,9 +1361,9 @@ describe('StudioPackageWorkspace', () => {
       await waitFor(() => expect(panel.getAllByTestId('studio-test-result')).toHaveLength(2), { timeout: 3000 })
       const [passed, failed] = panel.getAllByTestId('studio-test-result')
       expect(passed).toHaveAttribute('data-outcome', 'passed')
-      expect(passed).toHaveTextContent('passedtest_adds< 1 sec')
+      expect(passed).toHaveTextContent('Passedtest_adds< 1 sec')
       expect(failed).toHaveAttribute('data-outcome', 'failed')
-      expect(failed).toHaveTextContent('failedtest_greets< 1 sec')
+      expect(failed).toHaveTextContent('Failedtest_greets< 1 sec')
       expect(failed).toHaveTextContent('AssertionError: Hello Ada != Hi Ada')
       expect(panel.queryByRole('heading', { name: 'Test results' })).not.toBeInTheDocument()
 

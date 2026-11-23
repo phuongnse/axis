@@ -10,6 +10,7 @@ import {
   fetchAuthoringRequestDiff,
   ServerUnreachableError,
 } from '../platform/studio'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -40,8 +41,8 @@ async function allDiffEntries(
 /**
  * The body of the Result item of a ready, failed or accepted request: the Checks and Review lines with their verdicts,
  * then the request's changes, folded resource by resource. Show the checks opens the compile's problems and the scenario
- * results. The changes are read again when the request moves on, and a failed read shows no changes. See
- * docs/reference/ai-authoring-in-studio.md#the-diff.
+ * results, whose names link to Studio. The changes are read again when the request moves on, and a failed read shows no
+ * changes. See docs/reference/ai-authoring-in-studio.md#the-diff.
  */
 export function StudioAuthoringRequestResult({
   application,
@@ -128,6 +129,7 @@ export function StudioAuthoringRequestResult({
                     status: checks.checks.scenarios.outcome === 'passed' ? 'succeeded' : 'failed',
                     scenarios: checks.checks.scenarios.items,
                   }}
+                  scenarioAddressOf={(id, path) => studioResourceAddress(application, id, path)}
                 />
               )}
             </Flex>
