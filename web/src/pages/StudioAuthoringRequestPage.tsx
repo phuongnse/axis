@@ -14,6 +14,7 @@ import { ReasonDialog } from '../platform/ReasonDialog'
 import { ShellBarSlot } from '../platform/shellBarSlot'
 import { StatusTag } from '../platform/StatusTag'
 import { StepsBar, type StepsBarItem } from '../platform/StepsBar'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { useStudioConnection } from '../platform/studioConnection'
 import {
   acceptAuthoringRequest,
@@ -25,7 +26,7 @@ import {
   fetchAuthoringRequest,
   fetchStudioRequest,
   requestAuthoringRequestChanges,
-  resourceTitle,
+  retryAuthoringRequest,
   ServerUnreachableError,
   type StudioDiagnostic,
   type StudioRequest,
@@ -35,6 +36,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFollowJob } from '../platform/useFollowJob'
 import { PlatformContext } from './context'
+import { ResourceReference } from './ResourceReference'
 import {
   authoringRequestStates,
   type FeedEntry,
@@ -111,7 +113,8 @@ function guideWords(
  * sends the request back to work. Accept sends the accept route and follows its publish request with
  * `fetchStudioRequest`, kept in memory for this visit, and reads the request again when the accept ends. An accept that
  * met conflicts shows a warning in place of its status, which names each changed resource with who changed it and when,
- * and the bar offers Drop… only.
+ * and the bar offers Make the change again and Drop…. Make the change again sends the retry route, which clears the
+ * draft and sends the request back to work, and the page forgets that accept.
  * Until the request waits for its author or ends, the page asks for it every second and keeps the last answer when a read
  * fails. A request that does not exist shows its line and, when `onAskAi` is given, an Ask AI link that opens the request
  * panel. `resources` is the application's resource list, which names the resources of a conflict. See
@@ -205,8 +208,8 @@ export function StudioAuthoringRequestPage({
   const isAuthor = request.author === userId
   const accepting =
     isAuthor && request.state === 'ready' && followed !== null && (pending || followed.status === 'succeeded')
-  // The conflicts of the accept the page follows, which only the author sees. The bar then offers no Accept until the
-  // retry route exists, see docs/reference/ai-authoring-in-studio.md#accepting.
+  // The conflicts of the accept the page follows, which only the author sees. The bar then offers Make the change again
+  // and Drop… and no Accept, see docs/reference/ai-authoring-in-studio.md#accepting.
   const conflicts =
     isAuthor && request.state === 'ready' && followed?.status === 'failed'
       ? followed.diagnostics.filter((diagnostic) => diagnostic.code === acceptConflict)
@@ -265,7 +268,7 @@ export function StudioAuthoringRequestPage({
             <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />
             {followed !== null &&
               (conflicted ? (
-                <AcceptConflict conflicts={conflicts} resources={resources} />
+                <AcceptConflict application={application} conflicts={conflicts} resources={resources} />
               ) : (
                 <StudioRequestStatus request={followed} releaseNumber={null} />
               ))}
@@ -376,6 +379,23 @@ export function StudioAuthoringRequestPage({
                     }
                   >
                     {t('shell.studio.aiRequest.accept')}
+                  </AxisButton>
+                ) : isAuthor && request.state === 'ready' && conflicted ? (
+                  <AxisButton
+                    role="finish"
+                    data-testid="studio-ai-request-retry"
+                    disabled={acting}
+                    onClick={() =>
+                      void act(
+                        () => retryAuthoringRequest(application, requestId),
+                        (answered) => {
+                          setAccept(undefined)
+                          adopt(answered)
+                        },
+                      )
+                    }
+                  >
+                    {t('shell.studio.aiRequest.retry')}
                   </AxisButton>
                 ) : undefined
               }
@@ -576,9 +596,18 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
 /**
  * The warning that stands in place of "Not accepted" when the accept the page follows met conflicts, see
  * docs/reference/ai-authoring-in-studio.md#accepting. Each conflict is one bullet: the resource's title, then who changed
- * it and when, or only the title when no change is found. A resource the list does not hold yet is named by its file.
+ * it and when, or only the title when no change is found. The title is a `ResourceReference` link to the resource in
+ * Studio, and a resource the list does not hold yet is named by its file, as plain muted text.
  */
-function AcceptConflict({ conflicts, resources }: { conflicts: StudioDiagnostic[]; resources: StudioResourceItem[] }) {
+function AcceptConflict({
+  application,
+  conflicts,
+  resources,
+}: {
+  application: string
+  conflicts: StudioDiagnostic[]
+  resources: StudioResourceItem[]
+}) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   return (
@@ -590,8 +619,17 @@ function AcceptConflict({ conflicts, resources }: { conflicts: StudioDiagnostic[
         <ul style={{ margin: 0 }}>
           {conflicts.map((conflict) => {
             const resource = resources.find((item) => item.id === conflict.resourceId)
-            const name =
-              resource !== undefined ? resourceTitle(resource, locale, t) : conflict.file || conflict.resourceId || ''
+            const name = (
+              <ResourceReference
+                file={conflict.file || conflict.resourceId || ''}
+                resource={resource}
+                href={
+                  resource !== undefined && conflict.resourceId
+                    ? studioResourceAddress(application, conflict.resourceId)
+                    : undefined
+                }
+              />
+            )
             const time = formatValue(
               { name: 'changedAt', type: 'date-time' },
               conflict.changedAt ?? null,

@@ -157,7 +157,7 @@ Result, Started and Duration.
   shows an em dash.
 - The words of a step come from its kind and its outcome, and never from AI. Examples are "Wrote a plan",
   "Changed the draft", "Checked the draft", "Fixed the draft", "Reviewed the draft", "Asked for another plan:
-  “<comment>”" and "Asked for changes: “<comment>”".
+  “<comment>”", "Asked for changes: “<comment>”" and "Asked AI to make the change again".
 - The results read "Plan written", "Saved", "All scenarios pass", "No changes requested", "Refused" or
   "Ran out of time". The only free text is the author's own comment in a step.
 - **Writes that follow each other** _(planned for M35)_. Writes that follow each other fold into one group row, as
@@ -187,7 +187,7 @@ bar, never in the heading. Only the request's author sees its actions.
 | AI waits for an outside app _(planned for M35)_ | The app's line, as [below](#an-outside-apps-request) gives it | none                                                                                                         | Drop…                                                               |
 | Ready, a finding must change _(planned for M35)_ | "1 blocking finding", or "<n> blocking findings"         | Ask AI to fix it, which asks for changes with "Fix what the review found must change:" and each blocking finding as the comment | Drop…, Ask for other changes…, Accept anyway…, see [the diff](#the-diff) |
 | Ready, passed | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes…                                        |
-| Ready, an accept met a conflict               | Resources changed since AI read them                     | Make the change again _(planned for M35)_. Until then, none                                                       | Drop…                                                               |
+| Ready, an accept met a conflict               | Resources changed since AI read them                     | Make the change again                                                                                             | Drop…                                                               |
 | Ready, for anyone else | Waiting for its author to accept                         | none                                                                                                              | none                                                                |
 | Accepting | Accepting the draft                                      | none                                                                                                              | none                                                                |
 | Failed, for its author _(planned for M35)_ | AI could not finish                                      | Send again, which sends its words as a new request and opens it                                                   | Drop…                                                               |
@@ -396,12 +396,13 @@ and only when the deployment has a preview host, `studioPreviewHost` in [`GET /a
   in place of "Not accepted". It shows only for the accept that the page follows in this visit, so after a reload the
   request reads as Ready. It has one bullet for each resource: the resource's title, then who changed it and when. A
   bullet with no author shows only the title. The title is the name the resource has in the resource list, or its
-  file while the list loads. The bar then has no Accept, only Drop….
-- **A link to the resource** _(planned for M35)_. Each bullet's title is plain text until the
-  [`ResourceReference`](shared-widgets.md#which-widget) link draws it.
-- **Make the change again** _(planned for M35)_ is the bar's main action after a conflict. It sends the
+  file while the list loads. The bar then has Make the change again and Drop…, and no Accept.
+- **A link to the resource.** Each bullet's title is drawn by the
+  [`ResourceReference`](shared-widgets.md#which-widget) widget: a link to the resource in Studio, with its kind muted
+  after it. A package file, and a resource the list has not loaded yet, is plain muted file text with no link.
+- **Make the change again** is the bar's main action after a conflict. It sends the
   [retry](authoring-requests.md#routes) route. AI makes the change on a new draft from the folder as it is now, and the
-  checks and the review run again. Until it exists, the bar has no main action.
+  checks and the review run again. The page then shows the request as working, and it forgets the accept it followed.
 
 ### A failure
 

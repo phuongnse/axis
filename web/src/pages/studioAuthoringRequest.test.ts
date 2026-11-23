@@ -515,6 +515,13 @@ describe('requestHistory', () => {
     expect(row.result).toBeNull()
   })
 
+  it('words a retry step, which has no comment and no result', () => {
+    const [row] = requestHistory(requestOf({ steps: [step({ kind: 'retry', summary: null })] }))
+
+    expect(row.step).toEqual({ key: 'shell.studio.aiRequest.history.step.retry', values: { comment: '' } })
+    expect(row.result).toBeNull()
+  })
+
   it('gives a step of a kind with no words no step text, so its row shows the dash', () => {
     const [row] = requestHistory(requestOf({ steps: [step({ kind: 'write' })] }))
 

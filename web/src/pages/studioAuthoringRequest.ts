@@ -317,6 +317,7 @@ const historyStepKeys: Record<string, string> = {
   review: 'shell.studio.aiRequest.history.step.review',
   fix: 'shell.studio.aiRequest.history.step.fix',
   changeRequest: 'shell.studio.aiRequest.history.step.changeRequest',
+  retry: 'shell.studio.aiRequest.history.step.retry',
   accept: 'shell.studio.aiRequest.history.step.accept',
 }
 

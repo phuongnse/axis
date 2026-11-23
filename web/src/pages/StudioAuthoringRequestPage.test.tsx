@@ -14,6 +14,7 @@ import type {
   StudioRequestStatus,
   StudioResourceItem,
 } from '../platform/studio'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioAuthoringRequestPage } from './StudioAuthoringRequestPage'
@@ -191,9 +192,13 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
       if (action === 'accept') {
         return json(acceptRequest('queued'), 202)
       }
-      const next = { approve: 'working', 'change-plan': 'planning', 'request-changes': 'working', drop: 'dropped' }[
-        action
-      ] as AuthoringRequestState
+      const next = {
+        approve: 'working',
+        'change-plan': 'planning',
+        'request-changes': 'working',
+        retry: 'working',
+        drop: 'dropped',
+      }[action] as AuthoringRequestState
       server.current = { ...server.current, state: next }
       return answer(server.current)
     }),
@@ -1095,7 +1100,7 @@ describe('accepting a ready request', () => {
     expect(await accept()).toBeVisible()
   })
 
-  it('shows a conflict alert with a bullet for each changed resource, and Drop… with no Accept', async () => {
+  it('shows a conflict alert with a bullet for each changed resource, and Make the change again and Drop… with no Accept', async () => {
     const server = serverOf(ready())
     server.accept = ['queued', 'failed']
     server.acceptDiagnostics = [
@@ -1113,7 +1118,11 @@ describe('accepting a ready request', () => {
     ).toBeVisible()
     const items = within(alert).getAllByTestId('studio-ai-request-conflict-item')
     expect(items).toHaveLength(2)
-    expect(items[0].textContent).toBe(`Employee, changed by Linh Nguyen on ${timeOf('2026-11-18T10:15:00Z')}`)
+    expect(items[0].textContent).toBe(`Employee Role, changed by Linh Nguyen on ${timeOf('2026-11-18T10:15:00Z')}`)
+    expect(within(items[0]).getByRole('link', { name: 'Employee' })).toHaveAttribute(
+      'href',
+      studioResourceAddress(application, 'role-1'),
+    )
     expect(within(items[0]).getByText(timeOf('2026-11-18T10:15:00Z'), { selector: 'time' })).toHaveAttribute(
       'datetime',
       '2026-11-18T10:15:00Z',
@@ -1121,13 +1130,33 @@ describe('accepting a ready request', () => {
     expect(items[1].textContent).toBe(
       `packages/tax/rates.json, changed by Minh Tran on ${timeOf('2026-11-18T11:40:00Z')}`,
     )
+    expect(within(items[1]).queryByRole('link')).toBeNull()
 
     const guide = screen.getByTestId('studio-ai-request-guide')
     expect(within(guide).getByText('Resources changed since AI read them')).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Make the change again' })).toBeVisible()
     expect(within(guide).getByRole('button', { name: 'Drop…' })).toBeVisible()
     expect(within(guide).queryByRole('button', { name: 'Accept' })).toBeNull()
     expect(screen.queryByText('Not accepted. Nothing in the application changed.')).toBeNull()
     expect(screen.queryByTestId('studio-request-status')).toBeNull()
+  })
+
+  it('posts the retry when the author clicks "Make the change again", and then reads "AI is working on it"', async () => {
+    const server = serverOf(ready())
+    server.accept = ['queued', 'failed']
+    server.acceptDiagnostics = [conflict('role-1', 'roles/employee.json', 'Linh Nguyen', '2026-11-18T10:15:00Z')]
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ resources: [employee] })
+    await userEvent.click(await accept())
+    await screen.findByTestId('studio-ai-request-conflict', undefined, { timeout: 4000 })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Make the change again' }))
+
+    expect(server.calls.at(-1)).toEqual({ action: 'retry', body: undefined })
+    const guide = screen.getByTestId('studio-ai-request-guide')
+    expect(await within(guide).findByText('AI is working on it')).toBeVisible()
+    expect(screen.queryByTestId('studio-ai-request-conflict')).toBeNull()
+    expect(within(guide).queryByRole('button', { name: 'Make the change again' })).toBeNull()
   })
 
   it('shows "Accepted" and the state Accepted when the accept succeeds', async () => {
