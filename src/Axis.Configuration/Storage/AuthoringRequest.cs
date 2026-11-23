@@ -8,6 +8,10 @@ namespace Axis.Configuration.Storage;
 /// </summary>
 public sealed class AuthoringRequest
 {
+    /// <summary>Every state of a request, in the order a request goes through them, see <c>docs/reference/authoring-requests.md#states</c>.</summary>
+    public static readonly IReadOnlyList<string> States =
+        ["planning", "awaitingApproval", "working", "checking", "reviewing", "fixing", "ready", "accepted", "dropped", "failed"];
+
     public required Guid Id { get; init; }
 
     /// <summary>The <c>id</c> of the application manifest.</summary>

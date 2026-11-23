@@ -634,7 +634,7 @@ gives the reasons. The rules that a table follows are in [actions and controls](
   and it is compared exactly. A `table` widget's key is `site.{site path}.{page name}` in lower case, with the `/` of
   a module page written as `.`. The `taskInbox` and `processInspector` lists of a page use the page's key too. A
   platform table's key is a fixed name for its screen, such as `console.deadLetters`,
-  `studio.{application}.history` or `studio.{application}.{kind}`. A platform page with a second table gives that
+  `studio.{application}.history`, `studio.{application}.requests` or `studio.{application}.{kind}`. A platform page with a second table gives that
   table a key of its own. A key in any other form answers `400`.
 - **A prefixed table's key** _(planned for M42)_. A table with a `prefix` has the key `site.{site path}.{page name}.{prefix}`,
   in lower case.

@@ -2180,6 +2180,25 @@ export async function fetchAuthoringRequest(
 }
 
 /**
+ * Loads one page of the authoring requests of an application, newest first unless `query` sorts them. `query` is the record
+ * API's `page`, `pageSize`, `sort`, `search` and `filter` as a query string, see docs/reference/authoring-requests.md#routes.
+ * A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchAuthoringRequests(
+  application: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<{ items: AuthoringRequest[]; totalCount: number }> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests${query ? `?${query}` : ''}`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  const { items, totalCount } = (await response.json()) as { items: AuthoringRequest[]; totalCount: number }
+  return { items, totalCount }
+}
+
+/**
  * The module resource a layer file changes, as a request's diff gives it. `before` and `after` are its JSON text with the
  * layer applied at the diff's `start` and `tip`, and null where the target names no module resource. `marks` and `removed`
  * are those of `after`.

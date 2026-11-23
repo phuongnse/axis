@@ -48,6 +48,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { useHomeGrid } from './homeGrid'
 import { StudioAuthoringRequestPage } from './StudioAuthoringRequestPage'
+import { StudioAuthoringRequests } from './StudioAuthoringRequests'
 import { StudioEditor, type StudioEditorHandle } from './StudioEditor'
 import { StudioHistory, StudioRevisionPage } from './StudioHistory'
 import { StudioKindList } from './StudioKindList'
@@ -175,7 +176,8 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * panel links a package file's place to that file at its line, `&file=<path>&line=<n>`, and any other file's place is plain text.
  * `&view=releases` shows only the Releases heading and the release list. `&view=release&release=<number>` shows that
  * release's `StudioReleasePage` in place of the list, under the Releases entry, and its Activate… sends the same request as the list's.
- * `&view=requests&request=<id>` shows that authoring request's page in place of the content, and no sidebar entry is marked for it.
+ * `&view=requests` shows the AI requests table under a heading, and `&view=requests&request=<id>` shows that authoring request's page
+ * in place of the content. Neither marks a sidebar entry, so Overview is not marked for them.
  * An unknown request's Ask AI opens the request panel when `studioAi` is true.
  * Run tests sits beside Validate and shows only when `GET /api/me` answers `studioTest: true`. A selected scenario
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
@@ -648,6 +650,10 @@ function StudioWorkspace() {
                     previewHost={previewHost}
                     onAskAi={canAskAi ? () => setOpenPanel('askAi') : undefined}
                   />
+                ) : requestsView ? (
+                  <PageLayout title={t('shell.studio.aiRequests.title')}>
+                    <StudioAuthoringRequests application={application!} />
+                  </PageLayout>
                 ) : historyView ? (
                   revisionId !== null ? (
                     <StudioRevisionPage application={application!} revisionId={revisionId} resources={resources} />
