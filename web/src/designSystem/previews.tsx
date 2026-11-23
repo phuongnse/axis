@@ -42,7 +42,6 @@ import {
   emptyTaskInboxWidget,
   failingRoutes,
   failingTableWidget,
-  ownAiRoute,
   fields,
   invalidFormRoutes,
   invalidRequestForm,
@@ -372,7 +371,6 @@ export const previews: Record<string, readonly PreviewState[]> = {
       draw: () => <ShellPreview />,
       entry: '/account?tab=ai',
       frameHeight: shellFrameHeight,
-      fixtures: { '/api/me/ai': ownAiRoute() },
     },
     {
       caption: 'Account AI connect',
@@ -383,7 +381,6 @@ export const previews: Record<string, readonly PreviewState[]> = {
       ),
       entry: '/account?tab=ai',
       frameHeight: shellFrameHeight,
-      fixtures: { '/api/me/ai': ownAiRoute() },
     },
     { caption: 'Users page', draw: () => <ShellPreview />, entry: '/users', frameHeight: shellFrameHeight },
     {

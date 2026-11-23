@@ -4,6 +4,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { DialogFooter } from '../platform/DialogFooter'
+import { maskedKey } from '../platform/maskedKey'
 import { connectOwnAi, fetchOwnAi, type OwnAi, type OwnAiProvider } from '../platform/ownAi'
 import { requiredMark } from '../platform/requiredMark'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
@@ -73,7 +74,7 @@ export function AccountAi() {
                   term: t('shell.account.ai.provider'),
                   value: provider?.name ?? connection.provider,
                 },
-                { key: 'key', term: t('shell.account.ai.key'), value: `••••${connection.ending}` },
+                { key: 'key', term: t('shell.account.ai.key'), value: maskedKey(connection.ending) },
               ]}
             />
           )}

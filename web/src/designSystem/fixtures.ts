@@ -1217,28 +1217,12 @@ const ownAuthenticators: OwnAuthenticators = {
 }
 
 /**
- * Proposed (#3926): the account page's AI, as `GET /api/me/ai` would answer it. No API gives it yet. The provider is the
- * installation's `anthropic` binding. A `PUT` connects the AI, so the next read
- * shows it, as the server would once the agent host has tested the key.
+ * Proposed (#3926): the account page's AI, as `GET /api/me/ai` would answer it, with no AI connected. No API gives it yet.
+ * The provider is the installation's `anthropic` binding.
  */
-export function ownAiRoute(): FixtureRoute {
-  let ai: OwnAi = {
-    providers: [
-      {
-        id: 'anthropic',
-        name: 'Anthropic',
-      },
-    ],
-    connection: null,
-  }
-  return (init) => {
-    if (init?.method === 'PUT') {
-      const { provider, sealedKey } = JSON.parse(String(init.body)) as { provider: string; sealedKey: string }
-      ai = { ...ai, connection: { provider, ending: sealedKey.slice(-4) } }
-      return new Response(null, { status: 204 })
-    }
-    return ai
-  }
+const ownAi: OwnAi = {
+  providers: [{ id: 'anthropic', name: 'Anthropic' }],
+  connection: null,
 }
 
 const ownSessions: OwnSessions = {
@@ -1850,6 +1834,8 @@ export const routes: Record<string, FixtureRoute> = {
   '/api/me': () => currentUser,
   '/api/me/authenticators': () => ownAuthenticators,
   '/api/me/sessions': () => ownSessions,
+  // Proposed (#3926): connecting an AI is a PUT, which the dialog answers with its status alone, so 204 is enough.
+  '/api/me/ai': (init) => (init?.method === 'PUT' ? new Response(null, { status: 204 }) : ownAi),
   // A save is a PUT, which the page answers with its status alone, so 204 is enough.
   '/api/me/notification-preferences': (init) =>
     init?.method === 'PUT' ? new Response(null, { status: 204 }) : ownNotificationPreferences,

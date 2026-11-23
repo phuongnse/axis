@@ -4,6 +4,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { DialogFooter } from '../platform/DialogFooter'
 import { AxisField } from '../platform/AxisField'
+import { maskedKey } from '../platform/maskedKey'
 import { requiredMark } from '../platform/requiredMark'
 import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
@@ -133,7 +134,7 @@ export function TenantModelKeySection() {
       }
     >
       {modelKey.set ? (
-        <Typography.Text data-testid="tenant-model-key-masked">{`••••${modelKey.ending ?? ''}`}</Typography.Text>
+        <Typography.Text data-testid="tenant-model-key-masked">{maskedKey(modelKey.ending)}</Typography.Text>
       ) : (
         <Typography.Text>{t('shell.users.modelKey.none')}</Typography.Text>
       )}

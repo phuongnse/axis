@@ -3,7 +3,6 @@ import dayjs from 'dayjs'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router'
 import { accountActionUrl, reauthenticateUrl } from '../platform/api'
 import { AxisTable } from '../platform/AxisTable'
 import { assignLocation } from '../platform/navigation'
@@ -20,6 +19,7 @@ import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { StatusTag } from '../platform/StatusTag'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useAddressTab } from '../platform/useAddressTab'
 import { useTableView } from '../platform/useTableView'
 import { AccountAi } from './AccountAi'
 import { AccountNotifications } from './AccountNotifications'
@@ -36,6 +36,9 @@ const sessionFields = [
   { name: 'signedInAt', type: 'date' },
   { name: 'lastRequestAt', type: 'date' },
 ] as const
+
+/** The account page's tabs, in order. Security, the first, is left out of the address. */
+const accountTabs = ['security', 'notifications', 'ai'] as const
 
 /**
  * The person's account page, titled Your account, with a Security tab, which opens first, a Notifications tab, see
@@ -69,8 +72,7 @@ export function AccountPage() {
   )
   const sessionsView = useTableView(sessionFields, recordPageSize, noParameters, false, true, false, 'sessions.')
   // Proposed (#3926): the open tab is in the address as `tab`, so Studio's Connect your AI opens `/account?tab=ai`.
-  const [searchParams, setSearchParams] = useSearchParams()
-  const tab = searchParams.get('tab') ?? 'security'
+  const [tab, selectTab] = useAddressTab('tab', accountTabs)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -124,20 +126,7 @@ export function AccountPage() {
     <PageLayout title={t('shell.account.title')} band>
       <Tabs
         activeKey={tab}
-        onChange={(next) =>
-          setSearchParams(
-            (current) => {
-              const params = new URLSearchParams(current)
-              if (next === 'security') {
-                params.delete('tab')
-              } else {
-                params.set('tab', next)
-              }
-              return params
-            },
-            { replace: true },
-          )
-        }
+        onChange={selectTab}
         items={[
           {
             key: 'security',
