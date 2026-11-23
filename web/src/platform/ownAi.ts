@@ -1,15 +1,13 @@
 import { apiFetch } from './api'
 
 /**
- * A provider a person may connect, one for each binding of the installation that needs a key. The binding names the
- * model, so the person chooses no model, see docs/reference/model-bindings.md#bindings.
+ * A provider a person may connect, one for each binding of the installation that needs a key. The connection names no
+ * model: the author chooses one for each request in Studio's request panel, which #5204 designs.
  */
 export interface OwnAiProvider {
   id: string
   /** The provider's name, such as Anthropic. */
   name: string
-  /** The name of the model the binding names, as its provider writes it, such as Claude Sonnet 5.5. */
-  model: string
 }
 
 /** The person's connected AI. The key itself is never answered, only its last four characters. */
@@ -19,8 +17,8 @@ export interface OwnAiConnection {
 }
 
 /**
- * Proposed: `GET /api/me/ai`, which no API answers yet (#3926). The providers a person may connect, each with the model its
- * binding names, and the person's connected AI, or `null`.
+ * Proposed: `GET /api/me/ai`, which no API answers yet (#3926). The providers a person may connect, and the person's
+ * connected AI, or `null`.
  */
 export interface OwnAi {
   providers: OwnAiProvider[]

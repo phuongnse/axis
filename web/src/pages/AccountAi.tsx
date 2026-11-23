@@ -14,8 +14,8 @@ import { useDesignTokens } from '../platform/themeMode'
 /**
  * Proposed (#3926): the account page's AI tab, where a person connects their own AI, whose key runs every AI request
  * they send. With no AI connected it says so and offers Connect your AI…, which opens a dialog of the provider and the API
- * key. The person chooses no model: the installation's binding names it. Once connected it shows the provider, the
- * binding's model and the key's last four characters. See docs/reference/model-bindings.md#a-persons-own-key.
+ * key. It names no model: the author chooses one for each request in Studio's request panel, which #5204 designs. Once
+ * connected it shows the provider and the key's last four characters. See docs/reference/model-bindings.md#a-persons-own-key.
  */
 export function AccountAi() {
   const t = useText()
@@ -73,11 +73,6 @@ export function AccountAi() {
                   term: t('shell.account.ai.provider'),
                   value: provider?.name ?? connection.provider,
                 },
-                {
-                  key: 'model',
-                  term: t('shell.account.ai.model'),
-                  value: provider?.model,
-                },
                 { key: 'key', term: t('shell.account.ai.key'), value: `••••${connection.ending}` },
               ]}
             />
@@ -105,8 +100,9 @@ interface ConnectValues {
 
 /**
  * Proposed (#3926): the dialog that connects an AI. The provider comes first, then how the person signs in to it, which
- * is an API key for every provider today. The provider's binding names the model, so the dialog asks for none. It renders only while open, so closing it clears
- * the key. Connect sends the key, which the agent host tests with the provider before the server keeps it.
+ * is an API key for every provider today. The author chooses the model for each request in Studio, so the dialog asks
+ * for none. It renders only while open, so closing it clears the key. Connect sends the key, which the agent host tests
+ * with the provider before the server keeps it.
  */
 function ConnectDialog({
   providers,

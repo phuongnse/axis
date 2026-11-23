@@ -1218,7 +1218,7 @@ const ownAuthenticators: OwnAuthenticators = {
 
 /**
  * Proposed (#3926): the account page's AI, as `GET /api/me/ai` would answer it. No API gives it yet. The provider is the
- * installation's `anthropic` binding, and its model is an example, as the binding names it. A `PUT` connects the AI, so the next read
+ * installation's `anthropic` binding. A `PUT` connects the AI, so the next read
  * shows it, as the server would once the agent host has tested the key.
  */
 export function ownAiRoute(): FixtureRoute {
@@ -1227,7 +1227,6 @@ export function ownAiRoute(): FixtureRoute {
       {
         id: 'anthropic',
         name: 'Anthropic',
-        model: 'Claude Sonnet 5.5',
       },
     ],
     connection: null,
