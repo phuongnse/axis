@@ -255,7 +255,7 @@ test('a developer creates a package in Studio, opens its workspace, saves a file
       await developerPage.getByRole('button', { name: 'Build', exact: true }).click()
       await expect(developerPage.getByTestId('studio-package-build-state')).toHaveText('Failed', { timeout: 180_000 })
       await output.getByRole('tab', { name: 'Problems', exact: true }).click()
-      await output.getByRole('link', { name: 'packages/checks/broken.py, line 2', exact: true }).click()
+      await output.getByRole('link', { name: 'packages/checks/broken.py', exact: true }).click()
       await expect(developerPage).toHaveURL(/[?&]file=broken\.py&line=2(&|$)/)
       await expect(developerPage.getByTestId('studio-package-status')).toContainText('Line 2, column 1')
     } catch (error) {

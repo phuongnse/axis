@@ -1,4 +1,5 @@
 import { Flex } from 'antd'
+import { Link } from 'react-router'
 import { EmptyState } from '../platform/EmptyState'
 import { SidePanel } from '../platform/SidePanel'
 import { StatusTag } from '../platform/StatusTag'
@@ -12,8 +13,8 @@ import { ResourceReference } from './ResourceReference'
 
 /**
  * The Problems panel of the open application, drawn in `SidePanel`: a column on the right, under the header, that
- * is not modal. It lists every error, then every warning, each with its code, message and resource. A problem's resource
- * is a real link to the resource at the problem's path when `addressOf` is given, and it opens in a new tab with Ctrl+click
+ * is not modal. It lists every problem once under its resource, or its file, see {@link StudioProblemList}. A resource is
+ * a real link to the resource at its first problem's path when `addressOf` is given, and it opens in a new tab with Ctrl+click
  * while the panel stays open. `fileAddressOf` links a package file's place to the file, see {@link StudioProblemList}.
  * `onClose` runs from the close button. With no problem, it says so.
  */
@@ -55,15 +56,45 @@ export function StudioProblems({
   )
 }
 
+/** The problems that share one resource, or one file when they name no resource, in the order they are listed. */
+type ProblemGroup = { diagnostics: StudioDiagnostic[]; resource: StudioResourceItem | undefined }
+
 /**
- * The problems of a draft or a check, errors first, then warnings, each a bullet of `useBulletList` with its severity, code,
- * message and resource after it. The severity tag follows the bullet and stands apart from the text, which is a column of its own, so a long message wraps under itself. The resource
- * follows the message on its line. A problem's resource is a link when `addressOf` is given, see {@link ResourceReference},
- * and `addressOf` gives the address of that resource at the problem's path. Without `addressOf`, the resource is plain text.
- * A problem that names no resource shows its file, see {@link FileAtLine}. With `fileAddressOf` it also shows the line, and
- * the file is a link when `fileAddressOf` gives an address for it, which opens the file at the line, as for a package's
- * file. Any other file is plain text. The list has no margin of its own, see
- * docs/reference/shared-widgets.md#which-widget and docs/reference/actions-and-controls.md#opening-things.
+ * Groups the problems, see {@link StudioProblemList}. A problem falls in the group of its resource when `resources` holds
+ * it, and in the group of its file otherwise. Within a group, errors come first, then the rest, each in the order given.
+ * Groups with an error come first, then the others, each in the order its first problem came.
+ */
+function problemGroups(diagnostics: StudioDiagnostic[], resources?: readonly StudioResourceItem[]): ProblemGroup[] {
+  const groups = new Map<string, ProblemGroup>()
+  for (const diagnostic of diagnostics) {
+    const resource =
+      diagnostic.resourceId === null ? undefined : resources?.find((item) => item.id === diagnostic.resourceId)
+    const key = resource ? `resource:${resource.id}` : `file:${diagnostic.file}`
+    const group = groups.get(key) ?? { resource, diagnostics: [] }
+    group.diagnostics.push(diagnostic)
+    groups.set(key, group)
+  }
+  const sorted = [...groups.values()].map((group) => ({
+    diagnostics: [
+      ...group.diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
+      ...group.diagnostics.filter((diagnostic) => diagnostic.severity !== 'error'),
+    ],
+    resource: group.resource,
+  }))
+  return [
+    ...sorted.filter((group) => group.diagnostics[0].severity === 'error'),
+    ...sorted.filter((group) => group.diagnostics[0].severity !== 'error'),
+  ]
+}
+
+/**
+ * The problems of a draft or a check, grouped: each resource, or each file that names none, shows once, as a heading, with its
+ * problems as bullets of `useBulletList` under it. Within a group errors come first, and groups with an error come first, see
+ * {@link problemGroups}. Each problem has its severity, code and message, and no resource or file of its own. The heading is a
+ * link to the group's first problem's place, and every later problem has a "Show" link to its own place, when the heading is a
+ * link. A resource's place is `addressOf` at the problem's path. A package file's place is `fileAddressOf`, which the heading
+ * shows without a line. Any other file is plain text, see {@link FileAtLine} and {@link ResourceReference}. The list has no
+ * margin of its own, see docs/reference/shared-widgets.md#which-widget and docs/reference/actions-and-controls.md#opening-things.
  */
 export function StudioProblemList({
   diagnostics,
@@ -77,60 +108,51 @@ export function StudioProblemList({
   fileAddressOf?: (file: string, line?: number) => string | undefined
 }) {
   const bullets = useBulletList()
-  const ordered = [
-    ...diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
-    ...diagnostics.filter((diagnostic) => diagnostic.severity !== 'error'),
-  ]
+  const placeOf = (group: ProblemGroup, diagnostic: StudioDiagnostic) =>
+    group.resource ? addressOf?.(group.resource.id, diagnostic.path) : fileAddressOf?.(diagnostic.file, diagnostic.line)
   return (
-    <ul style={bullets.list}>
-      {ordered.map((diagnostic, index) => (
-        <li key={index} style={bullets.item}>
-          <DiagnosticRow
-            diagnostic={diagnostic}
-            resources={resources}
-            addressOf={addressOf}
-            fileAddressOf={fileAddressOf}
-          />
-        </li>
-      ))}
+    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      {problemGroups(diagnostics, resources).map((group, groupIndex) => {
+        const [first] = group.diagnostics
+        const firstPlace = placeOf(group, first)
+        return (
+          <li key={groupIndex} data-testid="studio-problem-group">
+            <div style={{ paddingBlock: 4 }}>
+              {group.resource === undefined && fileAddressOf ? (
+                <FileAtLine file={first.file} href={firstPlace} />
+              ) : (
+                <ResourceReference resource={group.resource} file={first.file} href={firstPlace} />
+              )}
+            </div>
+            <ul style={bullets.list}>
+              {group.diagnostics.map((diagnostic, index) => (
+                <li key={index} data-testid="studio-problem" style={bullets.item}>
+                  <DiagnosticRow diagnostic={diagnostic} show={index === 0 ? undefined : placeOf(group, diagnostic)} />
+                </li>
+              ))}
+            </ul>
+          </li>
+        )
+      })}
     </ul>
   )
 }
 
-/** One problem: severity, code and message, then its resource, or its file, with its line, when it names none. */
-function DiagnosticRow({
-  diagnostic,
-  resources,
-  addressOf,
-  fileAddressOf,
-}: {
-  diagnostic: StudioDiagnostic
-  resources?: readonly StudioResourceItem[]
-  addressOf?: (resourceId: string, path: string) => string
-  fileAddressOf?: (file: string, line?: number) => string | undefined
-}) {
+/** One problem: its severity, code and message. `show` is the place of a later problem in its group, which its "Show" link opens. */
+function DiagnosticRow({ diagnostic, show }: { diagnostic: StudioDiagnostic; show?: string }) {
   const t = useText()
   const { spacing } = useDesignTokens()
-  const resourceId = diagnostic.resourceId
-  const resource = resourceId === null ? undefined : resources?.find((item) => item.id === resourceId)
   return (
     <div style={{ paddingBlock: 4 }}>
       <Flex gap={spacing.xs} align="baseline">
         <StatusTag tone={severityTone(diagnostic.severity)}>{severityText(t, diagnostic.severity)}</StatusTag>
         <div data-testid="studio-problem-text" style={{ flex: 1, minWidth: 0, whiteSpace: 'normal' }}>
-          <strong>{diagnostic.code}</strong> {diagnostic.message}{' '}
-          {resource === undefined && fileAddressOf ? (
-            <FileAtLine
-              file={diagnostic.file}
-              line={diagnostic.line}
-              href={fileAddressOf(diagnostic.file, diagnostic.line)}
-            />
-          ) : (
-            <ResourceReference
-              resource={resource}
-              file={diagnostic.file}
-              href={resourceId !== null && addressOf ? addressOf(resourceId, diagnostic.path) : undefined}
-            />
+          <strong>{diagnostic.code}</strong> {diagnostic.message}
+          {show && (
+            <>
+              {' '}
+              <Link to={show}>{t('shell.studio.problems.show')}</Link>
+            </>
           )}
         </div>
       </Flex>

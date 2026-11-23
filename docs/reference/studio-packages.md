@@ -103,12 +103,13 @@ them there.
   request until it ends, see [the authoring API](#the-authoring-api). The Output tab opens when it starts. Its title
   row reads Build, with the build's state as a status tag: queued, building, built or failed. Under it are the lines
   the host wrote, with no box of their own. A build that cannot be sent or followed shows the request alert.
-- **Problems.** The Problems tab lists the folder's diagnostics whose file is under `packages/<id>/`, errors then
-  warnings, with the list of the [Problems panel](studio-workspace.md#problems-panel), or says "No problems.". After a
-  save it shows the problems that the save answered. A problem's file is a link to its address,
-  `&file=<path>&line=<n>`, named by the file and, when the diagnostic has a line, by ", line N". It opens the file in the
-  workspace, or switches to its tab, with the cursor at that line, or on line 1 when the diagnostic has none. The band's
-  Problems panel links a package file's problem to the same address.
+- **Problems.** The Problems tab lists the folder's diagnostics whose file is under `packages/<id>/`, with the list of the
+  [Problems panel](studio-workspace.md#problems-panel), or says "No problems.". The problems are grouped by file: the
+  file's heading is named by the file alone, and its problems are bullets under it, errors first. After a save it shows
+  the problems that the save answered. The heading is a link to the address of the first problem's line,
+  `&file=<path>&line=<n>`, and each later problem's Show link is a link to the address of its own line. Opening a link
+  opens the file in the workspace, or switches to its tab, with the cursor at that line, or on line 1 when the
+  diagnostic has none. The band's Problems panel links a package file's problems to the same addresses.
 - **Problems from a build or a test.** The diagnostics of a build, or of a test whose copy of the package the host
   refused, show in Problems like any other diagnostic, each opening its file at its line. They stay until the next
   build or test starts.

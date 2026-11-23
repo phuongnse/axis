@@ -524,8 +524,8 @@ transitions through a layer, and relaxes and restores points.
   contract already uses and a to-state that is also a from-state. The diagnostics of the contract's layer, such as `AXC0370` for a transition into a protected state,
   show in a list in the editor after a save and when the contract is opened again.
 - **A problem's severity in words.** The list of the layer's diagnostics is the Problems panel's list,
-  `StudioProblemList`, so errors come first and each problem is a bullet with its severity as a
-  status tag, Error in `danger` or Warning in `attention`, then its code, message and file, as in the
+  `StudioProblemList`. The layer's problems sit under its file as one group, errors first. Each problem is a bullet
+  with its severity as a status tag, Error in `danger` or Warning in `attention`, then its code and message, as in the
   [Problems panel](studio-workspace.md#problems-panel).
 - **Added rows.** A state or transition that the application added shows an **Added** tag and a
   **Delete** button, and has no named point, because a relax entry cannot name it. The module's own states and
