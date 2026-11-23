@@ -170,4 +170,45 @@ describe('the design-system shell states', () => {
     ).toBeVisible()
     expect(screen.getByText('Started Delivery.')).toBeVisible()
   }, 30000)
+
+  // Proposed (#3926): the account page's AI tab.
+  it('shows why a connect failed when the provider refuses the key at its test', async () => {
+    window.history.replaceState({}, '', '/?state=account-ai-connect-refused')
+
+    render(<Preview states={previews.shell} />)
+
+    const failed = await screen.findByTestId('account-ai-connect-failed', {}, { timeout: 15000 })
+    expect(failed).toHaveTextContent('Your provider refused this key.')
+    expect(screen.getByRole('dialog', { name: 'Connect your AI' })).toBeVisible()
+  }, 30000)
+
+  it("shows a refused key's state and what to do, with Change and Remove", async () => {
+    window.history.replaceState({}, '', '/?state=account-ai-key-refused')
+
+    render(<Preview states={previews.shell} />)
+
+    expect(await screen.findByTestId('account-ai-state', {}, { timeout: 15000 })).toHaveTextContent('Refused')
+    expect(screen.getByText('••••x7Qa')).toBeVisible()
+    expect(screen.getByTestId('account-ai-state-notice')).toHaveTextContent('Change your AI to go on.')
+    expect(screen.getByRole('button', { name: 'Change your AI…' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Remove your AI…' })).toBeVisible()
+  }, 30000)
+
+  it('shows a working key with no notice', async () => {
+    window.history.replaceState({}, '', '/?state=account-ai-connected')
+
+    render(<Preview states={previews.shell} />)
+
+    expect(await screen.findByTestId('account-ai-state', {}, { timeout: 15000 })).toHaveTextContent('Working')
+    expect(screen.queryByTestId('account-ai-state-notice')).toBeNull()
+  }, 30000)
+
+  it('asks before it removes the AI', async () => {
+    window.history.replaceState({}, '', '/?state=account-ai-remove')
+
+    render(<Preview states={previews.shell} />)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Remove your AI?' }, { timeout: 15000 })
+    expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeVisible()
+  }, 30000)
 })

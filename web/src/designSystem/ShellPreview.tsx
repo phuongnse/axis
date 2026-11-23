@@ -23,13 +23,13 @@ export function ShellPreview() {
 
 /**
  * Waits until the shell draws an element matching `selector`, then runs `act` on it once, so a state opens, collapses or
- * types into it once.
+ * types into it once. It looks in the whole preview frame, since a dialog or a menu draws in the frame outside the shell.
  */
 function useActOnMount(selector: string, act: (target: HTMLElement) => void) {
   const wrapper = useRef<HTMLDivElement>(null)
   const acted = useRef(false)
   useEffect(() => {
-    const element = wrapper.current
+    const element = wrapper.current?.closest<HTMLElement>('[data-preview-frame]') ?? wrapper.current
     if (!element) {
       return
     }

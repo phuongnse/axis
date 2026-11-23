@@ -57,6 +57,8 @@ import {
   loadingTableWidget,
   instanceId,
   noRowsPath,
+  ownAiRoute,
+  ownAiConnectRefused,
   type PreviewFieldType,
   locale,
   processInspectorWidget,
@@ -365,12 +367,14 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: '/account',
       frameHeight: shellFrameHeight,
     },
-    // Proposed (#3926): the account page's AI tab, with no AI connected, and its Connect your AI dialog.
+    // Proposed (#3926): the account page's AI tab, with no AI connected, its Connect your AI dialog, a connect the
+    // provider refuses, the connected AI in each state of its key, and the Change and Remove dialogs.
     {
       caption: 'Account AI',
       draw: () => <ShellPreview />,
       entry: '/account?tab=ai',
       frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiRoute() },
     },
     {
       caption: 'Account AI connect',
@@ -381,6 +385,65 @@ export const previews: Record<string, readonly PreviewState[]> = {
       ),
       entry: '/account?tab=ai',
       frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiRoute() },
+    },
+    {
+      caption: 'Account AI connect refused',
+      draw: () => (
+        <ClickOnMount selector='[data-testid="account-ai-connect"]'>
+          <ClickOnMount selector='[data-testid="account-ai-connect-ok"]'>
+            <TypedOnMount selector='input[type="password"]' text="sk-ant-api03-revoked">
+              <ShellPreview />
+            </TypedOnMount>
+          </ClickOnMount>
+        </ClickOnMount>
+      ),
+      entry: '/account?tab=ai',
+      frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiConnectRefused },
+    },
+    {
+      caption: 'Account AI connected',
+      draw: () => <ShellPreview />,
+      entry: '/account?tab=ai',
+      frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiRoute('working') },
+    },
+    {
+      caption: 'Account AI key refused',
+      draw: () => <ShellPreview />,
+      entry: '/account?tab=ai',
+      frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiRoute('refused') },
+    },
+    {
+      caption: 'Account AI billing problem',
+      draw: () => <ShellPreview />,
+      entry: '/account?tab=ai',
+      frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiRoute('billing') },
+    },
+    {
+      caption: 'Account AI change',
+      draw: () => (
+        <ClickOnMount selector='[data-testid="account-ai-change"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
+      entry: '/account?tab=ai',
+      frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiRoute('working') },
+    },
+    {
+      caption: 'Account AI remove',
+      draw: () => (
+        <ClickOnMount selector='[data-testid="account-ai-remove"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
+      entry: '/account?tab=ai',
+      frameHeight: shellFrameHeight,
+      fixtures: { '/api/me/ai': ownAiRoute('working') },
     },
     { caption: 'Users page', draw: () => <ShellPreview />, entry: '/users', frameHeight: shellFrameHeight },
     {

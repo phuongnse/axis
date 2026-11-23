@@ -43,6 +43,7 @@ function Frame({ height, children }: { height: number; children: ReactNode }) {
   return (
     <div
       ref={attach}
+      data-preview-frame
       style={
         {
           height: fill,

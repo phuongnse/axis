@@ -2,7 +2,7 @@ import type { ChartKind } from '../platform/chartOption'
 import type { CurrentUser } from '../platform/currentUser'
 import type { LegalLinks } from '../platform/LegalLine'
 import type { NotificationPage } from '../platform/notifications'
-import type { OwnAi } from '../platform/ownAi'
+import type { OwnAi, OwnAiState } from '../platform/ownAi'
 import type { OwnAuthenticators } from '../platform/ownAuthenticators'
 import type { OwnNotificationPreferences } from '../platform/ownNotificationPreferences'
 import type { OwnSessions } from '../platform/ownSessions'
@@ -1225,6 +1225,32 @@ const ownAi: OwnAi = {
   connection: null,
 }
 
+/** Proposed (#3926): a change, a connect or a remove of the person's AI answers with its status alone, so 204 is enough. */
+const ownAiChanged = (init?: RequestInit) => init?.method === 'PUT' || init?.method === 'DELETE'
+
+/**
+ * Proposed (#3926): the person's AI, with no AI connected, or with an Anthropic key connected in the key's `state`, for
+ * the AI tab's states. Each state gives its own, so the path is in no shared route.
+ */
+export function ownAiRoute(state?: OwnAiState): FixtureRoute {
+  return (init) =>
+    ownAiChanged(init)
+      ? new Response(null, { status: 204 })
+      : { ...ownAi, connection: state ? { provider: 'anthropic', ending: 'x7Qa', state } : null }
+}
+
+/**
+ * Proposed (#3926): a connect whose key the provider refuses at the agent host's test, answered as `422` problem details
+ * with the `reason` `key-refused`, as a quota refusal names its reason.
+ */
+export const ownAiConnectRefused: FixtureRoute = (init) =>
+  init?.method === 'PUT'
+    ? new Response(JSON.stringify({ title: 'The provider refused the key.', status: 422, reason: 'key-refused' }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/problem+json' },
+      })
+    : ownAi
+
 const ownSessions: OwnSessions = {
   endAllowed: true,
   sessions: [
@@ -1834,8 +1860,6 @@ export const routes: Record<string, FixtureRoute> = {
   '/api/me': () => currentUser,
   '/api/me/authenticators': () => ownAuthenticators,
   '/api/me/sessions': () => ownSessions,
-  // Proposed (#3926): connecting an AI is a PUT, which the dialog answers with its status alone, so 204 is enough.
-  '/api/me/ai': (init) => (init?.method === 'PUT' ? new Response(null, { status: 204 }) : ownAi),
   // A save is a PUT, which the page answers with its status alone, so 204 is enough.
   '/api/me/notification-preferences': (init) =>
     init?.method === 'PUT' ? new Response(null, { status: 204 }) : ownNotificationPreferences,
