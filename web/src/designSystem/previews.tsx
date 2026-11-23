@@ -26,6 +26,7 @@ import {
   typicalPageId,
   typicalProcessId,
   typicalRevisionId,
+  packageRevisionId,
 } from './studioFixtures'
 import {
   application,
@@ -412,6 +413,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Revision',
       fixtures: studioFixtures.typical,
       entry: `/studio?app=${application}&view=history&revision=${typicalRevisionId}`,
+    },
+    // Proposed: a revision that changed, added and removed package files, each as a line diff, see #4623.
+    {
+      caption: 'Package file revision',
+      fixtures: studioFixtures.typical,
+      entry: `/studio?app=${application}&view=history&revision=${packageRevisionId}`,
     },
     {
       caption: 'Release page',

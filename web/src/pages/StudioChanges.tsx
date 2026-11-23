@@ -1,5 +1,5 @@
 import { Flex, Typography } from 'antd'
-import { useContext, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useContext, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { CodeBlock } from '../platform/CodeBlock'
@@ -10,6 +10,7 @@ import { keyedListsOf, layerMarks } from '../platform/layerMarks'
 import {
   type AuthoringRequestLayerChange,
   changeRows,
+  isPackageFile,
   type StudioChangeAuthor,
   type StudioChangeRow,
   type StudioReleaseChange,
@@ -21,6 +22,7 @@ import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { fileLanguage } from './fileLanguage'
 import { LayerMarkLabel } from './LayerMarkViews'
 
 /** The JSON text of one side of a change, indented when it parses, and as it is when it does not. */
@@ -67,6 +69,40 @@ export function JsonDiff({ before, after }: { before: string | null; after: stri
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing.md }}>
       <Side testId="json-diff-before" title={t('shell.studio.history.before')} text={before} />
       <Side testId="json-diff-after" title={t('shell.studio.history.after')} text={after} />
+    </div>
+  )
+}
+
+const CodeEditor = lazy(() => import('./CodeEditor'))
+
+/**
+ * Proposed: a package file's change as a line diff, in the one code editor of Studio, read-only, coloured by the file's
+ * language, see #4623 and docs/reference/studio-packages.md#diffs. An added file shows each line added and a removed
+ * file each line removed. A resource keeps its {@link JsonDiff}.
+ */
+function LineDiff({
+  path,
+  name,
+  before,
+  after,
+}: {
+  path: string
+  name: string
+  before: string | null
+  after: string | null
+}) {
+  const t = useText()
+  return (
+    <div data-testid="line-diff">
+      <Suspense fallback={null}>
+        <CodeEditor
+          label={fillText(t('shell.studio.changes.diffName'), { name })}
+          value={after ?? ''}
+          original={before ?? ''}
+          language={fileLanguage(path)}
+          readOnly
+        />
+      </Suspense>
     </div>
   )
 }
@@ -187,12 +223,15 @@ function ChangeFile({
         </Flex>
         {changedBy}
         {module !== undefined && <LayerMarks module={module} />}
-        {(!folded || open) && (
-          <JsonDiff
-            before={module ? module.before : (file?.before ?? null)}
-            after={module ? module.after : (file?.after ?? null)}
-          />
-        )}
+        {(!folded || open) &&
+          (module === undefined && file !== undefined && isPackageFile(file.file) ? (
+            <LineDiff path={file.file} name={row.name} before={file.before} after={file.after} />
+          ) : (
+            <JsonDiff
+              before={module ? module.before : (file?.before ?? null)}
+              after={module ? module.after : (file?.after ?? null)}
+            />
+          ))}
       </Flex>
     </section>
   )

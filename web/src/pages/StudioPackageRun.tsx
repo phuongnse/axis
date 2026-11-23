@@ -364,11 +364,6 @@ export function StudioPackageRun({
   const rule = `1px solid ${colour.borderSubtle}`
   const scroll = { flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: spacing.md } as const
   const pane = { display: 'flex', flexDirection: 'column', minWidth: 0, height } as const
-  const findTexts = {
-    field: t('shell.studio.json.findField'),
-    count: t('shell.studio.json.findCount'),
-    none: t('shell.studio.json.findNone'),
-  }
 
   const ended = request !== null && request.status !== 'queued' && request.status !== 'running'
   const ran = request?.run ?? null
@@ -480,7 +475,6 @@ export function StudioPackageRun({
                           }}
                           language="json"
                           grow
-                          findTexts={findTexts}
                         />
                       </Suspense>
                       {parsed === null && (
@@ -543,7 +537,6 @@ export function StudioPackageRun({
                     language="json"
                     readOnly
                     grow
-                    findTexts={findTexts}
                   />
                 </Suspense>
               </div>

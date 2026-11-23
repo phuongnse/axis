@@ -428,9 +428,23 @@ const typicalReleases = {
   partChanges: [],
 } satisfies StudioReleases
 
-/** The revisions of Typical, newest first: a person in Studio, a command-line client, and the server's own start of history. */
+/**
+ * The revisions of Typical, newest first: an outside change to a package's files, a person in Studio, a command-line
+ * client, and the server's own start of history.
+ */
 const typicalRevisions = {
   items: [
+    // Proposed: an outside change that changed, added and removed package files, which the Package file revision state
+    // opens, see #4623.
+    {
+      id: 'r4',
+      summary: 'Outside change',
+      author: 'Axis',
+      userId: null,
+      client: null,
+      request: null,
+      time: '2026-10-22T11:15:00Z',
+    },
     {
       id: 'r3',
       summary: 'Added the approval step',
@@ -461,13 +475,13 @@ const typicalRevisions = {
   ],
   page: 1,
   pageSize: 20,
-  totalCount: 3,
+  totalCount: 4,
   start: 'r1',
 } satisfies { items: StudioRevision[]; page: number; pageSize: number; totalCount: number; start: string }
 
-/** The newest revision of Typical with the three files it changed, which the Revision state opens. */
+/** Revision r3 of Typical with the three files it changed, which the Revision state opens. */
 const typicalRevisionDiff = {
-  revision: typicalRevisions.items[0],
+  revision: typicalRevisions.items[1],
   resources: [
     {
       file: 'pages/request-list.json',
@@ -505,6 +519,48 @@ const typicalRevisionDiff = {
       name: 'OldRequest',
       before: JSON.stringify({ kind: 'form', name: 'OldRequest', entity: 'Request', sections: [] }),
       after: null,
+    },
+  ],
+} satisfies StudioRevisionDiff
+
+/**
+ * Proposed: revision r4 of Typical, an outside change to the approval-rules package: a changed adapter whose limit
+ * changed in one line and that gained a function, an added test file and a removed settings file, which the Package
+ * file revision state opens, see #4623. A package file has no id, kind or name, because its text is not a resource's
+ * JSON.
+ */
+const packageRevisionDiff = {
+  revision: typicalRevisions.items[0],
+  resources: [
+    {
+      file: 'packages/approval-rules/adapter.py',
+      change: 'changed',
+      id: null,
+      kind: null,
+      name: null,
+      before:
+        '"""Rules that decide who approves a purchase request."""\n\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Request:\n    amount: float\n    department: str\n    requester: str\n\n\nMANAGER_LIMIT = 5000\nDIRECTOR_LIMIT = 25000\n\n\ndef approver_role(request: Request) -> str:\n    """The role that approves the request, by its amount."""\n    if request.amount <= MANAGER_LIMIT:\n        return "manager"\n    if request.amount <= DIRECTOR_LIMIT:\n        return "director"\n    return "finance"\n\n\ndef needs_second_approval(request: Request) -> bool:\n    """Whether a second person approves the request."""\n    return request.amount > DIRECTOR_LIMIT\n',
+      after:
+        '"""Rules that decide who approves a purchase request."""\n\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Request:\n    amount: float\n    department: str\n    requester: str\n\n\nMANAGER_LIMIT = 10000\nDIRECTOR_LIMIT = 25000\n\n\ndef approver_role(request: Request) -> str:\n    """The role that approves the request, by its amount."""\n    if request.amount <= MANAGER_LIMIT:\n        return "manager"\n    if request.amount <= DIRECTOR_LIMIT:\n        return "director"\n    return "finance"\n\n\ndef needs_second_approval(request: Request) -> bool:\n    """Whether a second person approves the request."""\n    return request.amount > DIRECTOR_LIMIT or request.department == "it"\n\n\ndef approval_note(request: Request) -> str:\n    """The note the approver reads first."""\n    return f"{request.requester} asks for {request.amount:,.2f} for {request.department}."\n',
+    },
+    {
+      file: 'packages/approval-rules/limits.json',
+      change: 'removed',
+      id: null,
+      kind: null,
+      name: null,
+      before: '{\n  "managerLimit": 5000,\n  "directorLimit": 25000\n}\n',
+      after: null,
+    },
+    {
+      file: 'packages/approval-rules/tests/test_adapter.py',
+      change: 'added',
+      id: null,
+      kind: null,
+      name: null,
+      before: null,
+      after:
+        'from adapter import Request, approver_role, needs_second_approval\n\n\ndef test_a_small_request_goes_to_the_manager():\n    assert approver_role(Request(800, "sales", "Contoso buyer")) == "manager"\n\n\ndef test_an_it_request_needs_a_second_approval():\n    assert needs_second_approval(Request(1200, "it", "Contoso buyer"))\n',
     },
   ],
 } satisfies StudioRevisionDiff
@@ -718,6 +774,7 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/release-list`]: () => releasePage(answers.releases),
     [`${folderPath}/revisions`]: () => typicalRevisions,
     [`${folderPath}/revisions/${typicalRevisionId}`]: () => typicalRevisionDiff,
+    [`${folderPath}/revisions/${packageRevisionId}`]: () => packageRevisionDiff,
     [`${folderPath}/settings`]: () => settings,
     // A table of the open application asks for the person's kept choices, and no state keeps any.
     ...Object.fromEntries(
@@ -795,8 +852,11 @@ const newFolder: Folder = {
   bare: true,
 }
 
-/** The id of the newest revision of Typical, which the Revision state opens at `&revision=<id>`. */
-export const typicalRevisionId = typicalRevisions.items[0].id
+/** The id of revision r3 of Typical, which the Revision state opens at `&revision=<id>`. */
+export const typicalRevisionId = typicalRevisions.items[1].id
+
+/** Proposed: the id of revision r4 of Typical, which the Package file revision state opens, see #4623. */
+export const packageRevisionId = typicalRevisions.items[0].id
 
 /** The id of the Request entity of the Typical folder, which the Entity state opens at `&resource=<id>`. */
 export const typicalEntityId = id(firstEntityId)

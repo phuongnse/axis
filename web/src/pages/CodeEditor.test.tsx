@@ -12,8 +12,6 @@ import { withAntdStyles } from '../test/antdStyles'
 import CodeEditor, { type CodeEditorHandle, type CodeEditorProps } from './CodeEditor'
 import { jsonViewHeight } from './jsonViewHeight'
 
-const findTexts = { field: 'Find in code', count: '{current} of {count}', none: 'No matches' }
-
 interface RenderOptions {
   /** The mode the provider starts in, so a test does not depend on the stored or system choice. */
   initialMode?: ThemeMode
@@ -25,15 +23,7 @@ function renderEditor(props: Partial<CodeEditorProps> = {}, { initialMode, wrap 
   const handle = createRef<CodeEditorHandle>()
   const view = (extra: Partial<CodeEditorProps>) => {
     const editor = (
-      <CodeEditor
-        label="Code"
-        value={'one\ntwo\nthree'}
-        language="plain"
-        findTexts={findTexts}
-        ref={handle}
-        {...props}
-        {...extra}
-      />
+      <CodeEditor label="Code" value={'one\ntwo\nthree'} language="plain" ref={handle} {...props} {...extra} />
     )
     return (
       <ThemeModeProvider initialMode={initialMode}>

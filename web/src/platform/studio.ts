@@ -2386,6 +2386,14 @@ function changeRow(
   return { order, row: { key, name: resourceTitle(titled, locale, t), kind, change: change.change, resourceId } }
 }
 
+/**
+ * Proposed: whether a file of a diff is a package file, one under `packages/`, which a diff shows line by line, see #4623
+ * and docs/reference/studio-packages.md#diffs.
+ */
+export function isPackageFile(path: string): boolean {
+  return path.startsWith('packages/')
+}
+
 /** The resources whose name or id contains `search`, ignoring letter case and surrounding spaces. An empty search keeps all. */
 export function filterResources(items: StudioResourceItem[], search: string): StudioResourceItem[] {
   const needle = search.trim().toLowerCase()

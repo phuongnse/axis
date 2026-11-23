@@ -3,7 +3,6 @@ import { useEffect, useRef, type Ref, type RefObject } from 'react'
 import { loadKindValidator } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import CodeEditor, { type CodeEditorHandle } from './CodeEditor'
-import type { FindTexts } from './jsonFindPanel'
 import { jsonProblems } from './jsonProblems'
 
 export interface JsonViewProps {
@@ -16,8 +15,6 @@ export interface JsonViewProps {
    * absent, nothing follows the view.
    */
   boundary?: RefObject<HTMLElement | null>
-  /** The texts of the find bar. */
-  findTexts: FindTexts
   /** The resource kind whose schema the content is checked against. Without it, only the syntax is checked. */
   kind?: string
   /** Called with the number of problems that the checks mark, each time it changes. */
@@ -29,16 +26,7 @@ export interface JsonViewProps {
 export type JsonViewHandle = CodeEditorHandle
 
 /** A code editor for a resource's JSON that fills the window down to the shell footer and checks the text as it is typed. */
-export default function JsonView({
-  label,
-  value,
-  onChange,
-  boundary,
-  findTexts,
-  kind,
-  onProblems,
-  ref,
-}: JsonViewProps) {
+export default function JsonView({ label, value, onChange, boundary, kind, onProblems, ref }: JsonViewProps) {
   const t = useText()
   const latest = useRef({ kind, t })
   useEffect(() => {
@@ -52,7 +40,6 @@ export default function JsonView({
       value={value}
       onChange={onChange}
       language="json"
-      findTexts={findTexts}
       fill
       boundary={boundary}
       onProblems={onProblems}

@@ -7,17 +7,19 @@ import {
 } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { bracketMatching, codeFolding, foldGutter, foldKeymap, indentOnInput } from '@codemirror/language'
+import { unifiedMergeView } from '@codemirror/merge'
 import { diagnosticCount, linter, lintGutter, nextDiagnostic, type Diagnostic } from '@codemirror/lint'
 import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state'
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
 import { useSelectedItemTint } from '../platform/antTheme'
+import { changeTint } from '../platform/changeTint'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { indentFolding, languageSupport, type FileLanguage } from './fileLanguage'
-import { findPanel, type FindTexts } from './jsonFindPanel'
+import { findPanel } from './jsonFindPanel'
 import { useFillHeight } from './jsonViewHeight'
 
 /** Marks a change that came from the value, not from the author, so it is not reported as an edit. */
@@ -37,8 +39,14 @@ export interface CodeEditorProps {
   onChange?: (text: string) => void
   /** The language that colours, folds and indents the text, such as `fileLanguage(path)` of a file. */
   language: FileLanguage
-  /** The texts of the find bar. */
-  findTexts: FindTexts
+  /**
+   * Proposed: the text before a change. With it, the editor shows `value` as a line diff against it, see #4623: each
+   * removed line on the `danger` tint after "−" in the text colour, each added line on the `success` tint after "+" in
+   * the language's colours, the changed words inside a changed line underlined, and an unchanged stretch folded to "N unchanged lines" but for the 3
+   * lines on each side of a change. An empty `value` against a text is a removed file, which shows its lines removed
+   * and no line numbers. It is read when the editor is built, as `lint` is, and goes with `readOnly`.
+   */
+  original?: string
   /** Refuses the author's edits. The cursor, find and `goTo` still work. */
   readOnly?: boolean
   /** Fills the window down to the shell footer, and stops its scroll at its end. Without it, the editor is as tall as its text. */
@@ -91,7 +99,7 @@ export default function CodeEditor({
   value,
   onChange,
   language,
-  findTexts,
+  original,
   readOnly = false,
   fill = false,
   boundary,
@@ -115,10 +123,42 @@ export default function CodeEditor({
   const selectedTint = useSelectedItemTint()
   const theme = editorTheme(tokens, mode, selectedTint, !grow ? 'scroll' : readOnly ? 'grow' : 'growEditable')
   const phrases = useMemo(() => codePhrases(t), [t])
-  const latest = useRef({ onChange, value, findTexts, theme, language, readOnly, phrases, lint, onProblems, onCursor })
+  const findTexts = useMemo(
+    () => ({
+      field: t('shell.studio.json.findField'),
+      count: t('shell.studio.json.findCount'),
+      none: t('shell.studio.json.findNone'),
+    }),
+    [t],
+  )
+  const latest = useRef({
+    onChange,
+    value,
+    findTexts,
+    theme,
+    language,
+    original,
+    readOnly,
+    phrases,
+    lint,
+    onProblems,
+    onCursor,
+  })
 
   useEffect(() => {
-    latest.current = { onChange, value, findTexts, theme, language, readOnly, phrases, lint, onProblems, onCursor }
+    latest.current = {
+      onChange,
+      value,
+      findTexts,
+      theme,
+      language,
+      original,
+      readOnly,
+      phrases,
+      lint,
+      onProblems,
+      onCursor,
+    }
   })
 
   useEffect(() => {
@@ -160,6 +200,7 @@ export default function CodeEditor({
           ]),
           compartments.theme.of(initial.theme),
           EditorView.contentAttributes.of({ 'aria-label': label }),
+          initial.original === undefined ? [] : lineDiff(initial.original, initial.value === ''),
           initial.lint
             ? [
                 lintGutter(),
@@ -285,7 +326,34 @@ function codePhrases(t: (key: string) => string) {
     'Unfolded lines': t('shell.studio.code.unfolded'),
     to: t('shell.studio.code.to'),
     Completions: t('shell.studio.code.completions'),
+    '$ unchanged lines': t('shell.studio.code.unchangedLines'),
   })
+}
+
+/**
+ * Proposed: the line diff of `original` against the editor's text, with no accept or reject buttons and no change gutter,
+ * as the "−" and "+" marks and the tints of the editor's theme show each change, see #4623. A removed file hides its one
+ * empty line and the line numbers. The changed words are marked in a changed file only.
+ */
+function lineDiff(original: string, removed: boolean) {
+  return [
+    unifiedMergeView({
+      original,
+      // A removed line is in the text colour: a language's colours on the `danger` tint fall below 4.5:1.
+      syntaxHighlightDeletions: false,
+      // A whole file added or removed marks its lines only, as every word of it changed.
+      highlightChanges: original !== '' && !removed,
+      mergeControls: false,
+      gutter: false,
+      collapseUnchanged: { margin: 3, minSize: 4 },
+    }),
+    removed ? EditorView.editorAttributes.of({ class: 'cm-removedFile' }) : [],
+  ]
+}
+
+/** Proposed: the underline of the words that changed inside a changed line, in a state's text colour, see #4623. */
+function changedWords(textColour: string): string {
+  return `linear-gradient(${textColour}, ${textColour}) bottom / 100% 2px no-repeat`
 }
 
 /** How the editor's height follows its text: it scrolls in itself, or grows with the text, with a minimum height when editable. */
@@ -347,6 +415,32 @@ const editorTheme = sharedTheme((tokens, mode, selectedTint: string, height: Edi
       '.cm-findCount': { color: colour.textMuted },
       '.cm-searchMatch': { backgroundColor: 'transparent', outline: `1px solid ${colour.border}` },
       '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: selectedTint },
+      // Proposed: a line diff's look, as a run's changed field draws one, see #4623 and lineDiff below. Each line of a
+      // diff keeps room for its mark, so the code of every line starts at the same place.
+      '&.cm-merge-b .cm-line, .cm-deletedLine': {
+        position: 'relative',
+        paddingInline: `calc(${spacing.sm}px + 2ch) ${spacing.sm}px`,
+      },
+      '&.cm-merge-b .cm-changedLine': { backgroundColor: changeTint(colour.success) },
+      '&.cm-merge-b .cm-changedLine::before, .cm-deletedLine::before': {
+        position: 'absolute',
+        insetInlineStart: `${spacing.sm}px`,
+        color: colour.text,
+      },
+      '&.cm-merge-b .cm-changedLine::before': { content: '"+"' },
+      '.cm-deletedLine::before': { content: '"−"' },
+      // The changed words of a changed line are underlined in the state's text colour, as a stronger tint under coloured
+      // code falls below 4.5:1.
+      '&.cm-merge-b .cm-changedText': { background: changedWords(colour.successText) },
+      '.cm-deletedChunk': { backgroundColor: changeTint(colour.danger), paddingLeft: 0 },
+      '.cm-deletedChunk .cm-deletedText': { background: changedWords(colour.dangerText) },
+      '.cm-collapsedLines': {
+        color: colour.textMuted,
+        background: colour.fillSubtle,
+        padding: `0 ${spacing.sm}px 0 calc(${spacing.sm}px + 2ch)`,
+        '&:before, &:after': { content: 'none' },
+      },
+      '&.cm-removedFile .cm-gutters, &.cm-removedFile .cm-content > .cm-line': { display: 'none' },
     }),
   ]
 })
