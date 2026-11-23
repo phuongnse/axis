@@ -986,6 +986,28 @@ describe('ExpressionEditor reading', () => {
     await waitFor(() => expect(screen.getByTestId('studio-expression-reading')).toHaveTextContent(line))
   })
 
+  it.each([
+    ['en', "Status is one of 'draft', 'sent', or 'done'"],
+    ['vi', "Trạng thái là một trong 'draft', 'sent' hoặc 'done'"],
+  ])('joins the values of an "is one of" phrase with the list word for "or" in %s', async (locale, line) => {
+    renderReading(locale, () =>
+      json({
+        type: 'boolean',
+        diagnostics: [],
+        reading: {
+          kind: 'phrase',
+          words: 'in',
+          slots: [
+            [{ kind: 'name', name: 'status', labelKey: 'purchaseRequest.status' }],
+            ['draft', 'sent', 'done'].map((value) => ({ kind: 'value', type: 'text', value, labelKey: null })),
+          ],
+        },
+      }),
+    )
+
+    await waitFor(() => expect(screen.getByTestId('studio-expression-reading')).toHaveTextContent(line))
+  })
+
   it('reads a field with no label as its name, and a text value between single quotes', async () => {
     renderReading('en', () =>
       json({

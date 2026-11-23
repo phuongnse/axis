@@ -154,7 +154,7 @@ export function CellTenantsPage() {
         key: 'hosts',
         kind: 'freeText',
         title: t('shell.cell.tenants.hosts'),
-        render: (_value, tenant) => tenant.hosts.join(', '),
+        render: (_value, tenant) => new Intl.ListFormat(locale, { type: 'conjunction' }).format(tenant.hosts),
         filter: { kind: 'text' },
       },
       {

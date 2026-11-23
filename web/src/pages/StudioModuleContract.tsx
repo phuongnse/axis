@@ -22,6 +22,7 @@ import {
   type StudioResource,
   type StudioResourceItem,
 } from '../platform/studio'
+import { PlatformContext } from './context'
 import { useStudioConnection } from '../platform/studioConnection'
 import type { FilterKind } from '../platform/tableFilter'
 import { recordPageSize } from '../platform/tableQuery'
@@ -562,6 +563,7 @@ export function StudioModuleContract({
   onManifestStale?: () => void
 }) {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { generation, reconnecting, lost } = useStudioConnection()
   const [loaded, setLoaded] = useState<Loaded>()
   const loadedRef = useRef<Loaded>(undefined)
@@ -727,10 +729,13 @@ export function StudioModuleContract({
   }
 
   const noGuard = t('shell.studio.contract.noGuard')
-  const marksText = (row: ContractView['states'][number]) =>
-    [row.initial ? t('shell.studio.contract.initial') : '', row.deletable ? t('shell.studio.contract.deletable') : '']
-      .filter((mark) => mark !== '')
-      .join(', ')
+  // The lists of names on this screen join in the locale's words; the filters match the same values joined by commas.
+  const list = new Intl.ListFormat(locale, { type: 'conjunction' })
+  const marks = (row: ContractView['states'][number]) =>
+    [
+      row.initial ? t('shell.studio.contract.initial') : '',
+      row.deletable ? t('shell.studio.contract.deletable') : '',
+    ].filter((mark) => mark !== '')
   const relax: RelaxContext | undefined =
     manifest && moduleIndex(manifest.content, module) >= 0
       ? {
@@ -786,8 +791,8 @@ export function StudioModuleContract({
             {
               key: 'marks',
               title: t('shell.studio.contract.lifecycle'),
-              filter: { kind: 'text', value: (row) => marksText(row) || null },
-              render: (row) => marksText(row),
+              filter: { kind: 'text', value: (row) => marks(row).join(', ') || null },
+              render: (row) => list.format(marks(row)),
             },
             {
               key: 'point',
@@ -835,7 +840,7 @@ export function StudioModuleContract({
               key: 'from',
               title: t('shell.studio.contract.from'),
               filter: { kind: 'text', value: (row) => row.from.join(', ') || null },
-              render: (row) => row.from.join(', '),
+              render: (row) => list.format(row.from),
             },
             {
               key: 'to',
@@ -956,14 +961,14 @@ export function StudioModuleContract({
               key: 'actions',
               title: t('shell.studio.moduleGrants.actions'),
               filter: { kind: 'text', value: (row) => row.actions.join(', ') || null },
-              render: (row) => row.actions.join(', '),
+              render: (row) => list.format(row.actions),
             },
             {
               key: 'fields',
               title: t('shell.studio.moduleGrants.fields'),
               filter: { kind: 'text', value: (row) => row.fields.join(', ') || null },
               render: (row) =>
-                row.fields.length === 0 ? t('shell.studio.moduleGrants.allFields') : row.fields.join(', '),
+                row.fields.length === 0 ? t('shell.studio.moduleGrants.allFields') : list.format(row.fields),
             },
             {
               key: 'filter',

@@ -33,10 +33,12 @@ function ReadingNode({ node, ...labels }: Labels & { node: Reading }) {
 
   switch (node.kind) {
     case 'phrase': {
-      // The `in` phrase lists its values with `or`, and every other slot with a comma.
-      const separator = node.words === 'in' ? ` ${t('shell.studio.expression.reads.join.or')} ` : ', '
+      // The `in` phrase lists its values in the locale's words for "or", and every other slot with a comma.
       const parts = Object.fromEntries(
-        node.slots.map((slot, index) => [String(index), joined(slot, separator, labels)]),
+        node.slots.map((slot, index) => [
+          String(index),
+          node.words === 'in' ? anyOf(slot, labels) : joined(slot, ', ', labels),
+        ]),
       )
       return <FilledText text={t(`shell.studio.expression.reads.${node.words}`)} parts={parts} />
     }
@@ -74,6 +76,15 @@ function joined(nodes: Reading[], separator: string, labels: Labels) {
       <ReadingNode node={node} {...labels} />
     </Fragment>
   ))
+}
+
+/** The nodes as one list in the locale's words for "or", each node in place of its index. */
+function anyOf(nodes: Reading[], labels: Labels) {
+  return new Intl.ListFormat(labels.locale, { type: 'disjunction' })
+    .formatToParts(nodes.map((_, index) => `${index}`))
+    .map((part, index) =>
+      part.type === 'element' ? <ReadingNode key={index} node={nodes[Number(part.value)]} {...labels} /> : part.value,
+    )
 }
 
 function isGroup(node: Reading): boolean {

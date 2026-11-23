@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioConnectionContext } from '../platform/studioConnection'
 import { ThemeModeProvider } from '../platform/theme'
@@ -10,6 +11,7 @@ import { chooseOption, formItem } from '../test/antd'
 import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { followLink, renderGuarded } from '../test/leaveGuard'
 import type { StudioDiagnostic, StudioResource } from '../platform/studio'
+import { PlatformContext, type Platform } from './context'
 import { StudioModuleContract } from './StudioModuleContract'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -33,15 +35,22 @@ const contract = {
   },
 }
 
-function renderView(response: Response) {
+function renderView(response: Response, locale = 'en') {
   const fetchMock = vi.fn(async (_input: string) => response)
   vi.stubGlobal('fetch', fetchMock)
   render(
     <MemoryRouter>
       <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioModuleContract application="Checklist App" module="checklists" id="contract-id" />
-        </TextProvider>
+        <PlatformContext.Provider value={{ current: { locale, texts: {} } } as Platform}>
+          <TextProvider
+            catalogs={[
+              { texts: locale === 'vi' ? platformVietnamese : platformEnglish, fallbackTexts: platformEnglish },
+            ]}
+            development={false}
+          >
+            <StudioModuleContract application="Checklist App" module="checklists" id="contract-id" />
+          </TextProvider>
+        </PlatformContext.Provider>
       </ThemeModeProvider>
     </MemoryRouter>,
   )
@@ -89,7 +98,7 @@ describe('StudioModuleContract', () => {
 
     const states = await screen.findByTestId('studio-contract-states')
     expect(rowTexts(states)).toEqual([
-      'openInitial, Deletable',
+      'openInitial and Deletable',
       'checkedChecklist/states/checked/initialChecklist/states/checked/deletable',
       'closedChecklist/states/closed/initialChecklist/states/closed/deletable',
     ])
@@ -107,9 +116,20 @@ describe('StudioModuleContract', () => {
     ])
     expect(rowTexts(screen.getByTestId('studio-contract-ceiling'))).toEqual([
       'reviewerreadAll fieldsChecklist/ceiling/reviewer',
-      "Roles mapped to no slotread, updatestatusstatus == 'open'Checklist/ceiling/others",
+      "Roles mapped to no slotread and updatestatusstatus == 'open'Checklist/ceiling/others",
     ])
     expect(screen.getByText('Checklist/states/closed/initial')).toBeInTheDocument()
+  })
+
+  it('joins the marks and the actions in the list words of the Vietnamese locale', async () => {
+    renderView(
+      new Response(JSON.stringify({ id: 'contract-id', kind: 'contract', name: 'C', content: contract })),
+      'vi',
+    )
+
+    const states = await screen.findByTestId('studio-contract-states')
+    expect(rowTexts(states)[0]).toContain('Ban đầu và Có thể xóa')
+    expect(rowTexts(screen.getByTestId('studio-contract-ceiling'))[1]).toContain('read và update')
   })
 
   it('draws Add state and Add transition as secondary buttons on the title rows of their tables', async () => {

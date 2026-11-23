@@ -130,7 +130,7 @@ A text that holds a value reads as a whole sentence in every locale.
   placeholders, never words and names joined in code: "Added step {name} after {after}." / "Đã thêm bước {name} sau
   {after}.". `fillText` fills a string text, and `FilledText` fills a text with nodes. A text that already holds
   placeholders is never a piece of another text.
-- **A list of marks joins through the locale's list format.** _(planned for M35)_ `Intl.ListFormat` joins the items, so
+- **A list of marks joins through the locale's list format.** `Intl.ListFormat` joins the items, so
   each language writes its own "and" or its own comma.
 - **A kind in a text is its name, never its code.** The name comes from `kindSingular` or from
   `shell.studio.nav.kindOne.<kind>`: "{kind}, from {module}" / "{kind}, từ {module}". The capitals rule above applies.

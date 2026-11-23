@@ -3,13 +3,14 @@ import { AxisForm } from '../platform/AxisForm'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { EmptyDash } from '../platform/EmptyValue'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { fetchUserRoles, inviteUser, type RoleChange, type UserRoles } from '../platform/users'
 import { DialogFooter } from '../platform/DialogFooter'
+import { PlatformContext } from './context'
 
 /** The fields of the form. */
 interface InviteFields {
@@ -42,6 +43,7 @@ export function InviteUserModal({
   onReload: () => void
 }) {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { size } = useDesignTokens()
   const [form] = Form.useForm<InviteFields>()
   const [roles, setRoles] = useState<Pick<UserRoles, 'applications' | 'platformRoles'>>()
@@ -222,7 +224,9 @@ export function InviteUserModal({
               {chosen.length === 0 ? (
                 <EmptyDash />
               ) : (
-                chosen.map((change) => `${change.role} (${placeOf(change)})`).join(', ')
+                new Intl.ListFormat(locale, { type: 'conjunction' }).format(
+                  chosen.map((change) => `${change.role} (${placeOf(change)})`),
+                )
               )}
             </Typography.Text>
           </Flex>
