@@ -30,9 +30,11 @@ namespace Axis.Server.Studio;
 /// row. Just before the insert the quota is counted again under a transaction lock, so two sends at once cannot both pass it. The
 /// request, its encrypted refresh token and its audit record commit together. <c>GET .../authoring-requests</c> lists the newest 100 requests of the application and <c>GET .../authoring-requests/{id}</c>
 /// reads one with its steps. The session and role checks and the application come first, and then an <c>id</c> that is not a UUID of this
-/// application answers 404. <c>POST .../{id}/approve</c>, <c>.../change-plan</c> and <c>.../drop</c> run those checks, then answer 403
-/// to anyone but the request's author, for <c>change-plan</c> check its body <c>{ comment }</c> of 1 to 2000 characters (415, 400), and
-/// last check the state under a row lock (409). They answer 200 with the request. Problem titles never contain text from the request. The drop erases the stored refresh
+/// application answers 404. <c>POST .../{id}/approve</c>, <c>.../change-plan</c>, <c>.../request-changes</c> and <c>.../drop</c> run those checks, then answer 403
+/// to anyone but the request's author, for <c>change-plan</c> and <c>request-changes</c> check its body <c>{ comment }</c> of 1 to 2000 characters (415, 400), and
+/// last check the state under a row lock (409). <c>request-changes</c> also answers 409 for a draft that has an accept queued or running, and it
+/// keeps the comment as a <c>changeRequest</c> step, sets the round to 0, clears the agent host's claim and moves the request to <c>working</c>.
+/// They answer 200 with the request. Problem titles never contain text from the request. The drop erases the stored refresh
 /// token, and no answer carries it. <c>POST .../{id}/accept</c> takes no body and runs the same checks, then answers 409 for a request that is not
 /// <c>ready</c> or has no draft, and 409 for a draft that already has an accept queued or running. Otherwise it stores an <c>accept</c> publish request
 /// for the draft with the client <c>studio</c> and answers 202 with that request and a <c>Location</c> for <c>GET .../requests/{id}</c>. The accept writes the draft as a revision, so over the <c>storage</c> quota it is refused before any of these checks, as a save is, see
@@ -67,6 +69,7 @@ internal static class StudioAuthoringRequestEndpoints
     {
         Approve,
         ChangePlan,
+        RequestChanges,
         Drop,
         Accept,
     }
@@ -83,6 +86,9 @@ internal static class StudioAuthoringRequestEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/change-plan",
             (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
                 ChangeAsync(Action.ChangePlan, application, id, httpContext, options, database));
+        endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/request-changes",
+            (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
+                ChangeAsync(Action.RequestChanges, application, id, httpContext, options, database));
         endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/drop",
             (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
                 ChangeAsync(Action.Drop, application, id, httpContext, options, database));
@@ -495,7 +501,7 @@ internal static class StudioAuthoringRequestEndpoints
         }
 
         string? comment = null;
-        if (action == Action.ChangePlan)
+        if (action is Action.ChangePlan or Action.RequestChanges)
         {
             if (!HasJsonBody(httpContext.Request))
             {
@@ -504,7 +510,7 @@ internal static class StudioAuthoringRequestEndpoints
 
             if (await ReadBodyAsync(httpContext.Request, cancellationToken) is not { } body || !TryReadComment(body, out comment))
             {
-                return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid plan comment.");
+                return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid comment.");
             }
         }
 
@@ -527,12 +533,21 @@ internal static class StudioAuthoringRequestEndpoints
         {
             Action.Drop => state is not (null or "accepted" or "dropped"),
             Action.Accept => state == "ready" && draftId is not null,
+            Action.RequestChanges => state == "ready",
             _ => state == "awaitingApproval",
         };
         if (!allowed)
         {
             await transaction.RollbackAsync(cancellationToken);
             return StudioEndpoints.Problem(StatusCodes.Status409Conflict, "The request is not in a state that allows this.");
+        }
+
+        if (action == Action.RequestChanges
+            && draftId is { } pendingDraft
+            && await FindPendingAcceptAsync(connection, transaction, pendingDraft, cancellationToken) is not null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return StudioEndpoints.Problem(StatusCodes.Status409Conflict, "The draft already has an accept that has not finished.");
         }
 
         if (action == Action.Accept)
@@ -552,21 +567,13 @@ internal static class StudioAuthoringRequestEndpoints
                 await ExecuteAsync(
                     "UPDATE axis.authoring_requests SET state = 'planning' WHERE id = @id",
                     connection, transaction, requestId, cancellationToken);
-                await using (var step = new NpgsqlCommand(
-                    """
-                    INSERT INTO axis.authoring_request_steps (id, request_id, ordinal, kind, input_summary, finished_at)
-                    SELECT @step, @id, coalesce(max(ordinal), 0) + 1, 'planChange', @comment, now()
-                    FROM axis.authoring_request_steps WHERE request_id = @id
-                    """,
-                    connection,
-                    transaction))
-                {
-                    step.Parameters.AddWithValue("step", Guid.CreateVersion7());
-                    step.Parameters.AddWithValue("id", requestId);
-                    step.Parameters.AddWithValue("comment", comment!);
-                    await step.ExecuteNonQueryAsync(cancellationToken);
-                }
-
+                await InsertCommentStepAsync("planChange", connection, transaction, requestId, comment!, cancellationToken);
+                break;
+            case Action.RequestChanges:
+                await ExecuteAsync(
+                    "UPDATE axis.authoring_requests SET state = 'working', round = 0, claimed_by = NULL, claimed_until = NULL WHERE id = @id",
+                    connection, transaction, requestId, cancellationToken);
+                await InsertCommentStepAsync("changeRequest", connection, transaction, requestId, comment!, cancellationToken);
                 break;
             default:
                 await ExecuteAsync(
@@ -578,6 +585,25 @@ internal static class StudioAuthoringRequestEndpoints
 
         await transaction.CommitAsync(cancellationToken);
         return Results.Ok(await ReadAsync(connection, requestId, applicationId, application, steps: false, user.DisplayName, cancellationToken));
+    }
+
+    // A finished step of the given kind that holds the author's comment, after the request's last step.
+    private static async Task InsertCommentStepAsync(
+        string kind, NpgsqlConnection connection, NpgsqlTransaction transaction, Guid requestId, string comment, CancellationToken cancellationToken)
+    {
+        await using var step = new NpgsqlCommand(
+            """
+            INSERT INTO axis.authoring_request_steps (id, request_id, ordinal, kind, input_summary, finished_at)
+            SELECT @step, @id, coalesce(max(ordinal), 0) + 1, @kind, @comment, now()
+            FROM axis.authoring_request_steps WHERE request_id = @id
+            """,
+            connection,
+            transaction);
+        step.Parameters.AddWithValue("step", Guid.CreateVersion7());
+        step.Parameters.AddWithValue("id", requestId);
+        step.Parameters.AddWithValue("kind", kind);
+        step.Parameters.AddWithValue("comment", comment);
+        await step.ExecuteNonQueryAsync(cancellationToken);
     }
 
     // Queues the accept of the request's draft. It changes no authoring request: the publisher moves the request to accepted when the accept succeeds.

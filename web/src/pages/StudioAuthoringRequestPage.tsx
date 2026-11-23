@@ -23,6 +23,7 @@ import {
   dropAuthoringRequest,
   fetchAuthoringRequest,
   fetchStudioRequest,
+  requestAuthoringRequestChanges,
   resourceTitle,
   ServerUnreachableError,
   type StudioDiagnostic,
@@ -101,8 +102,10 @@ function guideWords(
  * in full, then the sender's line and the alert of an action that failed. Under them comes the feed, one `StepsBar` of
  * the Plan, Work, Result and Dropped items that the request has, each with its mark. A failed request shows its failure
  * in the item where it stopped, and the Result item of a ready, failed or accepted request ends with the status of the
- * accept that the page follows. The guide bar at the foot of the window gives the request's author Approve plan, Change the plan… and Drop…, and Accept and Drop… on
- * a ready request. Accept sends the accept route and follows its publish request with `fetchStudioRequest`, kept in
+ * accept that the page follows. The guide bar at the foot of the window gives the request's author Approve plan, Change
+ * the plan… and Drop…, and Accept, Ask for other changes… and Drop… on a ready request, where Ask for other changes…
+ * opens a dialog for a comment that sends the request back to work. Accept sends the accept route and follows its
+ * publish request with `fetchStudioRequest`, kept in
  * memory for this visit, and reads the request again when the accept ends. An accept that met conflicts shows a warning
  * in place of its status, which names each changed resource with who changed it and when, and the bar offers Drop… only.
  * Until the request waits for its author or ends, the page asks for it every second and keeps the last answer when a read
@@ -133,6 +136,7 @@ export function StudioAuthoringRequestPage({
   const [round, setRound] = useState(0)
   const [actionError, setActionError] = useState(false)
   const [changePlanOpen, setChangePlanOpen] = useState(false)
+  const [requestChangesOpen, setRequestChangesOpen] = useState(false)
   const [dropOpen, setDropOpen] = useState(false)
   const [acting, setActing] = useState(false)
   // The accept that the author sent in this visit, which the page follows to its end. It is never read back from the server.
@@ -316,6 +320,14 @@ export function StudioAuthoringRequestPage({
       onClick: () => setChangePlanOpen(true),
     })
   }
+  if (isAuthor && request.state === 'ready' && !accepting && !conflicted) {
+    fold.push({
+      key: 'requestChanges',
+      labelKey: 'shell.studio.aiRequest.requestChanges',
+      disabled: acting,
+      onClick: () => setRequestChangesOpen(true),
+    })
+  }
   if (
     isAuthor &&
     (request.state === 'planning' ||
@@ -401,6 +413,26 @@ export function StudioAuthoringRequestPage({
               return { ok: true }
             }}
             onClose={() => setChangePlanOpen(false)}
+            onChanged={() => setActionError(false)}
+          />
+        )}
+        {requestChangesOpen && (
+          <ReasonDialog
+            size="medium"
+            title={t('shell.studio.aiRequest.requestChanges.title')}
+            label={t('shell.studio.aiRequest.requestChanges.label')}
+            help={t('shell.studio.aiRequest.requestChanges.help')}
+            finishText={t('shell.studio.aiRequest.requestChanges.send')}
+            cancelText={t('shell.studio.cancel')}
+            requiredMessage={t('shell.studio.aiRequest.requestChanges.required')}
+            tooLongMessage={t('shell.studio.aiRequest.requestChanges.tooLong')}
+            maxLength={2000}
+            failedText={t('shell.studio.aiRequest.failed')}
+            onSend={async (comment) => {
+              adopt(await requestAuthoringRequestChanges(application, requestId, comment))
+              return { ok: true }
+            }}
+            onClose={() => setRequestChangesOpen(false)}
             onChanged={() => setActionError(false)}
           />
         )}

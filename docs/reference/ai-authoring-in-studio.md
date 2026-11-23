@@ -187,7 +187,7 @@ bar, never in the heading. Only the request's author sees its actions.
 | AI works, checks or reviews                   | AI is working on it                                      | none                                                                                                              | Drop…                                                               |
 | AI waits for an outside app _(planned for M35)_ | The app's line, as [below](#an-outside-apps-request) gives it | none                                                                                                         | Drop…                                                               |
 | Ready, a finding must change _(planned for M35)_ | "1 blocking finding", or "<n> blocking findings"         | Ask AI to fix it, which asks for changes with "Fix what the review found must change:" and each blocking finding as the comment | Drop…, Ask for other changes…, Accept anyway…, see [the diff](#the-diff) |
-| Ready, passed | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes… _(planned for M35)_                   |
+| Ready, passed | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes…                                        |
 | Ready, an accept met a conflict               | Resources changed since AI read them                     | Make the change again _(planned for M35)_. Until then, none                                                       | Drop…                                                               |
 | Ready, for anyone else | Waiting for its author to accept                         | none                                                                                                              | none                                                                |
 | Accepting | Accepting the draft                                      | none                                                                                                              | none                                                                |
@@ -205,7 +205,7 @@ to 2,000 characters, and its dialog has Cancel. A failure shows inside the dialo
 - **Answer…** _(planned for M35)_ is the main action while the plan has questions. Its `medium` dialog, "Answer the plan's
   questions", asks for "Your answers". Its help says "AI writes the plan again with your answers, and you
   approve it." Its button is **Ask for a new plan**, and it sends the answers as a change of plan.
-- **Ask for other changes…** _(planned for M35)_ is a secondary action for a ready draft with no conflict. Its `medium` dialog,
+- **Ask for other changes…** is a secondary action for a ready draft with no conflict. Its `medium` dialog,
   "Ask for other changes", asks "What should AI change?". Its help says "AI works on the same draft with your
   comment, then the checks and the review run again." Its button is **Ask AI to change it**.
 - **Drop…** is a secondary action that opens a `small` dialog, "Drop this request?". It says that AI stops

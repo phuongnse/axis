@@ -5,7 +5,8 @@ namespace Axis.Agent;
 
 /// <summary>
 /// The work of the <c>working</c> state, see <c>docs/reference/authoring-requests.md#states</c>. It makes the request's draft with <c>create_draft</c> and
-/// stores its id in <c>draft_id</c> before the first model call, and a step that runs again uses the stored draft. It then lets the model make the approved
+/// stores its id in <c>draft_id</c> before the first model call, and a step that runs again, or runs after the author asked for other changes, uses the stored draft.
+/// The first message then holds the comments of every change request, oldest first. It then lets the model make the approved
 /// change in that draft through the read tools, the write tools and the layer tool of the MCP server and nothing else, and moves the request to
 /// <c>checking</c> when the model ends its turn. A step whose model has not ended its turn within <see cref="DraftWork.MaxModelCalls"/> model calls, whose answer
 /// stops at the output limit, whose application the author can no longer list or whose draft cannot be made stops the request as <c>failed</c> with the
@@ -54,6 +55,19 @@ internal sealed class WorkingStep(TenantModelAdapters adapters, AiSettings setti
         return draft;
     }
 
-    private static string FirstMessage(AuthoringRequestToWork request) =>
-        "The request:\n" + request.Text + "\n\nThe approved plan:\n" + (request.Plan ?? "");
+    internal static string FirstMessage(AuthoringRequestToWork request)
+    {
+        var message = "The request:\n" + request.Text + "\n\nThe approved plan:\n" + (request.Plan ?? "");
+        if (request.ChangeRequests is not { Count: > 0 } comments)
+        {
+            return message;
+        }
+
+        foreach (var comment in comments)
+        {
+            message += "\n\nThe person asked for changes to the draft:\n" + comment;
+        }
+
+        return message + "\n\nChange the draft as these comments ask.";
+    }
 }
