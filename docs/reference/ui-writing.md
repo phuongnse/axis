@@ -91,25 +91,25 @@ noun.
 
 Help text follows these rules as well:
 
-- **An example says what it means.** _(planned for M35)_ "such as P3D for three days" / "như P3D là 3 ngày", or "such as
+- **An example says what it means.** "such as P3D for three days" / "như P3D là 3 ngày", or "such as
   2026-01-15T09:00:00Z for 9:00 UTC on 15 January 2026" / "như 2026-01-15T09:00:00Z là 9:00 UTC ngày 15/1/2026".
 - **An empty value has its own sentence.** _(planned for M35)_ The sentence says what empty does, and it is true:
   "Leave it empty for thirty seconds." / "Để trống thì là 30 giây."
-- **A condition says what happens when it is true.** _(planned for M35)_ "When this expression is true, the field shows.
+- **A condition says what happens when it is true.** "When this expression is true, the field shows.
   Leave it empty to always show it." / "Khi biểu thức này đúng, trường được hiển thị. Để trống thì trường luôn hiển thị.".
   The other two conditions read "the field must be filled in" / "trường bắt buộc phải điền" and "the field is read-only"
   / "trường chỉ đọc".
-- **A checkbox says what turning it on does.** _(planned for M35)_ "Turn on so people see the field but cannot change it."
+- **A checkbox says what turning it on does.** "Turn on so people see the field but cannot change it."
   / "Bật để người dùng chỉ xem được trường, không sửa được."
-- **A choice that clears another names what it clears.** _(planned for M35)_ It names the clear in the person's words:
+- **A choice that clears another names what it clears.** It names the clear in the person's words:
   "Choosing it clears the data source or form chosen before.", never "the widget's other binding".
-- **A text that the author writes in each language says so.** _(planned for M35)_ Its help ends "in each language of the
+- **A text that the author writes in each language says so.** Its help ends "in each language of the
   application" / "bằng từng ngôn ngữ của ứng dụng", as a page's title does.
-- **A width counts twelfths of a row.** _(planned for M35)_ The label is "Width (of 12)" / "Độ rộng (trên 12 cột)", and the
+- **A width counts twelfths of a row.** The label is "Width (of 12)" / "Độ rộng (trên 12 cột)", and the
   help gives 12 and 6 as examples: 12 fills the row, 6 takes half of it.
 - **A limit is stated plainly.** _(planned for M35)_ "up to 2000 characters" / "tối đa 2000 ký tự".
 - **A sample name is Contoso.** _(planned for M35)_ A help text that names a sample company or person uses Contoso.
-- **A setting shown in two places has one label and help.** _(planned for M35)_ A grant's "Record filter" / "Bộ lọc bản
+- **A setting shown in two places has one label and help.** A grant's "Record filter" / "Bộ lọc bản
   ghi", "Every record" / "Mọi bản ghi" and "All fields" / "Mọi trường" read the same in the matrix and in a policy's form.
 - **A label in a named group does not repeat the group.** _(planned for M35)_ The labels of an input, an output and a
   nested field are "Name" / "Tên" and "Type" / "Kiểu dữ liệu", because the group's name says the rest. A label outside
@@ -239,7 +239,7 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
 - **Used by's relations are the verb alone.** _(planned for M35)_ Where the row names the resource, a relation is the verb
   alone: "Phát ra", "Chờ", "Gửi đi", "Gọi thao tác", "Giả lập thao tác", "Kiểm thử". It names the resource only where the
   verb needs "cho" or "với": "Cấp quyền cho vai trò này", "Kiểm thử với vai trò này". An action is "hành động", never "nút".
-- **A scenario's fixed time names its event.** _(planned for M35)_ Its label is "Runs at" / "Chạy lúc", as the time bullet
+- **A scenario's fixed time names its event.** Its label is "Runs at" / "Chạy lúc", as the time bullet
   above asks, and its example says what the time means.
 
 ## Checks

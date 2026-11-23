@@ -7,6 +7,7 @@ import { fillText } from '../platform/fillText'
 import { StatusTag } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
 import { PlatformContext } from './context'
+import { useFieldTexts } from './fieldTexts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { targetActions } from './policyMatrixDraft'
 
@@ -38,6 +39,7 @@ export function StudioModulePolicy({
   layer?: DesignerLayer
 }) {
   const t = useText()
+  const { group } = useFieldTexts('policy')
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const grants: unknown[] = Array.isArray(value.grants) ? value.grants : []
 
@@ -94,7 +96,7 @@ export function StudioModulePolicy({
                   {t('shell.studio.matrix.removeGrant')}
                 </AxisButton>
               </Flex>
-              <AxisFieldGroup title={t('shell.studio.matrix.actions')} help={t('shell.studio.matrix.actions.help')}>
+              <AxisFieldGroup {...group('grants.actions')}>
                 <Flex gap="small" align="center" wrap>
                   <Checkbox.Group
                     options={accepted}

@@ -244,7 +244,7 @@ describe('FormProperties field', () => {
 
   it('writes the width of the field under width and removes it when the box is cleared', async () => {
     renderHarness({ sections: [{ name: 's', fields: [{ field: 'x' }] }] }, '/sections/0/fields/0')
-    const width = screen.getByRole('spinbutton', { name: 'Width' })
+    const width = screen.getByRole('spinbutton', { name: 'Width (of 12)' })
     expect(width).toHaveAccessibleDescription(english['shell.studio.field.form.sections.fields.width.help'])
 
     await userEvent.type(width, '8')

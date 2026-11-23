@@ -35,7 +35,7 @@ describe('StudioModulePolicy', () => {
       const grant = screen.getByTestId(`studio-module-policy-grant-${index}`)
       const group = within(grant).getByRole('group', {
         name: 'Actions',
-        description: platformEnglish['shell.studio.matrix.actions.help'],
+        description: platformEnglish['shell.studio.field.policy.grants.actions.help'],
       })
       expect(within(group).getByRole('checkbox', { name: 'read' })).toBeChecked()
     }
