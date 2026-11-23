@@ -14,10 +14,12 @@ Studio runs the application's [test scenarios](test-scenarios.md) through the
   answers `false` or fails. They are off while a request runs and while the reconnect message shows.
 - **The status line** shows queued, running and the outcome, as for Validate: Tests passed or Tests
   failed, and never a release number.
-- **Test results.** _(planned for M35)_ Each result reads as [a scenario's result](ai-authoring-in-studio.md#scenario-results)
-  does. Each scenario of the request's `scenarios` field shows a `StatusTag` that reads passed (`success`), failed (`danger`)
-  or skipped (`muted`), its time and, for a failure, the failing step and its message. Steps count from 1, as the scenario
-  editor's step cards do. The name is the only link, with its kind muted after it. A failure opens at the item's `path`, a pass at its top.
+- **Test results.** Each result reads as [a scenario's result](ai-authoring-in-studio.md#scenario-results)
+  does. Each scenario of the request's `scenarios` field shows its tag in a column of its own: Passed (`success`),
+  Failed (`danger`) or Skipped (`muted`). Then come its name, its kind and its time. A failure reads as one
+  sentence, "Failed at step N: <message>", in the text colour. Steps count from 1, as the scenario editor's step
+  cards do. The name is the only link, with its kind muted after it. A failure opens at the item's `path`, a pass
+  at its top.
 - **No empty pass.** While the request is queued or running, the list shows a note instead of rows, so
   an empty list never reads as a pass. A failed run with no results says that no scenario ran and
   points to the diagnostics: compile errors, a missing setting and an unknown scenario name fail a run

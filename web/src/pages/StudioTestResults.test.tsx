@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { designTokensFor } from '../platform/designTokens'
 import { studioFileAddress, studioResourceAddress } from '../platform/studioAddress'
 import { TextProvider } from '../platform/TextProvider'
 import type {
@@ -84,7 +85,7 @@ const failingTest: StudioPackageTestResult = {
 
 afterEach(() => localStorage.clear())
 
-describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
+describe.each(['light', 'dark'] as const)('StudioTestResults in %s mode', (mode) => {
   beforeEach(() => localStorage.setItem('axis.themeMode', mode))
 
   it.each(['queued', 'running'] as const)('shows a %s run as pending, with no rows', (status) => {
@@ -103,7 +104,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(rows).toHaveLength(1)
     expect(rows[0]).toHaveAttribute('data-outcome', 'passed')
     expect(rows[0]).toHaveTextContent('1.2 sec')
-    expect(within(rows[0]).getByText('passed').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
+    expect(within(rows[0]).getByText('Passed').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
     expect(within(rows[0]).getByText('Test scenario')).toBeInTheDocument()
 
     // A pass has no path, so its link opens the scenario at its top.
@@ -123,10 +124,12 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(failed).toHaveAttribute('data-outcome', 'failed')
     expect(failed).toHaveTextContent('ApprovalBelowThreshold')
     expect(failed).toHaveTextContent('< 1 sec')
-    expect(within(failed).getByText('failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
+    expect(within(failed).getByText('Failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
     expect(within(failed).getByText('Test scenario')).toBeInTheDocument()
-    expect(within(failed).getByText('Step 6')).toBeInTheDocument()
-    expect(failed).toHaveTextContent('The record status is approved, not rejected.')
+    const sentence = within(failed).getByText('Failed at step 6: The record status is approved, not rejected.')
+    expect(sentence).toBeVisible()
+    expect(sentence).toHaveStyle({ color: designTokensFor(mode).colour.text })
+    expect(sentence).not.toHaveStyle({ color: designTokensFor(mode).colour.dangerText })
 
     expect(within(failed).getAllByRole('link')).toHaveLength(1)
     expect(within(failed).getByRole('link', { name: 'ApprovalBelowThreshold' })).toHaveAttribute(
@@ -149,8 +152,8 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const rows = screen.getAllByTestId('studio-test-result')
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveAttribute('data-outcome', 'skipped')
-    expect(rows[0]).toHaveTextContent('skipped')
-    expect(within(rows[0]).getByText('skipped').closest('[data-tone]')).toHaveAttribute('data-tone', 'muted')
+    expect(rows[0]).toHaveTextContent('Skipped')
+    expect(within(rows[0]).getByText('Skipped').closest('[data-tone]')).toHaveAttribute('data-tone', 'muted')
     expect(rows[0]).toHaveTextContent('department-budgets/ApprovalRecordsDecision')
     expect(within(rows[0]).getByText('Relaxed point: Budget/effects/decisionRecorded')).toBeInTheDocument()
     expect(within(rows[0]).queryByRole('link')).not.toBeInTheDocument()
@@ -166,6 +169,44 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
   })
 })
 
+describe('StudioTestResults rows', () => {
+  const failedAt = (overrides: Partial<StudioScenarioResult>) => ({ ...approval, ...overrides })
+
+  it('puts each outcome tag alone in its own cell, and the name, kind and time in a second cell', () => {
+    renderResults(request({ status: 'failed', scenarios: [finance, approval] }))
+
+    const [passed, failed] = screen.getAllByTestId('studio-test-result')
+    const passedOutcome = within(passed).getByTestId('studio-test-result-outcome')
+    expect(passedOutcome.textContent).toBe('Passed')
+    const passedDetail = within(passed).getByTestId('studio-test-result-detail')
+    expect(within(passedDetail).getByText('FinanceApproval')).toBeInTheDocument()
+    expect(within(passedDetail).getByText('Test scenario')).toBeInTheDocument()
+    expect(within(passedDetail).getByText('1.2 sec')).toBeInTheDocument()
+
+    const failedOutcome = within(failed).getByTestId('studio-test-result-outcome')
+    expect(failedOutcome.textContent).toBe('Failed')
+    const failedDetail = within(failed).getByTestId('studio-test-result-detail')
+    expect(within(failedDetail).getByRole('link', { name: 'ApprovalBelowThreshold' })).toBeInTheDocument()
+    expect(within(failedDetail).getByText('Test scenario')).toBeInTheDocument()
+    expect(within(failedDetail).getByText('< 1 sec')).toBeInTheDocument()
+    expect(failedOutcome.parentElement).toBe(failed)
+    expect(failed).toHaveStyle({ display: 'grid', gridTemplateColumns: 'subgrid' })
+  })
+
+  it('reads a failure with a step but no message as "Failed at step N."', () => {
+    renderResults(request({ status: 'failed', scenarios: [failedAt({ message: null })] }))
+
+    expect(screen.getByText('Failed at step 6.')).toBeVisible()
+  })
+
+  it('reads a failure with a message but no step as "Failed: <message>"', () => {
+    renderResults(request({ status: 'failed', scenarios: [failedAt({ step: null, path: null })] }))
+
+    expect(screen.getByText('Failed: The record status is approved, not rejected.')).toBeVisible()
+    expect(screen.queryByText(/at step/)).not.toBeInTheDocument()
+  })
+})
+
 describe('StudioTestResults of a package test', () => {
   const packageTest = (overrides: Partial<StudioRequest> = {}) =>
     request({ status: 'failed', package: 'tools', packageTests: [passingTest, failingTest], ...overrides })
@@ -177,13 +218,13 @@ describe('StudioTestResults of a package test', () => {
     expect(passed).toHaveAttribute('data-outcome', 'passed')
     expect(passed).toHaveTextContent('test_adds')
     expect(passed).toHaveTextContent('1.2 sec')
-    expect(within(passed).getByText('passed').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
+    expect(within(passed).getByText('Passed').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
     expect(within(passed).queryByRole('button')).not.toBeInTheDocument()
     expect(failed).toHaveAttribute('data-outcome', 'failed')
     expect(failed).toHaveTextContent('test_greets')
     expect(failed).toHaveTextContent('< 1 sec')
     expect(failed).toHaveTextContent('AssertionError: Hello Ada != Hi Ada')
-    expect(within(failed).getByText('failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
+    expect(within(failed).getByText('Failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
 
     expect(within(failed).getByRole('link', { name: 'packages/tools/lib/x.py, line 3' })).toHaveAttribute(
       'href',
@@ -237,7 +278,7 @@ describe('StudioTestResults without scenarioAddressOf', () => {
 
     const failed = screen.getAllByTestId('studio-test-result').find((row) => row.dataset.outcome === 'failed')!
     expect(within(failed).getByText('ApprovalBelowThreshold')).toBeVisible()
-    expect(within(failed).getByText('The record status is approved, not rejected.')).toBeVisible()
+    expect(within(failed).getByText('Failed at step 6: The record status is approved, not rejected.')).toBeVisible()
     expect(within(failed).queryByRole('link')).not.toBeInTheDocument()
     expect(within(failed).queryByRole('button')).not.toBeInTheDocument()
   })
