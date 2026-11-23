@@ -23,7 +23,7 @@ namespace Axis.Server.Users;
 /// server serves one. It also says whether the user may use the operator console: the user holds the role that
 /// <c>Console:OperatorRole</c> names. It also says whether the user may administer users: the user holds the role that
 /// <c>Users:AdministratorRole</c> names and the tenant is not a preview tenant, which has no users page. It also says the
-/// tenant's status and, for an administrator in a cell, the address of the tenant's page in the billing portal. It also says
+/// tenant's status and, for an administrator in a cell, the address of the operator's billing page from <c>Cell:BillingPageUrl</c>, <c>null</c> without it. It also says
 /// whether the tenant has exports for the administrator, see <see cref="TenantExportEndpoints.CellTenant"/>.
 /// <para>
 /// <c>GET /api/users</c> lists the users of the tenant's realm to an administrator, as
@@ -220,7 +220,7 @@ internal static partial class UserEndpoints
 
     private static string? BillingUrl(bool administrator, CellOptions cell, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         cell.IsCell && administrator && !IsPreview(catalog, tenants) && tenants.Current is { } tenant
-            ? $"https://account.{cell.TenantDomain}/tenants/{Uri.EscapeDataString(tenant.TenantId)}"
+            ? BillingPage.Of(cell.BillingPageUrl, tenant.TenantId)
             : null;
 
     private static bool IsPreview(ITenantCatalog catalog, ITenantContextAccessor tenants) =>
@@ -290,8 +290,8 @@ internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadO
 /// <c>Console</c> is true when the user holds the operator console role.
 /// <c>Users</c> is true when the user holds the administrator role and the tenant is not a preview tenant.
 /// <c>TenantStatus</c> is <c>readOnly</c> while the tenant is read-only, otherwise <c>active</c>. <c>BillingUrl</c> is the
-/// tenant's page in the billing portal, <c>https://account.{Cell:TenantDomain}/tenants/{tenant id}</c>, and is <c>null</c>
-/// outside a cell, for a user without the administrator role and in a preview tenant. <c>TenantExports</c> is true when the user
+/// operator's billing page from <c>Cell:BillingPageUrl</c>, with the tenant's id in place of <c>{tenantId}</c>, and is <c>null</c>
+/// outside a cell, without the setting, for a user without the administrator role and in a preview tenant. <c>TenantExports</c> is true when the user
 /// holds the administrator role and the tenant is a cell tenant that is not a preview tenant, the tenants whose export routes answer.
 /// </summary>
 internal sealed record CurrentUserMeResponse(

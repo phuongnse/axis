@@ -21,6 +21,7 @@ public sealed class CellOptionsTests
             ("Cell:InternalUrl", "http://axis-internal:8080"),
             ("Cell:OperatorRealm", "ops"),
             ("Cell:OperatorRole", "ops-role"),
+            ("Cell:BillingPageUrl", "https://billing.example.com/pay?tenant={tenantId}"),
             ("Cell:BackupKeyFile", "/run/secrets/cell-backup-key")));
 
         Assert.True(options.IsCell);
@@ -34,6 +35,7 @@ public sealed class CellOptionsTests
         Assert.Equal("http://axis-internal:8080", options.InternalUrl);
         Assert.Equal("ops", options.OperatorRealm);
         Assert.Equal("ops-role", options.OperatorRole);
+        Assert.Equal("https://billing.example.com/pay?tenant={tenantId}", options.BillingPageUrl);
         Assert.Equal("/run/secrets/cell-backup-key", options.BackupKeyFile);
     }
 
@@ -121,6 +123,33 @@ public sealed class CellOptionsTests
             ("Cell:ConsoleAllowedNetworks:1", network))));
 
         Assert.Contains("Cell:ConsoleAllowedNetworks", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("http://billing.example.com/{tenantId}")]
+    [InlineData("billing.example.com")]
+    [InlineData("/billing/{tenantId}")]
+    public void A_billing_page_that_is_not_an_absolute_https_URL_is_refused_naming_the_setting(string address)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => CellOptions.Load(Settings(
+            ("Tenancy:Source", "directory"),
+            ("Cell:Id", "vn-1"),
+            ("Cell:Region", "vn"),
+            ("Cell:TenantDomain", "vn.example.com"),
+            ("Cell:BillingPageUrl", address))));
+
+        Assert.Contains("Cell:BillingPageUrl", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://billing.example.com/tenants/{tenantId}")]
+    [InlineData("https://billing.example.com")]
+    public void A_billing_page_that_is_an_absolute_https_URL_passes(string address)
+    {
+        var options = Options("vn-1", "vn");
+        options.BillingPageUrl = address;
+
+        Assert.Empty(CellOptionsValidator.Validate(options, TenancySource.Directory));
     }
 
     [Fact]

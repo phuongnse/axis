@@ -4,8 +4,10 @@ Hello {{name}},
 
 Someone, maybe you, tried to sign up for Axis with this email. It already had a trial, so no other one starts.
 
-To go on after the trial, choose a plan in the billing portal:
-{{billingPortalUrl}}
+{{#billingPageUrl}}
+To go on after the trial, choose a plan on the billing page:
+{{billingPageUrl}}
+{{/billingPageUrl}}
 
 If this was not you, ignore this email.
 

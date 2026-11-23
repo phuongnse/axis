@@ -831,6 +831,38 @@ public sealed class ControlPlaneOptionsTests
         Assert.DoesNotContain("ControlPlane:ConnectionString", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Without_a_billing_page_the_setting_is_empty()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.Null(factory.Services.GetRequiredService<ControlPlaneOptions>().BillingPageUrl);
+    }
+
+    [Fact]
+    public void A_billing_page_that_is_an_absolute_https_URL_loads()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:BillingPageUrl"] = "https://billing.example.com/tenants/{tenantId}" });
+
+        using var client = factory.CreateClient();
+
+        Assert.Equal("https://billing.example.com/tenants/{tenantId}", factory.Services.GetRequiredService<ControlPlaneOptions>().BillingPageUrl);
+    }
+
+    [Theory]
+    [InlineData("http://billing.example.com/{tenantId}")]
+    [InlineData("billing.example.com")]
+    public void A_billing_page_that_is_not_an_absolute_https_URL_stops_the_start_naming_the_setting(string address)
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:BillingPageUrl"] = address });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:BillingPageUrl", exception.Message, StringComparison.Ordinal);
+    }
+
     private static Dictionary<string, string?> SignUpApplicationSettings(string id, string en, string vi) => new()
     {
         ["ControlPlane:SignUp:Applications:0:Id"] = id,
