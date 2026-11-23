@@ -4,7 +4,9 @@
    `web/src` and the server for copies, forks and second ways to the same
    result. The audit runs over the whole prototype, after the per-step audits
    that [SKILL.md](SKILL.md) describes. Add what it finds to the design issue's
-   body as build notes, and set the body with `gh issue edit <n> --body-file <file>`.
+   body as build notes, and set the body with `gh issue edit <n> --body-file <file>`. If the issue
+   has a plan, comment the change on it in the same step, as
+   [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue) says.
 2. Tag the prototype's last commit and push the tag, then delete the branch:
    `git tag -a design-review/<yyyy-mm-dd>-<topic> -m "<what it shows>"`,
    `git push origin design-review/<yyyy-mm-dd>-<topic>`, then
