@@ -205,7 +205,7 @@ database.
 | `Tenancy:RefreshInterval`          | `00:00:30`      | How often the server and the worker read the tenant directory again, and the agent host as [AI settings](#ai-settings) say. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, and of the agent host as [AI settings](#ai-settings) say, naming the setting.                                                                                                                                                                                                                                                                                                       |
 | `Platform:SecretKey`               | none            | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, by the worker and `Axis.Admin` under `directory`, and by the agent host as [AI settings](#ai-settings) say. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start.                                                                                                                                                                                  |
 | `Platform:PreviousSecretKey`       | none            | The old installation key during a rotation, in the same form as `Platform:SecretKey`. Optional. The server, the worker and `Axis.Admin` read it, and the agent host as [AI settings](#ai-settings) say. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. A blank value counts as not set. A malformed value stops the start, naming the setting and never its value. `platform rekey` needs it. See [installation key](tenant-setting-commands.md#installation-key).                                                                                           |
-| `ConnectionStrings:Platform`       | none            | A role that reads the `platform` schema and writes only these: rows it inserts into `platform.data_protection_keys` and `platform.jobs`, the rows of `platform.tenant_usage`, `platform.tenant_usage_latest` and `platform.tenant_token_usage`, the rows of `platform.tenant_leases`, and rows it inserts and updates in `platform.tenant_daily_counters`. The server and the worker need it under `directory`, and the agent host as [AI settings](#ai-settings) say. Outside Development and Testing the server, and the worker and the agent host under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `ConnectionStrings:Platform`       | none            | A role that reads the `platform` schema and writes only these: rows it inserts into `platform.data_protection_keys` and `platform.jobs`, the rows of `platform.tenant_usage`, `platform.tenant_usage_latest` and `platform.tenant_token_usage`, the rows of `platform.tenant_leases`, and rows it inserts and updates in `platform.tenant_daily_counters` and `platform.host_keys`. The server and the worker need it under `directory`, and the agent host as [AI settings](#ai-settings) say. Outside Development and Testing the server, and the worker and the agent host under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 | `ConnectionStrings:PlatformSchema` | none            | The role that owns the `platform` schema. The server reads it at start for the platform migrations, under both sources, and for each `PUT /api/cell/tenants/{id}/quotas`, which opens an unpooled connection for that write alone. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. Outside Development and Testing the server refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls).                                                   |
 
 As environment variables they are `Tenancy__Source`, `Tenancy__RefreshInterval`,
@@ -504,7 +504,7 @@ The server reads them, and a bad value stops the start.
 ## AI settings
 
 The agent host reads the `Ai` settings: the model bindings, the default and review bindings, the
-[budgets of a request](authoring-requests.md#budgets) and the file of scripted answers of the tests. Their table is in [model bindings](model-bindings.md#bindings). The server and the agent host read
+[budgets of a request](authoring-requests.md#budgets), the file of scripted answers of the tests and the file of its own key. Their table is in [model bindings](model-bindings.md#bindings). The server and the agent host read
 `Ai:AllowTenantKeys`, see [a tenant's own key](model-bindings.md#a-tenants-own-key). The server also reads
 `Ai:DefaultBinding`, only to know whether it has a value, for `studioAi`, see
 [roles and the current user](security.md#roles-and-the-current-user). It never checks the name against a binding.
@@ -513,7 +513,7 @@ With `Ai:DefaultBinding` set, the agent host also reads its tenants, as the work
 [tenancy settings](#tenancy-settings). With it unset, AI authoring is off and the agent host starts
 idle, reading none of the settings below.
 
-- **What it reads.** `Ai:AllowTenantKeys`, `Tenancy:Source`, `Tenancy:RefreshInterval`,
+- **What it reads.** `Ai:AllowTenantKeys`, `Ai:HostKeyFile`, `Tenancy:Source`, `Tenancy:RefreshInterval`,
   `ConnectionStrings:Platform`, `Platform:SecretKey` and `Platform:PreviousSecretKey`, with the rules of
   the tenancy settings. Under `directory` it needs `ConnectionStrings:Platform` and
   `Platform:SecretKey`, and never reads `ConnectionStrings:PlatformSchema`. Under `configuration` it
@@ -529,6 +529,13 @@ idle, reading none of the settings below.
 - **Token usage.** Under `directory` it writes the tokens of each model call to the tenant's
   [usage](tenant-quotas.md#usage) over `ConnectionStrings:Platform`. Under `configuration` it
   writes none.
+- **The host key.** With `Ai:HostKeyFile` set, it reads its own key pair from that file, an EC P-256
+  private key in PEM form, at start. A file that cannot be read, or that holds another kind of key,
+  stops the start, and the message names the setting and never the path. Every replica holds the same
+  file. Under `directory` it publishes the public half and its key id in `platform.host_keys` over
+  `ConnectionStrings:Platform`. If publishing fails, it logs the failure once and retries every
+  `Tenancy:RefreshInterval`, and request work does not wait for it. Under `configuration` it publishes
+  nothing. See [keys and data protection](keys-and-data-protection.md#cryptographic-inventory).
 - **The tenant role.** It opens a tenant database only with the tenant's runtime role, and refuses a
   tenant whose role fails the [runtime role check](storage.md#database-roles). The error names the
   tenant and the role and never a connection string.

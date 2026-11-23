@@ -363,6 +363,7 @@ details response with the title "Sign in to read or write this data.":
   application content. The session is checked before any `404`, so a caller without a session cannot
   learn which sites or pages exist;
 - `GET /api/me`, `GET /api/about` and `GET /api/licences`;
+- `GET /api/agent-host/key`, which answers the public key of the agent host, or a `404` when none is published;
 - `GET /api/me/authenticators`;
 - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and `DELETE /api/me/sessions`;
 - `GET /api/me/tables/{key}` and the writes under it, see [table views and columns](frontend.md#table-views-and-columns);

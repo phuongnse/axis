@@ -1,6 +1,5 @@
-using System.Buffers.Text;
 using System.Security.Cryptography;
-using System.Text;
+using Axis.Tenancy.Keys;
 using Axis.Tenancy.Realms;
 
 namespace Axis.Administration;
@@ -35,7 +34,7 @@ public static class TenantClientKeys
                 return false;
             }
 
-            keyId = Describe(parameters).KeyId;
+            keyId = JwkThumbprint.Of(parameters).KeyId;
             pkcs8Pem = key.ExportPkcs8PrivateKeyPem();
             publicKeyPem = key.ExportSubjectPublicKeyInfoPem();
             return true;
@@ -55,14 +54,7 @@ public static class TenantClientKeys
     {
         using var key = ECDsa.Create();
         key.ImportFromPem(pem);
-        return Describe(key.ExportParameters(false));
-    }
-
-    private static RealmClientKey Describe(ECParameters parameters)
-    {
-        var x = Base64Url.EncodeToString(parameters.Q.X!);
-        var y = Base64Url.EncodeToString(parameters.Q.Y!);
-        var thumbprintInput = $$"""{"crv":"P-256","kty":"EC","x":"{{x}}","y":"{{y}}"}""";
-        return new RealmClientKey(Base64Url.EncodeToString(SHA256.HashData(Encoding.UTF8.GetBytes(thumbprintInput))), x, y);
+        var (keyId, x, y) = JwkThumbprint.Of(key.ExportParameters(false));
+        return new RealmClientKey(keyId, x, y);
     }
 }

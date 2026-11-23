@@ -15,6 +15,9 @@ public sealed class AiSettings
     /// <summary>The setting that names a file of scripted answers, see <c>docs/reference/model-bindings.md#bindings</c>.</summary>
     internal const string ScriptedAnswersFileSetting = "Ai:ScriptedAnswersFile";
 
+    /// <summary>The setting that names the agent host's key file, see <c>docs/reference/model-bindings.md#bindings</c>.</summary>
+    internal const string HostKeyFileSetting = "Ai:HostKeyFile";
+
     /// <summary>The fix rounds of a request when <c>Ai:FixRounds</c> is not set.</summary>
     public const int DefaultFixRounds = 3;
 
@@ -38,6 +41,7 @@ public sealed class AiSettings
         RequestTokenBudgetSetting,
         RequestTimeoutSetting,
         ScriptedAnswersFileSetting,
+        HostKeyFileSetting,
     ];
 
     /// <summary>The bindings by name.</summary>
@@ -59,6 +63,9 @@ public sealed class AiSettings
 
     /// <summary>The file of recorded answers that every binding replays, or <see langword="null"/> to call the providers. Only Development and Testing accept it.</summary>
     public string? ScriptedAnswersFile { get; init; }
+
+    /// <summary>The file of the agent host's key pair, or <see langword="null"/> when none is set or AI authoring is off, see <see cref="AgentHostKey"/>. Only <see cref="AgentHostKey.Load"/> reads the file.</summary>
+    public string? HostKeyFile { get; init; }
 
     /// <summary>The output limit of the binding. A name that is not configured, which only the scripted adapter of the tests answers for, gets the default.</summary>
     public int MaxOutputTokensOf(string binding) =>
@@ -83,10 +90,12 @@ public sealed class AiSettings
             bindings[section.Key] = LoadBinding(configuration, section.Key);
         }
 
+        var defaultBinding = NamedBinding(configuration, DefaultBindingSetting, bindings);
         return new AiSettings
         {
             Bindings = bindings,
-            DefaultBinding = NamedBinding(configuration, DefaultBindingSetting, bindings),
+            DefaultBinding = defaultBinding,
+            HostKeyFile = defaultBinding is null ? null : Text(configuration[HostKeyFileSetting]),
             ReviewBinding = NamedBinding(configuration, ReviewBindingSetting, bindings),
             FixRounds = ReadFixRounds(configuration[FixRoundsSetting]),
             RequestTokenBudget = ParseTokenBudget(configuration[RequestTokenBudgetSetting]),

@@ -32,7 +32,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             platform,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'platform' ORDER BY table_name");
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "deleted_tenants", "jobs", "operator_sessions", "restore_checks", "tenant_backup_keys", "tenant_backups", "tenant_bindings", "tenant_daily_counters", "tenant_data_keys", "tenant_host_requests", "tenant_hosts", "tenant_leases", "tenant_platform_providers", "tenant_quotas", "tenant_site_legal_links", "tenant_token_usage", "tenant_usage", "tenant_usage_latest", "tenants"], tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "deleted_tenants", "host_keys", "jobs", "operator_sessions", "restore_checks", "tenant_backup_keys", "tenant_backups", "tenant_bindings", "tenant_daily_counters", "tenant_data_keys", "tenant_host_requests", "tenant_hosts", "tenant_leases", "tenant_platform_providers", "tenant_quotas", "tenant_site_legal_links", "tenant_token_usage", "tenant_usage", "tenant_usage_latest", "tenants"], tables);
     }
 
     [Theory]
@@ -81,6 +81,20 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
                 (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.tenant_daily_counters', 'UPDATE')"))!,
                 (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.tenant_daily_counters', 'DELETE')"))!,
                 (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.tenant_daily_counters', 'TRUNCATE')"))!));
+        // The host keys can be inserted and updated, and never deleted or truncated. The key must be 65 bytes.
+        await ExecuteAsync(reader, "INSERT INTO platform.host_keys (host, key_id, public_key, published_at) VALUES ('agent', 'first', decode(repeat('04', 65), 'hex'), now())");
+        await ExecuteAsync(reader, "UPDATE platform.host_keys SET key_id = 'second'");
+        Assert.Equal("second", await ScalarAsync(platform, "SELECT key_id FROM platform.host_keys"));
+        await AssertSqlStateAsync(reader, "DELETE FROM platform.host_keys", PermissionDenied);
+        await AssertSqlStateAsync(reader, "TRUNCATE platform.host_keys", PermissionDenied);
+        await AssertSqlStateAsync(platform, "UPDATE platform.host_keys SET public_key = decode('04', 'hex')", PostgresErrorCodes.CheckViolation);
+        Assert.Equal(
+            (true, true, false, false),
+            (
+                (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.host_keys', 'INSERT')"))!,
+                (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.host_keys', 'UPDATE')"))!,
+                (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.host_keys', 'DELETE')"))!,
+                (bool)(await ScalarAsync(platform, $"SELECT has_table_privilege('{readerRole}', 'platform.host_keys', 'TRUNCATE')"))!));
         // The jobs can be inserted, and never updated, deleted or truncated.
         Assert.Equal(
             (true, false, false, false),
@@ -103,7 +117,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
                 platform,
                 $"""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = 'platform' AND c.relkind IN ('r', 'p') AND c.relname NOT IN ('data_protection_keys', 'jobs', 'operator_sessions', 'tenant_daily_counters', 'tenant_host_requests', 'tenant_leases', 'tenant_token_usage', 'tenant_usage', 'tenant_usage_latest')
+                WHERE n.nspname = 'platform' AND c.relkind IN ('r', 'p') AND c.relname NOT IN ('data_protection_keys', 'host_keys', 'jobs', 'operator_sessions', 'tenant_daily_counters', 'tenant_host_requests', 'tenant_leases', 'tenant_token_usage', 'tenant_usage', 'tenant_usage_latest')
                 AND has_table_privilege('{readerRole}', c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE')
                 """));
     }
@@ -287,7 +301,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             }));
         using var client = factory.CreateClient();
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "deleted_tenants", "jobs", "operator_sessions", "restore_checks", "tenant_backup_keys", "tenant_backups", "tenant_bindings", "tenant_daily_counters", "tenant_data_keys", "tenant_host_requests", "tenant_hosts", "tenant_leases", "tenant_platform_providers", "tenant_quotas", "tenant_site_legal_links", "tenant_token_usage", "tenant_usage", "tenant_usage_latest", "tenants"], probe.Tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "deleted_tenants", "host_keys", "jobs", "operator_sessions", "restore_checks", "tenant_backup_keys", "tenant_backups", "tenant_bindings", "tenant_daily_counters", "tenant_data_keys", "tenant_host_requests", "tenant_hosts", "tenant_leases", "tenant_platform_providers", "tenant_quotas", "tenant_site_legal_links", "tenant_token_usage", "tenant_usage", "tenant_usage_latest", "tenants"], probe.Tables);
     }
 
     private async Task<string> StartServerAsync(bool directory)

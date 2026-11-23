@@ -183,6 +183,7 @@ builder.Services.AddHostedService<PlatformKeyRingStart>();
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
 builder.Services.AddSingleton<TenantUsageStore>();
+builder.Services.AddSingleton<HostKeyStore>();
 builder.Services.AddSingleton<TenantDailyCounterStore>();
 builder.Services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>();
 builder.Services.AddSingleton(provider => new TenantLeases(provider.GetRequiredService<NpgsqlDataSource>(), provider.GetRequiredService<ILogger<TenantLeases>>()));
@@ -381,6 +382,7 @@ sessions.MapNotificationEndpoints();
 sessions.MapTenantNoticeEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();
+sessions.MapAgentHostKeyEndpoints();
 sessions.MapUserCommandEndpoints();
 sessions.MapConsoleEndpoints();
 sessions.MapAboutEndpoints();
