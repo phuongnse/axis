@@ -1,7 +1,7 @@
-import { Form, type FormItemProps } from 'antd'
-import { cloneElement, forwardRef, useId, type ReactElement, type Ref } from 'react'
+import { Checkbox, Form, Radio, Switch, Upload, type FormItemProps } from 'antd'
+import { cloneElement, forwardRef, useId, type ReactElement, type ReactNode, type Ref } from 'react'
 import { Announcement } from './Announcement'
-import { fieldClass } from './antTheme'
+import { fieldClass, fieldInputClass } from './antTheme'
 import { requiredMark } from './requiredMark'
 import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
@@ -231,9 +231,18 @@ type HelpedInputProps = {
   onChange?: (...args: never[]) => void
 }
 
+// A checkbox, a switch, an upload and a radio group keep their own width, see docs/reference/shell.md#layout.
+const ownWidth = [Checkbox, Radio.Group, Switch, Upload]
+
+/** The wrapper `fieldRules` sizes round an input that fills its field. An input that keeps its own width gets none. */
+function FieldInputFrame({ own, children }: { own: boolean; children: ReactNode }) {
+  return own ? children : <div className={fieldInputClass}>{children}</div>
+}
+
 /**
  * The help and the input under the label, and the error under the input. The error goes first in the input's
- * description, then the help, as the form's field does with Ant Design's error.
+ * description, then the help, as the form's field does with Ant Design's error. An input that fills the field goes in
+ * a wrapper that `fieldRules` sizes.
  */
 const HelpedInput = forwardRef(function HelpedInput(
   { help, input, status, error, 'aria-describedby': described, ...control }: HelpedInputProps,
@@ -264,13 +273,15 @@ const HelpedInput = forwardRef(function HelpedInput(
           {help}
         </div>
       )}
-      {cloneElement(input, {
-        ...control,
-        ref,
-        'aria-describedby': describedBy,
-        'aria-busy': status?.state === 'running' ? true : undefined,
-        ...(error === undefined ? {} : { 'aria-invalid': true, status: 'error' }),
-      } as object)}
+      <FieldInputFrame own={ownWidth.includes(input.type as never)}>
+        {cloneElement(input, {
+          ...control,
+          ref,
+          'aria-describedby': describedBy,
+          'aria-busy': status?.state === 'running' ? true : undefined,
+          ...(error === undefined ? {} : { 'aria-invalid': true, status: 'error' }),
+        } as object)}
+      </FieldInputFrame>
       {error !== undefined && (
         <div id={errorId} style={{ color: colour.dangerText }}>
           {error}
