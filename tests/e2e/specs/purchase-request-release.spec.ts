@@ -743,7 +743,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     { baseURL, browser, page },
     testInfo,
   ) => {
-    test.setTimeout(420_000)
+    test.setTimeout(600_000)
     const { server, folder } = await studioServer(testInfo)
     const title = `Suppliers ${Date.now().toString(36)}`
     const label = `Journey ${title}`
@@ -775,13 +775,15 @@ test.describe('the active release of the purchase request sample changes', () =>
       })
 
       await page.getByRole('button', { name: 'Validate', exact: true }).click()
-      await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
+      // The publisher runs one request of the application at a time, and other specs publish to it too, so the wait
+      // includes the queue. A failed run queued this validate for most of a minute.
+      await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 120_000 })
       // With no problem left, the band has no problems button.
       await expect(page.getByTestId('studio-problems')).toHaveCount(0)
 
       await page.getByTestId('studio-preview').click()
       // The status still shows the validate that ended before the click, so wait for the preview link instead.
-      await expect(page.getByTestId('studio-preview-link')).toBeVisible({ timeout: 60_000 })
+      await expect(page.getByTestId('studio-preview-link')).toBeVisible({ timeout: 120_000 })
       const preview = await signInToPreview(browser, baseURL!, 'requester')
       try {
         await preview.page.goto(suppliers)
@@ -808,7 +810,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(changed.getByTestId('studio-changes-by')).toHaveText('Changed by you')
       await confirmPublish(page, label)
       await expect(page).toHaveURL(/view=releases/)
-      await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
+      await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 120_000 })
       const published = page.getByTestId('studio-release-row').filter({ hasText: label })
       await expect(published).toHaveAttribute('data-number', String(maxNumber + 1))
       await expect(published).toHaveAttribute('data-active', 'true')
@@ -843,7 +845,8 @@ test.describe('the active release of the purchase request sample changes', () =>
         timeout: 15_000,
       })
       await confirmDialog(page, 'Activate')
-      await expect(status).toContainText('Activated', { timeout: 60_000 })
+      // The activation waits in the same queue.
+      await expect(status).toContainText('Activated', { timeout: 120_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
       await useSession(page, 'requester')
       await page.goto(suppliers)
