@@ -467,8 +467,8 @@ be kept right.
   Fields, turns paging off with the view's `paging` option and shows every row with no pager, because a pager would
   move the row an author is editing. Studio's policy matrix, the tables of a module contract, the operator console's Tenant
   table, the two licences lists, the account page's Authenticators and Sessions, the users page's Connected
-  apps and the tables of a process instance's page, apart from its History timeline, also show every row with no pager. Only a table that holds all its
-  rows reads it.
+  apps, the tables of a process instance's page, apart from its History timeline, and the History of an AI request's
+  page also show every row with no pager. Only a table that holds all its rows reads it.
 - **How many.** A paged table says what it shows of how many, as "1–20 of 143", with the numbers in the
   language's format.
 - **Too little room.** A table measures its own width, as it changes. Its text columns

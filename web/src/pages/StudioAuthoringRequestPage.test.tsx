@@ -692,6 +692,105 @@ describe('the Work item', () => {
   })
 })
 
+describe('the History', () => {
+  const approvedAt = '2026-11-18T09:05:00Z'
+  const approved = { author: 'u1', plan: 'Add a supplier field.', approvedAt }
+  /** The time a number of minutes after 09:00 on the day of the request. */
+  const at = (minutes: number) => new Date(Date.parse('2026-11-18T09:00:00Z') + minutes * 60_000).toISOString()
+  /** A step that starts at a minute and runs a minute, unless `overrides` gives it another end. */
+  const step = (kind: string, minute: number, overrides: Partial<AuthoringRequestStep> = {}): AuthoringRequestStep => ({
+    kind,
+    summary: null,
+    outcome: null,
+    tokens: 0,
+    startedAt: at(minute),
+    finishedAt: at(minute + 1),
+    checks: null,
+    ...overrides,
+  })
+  /** Opens the History from Show the steps and returns its table. */
+  const show = async () => {
+    await userEvent.click(await screen.findByRole('button', { name: 'Show the steps' }))
+    return screen.findByTestId('studio-ai-request-history')
+  }
+  /** The words of each body row, its Step and Result cells, newest first. */
+  const words = (table: HTMLElement) =>
+    within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) =>
+        within(row)
+          .getAllByRole('cell')
+          .slice(0, 2)
+          .map((cell) => cell.textContent),
+      )
+
+  it('folds the History open from Show the steps, closed at first', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps: [step('work', 6)] })).fetch)
+    renderPage()
+
+    const toggle = await screen.findByRole('button', { name: 'Show the steps' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('studio-ai-request-history')).toBeNull()
+
+    await userEvent.click(toggle)
+
+    expect(screen.getByRole('button', { name: 'Hide the steps' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('studio-ai-request-history')).toBeVisible()
+  })
+
+  it('shows the table of its steps with four columns, newest step first', async () => {
+    const steps = [
+      step('plan', 0),
+      step('planChange', 1, { summary: 'Fewer fields' }),
+      step('work', 2, { outcome: null }),
+      step('check', 3, { outcome: 'passed', checks: passedChecks as AuthoringRequestStep['checks'] }),
+      step('review', 4, { outcome: 'passed' }),
+      step('check', 5, { outcome: 'failed', checks: failedCompile as AuthoringRequestStep['checks'] }),
+    ]
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps })).fetch)
+    renderPage()
+
+    const table = await show()
+
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Step', 'Result', 'Started', 'Duration'])
+    expect(words(table)).toEqual([
+      ['Checked the draft', 'It does not compile: 2 problems'],
+      ['Reviewed the draft', 'No changes requested'],
+      ['Checked the draft', 'All scenarios pass'],
+      ['Changed the draft', 'Saved'],
+      ['Asked for another plan: “Fewer fields”', '—'],
+      ['Wrote a plan', 'Plan written'],
+    ])
+  })
+
+  it('shows an em dash in Duration for a step that is still running, and no pager with more than ten steps', async () => {
+    const steps = Array.from({ length: 11 }, (_, index) => step('work', index * 2))
+    steps.push(step('check', 22, { finishedAt: null }))
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'checking', steps })).fetch)
+    renderPage()
+
+    const table = await show()
+
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(12)
+    expect(within(rows[0]).getAllByRole('cell')[3]).toHaveTextContent('—')
+    expect(within(rows[1]).getAllByRole('cell')[3]).not.toHaveTextContent('—')
+    expect(within(table).queryByRole('list')).toBeNull()
+  })
+
+  it('shows Show the steps to a reader who is not the author', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps: [step('work', 6)] })).fetch)
+    renderPage({ userId: 'u9' })
+
+    expect(await screen.findByRole('button', { name: 'Show the steps' })).toBeVisible()
+  })
+})
+
 describe('the Plan item of an approved plan', () => {
   const approvedAt = '2026-11-18T09:05:00Z'
   const plan = 'Add a supplier field.\n\nShow it on the form.'

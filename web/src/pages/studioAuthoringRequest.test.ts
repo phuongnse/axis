@@ -6,7 +6,14 @@ import type {
   StudioDiagnostic,
   StudioScenarioResult,
 } from '../platform/studio'
-import { planChanges, planSummary, requestFeed, requestResult, workLine } from './studioAuthoringRequest'
+import {
+  planChanges,
+  planSummary,
+  requestFeed,
+  requestHistory,
+  requestResult,
+  workLine,
+} from './studioAuthoringRequest'
 
 const error: StudioDiagnostic = {
   code: 'AXIS-E101',
@@ -431,5 +438,90 @@ describe('planSummary', () => {
 
   it('has no rest for a plan of one paragraph', () => {
     expect(planSummary('  Add a field.\n')).toEqual({ summary: 'Add a field.', rest: '' })
+  })
+})
+
+describe('requestHistory', () => {
+  it('lists the steps newest first, each keyed by its position from the oldest', () => {
+    const steps = [
+      step({ kind: 'plan', startedAt: '2026-11-18T09:00:00Z', finishedAt: '2026-11-18T09:01:00Z' }),
+      step({ kind: 'work', startedAt: '2026-11-18T09:02:00Z', finishedAt: '2026-11-18T09:03:00Z' }),
+      step({ kind: 'fix', startedAt: '2026-11-18T09:04:00Z', finishedAt: '2026-11-18T09:05:00Z' }),
+    ]
+
+    expect(requestHistory(requestOf({ steps })).map((row) => [row.key, row.startedAt])).toEqual([
+      ['2', '2026-11-18T09:04:00Z'],
+      ['1', '2026-11-18T09:02:00Z'],
+      ['0', '2026-11-18T09:00:00Z'],
+    ])
+  })
+
+  it('gives a step that has not finished no duration and no result', () => {
+    const [row] = requestHistory(requestOf({ steps: [step({ kind: 'work', outcome: null, finishedAt: null })] }))
+
+    expect(row.ms).toBeNull()
+    expect(row.result).toBeNull()
+    expect(row.step).toEqual({ key: 'shell.studio.aiRequest.history.step.work', values: { comment: '' } })
+  })
+
+  it('gives a finished step its duration in milliseconds', () => {
+    const [row] = requestHistory(
+      requestOf({
+        steps: [step({ kind: 'work', startedAt: '2026-11-18T09:00:00Z', finishedAt: '2026-11-18T09:01:30Z' })],
+      }),
+    )
+
+    expect(row.ms).toBe(90_000)
+  })
+
+  it('reads a finished step from its kind and outcome, and a successful work step as saved', () => {
+    const [saved, plan] = requestHistory(
+      requestOf({ steps: [step({ kind: 'plan', outcome: null }), step({ kind: 'work', outcome: null })] }),
+    )
+
+    expect(saved.result).toEqual({ key: 'shell.studio.aiRequest.history.result.saved', values: {} })
+    expect(plan.result).toEqual({ key: 'shell.studio.aiRequest.history.result.planWritten', values: {} })
+  })
+
+  it('reads the reason a step stopped by its outcome, and an interrupted step as unfinished', () => {
+    const [interrupted, timed] = requestHistory(
+      requestOf({
+        steps: [step({ kind: 'work', outcome: 'timedOut' }), step({ kind: 'fix', outcome: 'interrupted' })],
+      }),
+    )
+
+    expect(timed.result).toEqual({ key: 'shell.studio.aiRequest.history.result.timedOut', values: {} })
+    expect(interrupted.result).toEqual({ key: 'shell.studio.aiRequest.history.result.unfinished', values: {} })
+  })
+
+  it('reads the result of a check from its checks, as the Checks line does', () => {
+    const failed = {
+      compile: { outcome: 'failed' as const, diagnostics: [error, error] },
+      packages: { outcome: 'notRun' as const, items: [] },
+      scenarios: { outcome: 'notRun' as const, request: null, diagnostics: [], items: [] },
+    }
+    const [row] = requestHistory(requestOf({ steps: [check(failed, 'failed')] }))
+
+    expect(row.result).toEqual({ key: 'shell.studio.aiRequest.checks.compile', values: { count: 2 } })
+  })
+
+  it('gives a planChange its comment, and no result', () => {
+    const [row] = requestHistory(requestOf({ steps: [step({ kind: 'planChange', summary: 'Fewer fields' })] }))
+
+    expect(row.step).toEqual({
+      key: 'shell.studio.aiRequest.history.step.planChange',
+      values: { comment: 'Fewer fields' },
+    })
+    expect(row.result).toBeNull()
+  })
+
+  it('gives a step of a kind with no words no step text, so its row shows the dash', () => {
+    const [row] = requestHistory(requestOf({ steps: [step({ kind: 'write' })] }))
+
+    expect(row.step).toBeNull()
+  })
+
+  it('has no rows for a request with no steps', () => {
+    expect(requestHistory(requestOf({}))).toEqual([])
   })
 })
