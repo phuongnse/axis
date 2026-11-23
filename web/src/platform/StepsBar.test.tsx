@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { contrast } from '../test/contrast'
 import { designTokensFor } from './designTokens'
-import { StepsBar } from './StepsBar'
+import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { StepsBar, type StepMark } from './StepsBar'
+import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 
 const sevenTitles = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven']
@@ -146,6 +148,109 @@ describe('StepsBar with onPick', () => {
   it('draws no button without onPick', () => {
     render(<StepsBar titles={['Basics', 'Extras']} current={0} />)
 
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+})
+
+describe('StepsBar with items', () => {
+  const marks: [StepMark, string, string][] = [
+    ['done', 'Done', 'anticon-check'],
+    ['now', 'In progress', 'anticon-loading'],
+    ['waiting', 'Waiting', 'anticon-clock-circle'],
+    ['stopped', 'Stopped', 'anticon-close'],
+    ['idle', 'Not reached', 'anticon-minus'],
+  ]
+
+  function renderFeed(items: { mark: StepMark; standing?: string; body?: string }[], titles: string[]) {
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StepsBar vertical titles={titles} items={items.map((item) => ({ ...item, body: item.body }))} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+  }
+
+  it.each(marks)(
+    'draws the %s mark as an icon, named "%s" for assistive technology, with the icon hidden',
+    (mark, name, icon) => {
+      renderFeed([{ mark }], ['Plan'])
+
+      const image = within(screen.getByRole('listitem')).getByRole('img', { name })
+      expect(image).toHaveAttribute('data-mark', mark)
+      const drawn = image.querySelector(`.${icon}`)
+      expect(drawn).toBeInTheDocument()
+      expect(drawn).toHaveAttribute('aria-hidden', 'true')
+    },
+  )
+
+  it('draws the mark in the circle of the small control size, in the colour of what the mark says', () => {
+    const tokens = designTokensFor('light')
+    renderFeed(
+      marks.map(([mark]) => ({ mark })),
+      marks.map(([mark]) => mark),
+    )
+
+    const colours: Record<StepMark, string> = {
+      done: tokens.colour.primaryText,
+      now: tokens.colour.primaryText,
+      waiting: tokens.colour.warningText,
+      stopped: tokens.colour.danger,
+      idle: tokens.colour.textMuted,
+    }
+    for (const [mark, name] of marks) {
+      const image = screen.getByRole('img', { name })
+      expect(image).toHaveStyle({ width: `${tokens.size.smallControl}px`, borderRadius: '50%' })
+      const expected = document.createElement('span')
+      expected.style.color = colours[mark]
+      expect(image.style.color).toBe(expected.style.color)
+    }
+  })
+
+  it('shows each title, its standing after it and its body under them', () => {
+    renderFeed(
+      [
+        { mark: 'done', standing: 'Approved on 18 Nov', body: 'The plan' },
+        { mark: 'now', body: 'Checking the draft' },
+      ],
+      ['Plan', 'Work'],
+    )
+
+    const [plan, work] = screen.getAllByRole('listitem')
+    expect(within(plan).getByText('Plan')).toBeVisible()
+    expect(within(plan).getByText('Plan').closest('strong')).not.toBeNull()
+    const standing = within(plan).getByText('Approved on 18 Nov')
+    expect(standing).toBeVisible()
+    expect(
+      standing.compareDocumentPosition(within(plan).getByText('Plan')) & Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy()
+    expect(within(plan).getByText('The plan')).toBeVisible()
+    expect(within(work).getByText('Work')).toBeVisible()
+    expect(within(work).getByText('Checking the draft')).toBeVisible()
+    expect(within(work).queryByText('Approved on 18 Nov')).toBeNull()
+  })
+
+  it('draws a line after each item but the last', () => {
+    renderFeed([{ mark: 'done' }, { mark: 'waiting' }, { mark: 'idle' }], ['Plan', 'Work', 'Result'])
+
+    const [plan, work, result] = screen.getAllByRole('listitem')
+    expect(within(plan).getAllByTestId('steps-bar-line')).toHaveLength(1)
+    expect(within(work).getAllByTestId('steps-bar-line')).toHaveLength(1)
+    expect(within(result).queryByTestId('steps-bar-line')).toBeNull()
+    expect(within(plan).getByTestId('steps-bar-line')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('marks the item that is now or waiting with aria-current, and no other', () => {
+    renderFeed([{ mark: 'done' }, { mark: 'waiting' }, { mark: 'idle' }], ['Plan', 'Work', 'Result'])
+
+    const items = screen.getAllByRole('listitem')
+    expect(items.map((item) => item.getAttribute('aria-current'))).toEqual([null, 'step', null])
+  })
+
+  it('draws no numbers, no check circle and no button for a step of a feed', () => {
+    renderFeed([{ mark: 'done' }, { mark: 'now' }], ['Plan', 'Work'])
+
+    expect(screen.queryByText('1')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
   })
 })

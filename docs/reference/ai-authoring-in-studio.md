@@ -109,8 +109,6 @@ A fix round reads as Working too.
 
 ### The feed
 
-_(planned for M35)_
-
 The page is one ordered list of items: Plan, Work, Result and Dropped. An item shows once it has something
 to show. The page has no tabs and no stages bar.
 
@@ -123,6 +121,9 @@ to show. The page has no tabs and no stages bar.
   - **Waiting** is a clock in `warningText`, while the item waits for a person.
   - **Stopped** is a cross in `danger`, where a failure stopped the request.
   - **Idle** is a dash in `textMuted`, where a dropped or failed request left the item.
+
+  Each mark is an image for assistive technology, named by its word: Done, In progress, Waiting, Stopped or Not reached.
+  The icon inside it is hidden. The item that is now or waiting is the current item of the list.
 - **Plan** is described in [the plan](#the-plan).
 - **Work** is described in [the Work item](#the-work-item).
 - **Result** shows once a ready or failed request has checks, and on an accepted request. Its mark is waiting
@@ -132,18 +133,18 @@ to show. The page has no tabs and no stages bar.
 
 ### The Work item
 
-_(planned for M35)_
-
 The Work item shows once the plan is approved. Its standing is "Fix round <n>" while AI fixes, and nothing
 else. Its line says what the work is doing or did.
 
-- While AI works, a spinner and the running step in present words, such as "Checking the draft".
-- When the work is done, "<n> steps in <duration>".
+- While AI works, the mark turns, and the line is the running step in present words. The request's state picks the words:
+  "Changing the draft" while it is `working`, "Fixing the draft", "Checking the draft" and "Reviewing the draft".
+- When the work is done, "<n> steps in <duration>". The steps are the `work`, `write`, `fix`, `check` and `review`
+  steps, and the duration runs from the first one's start to the last one's finish.
 - When the work stopped, an alert above the line says "AI could not finish this request.", with the
   failure as its message.
-- For an outside app's request, the [app's line](#an-outside-apps-request).
-
-The line ends with **Show the steps** or **Hide the steps**, which folds the History in and out.
+- **For an outside app's request** _(planned for M35)_. The line is the [app's line](#an-outside-apps-request).
+- **Show the steps** _(planned for M35)_. The line ends with **Show the steps** or **Hide the steps**, which folds
+  the History in and out.
 
 ### The History
 
@@ -228,20 +229,21 @@ These lines are the bar's words and the Work item's line.
 ## The plan
 
 A request waits for its author's approval of the plan before any change is made. The plan says what the
-application will change, so its author can decide. The page shows it as a part titled Plan, under the heading.
+application will change, so its author can decide. The page shows it as the Plan item of [the feed](#the-feed), under the heading.
 
-The Plan part shows the plan in each of its states.
+The Plan item shows the plan in each of its states.
 
-- While AI writes the plan, a spinner and "AI is reading the application and writing a plan. Nothing changes
+- While AI writes the plan, the mark turns, and the item reads "AI is reading the application and writing a plan. Nothing changes
   until the plan is approved."
 - While the plan waits for its author, nothing sits beside its title, and the plan is open.
-- **Once the plan is approved** _(planned for M35)_. The item reads "Approved on <time>", and the plan is folded
+- **Once the plan is approved.** The item reads "Approved on <time>", and the plan is folded
   under its summary.
-- **The summary** _(planned for M35)_. The summary is under the title in every state once AI has written the
-  plan. **Show the plan** or **Hide the plan** follows it on the same line.
-- **Earlier comments** _(planned for M35)_. The author's comments that asked for another plan come first, oldest
+- **The summary.** The summary is under the title in every state once AI has written the
+  plan. **Show the plan** or **Hide the plan** follows it on the same line. Until the plan has its own shape, its
+  summary is its first paragraph, and Show the plan shows only when more text follows that paragraph.
+- **Earlier comments.** The author's comments that asked for another plan come first, oldest
   first, as "Asked for another plan: “…”", in the text colour.
-- **A failure before approval** _(planned for M35)_. A request that failed before its plan was approved stops
+- **A failure before approval.** A request that failed before its plan was approved stops
   here, with its failure.
 
 The bar offers the author these actions while the plan waits.
@@ -276,14 +278,14 @@ A question is one that AI leaves to its author. A decision is a choice that AI m
 
 ## The diff
 
-The Result part shows after the Plan, on a ready, failed or accepted request that has checks, so its author can
+The Result item shows after the Work item, on a ready, failed or accepted request that has checks, so its author can
 decide. It shows what the request changes and how its checks and review went. Its parts come in this order: the
 checks and the review, then what changes. [Preview the draft](#preview-the-draft) and the accept's status, with
-[a conflict](#accepting), come after them.
+[a conflict](#accepting), come after them, and the accept's status or conflict closes the item.
 
 ### Checks and review
 
-Two lines open the Result part, Checks and Review. Each has its name in bold and its verdict as a
+Two lines open the Result item, Checks and Review. Each has its name in bold and its verdict as a
 [status tag](shared-widgets.md#which-widget). The verdicts start in one column, so the tags line up. Each
 line's summary sits under it, across the columns and flush with the name.
 
