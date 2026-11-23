@@ -143,12 +143,10 @@ else. Its line says what the work is doing or did.
 - When the work stopped, an alert above the line says "AI could not finish this request.", with the
   failure as its message.
 - **For an outside app's request** _(planned for M35)_. The line is the [app's line](#an-outside-apps-request).
-- **Show the steps** _(planned for M35)_. The line ends with **Show the steps** or **Hide the steps**, which folds
+- **Show the steps**. The line ends with **Show the steps** or **Hide the steps**, which folds
   the History in and out.
 
 ### The History
-
-_(planned for M35)_
 
 Under Show the steps comes the request's History, a table of its steps, newest first. Its columns are Step,
 Result, Started and Duration.
@@ -157,18 +155,19 @@ Result, Started and Duration.
   allows for a table that is part of one thing.
 - Duration reads "40 s", "3 min" or "1 h 5 min" in the reader's language. A step that is still running
   shows an em dash.
-- The words of a step come from its kind and its outcome, and never from AI. Examples are "Wrote a plan"
-  ("Proposed a plan" for an outside app), "Changed the draft", "Checked the draft", "Fixed the draft",
-  "Reviewed the draft", "Wrote <resource>", "Asked for another plan: “<comment>”" and
-  "Asked for changes: “<comment>”".
+- The words of a step come from its kind and its outcome, and never from AI. Examples are "Wrote a plan",
+  "Changed the draft", "Checked the draft", "Fixed the draft", "Reviewed the draft", "Asked for another plan:
+  “<comment>”" and "Asked for changes: “<comment>”".
 - The results read "Plan written", "Saved", "All scenarios pass", "No changes requested", "Refused" or
   "Ran out of time". The only free text is the author's own comment in a step.
-- Writes that follow each other fold into one group row, as [folding group rows](actions-and-controls.md#tables)
-  says. The row reads "Wrote 3 resources", or "Changed 3 resources" when one of them is a delete. Its Result
-  is the outcome the writes share, or "Results differ". Its Duration runs from the first write's start to
-  the last write's end.
-- Each write is a row under its group, with its own Result, Started and Duration. It names its resource
-  with [`ResourceReference`](shared-widgets.md#which-widget), so the name is the only link and the kind is muted.
+- **Writes that follow each other** _(planned for M35)_. Writes that follow each other fold into one group row, as
+  [folding group rows](actions-and-controls.md#tables) says. The row reads "Wrote 3 resources", or "Changed 3
+  resources" when one of them is a delete. Its Result is the outcome the writes share, or "Results differ". Its
+  Duration runs from the first write's start to the last write's end.
+- **Each write** _(planned for M35)_. Each write is a row under its group, with its own Result, Started and Duration.
+  It reads "Wrote <resource>" and names its resource with [`ResourceReference`](shared-widgets.md#which-widget), so the
+  name is the only link and the kind is muted.
+- **An outside app's steps** _(planned for M35)_. For an outside app, the plan step reads "Proposed a plan".
 
 ### The guide
 

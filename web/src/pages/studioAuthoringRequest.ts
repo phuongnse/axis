@@ -293,3 +293,90 @@ export function planSummary(plan: string): { summary: string; rest: string } {
   }
   return { summary: text.slice(0, blank.index).trimEnd(), rest: text.slice(blank.index + blank[0].length).trim() }
 }
+
+/**
+ * A row of a request's History, one step, see docs/reference/ai-authoring-in-studio.md#the-history. `step` and `result` are
+ * the text keys with the values that fill them, and each is null where the step has no words of its own.
+ */
+export interface HistoryRow {
+  key: string
+  startedAt: string
+  /** How long the step took in milliseconds, or null while it runs. */
+  ms: number | null
+  step: { key: string; values: Record<string, string> } | null
+  /** Null while the step runs, and for a step whose outcome has no words. */
+  result: { key: string; values: Record<string, number> } | null
+}
+
+/** The words of each step by its kind, see docs/reference/ai-authoring-in-studio.md#the-history. */
+const historyStepKeys: Record<string, string> = {
+  plan: 'shell.studio.aiRequest.history.step.plan',
+  planChange: 'shell.studio.aiRequest.history.step.planChange',
+  work: 'shell.studio.aiRequest.history.step.work',
+  check: 'shell.studio.aiRequest.history.step.check',
+  review: 'shell.studio.aiRequest.history.step.review',
+  fix: 'shell.studio.aiRequest.history.step.fix',
+  changeRequest: 'shell.studio.aiRequest.history.step.changeRequest',
+  accept: 'shell.studio.aiRequest.history.step.accept',
+}
+
+/**
+ * The result of a step, keyed by its kind and outcome, as `kind:outcome`, or by its outcome alone. A step with no outcome
+ * is keyed as `kind:null`. A check with checks reads its words from `checksResult` first, see `historyResultOf`.
+ */
+const historyResultKeys: Record<string, string> = {
+  'plan:null': 'shell.studio.aiRequest.history.result.planWritten',
+  'work:null': 'shell.studio.aiRequest.history.result.saved',
+  'fix:null': 'shell.studio.aiRequest.history.result.saved',
+  'review:passed': 'shell.studio.aiRequest.review.passed',
+  'review:findings': 'shell.studio.aiRequest.review.findings',
+  'review:notReviewed': 'shell.studio.aiRequest.review.notReviewed',
+  'accept:accepted': 'shell.studio.aiRequest.history.result.accepted',
+  'accept:conflict': 'shell.studio.aiRequest.history.result.conflict',
+  refused: 'shell.studio.aiRequest.history.result.refused',
+  notAccepted: 'shell.studio.aiRequest.history.result.notAccepted',
+  timedOut: 'shell.studio.aiRequest.history.result.timedOut',
+  overBudget: 'shell.studio.aiRequest.history.result.overBudget',
+  tokenEnded: 'shell.studio.aiRequest.history.result.tokenEnded',
+  noPlan: 'shell.studio.aiRequest.history.result.noPlan',
+  keyRefused: 'shell.studio.aiRequest.history.result.keyRefused',
+  noKey: 'shell.studio.aiRequest.history.result.noKey',
+  authorDisabled: 'shell.studio.aiRequest.history.result.authorDisabled',
+  unfinished: 'shell.studio.aiRequest.history.result.unfinished',
+  interrupted: 'shell.studio.aiRequest.history.result.unfinished',
+}
+
+/** The words of a step: its kind's words, with the author's comment for a step that carries one. */
+function historyStepOf(step: AuthoringRequestStep): HistoryRow['step'] {
+  const key = historyStepKeys[step.kind]
+  return key === undefined ? null : { key, values: { comment: step.summary ?? '' } }
+}
+
+/** The result of a step, from its checks when it has some, otherwise from its kind and outcome. */
+function historyResultOf(step: AuthoringRequestStep): HistoryRow['result'] {
+  if (step.finishedAt === null) {
+    return null
+  }
+  if (step.kind === 'check' && step.checks !== null && (step.outcome === 'passed' || step.outcome === 'failed')) {
+    const check = checksResult(step)
+    return { key: check.summaryKey, values: check.values }
+  }
+  const key = historyResultKeys[`${step.kind}:${step.outcome}`] ?? historyResultKeys[step.outcome ?? '']
+  return key === undefined ? null : { key, values: {} }
+}
+
+/**
+ * The rows of a request's History, newest first, see docs/reference/ai-authoring-in-studio.md#the-history. A step has no id,
+ * so each row is keyed by the step's position, oldest first, which stays the same because steps are only ever added.
+ */
+export function requestHistory(request: AuthoringRequest): HistoryRow[] {
+  return (request.steps ?? [])
+    .map((step, index) => ({
+      key: String(index),
+      startedAt: step.startedAt,
+      ms: step.finishedAt === null ? null : Math.max(0, Date.parse(step.finishedAt) - Date.parse(step.startedAt)),
+      step: historyStepOf(step),
+      result: historyResultOf(step),
+    }))
+    .reverse()
+}

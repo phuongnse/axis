@@ -3,6 +3,7 @@ import { type ReactNode, useContext, useState } from 'react'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, type AxisFoldAction } from '../platform/AxisButton'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { DialogFooter } from '../platform/DialogFooter'
 import { FilledText } from '../platform/FilledText'
 import { fillText } from '../platform/fillText'
@@ -37,10 +38,12 @@ import { PlatformContext } from './context'
 import {
   authoringRequestStates,
   type FeedEntry,
+  type HistoryRow,
   endedAuthoringRequestStates,
   planChanges,
   planSummary,
   requestFeed,
+  requestHistory,
   requestName,
   requestResult,
   workLine,
@@ -102,17 +105,18 @@ function guideWords(
  * in full, then the sender's line and the alert of an action that failed. Under them comes the feed, one `StepsBar` of
  * the Plan, Work, Result and Dropped items that the request has, each with its mark. A failed request shows its failure
  * in the item where it stopped, and the Result item of a ready, failed or accepted request ends with the status of the
- * accept that the page follows. The guide bar at the foot of the window gives the request's author Approve plan, Change
- * the plan… and Drop…, and Accept, Ask for other changes… and Drop… on a ready request, where Ask for other changes…
- * opens a dialog for a comment that sends the request back to work. Accept sends the accept route and follows its
- * publish request with `fetchStudioRequest`, kept in
- * memory for this visit, and reads the request again when the accept ends. An accept that met conflicts shows a warning
- * in place of its status, which names each changed resource with who changed it and when, and the bar offers Drop… only.
+ * accept that the page follows. The Work item's Show the steps folds open the request's History, a table of its steps. The
+ * guide bar at the foot of the window gives the request's author Approve plan, Change the plan… and Drop…, and Accept,
+ * Ask for other changes… and Drop… on a ready request, where Ask for other changes… opens a dialog for a comment that
+ * sends the request back to work. Accept sends the accept route and follows its publish request with
+ * `fetchStudioRequest`, kept in memory for this visit, and reads the request again when the accept ends. An accept that
+ * met conflicts shows a warning in place of its status, which names each changed resource with who changed it and when,
+ * and the bar offers Drop… only.
  * Until the request waits for its author or ends, the page asks for it every second and keeps the last answer when a read
  * fails. A request that does not exist shows its line and, when `onAskAi` is given, an Ask AI link that opens the request
  * panel. `resources` is the application's resource list, which names the resources of a conflict. See
  * docs/reference/ai-authoring-in-studio.md#the-heading, #the-feed, #the-work-item, #the-plan, #the-diff, #accepting and
- * #the-guide.
+ * #the-guide and #the-history.
  */
 export function StudioAuthoringRequestPage({
   application,
@@ -244,31 +248,13 @@ export function StudioAuthoringRequestPage({
       }
     }
     if (key === 'work') {
-      const line = workLine(request)
       return {
         mark,
         standing:
           request.state === 'fixing'
             ? fillText(t('shell.studio.aiRequest.work.fixRound'), { round: request.round })
             : undefined,
-        body: (
-          <Flex vertical gap={spacing.xs}>
-            {mark === 'stopped' && failure}
-            {line !== null && (
-              <Typography.Text>
-                {'key' in line
-                  ? t(line.key)
-                  : fillText(
-                      t(line.count === 1 ? 'shell.studio.aiRequest.work.doneOne' : 'shell.studio.aiRequest.work.done'),
-                      {
-                        count: line.count,
-                        duration: formatDuration(line.ms, locale, t),
-                      },
-                    )}
-              </Typography.Text>
-            )}
-          </Flex>
-        ),
+        body: <WorkBody key={request.id} request={request} failure={mark === 'stopped' ? failure : null} />,
       }
     }
     if (key === 'result') {
@@ -458,6 +444,85 @@ export function StudioAuthoringRequestPage({
         </Modal>
       </PageLayout>
     </div>
+  )
+}
+
+/**
+ * The body of the Work item, see docs/reference/ai-authoring-in-studio.md#the-work-item: the failure of a request that stopped
+ * here, its line, then Show the steps or Hide the steps once it has steps. That button folds in the History, closed at
+ * first, a table of every step with no paging, newest first, see docs/reference/ai-authoring-in-studio.md#the-history.
+ */
+function WorkBody({ request, failure }: { request: AuthoringRequest; failure: ReactNode }) {
+  const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const { spacing } = useDesignTokens()
+  const [open, setOpen] = useState<boolean>(false)
+  const line = workLine(request)
+  const hasSteps = (request.steps ?? []).length > 0
+  const columns: AxisColumn<HistoryRow>[] = [
+    {
+      key: 'step',
+      title: t('shell.studio.aiRequest.history.step'),
+      kind: 'freeText',
+      render: (_, row) => (row.step === null ? null : fillText(t(row.step.key), row.step.values)),
+    },
+    {
+      key: 'result',
+      title: t('shell.studio.aiRequest.history.result'),
+      kind: 'freeText',
+      render: (_, row) => (row.result === null ? null : fillText(t(row.result.key), row.result.values)),
+    },
+    {
+      key: 'startedAt',
+      title: t('shell.studio.aiRequest.history.started'),
+      kind: 'fixed',
+      render: (_, row) => formatValue({ name: 'startedAt', type: 'date-time' }, row.startedAt, {}, { locale, text: t }),
+    },
+    {
+      key: 'duration',
+      title: t('shell.studio.aiRequest.history.duration'),
+      kind: 'fixed',
+      render: (_, row) => (row.ms === null ? null : formatDuration(row.ms, locale, t)),
+    },
+  ]
+  return (
+    <Flex vertical gap={spacing.xs}>
+      {failure}
+      <Flex wrap gap="small" align="center">
+        {line !== null && (
+          <Typography.Text>
+            {'key' in line
+              ? t(line.key)
+              : fillText(
+                  t(line.count === 1 ? 'shell.studio.aiRequest.work.doneOne' : 'shell.studio.aiRequest.work.done'),
+                  {
+                    count: line.count,
+                    duration: formatDuration(line.ms, locale, t),
+                  },
+                )}
+          </Typography.Text>
+        )}
+        {hasSteps && (
+          <AxisButton
+            role="secondary"
+            aria-expanded={open}
+            data-testid="studio-ai-request-steps-toggle"
+            onClick={() => setOpen(!open)}
+          >
+            {t(open ? 'shell.studio.aiRequest.history.hide' : 'shell.studio.aiRequest.history.show')}
+          </AxisButton>
+        )}
+      </Flex>
+      {open && (
+        <AxisTable<HistoryRow>
+          testId="studio-ai-request-history"
+          pagination={false}
+          rowKey={(row) => row.key}
+          dataSource={requestHistory(request)}
+          columns={columns}
+        />
+      )}
+    </Flex>
   )
 }
 
