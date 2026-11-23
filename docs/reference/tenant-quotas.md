@@ -340,7 +340,7 @@ user name.
 - **The tenant's own usage.** A tenant administrator sees the tenant's own quotas and its usage of the last 30 days
   in the users page's "Usage" section, see [platform pages](platform-pages.md#export-data-and-usage).
 - **The operator's billing system** _(planned for M34)_. Axis sends each tenant's daily usage to the operator's billing
-  system as a signed event.
+  system as a signed event, see [events](billing-api.md#events).
 
 A tenant's administrator reads the usage through one route of the tenant's own host.
 

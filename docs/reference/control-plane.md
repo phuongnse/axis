@@ -29,6 +29,8 @@ through a cell's API.
   [plan and add-ons](billing-api.md#setting-the-plan-and-add-ons), [ends a subscription](billing-api.md#ending-a-subscription)
   and [reads a tenant's state and usage](billing-api.md#reading-a-tenant) through the [billing API](billing-api.md), with a
   client and a scope of its own.
+- **Billing events** _(planned for M34)_. The control plane sends the operator's billing system signed
+  [events](billing-api.md#events) as jobs on its queue.
 
 ## Two parts
 

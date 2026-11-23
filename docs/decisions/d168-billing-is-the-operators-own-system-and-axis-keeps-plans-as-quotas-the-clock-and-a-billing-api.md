@@ -64,14 +64,14 @@ What Axis keeps of the commercial life of a tenant:
 - **A billing API for the operator's billing system.** It has a client and a scope of its own. The
   billing system sets a tenant's plan and add-ons and the date the tenant is paid through, ends a
   subscription at its paid-through date, and reads a tenant's state and usage. Each call is idempotent
-  and audited, and the API is a public contract with a version.
+  and audited, and the API is a public contract with a version. See [billing API](../reference/billing-api.md).
 - **The clock stays in Axis.** A tenant paid through a date is `active`. Past that date Axis moves it
   to past due, then to read-only after the grace, then to deleting, as it does for an ended trial. A new
   paid-through date brings it back, see [subscriptions](../reference/subscriptions.md).
 - **A downgrade is refused** while the tenant's use is over the smaller plan.
 - **Axis sends signed events** to the operator's billing system: a tenant is created, a subscription
   changes state, and each tenant's daily usage. Deliveries retry, and each event has an id that stays
-  the same on every retry.
+  the same on every retry. See [events](../reference/billing-api.md#events).
 - **A tenant administrator sees** the plan, each quota with its use, the subscription's state and its
   next date in the tenant's administration. A link leads to the operator's billing page, which is a
   setting.
