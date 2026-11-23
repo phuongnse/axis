@@ -1,14 +1,16 @@
 // - Every row of docs/capabilities.md, under its '| Capability | Where |' header, names a capability once in
 //   the page and says where it lives: a link to the doc section that holds its rule, or, alone in the cell,
-//   a planned marker: '_(planned for Mx)_' for a milestone that docs/roadmap.md lists, or '_(planned)_'.
+//   a planned marker: '_(planned for Mx)_' for a milestone that docs/roadmap.md lists, or '_(planned, #n)_'
+//   with the open issue that builds the rule. A bare '_(planned)_' is still a home here: planned-markers.mjs reports it.
 //   So no capability is left without a home, see D154.
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { cellSeparator, lines } from './helpers.mjs'
+import { plannedMarker } from './planned-markers.mjs'
 
 const header = '| Capability | Where |'
 const roadmapRowPattern = /^\| \*\*(M\d+)\*\* \|/
-const markerPattern = /^_\(planned(?: for (M\d+(?:(?:, | and )M\d+)*))?\)_$/
+const markerPattern = new RegExp(`^${plannedMarker}$`)
 const linkPattern = /\]\([^)\s]+\)/
 
 /** Checks that each capability of the capability map has one row, and that the row says where it lives. */

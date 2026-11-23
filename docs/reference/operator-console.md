@@ -205,7 +205,7 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   Process filter offers the processes of the active releases. The address keeps the view as
   `failedWork.filter`, `failedWork.page` and `failedWork.pageSize`, because the page has other
   tables.
-- **Instance view** _(planned)_. The console shows the instance as the [instance page](process-inspector-widget.md#instance-page)
+- **Instance view**. The console shows the instance as the [instance page](process-inspector-widget.md#instance-page)
   does, with the process's name in place of its title.
 - **Paths, variables and cancels.** _(planned for M38)_ The instance detail that a failed-work entry opens
   shows the paths, the variables and the cancel of one path or one task, as the

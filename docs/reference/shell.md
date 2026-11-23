@@ -74,21 +74,21 @@ their own controls where they expect them.
   stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
   a scrollbar comes. A panel with no close button, such as the process designer's step panel, gives way while a panel
   the person opened is open, and comes back when that one closes. The page keeps the browser's scroll.
-- **A side panel's scroll** _(planned)_. The panel is as tall as the column under the header and scrolls from its top,
+- **A side panel's scroll** _(planned, #5065)_. The panel is as tall as the column under the header and scrolls from its top,
   with its scrollbar at its edge. Its head, the name and the close button, stays at the top of that scroll on
   `surface`, as the band stays at the top of the page's frame. A `borderSubtle` rule runs under the head, from the
   panel's start edge to its scrollbar, so the body that scrolls under it is parted from it.
-- **A side panel's head names what it shows** _(planned)_. The head names what the panel shows, such as the field's
+- **A side panel's head names what it shows** _(planned, #5049)_. The head names what the panel shows, such as the field's
   name or New field, though the field's Name box repeats it. Once the body scrolls, the head tells which item is open,
   and the panel's name is its accessible name.
-- **A side panel's actions** _(planned)_. `SidePanel` takes `actions`, drawn in an `ActionBar` at the panel's foot that
+- **A side panel's actions** _(planned, #5049)_. `SidePanel` takes `actions`, drawn in an `ActionBar` at the panel's foot that
   stays in place under the body. The actions are outlined, with the main action last on the right, so Cancel stands
   before the main action. Its actions end where the body's content ends, past the room the body keeps for its scrollbar.
-- **A part of the page in the side panel** _(planned)_. A part of what the page edits, such as an entity's field while
+- **A part of the page in the side panel** _(planned, #5059)_. A part of what the page edits, such as an entity's field while
   the other fields show, is edited in the side panel rather than a dialog. The panel keeps what is typed until Done, or
   the main action of a new part, and Cancel stands beside that action in its bar. Cancel and Close drop what is typed, and the panel asks first when
   that would drop text.
-- **A side panel's parts** _(planned)_. A side panel's parts are sections, each with its heading and a line under it. A
+- **A side panel's parts** _(planned, #5049)_. A side panel's parts are sections, each with its heading and a line under it. A
   `borderSubtle` rule runs between them from the panel's edge to its scrollbar.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a narrow strip of the entries'
   icons, each centred and named by a tooltip, and opens it again. Collapsed, a group's title gives way
@@ -109,12 +109,12 @@ their own controls where they expect them.
   under the header with a scroll of its own. That scroll stops at its end, as
   [scroll areas](actions-and-controls.md#scroll-areas) say. A regular band and the footer scroll with the
   page. The page declares its colour scheme, so every scrollbar, the page's and the sidebar's, follows the mode.
-- **Each region scrolls on its own** _(planned)_. The window does not scroll, and the shell is as tall as the
+- **Each region scrolls on its own** _(planned, #5065)_. The window does not scroll, and the shell is as tall as the
   window. The header stays at the top. Under it each region scrolls in a frame of its own, with its scrollbar at
   its own edge: the sidebar's menu, the page's frame and the side panel. So a scrollbar always stands beside what
   it scrolls, as in a workspace such as VS Code or Gmail. Each region stops at its end, see
   [scroll areas](actions-and-controls.md#scroll-areas).
-- **What stays at the top of the page** _(planned)_. What stays at the top of the page, such as Studio's compact
+- **What stays at the top of the page** _(planned, #5065)_. What stays at the top of the page, such as Studio's compact
   band, stays at the top of the page's frame.
 - **Flush page area.** Pages draw on `surface`, flush with the frame, with `spacing-lg` padding. A wide table
   scrolls inside its widget, so the page never scrolls sideways.
@@ -127,36 +127,36 @@ their own controls where they expect them.
   rule reaches past the page's padding to the page area's edges. In a drawer, a dialog, the sidebar, a
   tile or a column of a grid it stays inside. A runtime page's widget list, a record's detail and a record form also
   keep it inside.
-- **Rules, not boxes** _(planned)_. One `borderSubtle` rule parts a block from the one beside it, and no border, box
+- **Rules, not boxes** _(planned, #5128)_. One `borderSubtle` rule parts a block from the one beside it, and no border, box
   or rounded corner goes round a region. It follows dividers over containers, as Material's containment has it, and a
   code editor's split panes, and keeps clear of boxes inside boxes.
-- **Where a rule goes** _(planned)_. A rule goes under a block's title row, as under Files, Input, Output and Log, and
+- **Where a rule goes** _(planned, #5128)_. A rule goes under a block's title row, as under Files, Input, Output and Log, and
   where one block ends and the next begins, such as between a run's Output and its Log. Inside a block's content no
   rule is drawn at will: the parts of one task sit together under one title, set apart by spacing. Where a rule is
   needed is judged on the whole page, not by applying a rule everywhere.
 - **A rule runs the whole way**. It runs the length of what it parts, from one rule to the next or to the
   edge, as the rules under the header and beside the sidebar do.
-- **What fills a region fills it to its rules** _(planned)_. A log, a code editor or a table reaches the region's
+- **What fills a region fills it to its rules** _(planned, #5128)_. A log, a code editor or a table reaches the region's
   rules, with no box of its own.
-- **One inset per region** _(planned)_. A region's title row, its content and its action bar start and end at the same
+- **One inset per region** _(planned, #5128)_. A region's title row, its content and its action bar start and end at the same
   inset, `spacing-md` in a pane of a workspace and `spacing-lg` on a page. An action bar at the foot of a pane takes the
   pane's inset and keeps its actions' outlines, as it holds the pane's main action, and its look never depends on
   which buttons a person's rights show.
-- **Fields as wide as each other** _(planned)_. Every field of a region is as wide as the others, and no button stands
+- **Fields as wide as each other** _(planned, #5128)_. Every field of a region is as wide as the others, and no button stands
   loose beside an input. An action of the whole region, such as Reset or Import, sits in its title row, and an action
   of one control goes with the control.
-- **A title row's tools are light** _(planned)_. Tools such as the explorer's New and Refresh are subtle buttons, or
+- **A title row's tools are light**. Tools such as the explorer's New and Refresh are subtle buttons, or
   icon-only ones with their names as tooltips, at the usual button size. A region's main action there keeps its border,
   as [buttons](actions-and-controls.md#buttons) says.
 - **A title row's actions keep their roles.** `TitleRowActions` draws the actions of a part's and a field group's title
   row, each in its own role: a section's Add is a secondary button with its border, and a tool is subtle.
-- **A view switch sits above what it switches** _(planned)_. A switch between two views of one content, such as Form
+- **A view switch sits above what it switches** _(planned, #5130)_. A switch between two views of one content, such as Form
   and JSON, is a row of line tabs right above that content, in the one look every tab row of the workspace has, see
   [tab bars](actions-and-controls.md#tab-bars).
 - **The layout follows the work**. A region puts what to act on first, then the input, the action and the
   result. An action sits after what it acts on, at the foot of its region when the input can be long, and the result
   comes after it.
-- **A handle on a rule** _(planned)_. Every size handle, the side panel's included, is one handle: a grip of two bars
+- **A handle on a rule** _(planned, #5129)_. Every size handle, the side panel's included, is one handle: a grip of two bars
   in `border` at the middle of its rule, lying over the rule, and the rule and the grip turn `primary` under the
   pointer or a drag. `ResizeHandle` draws it.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area.
@@ -164,9 +164,9 @@ their own controls where they expect them.
   content column right above the footer. The slot sticks to the window's foot while the page scrolls and rests above
   the footer at the page's end, so a bar never covers the footer. Outside a shell, as in a widget preview, a bar draws
   in place. See the [save bar](studio-resource-form.md#save-bar).
-- **The page's frame holds the save bar** _(planned)_. The page's frame holds the page and the bar slot at its foot,
+- **The page's frame holds the save bar** _(planned, #5065)_. The page's frame holds the page and the bar slot at its foot,
   so the save bar stays at the frame's foot while the page scrolls.
-- **No link back** _(planned)_. A page has no link back, because the navigation and the browser lead back. A record's
+- **No link back**. A page has no link back, because the navigation and the browser lead back. A record's
   page whose record does not exist keeps one link to its list, see [routing](frontend.md#routing).
 - **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it, with `spacing-xs`
   padding above and below and `spacing-lg` at its sides, and its text in `textMuted`. Without a
@@ -175,7 +175,7 @@ their own controls where they expect them.
   [legal line](legal.md#legal-line): the copyright "© <year> Axis" on the left and the legal links on
   the right, from the `legal` of the site the shell shows, see [legal settings](legal.md#legal-settings).
   It shows no server status, and a page that cannot reach the server says so where it fails.
-- **No footer** _(planned)_. The shell has no footer, so no row of the window is kept for one, and it shows no copyright
+- **No footer** _(planned, #5065)_. The shell has no footer, so no row of the window is kept for one, and it shows no copyright
   and no version. App shells such as Gmail, Slack or Jira show no footer, and a footer at the end of the page's scroll
   would span only the page's column. The legal links are in the [account button](#account-button) for a signed-in
   person, see the [legal line](legal.md#legal-line).
@@ -226,7 +226,7 @@ below it. It says what the page is.
   page's heading, on its row, see [start process actions](form-widget.md#start-process-actions). A task page's
   Release, Claim and Reassign… and its outcomes sit there too, see [task page](task-inbox-widget.md#task-page). Other
   widgets' actions stay with them.
-- **A page that shows one thing** _(planned)_. The heading is the thing's name. The state the platform keeps of the
+- **A page that shows one thing** _(planned, #5133)_. The heading is the thing's name. The state the platform keeps of the
   thing is a tag beside the name, such as a task's Overdue, a process instance's Running or a release's Live. The line
   under the heading, in `textMuted`, is the thing's kind alone, such as Request or Task, and nothing more. A record has
   no tag, as its status is a field the author defines and its form shows. A new record has no name yet, so it is headed
@@ -234,7 +234,7 @@ below it. It says what the page is.
   line. This shape holds for every page of the shell that shows one thing: a saved or new record, a task, a process
   instance, a Studio resource, release or revision, the user page and a cell's tenant page. One `PageHeading` draws
   every one of them, filling `PageLayout`'s name, tags and line, see [which widget](shared-widgets.md#which-widget).
-- **Facts as the first part** _(planned)_. What else the platform keeps of the thing, and the page does not show
+- **Facts as the first part**. What else the platform keeps of the thing, and the page does not show
   elsewhere, is the page's first part. It is a list of facts through `TermList`, see
   [fields](actions-and-controls.md#fields), above a `borderSubtle` rule. It never sits on the heading's line.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
@@ -302,7 +302,7 @@ Sign-in itself is in [sign-in and the session](security.md#sign-in-and-the-sessi
   does the browser go to the identity provider's sign-out page.
 - **Account menu.** Its menu holds Your account (`shell.account.title`), which opens the
   [account page](platform-pages.md#tabs), and Sign out, as [signed in](#account-button) says.
-- **The Legal group** _(planned)_. Between Your account and Sign out, each part set off by a divider, the menu holds a
+- **The Legal group** _(planned, #5065)_. Between Your account and Sign out, each part set off by a divider, the menu holds a
   group named Legal, `shell.legal.label`. It holds Privacy and Terms when the site or its tenant sets them, then
   Licences, always, as the language and theme menu groups its choices. Its links and labels are the
   [legal line](legal.md#legal-line)'s.
@@ -375,7 +375,7 @@ Starting sign-in at once after a failure would loop, as the identity provider's 
 The warning is an alert that screen readers announce, with the platform text `shell.home.signInFailed` or
 `shell.home.signInDeclined`. The card's button returns to `/` after sign-in, never to any of these
 addresses.
-- **The legal line under the card** _(planned)_. The card ends in the legal line, under it and as wide as it, as the
+- **The legal line under the card** _(planned, #5065)_. The card ends in the legal line, under it and as wide as it, as the
   identity provider's card does. The shell has no footer to hold the line.
 
 ### Endpoints

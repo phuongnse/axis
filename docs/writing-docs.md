@@ -29,8 +29,8 @@ Each kind of content has one home. Write a fact in its home and link to it from 
 
 So no doc says that something "is built" or "is not built yet", other than by the
 [planned marker](#planned-work), and no doc holds dates of discussions, who confirmed what, issue or
-pull request numbers, or how a rule used to read. Links that track work, such as the roadmap's links
-to GitHub milestones, are the exception.
+pull request numbers, or how a rule used to read. Links that track work are the exception, such as the
+roadmap's links to GitHub milestones and the issue that a [planned marker](#planned-work) names.
 
 ## Decisions
 
@@ -114,8 +114,13 @@ else on a page says what is built.
 There are two markers:
 
 - `_(planned for Mx)_` marks work that the "Done when" of milestone Mx on the
-  [roadmap](roadmap.md#milestones) names.
-- `_(planned)_` marks agreed work that no milestone builds. It needs no open issue.
+  [roadmap](roadmap.md#milestones) names. It may also name the open issue that builds the work, as
+  `_(planned for Mx, #<n>)_`.
+- `_(planned, #<n>)_` marks agreed work that no milestone builds. It names the open issue that builds
+  the rule. The docs check refuses a bare `_(planned)_` that names no issue.
+
+A design review's docs change numbers each marker it writes with the number of the build issue that
+waits for the design issue.
 
 A planned rule describes the agreed result. It does not also describe what Axis does until then: the
 issue that builds it knows the starting point. The docs sweep of a milestone removes each of its
@@ -124,7 +129,8 @@ marker only to a later milestone whose "Done when" names the work. A moved marke
 its new milestone, which the sweep links in its pull request. When there is none, the sweep opens one
 in that milestone before its pull request is ready, as [follow-ups](delivery.md#the-life-of-an-issue)
 say. When no later "Done when" names the work, the sweep adds the work to that row's "Done when", or
-changes the marker to `_(planned)_`, and the issue that builds it leaves the milestone for `improvement`.
+changes the marker to `_(planned, #<n>)_` with the issue that builds it. That issue leaves the milestone for
+`improvement`.
 
 ## References in the code
 
@@ -318,7 +324,8 @@ agrees.
       the repository.
     - [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that `docs/README.md` lists every
       doc, that the decisions index matches the decision files and that a superseded row names a live
-      decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size
+      decision, that no planned marker names a milestone the roadmap calls Done, sits in a sentence or is a bare marker
+      that names no issue, the size
       limits, the word limits of AGENTS.md, the scripts that its Commands table names, the [ASVS](reference/asvs.md#requirements) and threat model tables, and the
       [development users](reference/security.md#development-users) table against the development
       realm, the Studio spec folders table of the [E2E stack](testing.md#the-e2e-stack) against the

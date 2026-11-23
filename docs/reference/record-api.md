@@ -580,7 +580,7 @@ release.
 - **`400` for a validation.** A record that breaks one of its entity's
   validations is a validation problem keyed at the validation's field. See
   [Child rows, computed fields and validations](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
-- **`400` for a validation with no field** _(planned)_. A record that breaks a validation with no `field` is a validation
+- **`400` for a validation with no field** _(planned, #5049)_. A record that breaks a validation with no `field` is a validation
   problem keyed `/values`, the whole record, not one field.
 - **`415`.** A `POST` or `PATCH` without `Content-Type` or with any type other
   than `application/json` with an optional `utf-8` charset.

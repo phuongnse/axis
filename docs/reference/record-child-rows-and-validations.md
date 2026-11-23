@@ -107,7 +107,7 @@ other key is reported in the same response. The message is the validation's
 text key, and the client shows the text in the user's locale. The client gets
 validation as the user types from the [form state endpoint](record-form-state.md#form-state).
 
-- **A validation of the whole record** _(planned)_. A validation with no `field` holds for the record. Its failure is
+- **A validation of the whole record** _(planned, #5049)_. A validation with no `field` holds for the record. Its failure is
   keyed `/values`, and the form shows its message at the top of the form, above its fields.
 
 A run-time error in an expression, or a computed value that does not fit its
