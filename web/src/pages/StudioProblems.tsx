@@ -57,7 +57,7 @@ export function StudioProblems({
 }
 
 /** The problems that share one resource, or one file when they name no resource, in the order they are listed. */
-type ProblemGroup = { resource: StudioResourceItem | undefined; diagnostics: StudioDiagnostic[] }
+type ProblemGroup = { diagnostics: StudioDiagnostic[]; resource: StudioResourceItem | undefined }
 
 /**
  * Groups the problems, see {@link StudioProblemList}. A problem falls in the group of its resource when `resources` holds
@@ -75,11 +75,11 @@ function problemGroups(diagnostics: StudioDiagnostic[], resources?: readonly Stu
     groups.set(key, group)
   }
   const sorted = [...groups.values()].map((group) => ({
-    resource: group.resource,
     diagnostics: [
       ...group.diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
       ...group.diagnostics.filter((diagnostic) => diagnostic.severity !== 'error'),
     ],
+    resource: group.resource,
   }))
   return [
     ...sorted.filter((group) => group.diagnostics[0].severity === 'error'),
@@ -111,7 +111,7 @@ export function StudioProblemList({
   const placeOf = (group: ProblemGroup, diagnostic: StudioDiagnostic) =>
     group.resource ? addressOf?.(group.resource.id, diagnostic.path) : fileAddressOf?.(diagnostic.file, diagnostic.line)
   return (
-    <ul style={{ margin: 0, padding: 0, listStyleType: 'none' }}>
+    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {problemGroups(diagnostics, resources).map((group, groupIndex) => {
         const [first] = group.diagnostics
         const firstPlace = placeOf(group, first)
