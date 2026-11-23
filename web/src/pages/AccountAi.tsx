@@ -13,9 +13,9 @@ import { useDesignTokens } from '../platform/themeMode'
 
 /**
  * Proposed (#3926): the account page's AI tab, where a person connects their own AI, whose key runs every AI request
- * they send. With no AI connected it says so and offers Connect your AI…, which opens a dialog of the provider, the model
- * and the API key. Once connected it shows the provider, the model and the key's last four characters. See
- * docs/reference/model-bindings.md#a-persons-own-key.
+ * they send. With no AI connected it says so and offers Connect your AI…, which opens a dialog of the provider and the API
+ * key. The person chooses no model: the installation's binding names it. Once connected it shows the provider, the
+ * binding's model and the key's last four characters. See docs/reference/model-bindings.md#a-persons-own-key.
  */
 export function AccountAi() {
   const t = useText()
@@ -76,7 +76,7 @@ export function AccountAi() {
                 {
                   key: 'model',
                   term: t('shell.account.ai.model'),
-                  value: provider?.models.find((model) => model.id === connection.model)?.name ?? connection.model,
+                  value: provider?.model,
                 },
                 { key: 'key', term: t('shell.account.ai.key'), value: `••••${connection.ending}` },
               ]}
@@ -100,13 +100,12 @@ export function AccountAi() {
 
 interface ConnectValues {
   provider: string
-  model: string
   key: string
 }
 
 /**
- * Proposed (#3926): the dialog that connects an AI. The provider comes first, then the model it offers, then how the
- * person signs in to it, which is an API key for every provider today. It renders only while open, so closing it clears
+ * Proposed (#3926): the dialog that connects an AI. The provider comes first, then how the person signs in to it, which
+ * is an API key for every provider today. The provider's binding names the model, so the dialog asks for none. It renders only while open, so closing it clears
  * the key. Connect sends the key, which the agent host tests with the provider before the server keeps it.
  */
 function ConnectDialog({
@@ -123,15 +122,11 @@ function ConnectDialog({
   const [form] = Form.useForm<ConnectValues>()
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
-  const first = providers[0]
-  const providerId = Form.useWatch('provider', form) ?? first?.id
-  const models = providers.find((provider) => provider.id === providerId)?.models ?? []
-
-  async function connect({ provider, model, key }: ConnectValues) {
+  async function connect({ provider, key }: ConnectValues) {
     setBusy(true)
     setFailed(false)
     try {
-      if (await connectOwnAi(provider, model, key)) {
+      if (await connectOwnAi(provider, key)) {
         onConnected()
         return
       }
@@ -166,7 +161,7 @@ function ConnectDialog({
         layout="vertical"
         requiredMark={requiredMark}
         scrollToFirstError={{ focus: true }}
-        initialValues={{ provider: first?.id, model: first?.models[0]?.id }}
+        initialValues={{ provider: providers[0]?.id }}
         onFinish={(values) => void connect(values)}
       >
         <Flex vertical gap={spacing.lg}>
@@ -176,20 +171,7 @@ function ConnectDialog({
             help={t('shell.account.ai.providerHelp')}
             requiredMessage={t('shell.account.ai.providerRequired')}
           >
-            <Select
-              options={providers.map((provider) => ({ value: provider.id, label: provider.name }))}
-              onChange={(next: string) =>
-                form.setFieldValue('model', providers.find((provider) => provider.id === next)?.models[0]?.id)
-              }
-            />
-          </AxisField>
-          <AxisField
-            name="model"
-            label={t('shell.account.ai.model')}
-            help={t('shell.account.ai.modelHelp')}
-            requiredMessage={t('shell.account.ai.modelRequired')}
-          >
-            <Select options={models.map((model) => ({ value: model.id, label: model.name }))} />
+            <Select options={providers.map((provider) => ({ value: provider.id, label: provider.name }))} />
           </AxisField>
           <AxisField
             name="key"

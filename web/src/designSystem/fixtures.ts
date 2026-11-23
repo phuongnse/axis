@@ -1217,8 +1217,8 @@ const ownAuthenticators: OwnAuthenticators = {
 }
 
 /**
- * Proposed (#3926): the account page's AI, as `GET /api/me/ai` would answer it. No API gives it yet, and the authoring
- * eval's supported models list is still empty, so the models are examples. A `PUT` connects the AI, so the next read
+ * Proposed (#3926): the account page's AI, as `GET /api/me/ai` would answer it. No API gives it yet. The provider is the
+ * installation's `anthropic` binding, and its model is an example, as the binding names it. A `PUT` connects the AI, so the next read
  * shows it, as the server would once the agent host has tested the key.
  */
 export function ownAiRoute(): FixtureRoute {
@@ -1227,22 +1227,15 @@ export function ownAiRoute(): FixtureRoute {
       {
         id: 'anthropic',
         name: 'Anthropic',
-        models: [
-          { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
-          { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
-        ],
+        model: 'Claude Sonnet 5.5',
       },
     ],
     connection: null,
   }
   return (init) => {
     if (init?.method === 'PUT') {
-      const { provider, model, sealedKey } = JSON.parse(String(init.body)) as {
-        provider: string
-        model: string
-        sealedKey: string
-      }
-      ai = { ...ai, connection: { provider, model, ending: sealedKey.slice(-4) } }
+      const { provider, sealedKey } = JSON.parse(String(init.body)) as { provider: string; sealedKey: string }
+      ai = { ...ai, connection: { provider, ending: sealedKey.slice(-4) } }
       return new Response(null, { status: 204 })
     }
     return ai

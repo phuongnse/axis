@@ -62,8 +62,6 @@
   "shell.account.ai.providerHelp": "Công ty có AI chạy các yêu cầu của bạn.",
   "shell.account.ai.providerRequired": "Chọn nhà cung cấp.",
   "shell.account.ai.model": "Mô hình",
-  "shell.account.ai.modelHelp": "Các mô hình Axis đã kiểm thử cho việc thay đổi ứng dụng.",
-  "shell.account.ai.modelRequired": "Chọn mô hình.",
   "shell.account.ai.key": "Khóa API",
   "shell.account.ai.keyHelp": "Tạo khóa trong trang quản lý của nhà cung cấp. Axis thử khóa với nhà cung cấp trước khi lưu, và không bao giờ hiện lại khóa.",
   "shell.account.ai.keyRequired": "Nhập khóa API của bạn.",

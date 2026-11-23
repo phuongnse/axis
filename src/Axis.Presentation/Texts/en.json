@@ -62,8 +62,6 @@
   "shell.account.ai.providerHelp": "The company whose AI runs your requests.",
   "shell.account.ai.providerRequired": "Choose a provider.",
   "shell.account.ai.model": "Model",
-  "shell.account.ai.modelHelp": "The models that Axis has tested for changing applications.",
-  "shell.account.ai.modelRequired": "Choose a model.",
   "shell.account.ai.key": "API key",
   "shell.account.ai.keyHelp": "Create a key in your provider's console. Axis tests it with your provider before it keeps it, and never shows it again.",
   "shell.account.ai.keyRequired": "Enter your API key.",
