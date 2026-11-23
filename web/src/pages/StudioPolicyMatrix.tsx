@@ -32,6 +32,7 @@ import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
 import { ExpressionField } from './ExpressionField'
+import { useFieldTexts } from './fieldTexts'
 import { newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
 
 type Content = Record<string, unknown>
@@ -371,6 +372,7 @@ function OwnGrants({
   onWritten: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem) => void
 }) {
   const t = useText()
+  const { field: fieldText, group: groupText } = useFieldTexts('policy')
   const { generation, reconnecting, lost } = useStudioConnection()
   const accessId = role.accessPolicy.id
   const [state, setState] = useState<PolicyState>(() => (accessId === null ? freshPolicy(role) : undefined))
@@ -542,7 +544,7 @@ function OwnGrants({
               </AxisButton>
             </Flex>
             {/* The actions are one group with its help, see docs/reference/actions-and-controls.md#fields. */}
-            <AxisFieldGroup title={t('shell.studio.matrix.actions')} help={t('shell.studio.matrix.actions.help')}>
+            <AxisFieldGroup {...groupText('grants.actions')}>
               <Flex gap="small" align="center" wrap>
                 <Checkbox.Group
                   data-testid="studio-matrix-actions"
@@ -565,17 +567,17 @@ function OwnGrants({
             </AxisFieldGroup>
             {target.kind === 'entity' && (
               <>
-                <AxisField label={t('shell.studio.matrix.filter')} help={t('shell.studio.matrix.filter.help')}>
+                <AxisField {...fieldText('grants.filter')}>
                   <ExpressionField
                     check={{ application, resourceId: String(draft.id), kind: 'policy', draft: () => draft, names }}
                     pointer={filterPath}
-                    name={t('shell.studio.matrix.filter')}
+                    name={fieldText('grants.filter').label}
                     value={filter}
                     required={false}
                     onChange={(path, next) => edit(path, next)}
                   />
                 </AxisField>
-                <AxisField label={t('shell.studio.matrix.fields')} help={t('shell.studio.matrix.fields.help')}>
+                <AxisField {...fieldText('grants.fields')}>
                   <Select
                     mode="multiple"
                     virtual={false}
