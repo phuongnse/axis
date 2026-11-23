@@ -20,6 +20,7 @@ namespace Axis.ControlPlane;
 /// The plans are optional, and each needs a code, a version, both names, included users, and every quota except the users. A number is plain digits.
 /// The billing client's settings are optional as a group, and once one is set, all of them are required, with an https authority.
 /// The billing events address is optional, and once it is set, it must be an absolute https URL and the secret is required.
+/// The billing page is optional and, once set, is an absolute https URL, see <see cref="BillingPage"/>.
 /// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
@@ -70,6 +71,12 @@ public sealed partial class ControlPlaneOptions
     /// <see cref="Load"/> fills in <c>https://account.&lt;TenantDomain&gt;</c>, so it is never empty on a loaded instance.
     /// </summary>
     public string? PublicUrl { get; set; }
+
+    /// <summary>
+    /// The operator's billing page, an absolute https URL that may hold <c>{tenantId}</c>, see <see cref="BillingPage"/>. Optional:
+    /// without it the emails that point to billing have no billing line.
+    /// </summary>
+    public string? BillingPageUrl { get; set; }
 
     /// <summary>The DNS server that holds the tenant subdomains. Optional.</summary>
     public ControlPlaneDnsOptions Dns { get; set; } = new();
@@ -182,6 +189,11 @@ public sealed partial class ControlPlaneOptions
             {
                 problems.Add($"The setting {SectionName}:{nameof(PublicUrl)} must be an https URL outside Development.");
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.BillingPageUrl) && !BillingPage.IsValid(options.BillingPageUrl))
+        {
+            problems.Add($"The setting {SectionName}:{nameof(BillingPageUrl)} must be an absolute https URL.");
         }
 
         problems.AddRange(DnsProblems(options.Dns, RequiresVerifiedTls(environment)));

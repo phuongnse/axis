@@ -727,7 +727,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task The_trial_used_email_holds_the_sign_in_address_while_the_directory_holds_the_tenant_and_the_billing_portal_link_otherwise(bool inDirectory)
+    public async Task The_trial_used_email_holds_the_sign_in_address_while_the_directory_holds_the_tenant_and_the_billing_page_link_otherwise(bool inDirectory)
     {
         var cancellation = TestContext.Current.CancellationToken;
         using var factory = await FactoryAsync();
@@ -760,7 +760,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         }
         else
         {
-            Assert.Contains($"https://account.vn.example.com/tenants/{subdomain}", text, StringComparison.Ordinal);
+            Assert.Contains($"https://billing.example.com/tenants/{subdomain}", text, StringComparison.Ordinal);
             Assert.DoesNotContain("Sign in at", text, StringComparison.Ordinal);
         }
     }
@@ -1293,6 +1293,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
             builder.UseSetting("ControlPlane:DirectoryConnectionString", DirectoryConnectionString);
             builder.UseSetting("ControlPlane:Dns:Provider", "InMemory");
             builder.UseSetting("ControlPlane:MailFrom", "no-reply@vn.example.com");
+            builder.UseSetting("ControlPlane:BillingPageUrl", "https://billing.example.com/tenants/{tenantId}");
             builder.UseSetting("ControlPlane:Mail:Host", host);
             builder.UseSetting("ControlPlane:Mail:Port", port.ToString(CultureInfo.InvariantCulture));
             builder.UseSetting("ControlPlane:Mail:UseTls", "false");

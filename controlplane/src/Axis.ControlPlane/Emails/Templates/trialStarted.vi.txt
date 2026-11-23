@@ -6,8 +6,12 @@ Bản dùng thử đã bắt đầu. Đăng nhập tại:
 
 {{tenantAddress}}
 
-Bản dùng thử kết thúc lúc {{nextStepAt}}. Sau đó không gian làm việc chuyển sang chế độ chỉ xem: vẫn đọc được nhưng không thay đổi được gì. Để tiếp tục sử dụng, hãy thanh toán trên trang thanh toán trước thời điểm đó:
+Bản dùng thử kết thúc lúc {{nextStepAt}}. Sau đó không gian làm việc chuyển sang chế độ chỉ xem: vẫn đọc được nhưng không thay đổi được gì.
 
-{{billingPortalUrl}}
+{{#billingPageUrl}}
+Để tiếp tục sử dụng, hãy thanh toán trên trang thanh toán trước thời điểm đó:
+
+{{billingPageUrl}}
+{{/billingPageUrl}}
 
 Đội ngũ Axis

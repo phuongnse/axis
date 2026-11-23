@@ -242,17 +242,34 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
     }
 
     [Fact]
-    public async Task Me_answers_the_billing_address_of_the_tenant_in_a_cell_to_an_administrator_only()
+    public async Task Me_answers_no_billing_address_in_a_cell_without_a_billing_page()
     {
         var role = NewRole();
         var quiz = await PrepareTenantAsync("quiz", role);
         var platform = await PreparePlatformAsync(quiz with { Host = "quiz.example.test" });
         await using var factory = CreateFactory(platform, new LogCollector(), [.. _cellSettings, ("Users:AdministratorRole", "author")]);
         using var administrator = factory.CreateClient().SignedInAs("author");
+
+        var administratorMe = await ReadMeAsync(administrator, "quiz.example.test");
+
+        Assert.Equal(JsonValueKind.Null, administratorMe.GetProperty("billingUrl").ValueKind);
+    }
+
+    [Fact]
+    public async Task Me_answers_the_billing_address_of_the_tenant_in_a_cell_to_an_administrator_only()
+    {
+        var role = NewRole();
+        var quiz = await PrepareTenantAsync("quiz", role);
+        var platform = await PreparePlatformAsync(quiz with { Host = "quiz.example.test" });
+        await using var factory = CreateFactory(
+            platform,
+            new LogCollector(),
+            [.. _cellSettings, ("Cell:BillingPageUrl", "https://billing.example.test/pay?tenant={tenantId}"), ("Users:AdministratorRole", "author")]);
+        using var administrator = factory.CreateClient().SignedInAs("author");
         using var member = factory.CreateClient().SignedInAs("requester");
 
         var administratorMe = await ReadMeAsync(administrator, "quiz.example.test");
-        Assert.Equal("https://account.vn.example.test/tenants/quiz", administratorMe.GetProperty("billingUrl").GetString());
+        Assert.Equal("https://billing.example.test/pay?tenant=quiz", administratorMe.GetProperty("billingUrl").GetString());
 
         var memberMe = await ReadMeAsync(member, "quiz.example.test");
         Assert.Equal(JsonValueKind.Null, memberMe.GetProperty("billingUrl").ValueKind);

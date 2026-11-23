@@ -102,8 +102,8 @@ An add-on lets a business have more users without moving to the next plan.
   people than its plan takes a pack instead of the next plan.
 - **Adding and dropping.** The operator's billing system adds or drops a pack of a tenant through the
   [billing API](billing-api.md#setting-the-plan-and-add-ons).
-- **Dropping a pack that the use does not fit** _(planned for M34)_. Dropping one that would leave more
-  enabled users than the new number is refused, naming how many users to disable first.
+- **Dropping a pack that the use does not fit.** Dropping one that would leave more users than the new
+  number is refused, naming how many users are over, so that many users are disabled first.
 
 ## Changing a plan
 
@@ -111,5 +111,5 @@ The operator's billing system changes a tenant's plan through the
 [billing API](billing-api.md#setting-the-plan-and-add-ons).
 
 - **A larger plan** applies at once, and the control plane writes its quotas to the cell.
-- **A smaller plan** _(planned for M34)_. It is refused when the tenant's use is over one of the smaller
+- **A smaller plan.** It is refused when the tenant's use is over one of the smaller
   plan's quotas, such as more users or storage. The refusal names each quota and the amount over.

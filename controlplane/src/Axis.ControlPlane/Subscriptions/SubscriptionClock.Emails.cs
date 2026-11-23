@@ -3,6 +3,7 @@ using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.SignUp;
+using Axis.Tenancy;
 using MimeKit;
 using Npgsql;
 
@@ -189,7 +190,7 @@ internal sealed partial class SubscriptionClock
             {
                 ["name"] = recipient.Name,
                 ["tenantAddress"] = SignUpAddress.Of(options, candidate.TenantId),
-                ["billingPortalUrl"] = SignUpAddress.BillingPortalOf(options, candidate.TenantId),
+                ["billingPageUrl"] = BillingPage.Of(options.BillingPageUrl, candidate.TenantId) ?? string.Empty,
             };
             if (nextStep is { } at)
             {

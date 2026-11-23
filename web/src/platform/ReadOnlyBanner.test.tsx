@@ -8,7 +8,7 @@ import { Shell } from './Shell'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 
-const billingUrl = 'https://account.vn.example.test/tenants/quiz'
+const billingUrl = 'https://billing.example.test/tenants/quiz'
 const navigation = [
   { key: 'home', path: '/', labelKey: 'nav.home' },
   { key: 'notes', path: '/e2e/notes', labelKey: 'nav.notes' },
@@ -84,7 +84,7 @@ describe('ReadOnlyBanner', () => {
 
     expect(banner).toHaveTextContent('This workspace is read-only.')
     expect(banner).toHaveTextContent('nothing can change or run until it is paid')
-    expect(screen.getByRole('link', { name: 'Open billing' })).toHaveAttribute('href', billingUrl)
+    expect(screen.getByRole('link', { name: 'Open billing page' })).toHaveAttribute('href', billingUrl)
   })
 
   it.each(['/', '/e2e/notes'])(
@@ -94,7 +94,7 @@ describe('ReadOnlyBanner', () => {
       renderShell(path)
 
       expect(await screen.findByRole('alert')).toHaveTextContent('This workspace is read-only.')
-      expect(screen.queryByRole('link', { name: 'Open billing' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Open billing page' })).not.toBeInTheDocument()
     },
   )
 

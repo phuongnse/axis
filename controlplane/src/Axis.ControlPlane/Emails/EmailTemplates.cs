@@ -5,7 +5,9 @@ namespace Axis.ControlPlane.Emails;
 /// <summary>
 /// The email templates of the control plane: for each kind a text in every language of <see cref="Languages"/>. A template is a
 /// text file named <c>&lt;kind&gt;.&lt;language&gt;.txt</c>, embedded in the assembly. Its first line is <c>Subject: …</c>, a blank
-/// line follows, and the rest is the plain text body. A placeholder is written <c>{{name}}</c>. The kinds are found from the
+/// line follows, and the rest is the plain text body. A placeholder is written <c>{{name}}</c>. A block that is left out when its
+/// value is empty is written <c>{{#name}}</c> and <c>{{/name}}</c>, each on a line of its own around the block's lines, and the
+/// value <c>name</c> is a placeholder like any other. A block that is left out leaves no empty paragraph. The kinds are found from the
 /// files themselves, so a new kind needs no registration, and a kind that lacks a language or whose languages use different
 /// placeholders is rejected when the set is loaded, which stops the start.
 /// </summary>
@@ -73,6 +75,10 @@ internal sealed partial class EmailTemplates
             {
                 problems.Add($"The email template {kind} has no 'Subject:' first line and a blank line before the body in {language}.");
             }
+            else if (StrayMarker().IsMatch(Block().Replace(template.Body, string.Empty)))
+            {
+                problems.Add($"The email template {kind} has a block marker in {language} that is not on a line of its own or has no closing marker.");
+            }
             else
             {
                 languages[language] = template;
@@ -124,9 +130,12 @@ internal sealed partial class EmailTemplates
             throw new ArgumentException($"The email template {kind} needs a value for {string.Join(", ", missing)}.", nameof(values));
         }
 
-        // One pass, so a value that holds {{x}} is never filled in again. A subject is one line.
+        // Blocks first, then one pass of placeholders, so a value that holds {{x}} or a marker is never read again. A subject is one line.
         string Fill(string text) => Placeholder().Replace(text, match => values[match.Groups[1].Value]);
-        return (Fill(template.Subject).ReplaceLineEndings(" "), Fill(template.Body));
+        var body = Block().Replace(
+            template.Body,
+            match => string.IsNullOrWhiteSpace(values[match.Groups[1].Value]) ? string.Empty : match.Groups[2].Value.TrimEnd('\n'));
+        return (Fill(template.Subject).ReplaceLineEndings(" "), Fill(BlankRuns().Replace(body, "\n\n").Trim()));
     }
 
     private Template Get(string kind, string language)
@@ -159,11 +168,21 @@ internal sealed partial class EmailTemplates
         }
 
         var placeholders = Placeholder().Matches(subject + "\n" + body).Select(match => match.Groups[1].Value).ToHashSet(StringComparer.Ordinal);
+        placeholders.UnionWith(Block().Matches(body).Select(match => match.Groups[1].Value));
         return new Template(subject, body, placeholders);
     }
 
     [GeneratedRegex(@"\{\{(\w+)\}\}")]
     private static partial Regex Placeholder();
+
+    [GeneratedRegex(@"^\{\{#(\w+)\}\}\n(.*?)^\{\{/\1\}\}$", RegexOptions.Multiline | RegexOptions.Singleline)]
+    private static partial Regex Block();
+
+    [GeneratedRegex(@"\{\{[#/]\w+\}\}")]
+    private static partial Regex StrayMarker();
+
+    [GeneratedRegex(@"\n{3,}")]
+    private static partial Regex BlankRuns();
 
     private sealed record Template(string Subject, string Body, HashSet<string> Placeholders);
 }

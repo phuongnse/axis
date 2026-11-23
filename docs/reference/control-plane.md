@@ -243,7 +243,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
   their settings is set, all of them are required. The sign-up challenge key is optional. The disposable domain list is optional, and once one of its
-  settings is set, both are required. The public URL is optional. The billing client's settings are optional, and once one of them is set, all of them are required.
+  settings is set, both are required. The public URL is optional. The billing page is optional. The billing client's settings are optional, and once one of them is set, all of them are required.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, or the quota key, and never its value.
 - **Forwarded headers.** The control plane reads `ForwardedHeaders:KnownProxies` and
@@ -262,7 +262,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | --- | --- | --- |
 | `ControlPlane:Region` | The region code, such as `vn` | Lowercase letters and digits only |
 | `ControlPlane:TenantDomain` | The domain of the region's tenant subdomains, such as `vn.example.com` | A valid domain name |
-| `ControlPlane:PublicUrl` | The address that the links of the control plane's emails start with. Optional. Default `https://account.<ControlPlane:TenantDomain>` | An absolute URL, and `https` outside Development and Testing |
+| `ControlPlane:PublicUrl` | The address of the control plane's own pages, such as the confirm link of the sign-up email. Optional. Default `https://account.<ControlPlane:TenantDomain>` | An absolute URL, and `https` outside Development and Testing |
 | `ControlPlane:ConnectionString` | The connection to the control plane's own PostgreSQL | A valid Npgsql connection string. Outside Development and Testing it must set `SSL Mode=VerifyFull` |
 | `ControlPlane:DirectoryConnectionString` | The connection to the [region directory](region-directory.md)'s own PostgreSQL. Optional | When set, the same checks as `ControlPlane:ConnectionString`, `ControlPlane:Dns:Provider` is required, and ready checks the directory's database |
 | `ControlPlane:MailFrom` | The address every email of the control plane comes from | A valid email address |
@@ -284,6 +284,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Dns:Zone` | The zone that holds the tenant subdomains, such as `vn.example.com` | A valid domain name, with `Rfc2136` |
 | `ControlPlane:Dns:KeyName` | The name of the TSIG key that the server knows | Not empty, with `Rfc2136` |
 | `ControlPlane:Dns:Key` | The TSIG HMAC-SHA256 key as base64, from the secret `ControlPlane__Dns__Key` | Valid base64, with `Rfc2136`. Never a value in a setting file or a message |
+| `ControlPlane:BillingPageUrl` | The operator's billing page, which the trial, read-only, deletion and trial-used [emails](subscriptions.md#emails) link. `{tenantId}` in it is replaced by the tenant's id. Optional. Without it those emails have no billing line | An absolute `https` URL |
 | `ControlPlane:Billing:Authority` | The issuer URL of the operator's identity provider, which signs the billing client's tokens, see [signing in](billing-api.md#signing-in). Optional. Without the three `ControlPlane:Billing` settings every billing route answers `401` | An absolute `https` URL, when any `ControlPlane:Billing` setting is set |
 | `ControlPlane:Billing:Audience` | The audience that the billing client's token carries | Not empty, when any `ControlPlane:Billing` setting is set |
 | `ControlPlane:Billing:ClientId` | The id of the billing client, as the token's `client_id` or `azp` claim names it. It is the actor of the billing audit records | Not empty, when any `ControlPlane:Billing` setting is set |

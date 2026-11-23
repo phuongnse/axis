@@ -16,7 +16,7 @@ function isCurrent(address: string, pathname: string): boolean {
 /**
  * The "Switch to" button in the shell header. Its menu lists the person's sites, then Studio for a
  * user who may use it, the operator console for a user who may use that, Users for an
- * administrator and Billing, a link to the billing portal, for an administrator in a cell. The site or tool of the current page is drawn selected and marked as the current page.
+ * administrator and Billing, a link to the operator's billing page, for an administrator in a cell with a billing page set. The site or tool of the current page is drawn selected and marked as the current page.
  * It renders nothing
  * while the user loads, when nobody is signed in, or when loading the user fails. When loading the
  * sites fails, the menu lists only the tools.
