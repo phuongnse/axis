@@ -93,9 +93,9 @@ export function KeyInput({
 
 /**
  * Rows of a key and a value, each removable. Add sits on the group's title row and adds a row under a fresh key. Each
- * row's Delete is in its "…" menu, and a read-only editor, Ant Design's `componentDisabled`, shows neither, see
- * docs/reference/studio-editors-by-kind.md#scenario-editor. Empty, the rows draw `emptyText` in place of a row, see
- * docs/reference/actions-and-controls.md#showing-what-is-empty.
+ * row's Delete is the trash icon, named by its tooltip, and a read-only editor, Ant Design's `componentDisabled`, shows
+ * neither, see docs/reference/studio-editors-by-kind.md#scenario-editor. Empty, the rows draw `emptyText` in place of a
+ * row, see docs/reference/actions-and-controls.md#showing-what-is-empty.
  */
 export function KeyValueRows({
   pointer,
@@ -131,7 +131,7 @@ export function KeyValueRows({
       <Flex vertical gap="small">
         {Object.keys(values).length === 0 && <EmptyState text={emptyText} />}
         {Object.keys(values).map((key) => (
-          <Flex key={key} gap="small" align="flex-start">
+          <Flex key={key} gap="small" align="flex-start" data-testid={`studio-field-${pointer}/${pointerSegment(key)}`}>
             <Flex gap="small" align="flex-end" style={{ flex: 1 }}>
               <AxisField {...keyField}>
                 <KeyInput
@@ -154,12 +154,11 @@ export function KeyValueRows({
             </Flex>
             {componentDisabled ? null : (
               <RowActions
-                fold
                 actions={[
                   {
                     key: 'remove',
                     labelKey: 'shell.studio.scenario.remove',
-                    destructive: true,
+                    meaning: 'remove',
                     onClick: () => onChange(`${pointer}/${pointerSegment(key)}`, undefined),
                   },
                 ]}
@@ -565,7 +564,6 @@ export function ScenarioStep({
         extra={
           componentDisabled ? undefined : (
             <RowActions
-              fold
               actions={[
                 {
                   key: 'moveUp',
@@ -582,7 +580,7 @@ export function ScenarioStep({
                 {
                   key: 'remove',
                   labelKey: 'shell.studio.scenario.remove',
-                  destructive: true,
+                  meaning: 'remove',
                   onClick: () => onChange(pointer, undefined),
                 },
               ]}

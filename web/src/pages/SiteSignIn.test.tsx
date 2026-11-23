@@ -1,19 +1,24 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider } from 'antd'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
-import { emptyDescription, optionTexts, shownMenu } from '../test/antd'
+import { ThemeModeProvider } from '../platform/theme'
+import { emptyDescription, optionTexts, tabTo } from '../test/antd'
+import { withAntdStyles } from '../test/antdStyles'
 import { SiteSignIn } from './SiteSignIn'
 
 function renderPicker(value: unknown, providers = ['accounts', 'company'], readOnly = false) {
   const onChange = vi.fn()
   render(
     <ConfigProvider componentDisabled={readOnly}>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <SiteSignIn providers={providers} value={value} onChange={onChange} />
-      </TextProvider>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <SiteSignIn providers={providers} value={value} onChange={onChange} />
+        </TextProvider>
+      </ThemeModeProvider>
     </ConfigProvider>,
   )
   return onChange
@@ -33,11 +38,12 @@ describe('SiteSignIn', () => {
     ).toBeTruthy()
   })
 
-  it('shows no Add provider and no "…" menu when the editor is read-only', () => {
+  it('shows no Add provider and no Remove when the editor is read-only', () => {
     renderPicker(['company'], ['accounts', 'company'], true)
 
     expect(screen.getByTestId('studio-field-/signIn/0')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Add provider' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
     expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
   })
 
@@ -69,9 +75,7 @@ describe('SiteSignIn', () => {
   it('removes a row and keeps the others', async () => {
     const onChange = renderPicker(['accounts', 'company'])
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/signIn/0')).getByRole('button', { name: 'Actions' }))
-    await shownMenu('Actions')
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+    await userEvent.click(within(screen.getByTestId('studio-field-/signIn/0')).getByRole('button', { name: 'Remove' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/signIn', ['company'])
   })
@@ -80,9 +84,7 @@ describe('SiteSignIn', () => {
     const onChange = renderPicker(['company'])
     expect(screen.queryByText(platformEnglish['shell.studio.site.allProvidersHint'])).toBeNull()
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/signIn/0')).getByRole('button', { name: 'Actions' }))
-    await shownMenu('Actions')
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+    await userEvent.click(within(screen.getByTestId('studio-field-/signIn/0')).getByRole('button', { name: 'Remove' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/signIn', undefined)
   })
@@ -91,5 +93,25 @@ describe('SiteSignIn', () => {
     renderPicker(undefined)
 
     expect(emptyDescription(platformEnglish['shell.studio.site.allProvidersHint'])).toBeVisible()
+  })
+
+  describe('with antd styles', () => {
+    withAntdStyles()
+
+    beforeEach(() => localStorage.setItem('axis.themeMode', 'dark'))
+
+    it('draws Remove as the trash icon in dangerText and names it on keyboard focus in dark mode', async () => {
+      renderPicker(['accounts', 'company'])
+
+      const row = screen.getByTestId('studio-field-/signIn/0')
+      const remove = within(row).getByRole('button', { name: 'Remove' })
+      expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+      expect(remove).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
+      expect(within(row).queryByRole('button', { name: 'Actions' })).toBeNull()
+      await tabTo(remove)
+
+      // Other tooltips the tab passed may stay open, so the one of Remove is found among them.
+      await waitFor(() => expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toContain('Remove'))
+    })
   })
 })

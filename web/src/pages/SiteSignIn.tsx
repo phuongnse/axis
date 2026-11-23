@@ -10,8 +10,8 @@ import type { ChangeHandler } from './SchemaForm'
 /**
  * The `signIn` list of a site: rows that each pick one of the application's identity providers by name, in a part
  * headed with the list's title and help. Removing the last row removes the key, and the form then says that the site
- * allows every provider. Its Add provider sits on the right of the part's heading, and each row's Remove is in its "…"
- * menu. A read-only editor, Ant Design's `componentDisabled`, shows neither, see
+ * allows every provider. Its Add provider sits on the right of the part's heading, and each row's Remove is the trash
+ * icon, named by its tooltip. A read-only editor, Ant Design's `componentDisabled`, shows neither, see
  * docs/reference/studio-editors-by-kind.md#a-sites-sign-in.
  */
 export function SiteSignIn({
@@ -54,12 +54,11 @@ export function SiteSignIn({
               </div>
               {componentDisabled ? null : (
                 <RowActions
-                  fold
                   actions={[
                     {
                       key: 'remove',
                       labelKey: 'shell.studio.site.removeProvider',
-                      destructive: true,
+                      meaning: 'remove',
                       onClick: () => {
                         const rest = entries.filter((_, position) => position !== index)
                         onChange('/signIn', rest.length > 0 ? rest : undefined)

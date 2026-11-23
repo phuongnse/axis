@@ -128,12 +128,11 @@ function StubCard({
           </Flex>
           {componentDisabled ? null : (
             <RowActions
-              fold
               actions={[
                 {
                   key: 'remove',
                   labelKey: 'shell.studio.scenario.remove',
-                  destructive: true,
+                  meaning: 'remove',
                   onClick: () => onChange(pointer, undefined),
                 },
               ]}
@@ -238,12 +237,11 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
                     </Flex>
                     {componentDisabled ? null : (
                       <RowActions
-                        fold
                         actions={[
                           {
                             key: 'remove',
                             labelKey: 'shell.studio.scenario.remove',
-                            destructive: true,
+                            meaning: 'remove',
                             onClick: () => onChange(pointer, undefined),
                           },
                         ]}
