@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { followLink, renderGuarded } from '../test/leaveGuard'
-import { chooseOption, formItem, hasFieldError, isRequiredLabel, tabTo } from '../test/antd'
+import { chooseOption, formItem, formMessages, hasFieldError, isRequiredLabel, tabTo } from '../test/antd'
 import { filterTexts } from '../test/tableFilter'
 import { CanvasActionsContext } from './canvasActions'
 import { designTokensFor } from './designTokens'
@@ -779,7 +779,7 @@ describe('FormWidget', () => {
       submitForm()
 
       const message = await screen.findByTestId('field-error-title')
-      expect(message.closest('.ant-form-item-explain')).toHaveStyle({
+      expect(formMessages(message)).toHaveStyle({
         marginTop: '4px',
         fontSize: '14px',
         lineHeight: '20px',

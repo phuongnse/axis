@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { AcceptTermsField } from './AcceptTermsField'
 import { designTokensFor } from './designTokens'
 import { ThemeModeProvider } from './theme'
+import { formMessages } from '../test/antd'
+import { withAntdStyles } from '../test/antdStyles'
 
 function renderField(documents: Parameters<typeof AcceptTermsField>[0]['documents'], finish = vi.fn()) {
   const { container } = render(
@@ -84,5 +86,22 @@ describe('AcceptTermsField', () => {
     expect(screen.getByRole('link', { name: 'Terms of service' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Privacy policy' })).not.toBeInTheDocument()
     expect(screen.getByText(/I accept the/)).toHaveTextContent('I accept the Terms of service and the Privacy policy.')
+  })
+})
+
+describe('AcceptTermsField message look', () => {
+  withAntdStyles()
+
+  it('draws its required message 4px under the box, in a 14px font on a 20px line', async () => {
+    renderField(both)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await screen.findByText('Accept the terms to continue.')
+    expect(formMessages(screen.getByRole('checkbox'))).toHaveStyle({
+      marginTop: '4px',
+      fontSize: '14px',
+      lineHeight: '20px',
+    })
   })
 })

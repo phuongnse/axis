@@ -152,6 +152,13 @@ export function formItem(element: HTMLElement): HTMLElement {
   return item
 }
 
+/** The box that holds the messages of the form item that holds `element`, which is where Ant Design's `help` part styles them. */
+export function formMessages(element: HTMLElement): HTMLElement {
+  const messages = formItem(element).querySelector<HTMLElement>('.ant-form-item-explain')
+  if (!messages) throw new Error('The form item shows no message')
+  return messages
+}
+
 /** The flex that holds `element`, whose children are the fields of one row. */
 export function flexOf(element: HTMLElement): HTMLElement {
   const flex = element.closest<HTMLElement>('.ant-flex')
