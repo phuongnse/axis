@@ -75,8 +75,8 @@ What Axis keeps of the commercial life of a tenant:
 - **A tenant administrator sees** _(planned for M34)_ the plan, each quota with its use, the
   subscription's state and its next date in the tenant's administration. A link leads to the
   operator's billing page, which is a setting.
-- **A tenant administrator accepts a new version** of the terms or of the data processing agreement in
-  the shell, before anything else, and Axis records it as at sign-up.
+- **A tenant administrator accepts a new version** _(planned for M34)_ of the terms or of the data
+  processing agreement in the shell, before anything else, and Axis records it as at sign-up.
 - **Axis drops** prices, currencies, proration, billing invoices, the ledger, payments, payment
   providers, reconciliation, e-invoices, the billing portal with its accounts, owners and billing
   contacts, payment reminders and the operator's billing commands.
