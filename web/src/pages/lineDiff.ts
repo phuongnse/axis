@@ -1,5 +1,5 @@
 import { getChunks, getOriginalDoc, unifiedMergeView, type Chunk } from '@codemirror/merge'
-import { Prec, RangeSetBuilder, type Extension } from '@codemirror/state'
+import { Prec, RangeSetBuilder, type EditorState, type Extension } from '@codemirror/state'
 import {
   Decoration,
   EditorView,
@@ -20,9 +20,42 @@ import {
  * numbers: a removed file is its own text, each line drawn removed.
  */
 export function lineDiff(original: string, removed: boolean): Extension {
-  if (original === '') {
-    return wholeFile(removed)
+  return [flush, original === '' ? wholeFile(removed) : changedFile(original)]
+}
+
+/**
+ * Proposed: a diff fills its file's block flush, as #3263 agreed, with no frame or corners of its own, and keyboard
+ * focus stays visible inside the block's edge, see #4623.
+ */
+const flush = Prec.high(
+  EditorView.theme({ '&': { border: 'none', borderRadius: 'unset' }, '&.cm-focused': { outlineOffset: '-2px' } }),
+)
+
+/** The lines a diff adds and removes, for its file's header. */
+export interface DiffCounts {
+  added: number
+  removed: number
+}
+
+/** The lines the line diff of an editor's state adds and removes. A file added or removed whole counts every line. */
+export function diffCounts(state: EditorState, whole: 'added' | 'removed' | null): DiffCounts {
+  if (whole !== null) {
+    return whole === 'added' ? { added: state.doc.lines, removed: 0 } : { added: 0, removed: state.doc.lines }
   }
+  const before = getOriginalDoc(state)
+  const lines = (doc: EditorState['doc'], from: number, to: number) =>
+    from >= to ? 0 : doc.lineAt(Math.min(to - 1, doc.length)).number - doc.lineAt(from).number + 1
+  return (getChunks(state)?.chunks ?? []).reduce(
+    (counts, chunk) => ({
+      added: counts.added + lines(state.doc, chunk.fromB, chunk.toB),
+      removed: counts.removed + lines(before, chunk.fromA, chunk.toA),
+    }),
+    { added: 0, removed: 0 },
+  )
+}
+
+/** A file that changed in part: the merge view against `original`, its column of the text before's numbers and its marks. */
+function changedFile(original: string): Extension {
   return [
     unifiedMergeView({
       original,

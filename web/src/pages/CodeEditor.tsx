@@ -20,7 +20,7 @@ import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { indentFolding, languageSupport, type FileLanguage } from './fileLanguage'
 import { findPanel } from './jsonFindPanel'
 import { useFillHeight } from './jsonViewHeight'
-import { diffText, lineDiff } from './lineDiff'
+import { diffCounts, diffText, lineDiff, type DiffCounts } from './lineDiff'
 
 /** Marks a change that came from the value, not from the author, so it is not reported as an edit. */
 const external = Annotation.define<boolean>()
@@ -49,6 +49,8 @@ export interface CodeEditorProps {
    * `readOnly`.
    */
   original?: string
+  /** Proposed: with `original`, gets the lines the diff adds and removes once the editor is built, see #4623. */
+  onDiffCounts?: (counts: DiffCounts) => void
   /** Refuses the author's edits. The cursor, find and `goTo` still work. */
   readOnly?: boolean
   /** Fills the window down to the shell footer, and stops its scroll at its end. Without it, the editor is as tall as its text. */
@@ -102,6 +104,7 @@ export default function CodeEditor({
   onChange,
   language,
   original,
+  onDiffCounts,
   readOnly = false,
   fill = false,
   boundary,
@@ -145,6 +148,7 @@ export default function CodeEditor({
     language: shownLanguage,
     original,
     removedFile,
+    onDiffCounts,
     readOnly,
     phrases,
     lint,
@@ -161,6 +165,7 @@ export default function CodeEditor({
       language: shownLanguage,
       original,
       removedFile,
+      onDiffCounts,
       readOnly,
       phrases,
       lint,
@@ -234,6 +239,10 @@ export default function CodeEditor({
       }),
     })
     viewRef.current = view
+    if (initial.original !== undefined) {
+      const whole = initial.removedFile ? 'removed' : diffText(initial.original) === '' ? 'added' : null
+      initial.onDiffCounts?.(diffCounts(view.state, whole))
+    }
     initial.onCursor?.(cursorOf(view.state))
     return () => {
       view.destroy()

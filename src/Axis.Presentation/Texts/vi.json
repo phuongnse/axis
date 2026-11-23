@@ -2666,6 +2666,8 @@
   "shell.studio.changes.hideDiff": "Ẩn thay đổi",
   "shell.studio.changes.showDiffName": "Xem thay đổi của {name}",
   "shell.studio.changes.diffName": "Thay đổi của {name}",
+  "shell.studio.changes.counts": "Thêm {added} dòng, bớt {removed} dòng",
+  "shell.studio.changes.packageFile": "Tệp của gói",
   "shell.studio.changes.hideDiffName": "Ẩn thay đổi của {name}",
   "shell.studio.history.before": "Trước",
   "shell.studio.history.after": "Sau",
