@@ -27,6 +27,7 @@ import {
   typicalProcessId,
   typicalRevisionId,
   packageRevisionId,
+  typicalAuthoringRequestId,
 } from './studioFixtures'
 import {
   application,
@@ -419,6 +420,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Package file revision',
       fixtures: studioFixtures.typical,
       entry: `/studio?app=${application}&view=history&revision=${packageRevisionId}`,
+    },
+    // Proposed: a ready authoring request whose draft changes package files, each as a line diff, see #4623.
+    {
+      caption: 'Authoring request',
+      fixtures: studioFixtures.typical,
+      entry: `/studio?app=${application}&view=requests&request=${typicalAuthoringRequestId}`,
     },
     {
       caption: 'Release page',

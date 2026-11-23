@@ -1,4 +1,6 @@
 import type {
+  AuthoringRequest,
+  AuthoringRequestDiff,
   ExpressionCheck,
   ExpressionReading,
   ExpressionScope,
@@ -19,6 +21,7 @@ import type {
   StudioResourceItem,
   StudioResourceReferences,
   StudioRevision,
+  StudioRevisionChange,
   StudioRevisionDiff,
 } from '../platform/studio'
 import {
@@ -524,46 +527,141 @@ const typicalRevisionDiff = {
 } satisfies StudioRevisionDiff
 
 /**
- * Proposed: revision r4 of Typical, an outside change to the approval-rules package: a changed adapter whose limit
- * changed in one line and that gained a function, an added test file and a removed settings file, which the Package
- * file revision state opens, see #4623. A package file has no id, kind or name, because its text is not a resource's
- * JSON.
+ * Proposed: the changes to the approval-rules package that revision r4 made and that the Authoring request state's draft
+ * makes, see #4623: a changed adapter whose limit changed in one line and that gained a function, a removed settings
+ * file and an added test file. A package file has no id, kind or name, because its text is not a resource's JSON.
+ */
+const approvalRulesChanges = [
+  {
+    file: 'packages/approval-rules/adapter.py',
+    change: 'changed',
+    id: null,
+    kind: null,
+    name: null,
+    before:
+      '"""Rules that decide who approves a purchase request."""\n\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Request:\n    amount: float\n    department: str\n    requester: str\n\n\nMANAGER_LIMIT = 5000\nDIRECTOR_LIMIT = 25000\n\n\ndef approver_role(request: Request) -> str:\n    """The role that approves the request, by its amount."""\n    if request.amount <= MANAGER_LIMIT:\n        return "manager"\n    if request.amount <= DIRECTOR_LIMIT:\n        return "director"\n    return "finance"\n\n\ndef needs_second_approval(request: Request) -> bool:\n    """Whether a second person approves the request."""\n    return request.amount > DIRECTOR_LIMIT\n',
+    after:
+      '"""Rules that decide who approves a purchase request."""\n\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Request:\n    amount: float\n    department: str\n    requester: str\n\n\nMANAGER_LIMIT = 10000\nDIRECTOR_LIMIT = 25000\n\n\ndef approver_role(request: Request) -> str:\n    """The role that approves the request, by its amount."""\n    if request.amount <= MANAGER_LIMIT:\n        return "manager"\n    if request.amount <= DIRECTOR_LIMIT:\n        return "director"\n    return "finance"\n\n\ndef needs_second_approval(request: Request) -> bool:\n    """Whether a second person approves the request."""\n    return request.amount > DIRECTOR_LIMIT or request.department == "it"\n\n\ndef approval_note(request: Request) -> str:\n    """The note the approver reads first."""\n    return f"{request.requester} asks for {request.amount:,.2f} for {request.department}."\n',
+  },
+  {
+    file: 'packages/approval-rules/limits.json',
+    change: 'removed',
+    id: null,
+    kind: null,
+    name: null,
+    before: '{\n  "managerLimit": 5000,\n  "directorLimit": 25000\n}\n',
+    after: null,
+  },
+  {
+    file: 'packages/approval-rules/tests/test_adapter.py',
+    change: 'added',
+    id: null,
+    kind: null,
+    name: null,
+    before: null,
+    after:
+      'from adapter import Request, approver_role, needs_second_approval\n\n\ndef test_a_small_request_goes_to_the_manager():\n    assert approver_role(Request(800, "sales", "Contoso buyer")) == "manager"\n\n\ndef test_an_it_request_needs_a_second_approval():\n    assert needs_second_approval(Request(1200, "it", "Contoso buyer"))\n',
+  },
+] satisfies StudioRevisionChange[]
+
+/**
+ * Proposed: revision r4 of Typical, an outside change to the approval-rules package, which the Package file revision
+ * state opens, see #4623.
  */
 const packageRevisionDiff = {
   revision: typicalRevisions.items[0],
-  resources: [
+  resources: approvalRulesChanges,
+} satisfies StudioRevisionDiff
+
+/** Proposed: the id of the authoring request that the Authoring request state opens, see #4623. */
+export const typicalAuthoringRequestId = '7c1e5a2b-4d3f-4e6a-9b8c-0d1e2f3a4b5c'
+
+/**
+ * Proposed: a ready authoring request of Alex Morgan, who is signed in, whose draft changes the approval-rules package:
+ * its checks passed and its review asked for no change, so the Result part shows its changes, see #4623 and
+ * docs/reference/ai-authoring-in-studio.md#the-diff.
+ */
+const typicalAuthoringRequest = {
+  id: typicalAuthoringRequestId,
+  application,
+  author: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+  authorName: 'Alex Morgan',
+  text: 'Raise the manager limit to 10,000, and send every IT request to a second approval. Add a note the approver reads first.',
+  state: 'ready',
+  plan: 'Change the approval-rules adapter: raise MANAGER_LIMIT to 10000, make IT requests need a second approval and add approval_note. Move the limits out of limits.json, which nothing reads, and add tests for the two rules.',
+  round: 1,
+  tokens: 18240,
+  autoAccept: false,
+  sentAt: '2026-10-22T10:02:00Z',
+  approvedAt: '2026-10-22T10:05:00Z',
+  finishedAt: null,
+  steps: [
     {
-      file: 'packages/approval-rules/adapter.py',
-      change: 'changed',
-      id: null,
-      kind: null,
-      name: null,
-      before:
-        '"""Rules that decide who approves a purchase request."""\n\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Request:\n    amount: float\n    department: str\n    requester: str\n\n\nMANAGER_LIMIT = 5000\nDIRECTOR_LIMIT = 25000\n\n\ndef approver_role(request: Request) -> str:\n    """The role that approves the request, by its amount."""\n    if request.amount <= MANAGER_LIMIT:\n        return "manager"\n    if request.amount <= DIRECTOR_LIMIT:\n        return "director"\n    return "finance"\n\n\ndef needs_second_approval(request: Request) -> bool:\n    """Whether a second person approves the request."""\n    return request.amount > DIRECTOR_LIMIT\n',
-      after:
-        '"""Rules that decide who approves a purchase request."""\n\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Request:\n    amount: float\n    department: str\n    requester: str\n\n\nMANAGER_LIMIT = 10000\nDIRECTOR_LIMIT = 25000\n\n\ndef approver_role(request: Request) -> str:\n    """The role that approves the request, by its amount."""\n    if request.amount <= MANAGER_LIMIT:\n        return "manager"\n    if request.amount <= DIRECTOR_LIMIT:\n        return "director"\n    return "finance"\n\n\ndef needs_second_approval(request: Request) -> bool:\n    """Whether a second person approves the request."""\n    return request.amount > DIRECTOR_LIMIT or request.department == "it"\n\n\ndef approval_note(request: Request) -> str:\n    """The note the approver reads first."""\n    return f"{request.requester} asks for {request.amount:,.2f} for {request.department}."\n',
+      kind: 'plan',
+      summary: null,
+      outcome: null,
+      tokens: 3120,
+      startedAt: '2026-10-22T10:02:00Z',
+      finishedAt: '2026-10-22T10:03:10Z',
+      checks: null,
     },
     {
-      file: 'packages/approval-rules/limits.json',
-      change: 'removed',
-      id: null,
-      kind: null,
-      name: null,
-      before: '{\n  "managerLimit": 5000,\n  "directorLimit": 25000\n}\n',
-      after: null,
+      kind: 'work',
+      summary: null,
+      outcome: null,
+      tokens: 11800,
+      startedAt: '2026-10-22T10:05:00Z',
+      finishedAt: '2026-10-22T10:07:40Z',
+      checks: null,
     },
     {
-      file: 'packages/approval-rules/tests/test_adapter.py',
-      change: 'added',
-      id: null,
-      kind: null,
-      name: null,
-      before: null,
-      after:
-        'from adapter import Request, approver_role, needs_second_approval\n\n\ndef test_a_small_request_goes_to_the_manager():\n    assert approver_role(Request(800, "sales", "Contoso buyer")) == "manager"\n\n\ndef test_an_it_request_needs_a_second_approval():\n    assert needs_second_approval(Request(1200, "it", "Contoso buyer"))\n',
+      kind: 'check',
+      summary: null,
+      outcome: 'passed',
+      tokens: 0,
+      startedAt: '2026-10-22T10:07:40Z',
+      finishedAt: '2026-10-22T10:08:20Z',
+      checks: {
+        compile: { outcome: 'passed', diagnostics: [] },
+        packages: { outcome: 'passed', items: [] },
+        scenarios: {
+          outcome: 'passed',
+          request: null,
+          diagnostics: [],
+          items: [
+            {
+              name: 'ApprovalBelowThreshold',
+              resourceId: 'scenario-approval-below-threshold',
+              file: 'scenarios/approval-below-threshold.json',
+              outcome: 'passed',
+              durationMs: 420,
+              step: null,
+              path: null,
+              message: null,
+            },
+          ],
+        },
+      },
+    },
+    {
+      kind: 'review',
+      summary: null,
+      outcome: 'passed',
+      tokens: 3320,
+      startedAt: '2026-10-22T10:08:20Z',
+      finishedAt: '2026-10-22T10:09:05Z',
+      checks: { review: { outcome: 'passed', findings: null } },
     },
   ],
-} satisfies StudioRevisionDiff
+} satisfies AuthoringRequest
+
+/** Proposed: the draft's diff of the Authoring request state, one page, see #4623. */
+const typicalAuthoringRequestDiff = {
+  start: 'c4',
+  tip: 'd1',
+  resources: approvalRulesChanges.map((change) => ({ ...change, target: null })),
+  cursor: null,
+} satisfies AuthoringRequestDiff
 
 /** Release 2 of Typical's history, which is live: it pins the Organization module and compares with release 1. */
 const typicalRelease: StudioRelease = {
@@ -775,6 +873,8 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/revisions`]: () => typicalRevisions,
     [`${folderPath}/revisions/${typicalRevisionId}`]: () => typicalRevisionDiff,
     [`${folderPath}/revisions/${packageRevisionId}`]: () => packageRevisionDiff,
+    [`${folderPath}/authoring-requests/${typicalAuthoringRequestId}`]: () => typicalAuthoringRequest,
+    [`${folderPath}/authoring-requests/${typicalAuthoringRequestId}/diff`]: () => typicalAuthoringRequestDiff,
     [`${folderPath}/settings`]: () => settings,
     // A table of the open application asks for the person's kept choices, and no state keeps any.
     ...Object.fromEntries(
