@@ -449,12 +449,11 @@ test.describe('Studio on a copy of its own', () => {
       ).toBeVisible()
 
       await page.goto(`${server.url}/studio?app=PurchaseRequests`)
-      const diagnostic = (await openProblems(page))
-        .getByRole('listitem')
-        .filter({ hasText: 'AXC0012' })
-      await expect(diagnostic).toContainText('AXC0012')
-      const link = diagnostic.getByRole('link', { name: 'SubmitPurchaseRequest', exact: true })
-      await expect(link).toHaveAttribute('href', /path=%2Finput%2F2%2Ftarget/)
+      const panel = await openProblems(page)
+      await expect(panel).toContainText('AXC0012')
+      // The link's address ends in the problem's path, so it finds the link however the panel groups its problems.
+      const link = panel.locator('a[href$="path=%2Finput%2F2%2Ftarget"]')
+      await expect(link).toBeVisible()
 
       // Ctrl+click opens the same address in a new tab, and the panel stays open here.
       const [tab] = await Promise.all([
