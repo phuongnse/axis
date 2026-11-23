@@ -370,8 +370,6 @@ muted, each `spacing-xs` from the last.
 
 ### Preview the draft
 
-_(planned for M35)_
-
 **Preview the draft** is a `secondary` button after the diff. It shows while the request is ready, to its author,
 and only when the deployment has a preview host, `studioPreviewHost` in [`GET /api/me`](security.md#roles-and-the-current-user).
 

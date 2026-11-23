@@ -45,6 +45,7 @@ function request(overrides: Partial<AuthoringRequest> = {}): AuthoringRequest {
     sentAt,
     approvedAt: null,
     finishedAt: null,
+    draft: null,
     ...overrides,
   }
 }
@@ -163,6 +164,24 @@ function acceptRequest(status: StudioRequestStatus, diagnostics: StudioDiagnosti
   }
 }
 
+/** The preview of the draft, as the draft preview route and the request read route answer it. */
+function previewRequest(status: StudioRequestStatus): StudioRequest {
+  return { ...acceptRequest(status), id: 'p2', kind: 'publish', target: 'preview' }
+}
+
+const siteId = 'site-1'
+
+/** The application's site, which the preview links name. */
+const site: StudioResourceItem = {
+  id: siteId,
+  kind: 'site',
+  name: 'Purchasing',
+  file: 'sites/purchasing.json',
+  version: 'a',
+  usedBy: 0,
+  titles: { en: 'Purchasing' },
+}
+
 /**
  * A server that answers by URL and method: a read answers the request as `server.current` holds it, and each action
  * answers with the request in the state it moves to, or with a 500 when `refuse` names it. `calls` lists the actions.
@@ -172,6 +191,8 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
     current,
     /** The statuses that reads of the accept's publish request answer in turn, the last one for every read after. */
     accept: ['queued'] as StudioRequestStatus[],
+    /** The statuses that reads of the draft's preview answer in turn, the last one for every read after. */
+    preview: ['succeeded'] as StudioRequestStatus[],
     /** The diagnostics that the accept's publish request answers once it has failed. */
     acceptDiagnostics: [] as StudioDiagnostic[],
     calls: [] as { action: string; body: unknown }[],
@@ -190,6 +211,12 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
           }
           return json(acceptRequest(status, status === 'failed' ? server.acceptDiagnostics : []))
         }
+        if (String(input).endsWith('/requests/p2')) {
+          return json(previewRequest(server.preview.length > 1 ? server.preview.shift()! : server.preview[0]))
+        }
+        if (String(input).endsWith(`/resources/${siteId}`)) {
+          return json({ ...site, content: { path: 'purchasing' } })
+        }
         return answer(server.current)
       }
       server.calls.push({ action, body: init.body === undefined ? undefined : JSON.parse(String(init.body)) })
@@ -198,6 +225,9 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
       }
       if (action === 'accept') {
         return json(acceptRequest('queued'), 202)
+      }
+      if (action === 'preview') {
+        return json(previewRequest('queued'), 202)
       }
       const next = {
         approve: 'working',
@@ -213,7 +243,9 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
   return server
 }
 
-function renderPage(props: { onAskAi?: () => void; userId?: string; resources?: StudioResourceItem[] } = {}) {
+function renderPage(
+  props: { onAskAi?: () => void; userId?: string; resources?: StudioResourceItem[]; previewHost?: string | null } = {},
+) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
@@ -224,6 +256,7 @@ function renderPage(props: { onAskAi?: () => void; userId?: string; resources?: 
             userId={props.userId ?? 'u1'}
             onAskAi={props.onAskAi}
             resources={props.resources}
+            previewHost={props.previewHost ?? null}
           />
         </MemoryRouter>
       </TextProvider>
@@ -811,6 +844,71 @@ describe('the feed', () => {
     const conflict = await screen.findByTestId('studio-ai-request-conflict', undefined, { timeout: 4000 })
     const items = Array.from(screen.getByTestId('steps-bar').children) as HTMLElement[]
     expect(items[2]).toContainElement(conflict)
+  })
+})
+
+describe('Preview the draft', () => {
+  const ready = (overrides: Partial<AuthoringRequest> = {}) =>
+    request({
+      state: 'ready',
+      author: 'u1',
+      plan: planOf('Add a field.'),
+      steps: [checkStep(passedChecks, 'passed')],
+      draft: 'd1',
+      ...overrides,
+    })
+  const previewHost = 'preview.example.test'
+
+  it.each([
+    ['another person', ready({ author: 'u2' }), previewHost],
+    ['a deployment without a preview host', ready(), null],
+    ['a request that is not ready', ready({ state: 'working' }), previewHost],
+    ['a request without a draft', ready({ draft: null }), previewHost],
+  ] as const)('is not shown for %s', async (_, shown, host) => {
+    vi.stubGlobal('fetch', serverOf(shown).fetch)
+    renderPage({ previewHost: host, resources: [site] })
+
+    await screen.findByTestId('studio-ai-request-state')
+    await screen.findByTestId('studio-ai-request-guide')
+    expect(screen.queryByTestId('studio-ai-request-preview')).toBeNull()
+  })
+
+  it('sends the draft route, is off while the preview runs and ends the status line with a link named by each site', async () => {
+    const server = serverOf(ready())
+    server.preview = ['running', 'succeeded']
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ previewHost, resources: [site] })
+
+    const button = await screen.findByTestId('studio-ai-request-preview')
+    expect(button).toHaveTextContent('Preview the draft')
+    await userEvent.click(button)
+
+    expect(server.calls).toEqual([{ action: 'preview', body: undefined }])
+    expect(server.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/drafts/d1/preview'),
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(await screen.findByTestId('studio-request-status')).toHaveAttribute('data-status', 'queued')
+    expect(screen.getByTestId('studio-ai-request-preview')).toBeDisabled()
+
+    const link = await screen.findByTestId('studio-preview-link', undefined, { timeout: 4000 })
+    expect(link).toHaveTextContent('Open Purchasing')
+    expect(link.getAttribute('href')).toContain('//preview.example.test')
+    expect(link.getAttribute('href')).toMatch(/\/purchasing$/)
+    expect(screen.getByTestId('studio-request-status')).toHaveTextContent('The preview is ready. Open Purchasing')
+    expect(screen.getByTestId('studio-ai-request-preview')).toBeEnabled()
+    expect(screen.getByTestId('studio-ai-request-result')).toContainElement(link)
+  })
+
+  it('shows an error and no status line when the draft route is refused', async () => {
+    vi.stubGlobal('fetch', serverOf(ready(), ['preview']).fetch)
+    renderPage({ previewHost, resources: [site] })
+
+    await userEvent.click(await screen.findByTestId('studio-ai-request-preview'))
+
+    expect(await screen.findByTestId('studio-ai-request-preview-error')).toBeVisible()
+    expect(screen.queryByTestId('studio-request-status')).toBeNull()
+    expect(screen.getByTestId('studio-ai-request-preview')).toBeEnabled()
   })
 })
 

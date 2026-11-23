@@ -245,15 +245,16 @@ its end.
   the Overview after a link, and the status line follows the request there. Publish is off while a request runs,
   the reconnect shows, the history or the changed files load or nothing is left to publish. A failed history drops `<n>` and the line, and a folder that is all live drops `<n>`.
 - **Preview** shows only when `GET /api/me` answers a `studioPreviewHost` that is not null, and needs
-  no `studioPublisher`. It sends `POST .../preview` at once, with no dialog. A succeeded preview shows
-  Previewed and a link to each of the application's sites on the preview host, built from the page's
-  protocol and port, the `studioPreviewHost` and the site's `path`, which Studio reads from the folder's
+  no `studioPublisher`. It sends `POST .../preview` at once, with no dialog. A succeeded preview's status
+  line reads "The preview is ready." and ends with a link to each of the application's sites on the preview host,
+  built from the page's protocol and port, the `studioPreviewHost` and the site's `path`, which Studio reads from the folder's
   `site` resources when the preview succeeds. So the preview host must be served on the page's port and
   protocol, and a site renamed after the request was sent can give a wrong link. A failed preview shows
   Preview failed. A preview shows no release number and leaves the Releases list as it is, because its
   release belongs to the preview tenant's own history.
-- **Preview's status line** _(planned for M35)_. Its status line ends with "The preview is ready. Open <site>" and a link
-  for each site, as [Preview the draft](ai-authoring-in-studio.md#preview-the-draft) does.
+- **Preview's status line.** Each link is named by its site, "Open <site>", such as "Open Purchasing", as
+  [Preview the draft](ai-authoring-in-studio.md#preview-the-draft) names them. The links come after the line's text, with
+  no bare addresses under it.
 - **The status line.** Studio checks `GET .../requests/{id}` every second, with no time limit, until
   the status is `succeeded` or `failed`, and shows queued or running meanwhile. It shows the outcome
   only once the publisher has finished the request.

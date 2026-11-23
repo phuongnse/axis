@@ -90,7 +90,7 @@ from every other draft.
   pages. The route is in [the authoring API](authoring-revisions.md#draft-diff).
 - **Made for a request** _(planned for M35)_. The first write on an approved
   [authoring request](authoring-requests.md#states) makes the draft, and its record also holds the request id.
-- **Preview** _(planned for M35)_. A draft is tried on the preview tenant by the draft preview route, see
+- **Preview.** A draft is tried on the preview tenant by the draft preview route, see
   [routes](authoring-requests.md#routes).
 - **Titles** _(planned for M35)_. The entries of a draft's diff carry `titles`, see
   [the draft diff](authoring-revisions.md#draft-diff).

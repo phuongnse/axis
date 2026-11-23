@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
@@ -29,6 +30,10 @@ namespace Axis.Server.Studio;
 /// In a cell, <c>publish</c> checks the tenant's storage quota (403 <c>quota-exceeded</c>) right after the session.
 /// In a cell, <c>publish</c> and <c>preview</c> of a folder with a file under <c>packages/</c> answer the quota 403 while the
 /// tenant's <c>packageCpuSecondsPerDay</c> is 0, after the manifest check and before the body, see <c>docs/reference/tenant-quotas.md#refusals</c>.
+/// <c>POST /api/studio/apps/{application}/drafts/{draft}/preview</c> stores the same <c>publish</c> request with target <c>preview</c>
+/// from the files of the author's own draft, with its id as <c>draft_id</c>, see <c>docs/reference/authoring-requests.md#routes</c>. The checks run in
+/// order: session (401), author role (403), application (404), the caller's own draft (404, or 503 when the write lock is busy), the preview tenant (409), the manifest
+/// check (409), then the package quota when the draft has a file under <c>packages/</c>.
 /// <c>POST /api/studio/apps/{application}/releases/{id}/activate</c> stores an <c>activate</c> request that names a release of
 /// the application's history in this tenant, with no snapshot, and answers as <c>publish</c> does. It runs the same checks
 /// as <c>publish</c>, and then answers 404 for an <c>id</c> that is not a UUID or is not in the history. It ignores its body.
@@ -63,6 +68,7 @@ internal static class StudioPublishEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/validate", ValidateAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync).WithRateLimit(Partition.Publishing).WithStorageQuota();
         endpoints.MapPost("/api/studio/apps/{application}/preview", PreviewAsync).WithRateLimit(Partition.Publishing);
+        endpoints.MapPost("/api/studio/apps/{application}/drafts/{draft}/preview", PreviewDraftAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/test", TestAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/build", BuildAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/run", RunAsync).WithRateLimit(Partition.Publishing);
@@ -134,6 +140,61 @@ internal static class StudioPublishEndpoints
         }
 
         return await StoreAsync("publish", application, folder, label: null, note: null, httpContext, database, writeLock, target: "preview");
+    }
+
+    // The order of checks is that of docs/reference/authoring-requests.md#routes.
+    private static async Task<IResult> PreviewDraftAsync(
+        string application,
+        string draft,
+        HttpContext httpContext,
+        StudioOptions options,
+        TenantDatabase database,
+        IStudioWriteLock writeLock,
+        ITenantCatalog catalog,
+        ITenantContextAccessor tenants)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var user = (await CurrentUsers.FindAsync(httpContext))!;
+        var drafts = StudioDrafts.For(StudioEndpoints.ForRequest(httpContext, options).RevisionsPath, folder, user.Id, user.DisplayName, writeLock);
+        if (drafts is null)
+        {
+            return StudioEndpoints.NotFound(StudioRevisionEndpoints.NoDraft);
+        }
+
+        var cancellationToken = httpContext.RequestAborted;
+        var outcome = await drafts.FilesAsync(draft, cancellationToken);
+        if (outcome.Refusal is { } refused)
+        {
+            return refused == StudioWriteRefusal.Unavailable
+                ? StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable)
+                : StudioEndpoints.NotFound(StudioRevisionEndpoints.NoDraft);
+        }
+
+        if (StudioPreview.Find(catalog, tenants.Current!.TenantId) is null)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status409Conflict, "This tenant has no preview tenant.");
+        }
+
+        if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
+        {
+            return NoManifestIdProblem();
+        }
+
+        var files = outcome.Value!;
+        if (files.Any(file => file.File.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal))
+            && await PackageQuota.RefusalAsync(httpContext.RequestServices, tenants.Current.TenantId, cancellationToken) is { } quotaRefusal)
+        {
+            return quotaRefusal;
+        }
+
+        return await InsertAsync(
+            "publish", application, manifest.Name, applicationId, SnapshotJson(StudioFolder.Snapshot(files)), releaseId: null, label: null, note: null, user, database,
+            cancellationToken, target: "preview", draftId: Guid.Parse(draft));
     }
 
     private static async Task<IResult> PublishAsync(
@@ -516,12 +577,13 @@ internal static class StudioPublishEndpoints
         string? scenarioNames = null,
         string? package = null,
         string? operation = null,
-        string? input = null)
+        string? input = null,
+        Guid? draftId = null)
     {
         var id = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         var requestedAt = await InsertRequestAsync(
-            connection, id, kind, applicationId, target, snapshot, releaseId, label, note, user.Id, scenarioNames, draftId: null, folder: null, client: null, package, operation, input, cancellationToken);
+            connection, id, kind, applicationId, target, snapshot, releaseId, label, note, user.Id, scenarioNames, draftId, folder: null, client: null, package, operation, input, cancellationToken);
 
         // The name is the one in the user's profile, else the session's, as GET answers it.
         var names = await UserProfiles.FindDisplayNamesAsync(connection, [user.Id], cancellationToken);

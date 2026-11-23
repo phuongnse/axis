@@ -98,6 +98,7 @@ function requestOf(overrides: Partial<AuthoringRequest>): AuthoringRequest {
     sentAt: '2026-11-18T09:00:00Z',
     approvedAt: null,
     finishedAt: null,
+    draft: null,
     steps: [],
     ...overrides,
   }

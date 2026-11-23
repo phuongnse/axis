@@ -18,6 +18,7 @@ import {
   fetchStudioRelease,
   fetchStudioResource,
   filterResources,
+  findPreviewLinks,
   folderDiffers,
   nextReleaseNumber,
   groupByKind,
@@ -36,6 +37,7 @@ import {
   type StudioReleaseChange,
   type StudioRevision,
   type StudioReleases,
+  type StudioRequest,
   type StudioNames,
   type StudioResourceItem,
   waitForServer,
@@ -687,6 +689,64 @@ describe('previewSiteUrl', () => {
     expect(previewSiteUrl('preview.example.test', 'leave', { protocol: 'https:', port: '' })).toBe(
       'https://preview.example.test/leave',
     )
+  })
+})
+
+describe('findPreviewLinks', () => {
+  const site: StudioResourceItem = {
+    id: 'site-1',
+    kind: 'site',
+    name: 'Purchasing',
+    file: 'sites/purchasing.json',
+    version: 'a',
+    usedBy: 0,
+  }
+  const ended = (overrides: Partial<StudioRequest> = {}): StudioRequest => ({
+    id: 'p2',
+    application: 'PurchaseRequests',
+    kind: 'publish',
+    target: 'preview',
+    status: 'succeeded',
+    label: null,
+    note: null,
+    releaseId: null,
+    diagnostics: [],
+    scenarios: null,
+    ...overrides,
+  })
+  const stubSite = () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ...site, content: { path: 'purchasing' } })))
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('gives each site with its address on the preview host for a succeeded preview', async () => {
+    const fetchMock = stubSite()
+
+    const links = await findPreviewLinks(
+      'PurchaseRequests',
+      'preview.example.test',
+      [site],
+      ended(),
+      new AbortController().signal,
+    )
+
+    expect(links).toEqual([{ site, url: previewSiteUrl('preview.example.test', 'purchasing') }])
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('gives none for a request that is not a succeeded preview or when the deployment has no preview host', async () => {
+    const fetchMock = stubSite()
+    const signal = new AbortController().signal
+
+    expect(
+      await findPreviewLinks('PurchaseRequests', 'preview.example.test', [site], ended({ target: 'tenant' }), signal),
+    ).toEqual([])
+    expect(
+      await findPreviewLinks('PurchaseRequests', 'preview.example.test', [site], ended({ status: 'failed' }), signal),
+    ).toEqual([])
+    expect(await findPreviewLinks('PurchaseRequests', null, [site], ended(), signal)).toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
 

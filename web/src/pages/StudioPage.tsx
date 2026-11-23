@@ -644,6 +644,7 @@ function StudioWorkspace() {
                     requestId={requestId}
                     userId={userId}
                     resources={resources}
+                    previewHost={previewHost}
                   />
                 ) : historyView ? (
                   revisionId !== null ? (

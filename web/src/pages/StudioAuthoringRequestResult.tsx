@@ -1,6 +1,7 @@
 import { Flex, Typography } from 'antd'
 import type { CSSProperties } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { fillText } from '../platform/fillText'
 import { StatusTag } from '../platform/StatusTag'
@@ -8,14 +9,22 @@ import {
   type AuthoringRequest,
   type AuthoringRequestDiffEntry,
   fetchAuthoringRequestDiff,
+  fetchStudioRequest,
+  findPreviewLinks,
+  type PreviewLink,
+  previewStudioDraft,
   ServerUnreachableError,
+  type StudioRequest,
+  type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useFollowJob } from '../platform/useFollowJob'
 import { requestResult } from './studioAuthoringRequest'
 import { StudioChanges } from './StudioChanges'
 import { StudioProblemList } from './StudioProblems'
+import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
 
 /** Every page of the request's diff, in order, or null when the request has neither a draft nor an accept. */
@@ -40,17 +49,24 @@ async function allDiffEntries(
 /**
  * The body of the Result item of a ready, failed or accepted request: the Checks and Review lines with their verdicts,
  * then the request's changes, folded resource by resource. Show the checks opens the compile's problems and the scenario
- * results. The changes are read again when the request moves on, and a failed read shows no changes. See
- * docs/reference/ai-authoring-in-studio.md#the-diff.
+ * results. The changes are read again when the request moves on, and a failed read shows no changes. A ready request's author
+ * sees Preview the draft after the changes when `previewHost` is set. It sends the draft's preview route and follows the
+ * request with `fetchStudioRequest`, kept in memory for this visit, and is off while it runs. Its status line ends with a link to
+ * each of `sites` on the preview host, as the band's Preview does. See docs/reference/ai-authoring-in-studio.md#the-diff and
+ * #preview-the-draft.
  */
 export function StudioAuthoringRequestResult({
   application,
   request,
   isAuthor,
+  previewHost,
+  sites,
 }: {
   application: string
   request: AuthoringRequest
   isAuthor: boolean
+  previewHost: string | null
+  sites: StudioResourceItem[]
 }) {
   const t = useText()
   const { spacing } = useDesignTokens()
@@ -61,6 +77,17 @@ export function StudioAuthoringRequestResult({
   const key = `${application}/${request.id}/${request.state}/${request.round}/${generation}`
   const files = loaded?.key === key ? loaded.files : []
   const [checksOpen, setChecksOpen] = useState(false)
+  // The preview that the author sent in this visit and the links it ended with. It is never read back from the server.
+  const [previewed, setPreviewed] = useState<{ requestId: string; value: StudioRequest; links: PreviewLink[] }>()
+  const [sending, setSending] = useState(false)
+  const [previewFailed, setPreviewFailed] = useState(false)
+  const preview = previewed?.requestId === request.id ? previewed : null
+  const previewing = preview !== null && (preview.value.status === 'queued' || preview.value.status === 'running')
+  const previewId = previewing ? preview.value.id : null
+  const sitesRef = useRef(sites)
+  useEffect(() => {
+    sitesRef.current = sites
+  })
   const result = requestResult(request, isAuthor)
   const grid: CSSProperties = {
     display: 'grid',
@@ -93,6 +120,43 @@ export function StudioAuthoringRequestResult({
     )
     return () => controller.abort()
   }, [key, application, request.id, lost])
+
+  useFollowJob(previewId === null ? null : `${application}/${previewId}/${generation}`, {
+    read: (signal) => fetchStudioRequest(application, previewId!, signal),
+    ends: (answer) => answer.status !== 'queued' && answer.status !== 'running',
+    interval: 1000,
+    waitFirst: true,
+    onAnswer: (value) => setPreviewed({ requestId: request.id, value, links: [] }),
+    onEnd: async (value, signal) => {
+      const links = await findPreviewLinks(application, previewHost, sitesRef.current, value, signal)
+      setPreviewed({ requestId: request.id, value, links })
+    },
+    onError: (error) => {
+      if (error instanceof ServerUnreachableError) {
+        lost()
+        return 'stop'
+      }
+      console.warn(`Reading the preview '${previewId}' of the authoring request '${request.id}' failed`, error)
+      return 'retry'
+    },
+  })
+
+  async function previewDraft(draft: string) {
+    setSending(true)
+    setPreviewFailed(false)
+    try {
+      setPreviewed({ requestId: request.id, value: await previewStudioDraft(application, draft), links: [] })
+    } catch (error) {
+      if (error instanceof ServerUnreachableError) {
+        lost()
+      } else {
+        console.warn(`Previewing the draft of the authoring request '${request.id}' of '${application}' failed`, error)
+        setPreviewFailed(true)
+      }
+    } finally {
+      setSending(false)
+    }
+  }
 
   const { checks, review } = result
   // A passed review stores no text, so it has no summary. A review with findings shows its own text.
@@ -149,6 +213,28 @@ export function StudioAuthoringRequestResult({
         <Flex vertical gap={spacing.xs}>
           <Typography.Text strong>{t('shell.studio.aiRequest.changes')}</Typography.Text>
           <StudioChanges files={files} resources={[]} folded />
+        </Flex>
+      )}
+      {isAuthor && request.state === 'ready' && previewHost !== null && request.draft !== null && (
+        <Flex vertical gap={spacing.xs} align="flex-start">
+          <AxisButton
+            role="secondary"
+            data-testid="studio-ai-request-preview"
+            disabled={sending || previewing}
+            onClick={() => void previewDraft(request.draft!)}
+          >
+            {t('shell.studio.aiRequest.previewDraft')}
+          </AxisButton>
+          {previewFailed && (
+            <AxisAlert
+              data-testid="studio-ai-request-preview-error"
+              kind="error"
+              message={t('shell.studio.request.sendFailed')}
+            />
+          )}
+          {preview !== null && (
+            <StudioRequestStatus request={preview.value} releaseNumber={null} previewLinks={preview.links} />
+          )}
         </Flex>
       )}
     </Flex>

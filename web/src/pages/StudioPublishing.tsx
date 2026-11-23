@@ -6,10 +6,10 @@ import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioReleases,
   fetchStudioRequest,
-  fetchStudioResource,
-  previewSiteUrl,
+  findPreviewLinks,
   previewStudioApp,
   publishStudioApp,
+  type PreviewLink,
   type PublishDetails,
   activateStudioRelease,
   ServerUnreachableError,
@@ -54,45 +54,17 @@ async function findReleaseNumber(
   return releases.items.find((item) => item.releaseId === ended.releaseId)?.number ?? null
 }
 
-// The site paths are read from the folder, so a path renamed since the request was sent gives a wrong link.
-async function findPreviewLinks(
-  application: string,
-  previewHost: string | null,
-  sites: StudioResourceItem[],
-  ended: StudioRequest,
-  signal: AbortSignal,
-): Promise<string[]> {
-  if (ended.target !== 'preview' || ended.status !== 'succeeded' || previewHost === null) {
-    return []
-  }
-  const links: string[] = []
-  for (const site of sites) {
-    try {
-      const { content } = await fetchStudioResource(application, site.id, signal)
-      if (typeof content.path === 'string') {
-        links.push(previewSiteUrl(previewHost, content.path))
-      }
-    } catch (error) {
-      if (signal.aborted || error instanceof ServerUnreachableError) {
-        throw error
-      }
-      console.warn(`Loading the site '${site.id}' for the preview links failed`, error)
-    }
-  }
-  return links
-}
-
 /**
  * The band of the open application, with the status of the request its buttons send and its release history. The
  * band holds the `newResource` button, Validate, Preview, Run tests, Ask AI and Publish. Ask AI shows only when `canAskAi`, sits just
  * before Publish and never folds, and `onToggleAskAi` opens and closes the request panel, see `StudioAskAi`, with `askAiOpen` saying whether it is open. They keep one line: when they do not
  * fit, Validate, Preview and Run tests fold into one "…" menu, see `AxisActionRow`. On its left it shows the application's
  * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the Problems
- * panel beside the page, then the release state. The request status, test results and
- * preview links show at the top of the content, under the band, then `children`, which is called with the release history
+ * panel beside the page, then the release state. The request status and test results
+ * show at the top of the content, under the band, then `children`, which is called with the release history
  * when it is a function. The release list follows only on `releasesView`, under the page's heading. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
- * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
- * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
+ * preview request. When it succeeds, its status line ends with a link to each of the application's `sites` on the preview host, named by
+ * the site and built from the page's protocol and port, see `StudioRequestStatus`. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish… calls `onOpenPublish`, which opens the publish page, see `StudioPublishPage`, and
  * hides while `publishView` is set, because that page has its own Publish. The ref's `publish` sends the publish
  * request with the label and note the page gives it, see docs/reference/studio.md#publishing, and the status line shows
@@ -163,7 +135,7 @@ export function StudioPublishing({
   const { generation, reconnecting, lost } = useStudioConnection()
   const [request, setRequest] = useState<StudioRequest | null>(null)
   const [releaseNumber, setReleaseNumber] = useState<number | null>(null)
-  const [previewLinks, setPreviewLinks] = useState<string[]>([])
+  const [previewLinks, setPreviewLinks] = useState<PreviewLink[]>([])
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [history, setHistory] = useState<StudioReleases | 'failed'>()
@@ -337,18 +309,9 @@ export function StudioPublishing({
       </StudioBand>
       <Flex vertical gap="middle" style={{ minWidth: 0 }}>
         {sendError !== null && <AxisAlert data-testid="studio-request-error" kind="error" message={sendError} />}
-        {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
+        {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} previewLinks={previewLinks} />}
         {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
           <StudioTestResults request={request} scenarioAddressOf={scenarioAddressOf} />
-        )}
-        {previewLinks.length > 0 && (
-          <Flex vertical gap={4}>
-            {previewLinks.map((link) => (
-              <a key={link} data-testid="studio-preview-link" href={link} target="_blank" rel="noreferrer">
-                {link}
-              </a>
-            ))}
-          </Flex>
         )}
         {typeof children === 'function' ? children(history) : children}
         {releasesView && history && history !== 'failed' && (

@@ -120,7 +120,8 @@ function guideWords(
  * draft and sends the request back to work, and the page forgets that accept.
  * Until the request waits for its author or ends, the page asks for it every second and keeps the last answer when a read
  * fails. A request that does not exist shows its line and, when `onAskAi` is given, an Ask AI link that opens the request
- * panel. `resources` is the application's resource list, which names the resources of a conflict. See
+ * panel. `resources` is the application's resource list, which names the resources of a conflict and holds the sites that Preview the
+ * draft links to on `previewHost`, see `StudioAuthoringRequestResult`. See
  * docs/reference/ai-authoring-in-studio.md#the-heading, #the-feed, #the-work-item, #the-plan, #the-plans-groups, #the-diff, #accepting and
  * #the-guide, #replies and #the-history.
  */
@@ -130,12 +131,14 @@ export function StudioAuthoringRequestPage({
   userId,
   onAskAi,
   resources = [],
+  previewHost,
 }: {
   application: string
   requestId: string
   userId: string | null
   onAskAi?: () => void
   resources?: StudioResourceItem[]
+  previewHost: string | null
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -273,7 +276,13 @@ export function StudioAuthoringRequestPage({
         mark,
         body: (
           <Flex vertical gap={spacing.sm}>
-            <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />
+            <StudioAuthoringRequestResult
+              application={application}
+              request={request}
+              isAuthor={isAuthor}
+              previewHost={previewHost}
+              sites={resources.filter((item) => item.kind === 'site')}
+            />
             {followed !== null &&
               (conflicted ? (
                 <AcceptConflict application={application} conflicts={conflicts} resources={resources} />
