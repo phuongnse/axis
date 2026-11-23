@@ -104,7 +104,7 @@ const failedTest = {
  * `readTest` answers otherwise. A move answers `moveStatus` with a problem when it is not 200, and moves nothing. The
  * package's run inputs start as `saved` at version `v0`, or have no version before the first save, and a write with a wrong version
  * answers `409`. A run answers `202`, and its request has ended with the run `greet`. Every request is recorded in
- * `requests`, and `writesSent` has those that are not reads.
+ * `requests`, and `writesSent` has those that are not reads. `manifest` replaces the package's `axis-package.json`.
  */
 function stubPackage(
   writes: Record<string, () => Response> = {},
@@ -113,9 +113,10 @@ function stubPackage(
   saved: StudioRunInput[] | null = null,
   readTest: () => Response = () => json(failedTest),
   moveStatus = 200,
+  manifest = contents['axis-package.json'],
 ) {
   const puts: { path: string; ifMatch: string | null; body: { content: string } }[] = []
-  const store = { ...contents }
+  const store: Record<string, string> = { ...contents, 'axis-package.json': manifest }
   let stored = { items: saved ?? [], version: saved === null ? null : 0 }
   requests = []
   vi.stubGlobal(
@@ -1053,6 +1054,39 @@ describe('StudioPackageWorkspace', () => {
         operation: 'greet',
         input: { name: 'Ada', count: null },
       })
+    })
+
+    it('keeps a boolean input its own width, as a checkbox does in a form', async () => {
+      stubPackage(
+        {},
+        [],
+        () => json(failedBuild),
+        null,
+        () => json(failedTest),
+        200,
+        JSON.stringify({
+          id: 'tools',
+          label: 'Purchasing tools',
+          version: '1.2.0',
+          operations: [
+            {
+              name: 'greet',
+              type: 'greet',
+              idempotent: true,
+              input: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'enabled', type: 'boolean' },
+              ],
+            },
+          ],
+        }),
+      )
+      renderWorkspace(true)
+      const panel = await openRun()
+
+      const checkbox = within(panel).getByRole('checkbox', { name: /^enabled/ })
+      expect(checkbox.closest('.ant-checkbox-wrapper')).not.toHaveStyle({ width: '100%' })
+      expect(within(panel).getByRole('textbox', { name: /^name/ })).toHaveStyle({ width: '100%' })
     })
 
     it('shows each input field that has no value as null in the JSON, and follows the form', async () => {
