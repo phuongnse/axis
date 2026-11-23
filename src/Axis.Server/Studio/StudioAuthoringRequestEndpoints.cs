@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
@@ -30,10 +31,12 @@ namespace Axis.Server.Studio;
 /// row. Just before the insert the quota is counted again under a transaction lock, so two sends at once cannot both pass it. The
 /// request, its encrypted refresh token and its audit record commit together. <c>GET .../authoring-requests</c> lists the newest 100 requests of the application and <c>GET .../authoring-requests/{id}</c>
 /// reads one with its steps. The session and role checks and the application come first, and then an <c>id</c> that is not a UUID of this
-/// application answers 404. <c>POST .../{id}/approve</c>, <c>.../change-plan</c>, <c>.../request-changes</c> and <c>.../drop</c> run those checks, then answer 403
+/// application answers 404. <c>POST .../{id}/approve</c>, <c>.../change-plan</c>, <c>.../request-changes</c>, <c>.../retry</c> and <c>.../drop</c> run those checks, then answer 403
 /// to anyone but the request's author, for <c>change-plan</c> and <c>request-changes</c> check its body <c>{ comment }</c> of 1 to 2000 characters (415, 400), and
 /// last check the state under a row lock (409). <c>request-changes</c> also answers 409 for a draft that has an accept queued or running, and it
 /// keeps the comment as a <c>changeRequest</c> step, sets the round to 0, clears the agent host's claim and moves the request to <c>working</c>.
+/// <c>retry</c> takes no body and answers 409 unless the request is <c>ready</c> with a draft whose newest accept failed with <c>AXC0377</c>, a conflict. It
+/// clears the draft, sets the round to 0, clears the agent host's claim, stores a <c>retry</c> step with no comment and moves the request to <c>working</c>.
 /// They answer 200 with the request. Problem titles never contain text from the request. The drop erases the stored refresh
 /// token, and no answer carries it. <c>POST .../{id}/accept</c> takes no body and runs the same checks, then answers 409 for a request that is not
 /// <c>ready</c> or has no draft, and 409 for a draft that already has an accept queued or running. Otherwise it stores an <c>accept</c> publish request
@@ -70,6 +73,7 @@ internal static class StudioAuthoringRequestEndpoints
         Approve,
         ChangePlan,
         RequestChanges,
+        Retry,
         Drop,
         Accept,
     }
@@ -89,6 +93,9 @@ internal static class StudioAuthoringRequestEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/request-changes",
             (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
                 ChangeAsync(Action.RequestChanges, application, id, httpContext, options, database));
+        endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/retry",
+            (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
+                ChangeAsync(Action.Retry, application, id, httpContext, options, database));
         endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/drop",
             (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
                 ChangeAsync(Action.Drop, application, id, httpContext, options, database));
@@ -534,6 +541,8 @@ internal static class StudioAuthoringRequestEndpoints
             Action.Drop => state is not (null or "accepted" or "dropped"),
             Action.Accept => state == "ready" && draftId is not null,
             Action.RequestChanges => state == "ready",
+            Action.Retry => state == "ready" && draftId is { } conflictedDraft
+                && await LastAcceptConflictedAsync(connection, transaction, applicationId, conflictedDraft, cancellationToken),
             _ => state == "awaitingApproval",
         };
         if (!allowed)
@@ -575,6 +584,12 @@ internal static class StudioAuthoringRequestEndpoints
                     connection, transaction, requestId, cancellationToken);
                 await InsertCommentStepAsync("changeRequest", connection, transaction, requestId, comment!, cancellationToken);
                 break;
+            case Action.Retry:
+                await ExecuteAsync(
+                    "UPDATE axis.authoring_requests SET state = 'working', round = 0, draft_id = NULL, claimed_by = NULL, claimed_until = NULL WHERE id = @id",
+                    connection, transaction, requestId, cancellationToken);
+                await InsertCommentStepAsync("retry", connection, transaction, requestId, comment: null, cancellationToken);
+                break;
             default:
                 await ExecuteAsync(
                     "UPDATE axis.authoring_requests SET state = 'dropped', finished_at = now(), claimed_by = NULL, claimed_until = NULL, refresh_token = NULL WHERE id = @id",
@@ -587,9 +602,9 @@ internal static class StudioAuthoringRequestEndpoints
         return Results.Ok(await ReadAsync(connection, requestId, applicationId, application, steps: false, user.DisplayName, cancellationToken));
     }
 
-    // A finished step of the given kind that holds the author's comment, after the request's last step.
+    // A finished step of the given kind that holds the author's comment, if any, after the request's last step.
     private static async Task InsertCommentStepAsync(
-        string kind, NpgsqlConnection connection, NpgsqlTransaction transaction, Guid requestId, string comment, CancellationToken cancellationToken)
+        string kind, NpgsqlConnection connection, NpgsqlTransaction transaction, Guid requestId, string? comment, CancellationToken cancellationToken)
     {
         await using var step = new NpgsqlCommand(
             """
@@ -602,7 +617,7 @@ internal static class StudioAuthoringRequestEndpoints
         step.Parameters.AddWithValue("step", Guid.CreateVersion7());
         step.Parameters.AddWithValue("id", requestId);
         step.Parameters.AddWithValue("kind", kind);
-        step.Parameters.AddWithValue("comment", comment);
+        step.Parameters.AddWithValue("comment", (object?)comment ?? DBNull.Value);
         await step.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -643,6 +658,26 @@ internal static class StudioAuthoringRequestEndpoints
             transaction);
         check.Parameters.AddWithValue("draft", draftId);
         return await check.ExecuteScalarAsync(cancellationToken) as Guid?;
+    }
+
+    // True when the newest accept of the draft failed with AXC0377, see docs/reference/authoring-requests.md#routes.
+    private static async Task<bool> LastAcceptConflictedAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, Guid applicationId, Guid draftId, CancellationToken cancellationToken)
+    {
+        await using var check = new NpgsqlCommand(
+            """
+            SELECT status = 'failed' AND diagnostics @> jsonb_build_array(jsonb_build_object('code', @code::text))
+            FROM axis.publish_requests
+            WHERE application_id = @application AND kind = 'accept' AND draft_id = @draft
+            ORDER BY requested_at DESC, id DESC
+            LIMIT 1
+            """,
+            connection,
+            transaction);
+        check.Parameters.AddWithValue("application", applicationId);
+        check.Parameters.AddWithValue("draft", draftId);
+        check.Parameters.AddWithValue("code", DiagnosticCodes.AcceptConflict);
+        return await check.ExecuteScalarAsync(cancellationToken) is true;
     }
 
     private static async Task ExecuteAsync(

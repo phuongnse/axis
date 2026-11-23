@@ -2639,6 +2639,7 @@
   "shell.studio.aiRequest.conflict": "Có người đã thay đổi các tài nguyên này sau khi AI đọc, nên chưa có gì được chấp nhận:",
   "shell.studio.aiRequest.conflict.item": "{name}: {author} thay đổi lúc {time}",
   "shell.studio.aiRequest.accept": "Chấp nhận",
+  "shell.studio.aiRequest.retry": "Nhờ AI làm lại thay đổi",
   "shell.studio.aiRequest.changePlan": "Đổi kế hoạch…",
   "shell.studio.aiRequest.changePlan.title": "Đổi kế hoạch",
   "shell.studio.aiRequest.changePlan.label": "Bạn muốn kế hoạch khác đi thế nào?",

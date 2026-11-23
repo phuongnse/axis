@@ -300,6 +300,79 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_authors_retry_of_an_accept_conflict_clears_the_draft_and_the_claim_and_sends_the_request_back_to_work_with_round_0()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("authoring_requests_retry", CancellationToken);
+        await using var factory = NewFactory(folder.Path, connectionString);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var employee = factory.CreateClient().SignedInAs("employee");
+        var id = await SendRequestAsync(author);
+        var draft = Guid.NewGuid();
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            $"UPDATE axis.authoring_requests SET state = 'ready', draft_id = '{draft}', round = 3, claimed_by = 'host', claimed_until = now() + interval '1 hour' WHERE id = '{id}'",
+            CancellationToken);
+        var unchanged = $"ready|3|{draft}|false";
+        const string Row = "SELECT state || '|' || round || '|' || coalesce(draft_id::text, '') || '|' || (claimed_by IS NULL AND claimed_until IS NULL) FROM axis.authoring_requests WHERE id = '{0}'";
+
+        // Another author is refused, and nothing is stored.
+        using var other = await StudioPublishTests.SendAsync(employee, HttpMethod.Post, $"{Url}/{id}/retry", Host);
+        Assert.Equal(HttpStatusCode.Forbidden, other.StatusCode);
+
+        // A ready request with no accept is a 409, and so is a request that is not ready.
+        using var noAccept = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/retry", Host);
+        Assert.Equal(HttpStatusCode.Conflict, noAccept.StatusCode);
+        await SetStateAsync(connectionString, id, "awaitingApproval");
+        using var notReady = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/retry", Host);
+        Assert.Equal(HttpStatusCode.Conflict, notReady.StatusCode);
+        await SetStateAsync(connectionString, id, "ready");
+
+        // An accept that has not finished is a 409.
+        using var first = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        using var pending = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/retry", Host);
+        Assert.Equal(HttpStatusCode.Conflict, pending.StatusCode);
+
+        // The newest accept decides: an older conflict does not count when the newest accept failed for another reason.
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            """UPDATE axis.publish_requests SET status = 'failed', finished_at = now(), diagnostics = '[{"code":"AXC0377"}]'""",
+            CancellationToken);
+        using var second = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            """UPDATE axis.publish_requests SET status = 'failed', finished_at = now(), diagnostics = '[{"code":"AXIS-E101"}]' WHERE status = 'queued'""",
+            CancellationToken);
+        using var otherFailure = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/retry", Host);
+        Assert.Equal(HttpStatusCode.Conflict, otherFailure.StatusCode);
+        Assert.Equal(unchanged, await StringAsync(connectionString, string.Format(Row, id)));
+        Assert.Equal(0L, await ScalarAsync(connectionString, "SELECT count(*) FROM axis.authoring_request_steps"));
+
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            """UPDATE axis.publish_requests SET diagnostics = '[{"code":"AXC0377"}]' WHERE diagnostics @> '[{"code":"AXIS-E101"}]'""",
+            CancellationToken);
+        using var retried = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/retry", Host);
+
+        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
+        using var retriedBody = await StudioPublishTests.ReadAsync(retried);
+        Assert.Equal("working", retriedBody.RootElement.GetProperty("state").GetString());
+        Assert.Equal(0, retriedBody.RootElement.GetProperty("round").GetInt32());
+        Assert.Equal("working|0||true", await StringAsync(connectionString, string.Format(Row, id)));
+        using var read = await StudioPublishTests.GetJsonAsync(author, $"{Url}/{id}", Host);
+        var steps = read.RootElement.GetProperty("steps");
+        Assert.Equal(1, steps.GetArrayLength());
+        Assert.Equal("retry", steps[0].GetProperty("kind").GetString());
+        Assert.Equal(JsonValueKind.Null, steps[0].GetProperty("summary").ValueKind);
+
+        // The request is working now, so a second retry is a 409.
+        using var again = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/retry", Host);
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+    }
+
+    [Fact]
     public async Task Sending_approving_and_dropping_each_write_one_audit_record_with_the_author_the_application_and_the_request()
     {
         using var folder = StudioPublishTests.NewFolder();

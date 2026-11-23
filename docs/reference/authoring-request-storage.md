@@ -52,6 +52,8 @@ when the author approves, changes the plan or drops it. The publisher moves a `r
   step finds its claim, and a step never moves an `accepted` request.
   A `changeRequest` step holds the author's comment in `input_summary`, see
   [requesting changes](authoring-requests.md#routes). It has no `outcome` and no `checks`.
+  A `retry` step marks the author's retry of an accept conflict, see
+  [retrying a conflict as the author](authoring-requests.md#routes). It has no `input_summary`, no `outcome` and no `checks`.
 
 ### New columns
 

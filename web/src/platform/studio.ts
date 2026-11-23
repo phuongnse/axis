@@ -2162,13 +2162,13 @@ export async function fetchAuthoringRequestDiff(
 }
 
 /**
- * Posts an action on one authoring request, `approve`, `change-plan`, `request-changes` or `drop`, and answers the request. A 401 shows the
+ * Posts an action on one authoring request, `approve`, `change-plan`, `request-changes`, `retry` or `drop`, and answers the request. A 401 shows the
  * sign-in prompt and throws, as any other failed status does.
  */
 async function postAuthoringRequestAction(
   application: string,
   id: string,
-  action: 'approve' | 'change-plan' | 'request-changes' | 'drop',
+  action: 'approve' | 'change-plan' | 'request-changes' | 'retry' | 'drop',
   body?: { comment: string },
 ): Promise<AuthoringRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}/${action}`
@@ -2206,6 +2206,14 @@ export function requestAuthoringRequestChanges(
   comment: string,
 ): Promise<AuthoringRequest> {
   return postAuthoringRequestAction(application, id, 'request-changes', { comment })
+}
+
+/**
+ * Has AI make the change again after an accept met a conflict, which clears the draft and moves the request back to
+ * `working` with its round at 0, see docs/reference/authoring-requests.md#routes.
+ */
+export function retryAuthoringRequest(application: string, id: string): Promise<AuthoringRequest> {
+  return postAuthoringRequestAction(application, id, 'retry')
 }
 
 /** Drops a request, which ends it as `dropped`. */

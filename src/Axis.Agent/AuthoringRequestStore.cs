@@ -12,7 +12,7 @@ namespace Axis.Agent;
 /// comments of every change of plan, oldest first, the draft the request works in, once the working step has made it, the <c>checks</c> of its newest
 /// <c>check</c> step as JSON, once a check has stored them, the tokens its steps have used, when the time limit starts, its <c>round</c>, the
 /// findings of its newest <c>review</c> step after that check, if the review had any, and the comments of every <c>changeRequest</c> step, oldest first.
-/// The time limit starts at the later of the approval of the plan and the newest change request, see <c>docs/reference/authoring-requests.md#budgets</c>.
+/// The time limit starts at the later of the approval of the plan and the newest change request or retry, see <c>docs/reference/authoring-requests.md#budgets</c>.
 /// </summary>
 public sealed record AuthoringRequestToWork(
     Guid Id,
@@ -56,7 +56,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         (SELECT s.checks::text FROM axis.authoring_request_steps s
               WHERE s.request_id = a.id AND s.kind = 'check' AND s.checks IS NOT NULL ORDER BY s.ordinal DESC LIMIT 1),
         a.tokens,
-        greatest(a.approved_at, (SELECT max(s.finished_at) FROM axis.authoring_request_steps s WHERE s.request_id = a.id AND s.kind = 'changeRequest')),
+        greatest(a.approved_at, (SELECT max(s.finished_at) FROM axis.authoring_request_steps s WHERE s.request_id = a.id AND s.kind IN ('changeRequest', 'retry'))),
         a.round,
         (SELECT r.checks->'review'->>'findings' FROM axis.authoring_request_steps r
               WHERE r.request_id = a.id AND r.kind = 'review' AND r.checks IS NOT NULL
