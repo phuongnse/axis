@@ -144,9 +144,11 @@ export function StudioPublishPage({
                   : fillText(t('shell.studio.publish.changes.many'), { count: changes.diff.resources.length }),
             }}
           >
+            {/* Proposed: the files fold at first, as the page lists every file since the live release, see #4623. */}
             <StudioChanges
               files={changes.diff.resources}
               resources={resources}
+              folded
               changedBy={{
                 application,
                 authors: (file) => changeAuthors(file.by, userId, changes.requestNames),

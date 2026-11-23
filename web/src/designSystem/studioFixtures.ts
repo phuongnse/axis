@@ -21,6 +21,8 @@ import type {
   StudioResourceItem,
   StudioResourceReferences,
   StudioRevision,
+  StudioLiveDiff,
+  StudioLiveRevision,
   StudioRevisionChange,
   StudioRevisionDiff,
 } from '../platform/studio'
@@ -32,6 +34,7 @@ import {
   locale,
   noTableChoices,
   tableWidget,
+  currentUser,
 } from './fixtures'
 import type { FixtureRoute } from './fixtureFetch'
 
@@ -663,6 +666,37 @@ const typicalAuthoringRequestDiff = {
   cursor: null,
 } satisfies AuthoringRequestDiff
 
+/** Proposed: the revision that accepted the Authoring request state's draft, which the live diff names, see #4623. */
+const acceptRevision = {
+  id: 'r5',
+  summary: 'Accept draft',
+  author: 'Alex Morgan',
+  userId: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+  client: 'studio',
+  request: null,
+  time: '2026-10-22T10:20:00Z',
+  authoringRequest: typicalAuthoringRequestId,
+} satisfies StudioLiveRevision
+
+/** A revision of the live diff's `by` that no AI request made. */
+const byPerson = (revision: StudioRevision): StudioLiveRevision => ({ ...revision, authoringRequest: null })
+
+/**
+ * Proposed: the files of Typical that differ from live release 2, for the Publish page state, see #4623: the Requests
+ * page Alex Morgan changed in Studio, the adapter and its test that the AI request changed, and the settings file the
+ * outside change removed, each with who changed it since the release.
+ */
+const typicalLiveDiff = {
+  release: 2,
+  resources: [
+    { ...typicalRevisionDiff.resources[0], titles: null, by: [byPerson(typicalRevisions.items[1])] },
+    { ...approvalRulesChanges[0], titles: null, by: [acceptRevision] },
+    { ...approvalRulesChanges[1], titles: null, by: [byPerson(typicalRevisions.items[0])] },
+    { ...approvalRulesChanges[2], titles: null, by: [acceptRevision] },
+  ],
+  cursor: null,
+} satisfies StudioLiveDiff & { cursor: null }
+
 /** Release 2 of Typical's history, which is live: it pins the Organization module and compares with release 1. */
 const typicalRelease: StudioRelease = {
   number: 2,
@@ -1108,5 +1142,11 @@ export const studioFixtures = {
   withErrors: workspaceRoutes(typicalFolder, errorAnswers),
   newApplication: workspaceRoutes(newFolder, unpublishedAnswers),
   releasePage: { ...workspaceRoutes(typicalFolder), [`${folderPath}/releases/2`]: () => typicalRelease },
+  // Proposed: Typical for a person who may publish, with the files that differ from the live release, see #4623.
+  publishPage: {
+    ...workspaceRoutes(typicalFolder),
+    '/api/me': () => ({ ...currentUser, studioPublisher: true }),
+    [`${folderPath}/releases/live/diff`]: () => typicalLiveDiff,
+  },
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
 } satisfies Record<string, Record<string, FixtureRoute>>

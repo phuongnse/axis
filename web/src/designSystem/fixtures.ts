@@ -885,7 +885,7 @@ const categoryRecord: RecordItem = {
   labels: {},
 }
 
-const currentUser: CurrentUser = {
+export const currentUser: CurrentUser = {
   id: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
   displayName: 'Alex Morgan',
   roles: ['Author', 'Operator', 'Administrator'],
