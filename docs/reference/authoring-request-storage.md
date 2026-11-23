@@ -23,8 +23,10 @@ when the author approves, changes the plan or drops it. The publisher moves a `r
   `(application_id, sent_at, id)` and `(sent_at)` serve the list and the monthly count.
 - **`axis.authoring_request_steps`.** One row per step: `id` (`uuid`), `request_id` (`uuid`, deleted
   with its request), `ordinal` (`integer`, unique per request), `kind`, `input_summary` and `outcome`
-  (`text`, null), `tokens` (`bigint`), `messages` (`jsonb`, null), `checks` (`jsonb`, null), `started_at` (`timestamptz`) and
-  `finished_at` (`timestamptz`, null). A comment that asks for another plan is a `planChange` step. A step that
+  (`text`, null), `tokens` (`bigint`), `messages` (`jsonb`, null), `checks` (`jsonb`, null), `resource` (`jsonb`, null), `started_at` (`timestamptz`) and
+  `finished_at` (`timestamptz`, null). A comment that asks for another plan is a `planChange` step. A `write` step holds
+  the resource it wrote or deleted in `resource`, `{ kind, id, name }`, and `resource` is null on every other step, see
+  [writes](authoring-requests.md#states). A step that
   never finished has the `outcome` `interrupted` once a later host closes it, see
   [resuming](authoring-requests.md#durable-requests). A step that found the author's token ended
   has the `outcome` `tokenEnded`, see [acting for the author](authoring-requests.md#acting-for-the-author).
@@ -59,9 +61,7 @@ _(planned for M35)_
 
 - **`axis.authoring_requests`.** `title` (`text`, null), `client` (`text`, `studio` or the outside client id),
   `co_authors` (`text[]`) and `plan` as `jsonb` of [the plan's shape](authoring-requests.md#states).
-- **`axis.authoring_request_steps`.** A `write` step holds the resource it wrote in a `resource` column, `jsonb` of `{ kind, id, name }`, which is null on
-  every other step.
-  A `review` step has the new outcome `notReviewed`, and its `checks` holds the review's shape, see
+- **`axis.authoring_request_steps`.** A `review` step has the new outcome `notReviewed`, and its `checks` holds the review's shape, see
   [the review's shape](authoring-requests.md#states).
 - **Outside apps.** An outside app's request has its refresh token stored at approval, not at send, because
   approval is the first moment its author has a Studio session for it, see

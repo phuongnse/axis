@@ -296,6 +296,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             step.Property(s => s.Tokens).HasColumnName("tokens").HasDefaultValue(0L);
             step.Property(s => s.Messages).HasColumnName("messages").HasColumnType("jsonb");
             step.Property(s => s.Checks).HasColumnName("checks").HasColumnType("jsonb");
+            step.Property(s => s.Resource).HasColumnName("resource").HasColumnType("jsonb");
             step.Property(s => s.StartedAt).HasColumnName("started_at").HasDefaultValueSql("now()");
             step.Property(s => s.FinishedAt).HasColumnName("finished_at");
             step.HasIndex(s => new { s.RequestId, s.Ordinal }).IsUnique()

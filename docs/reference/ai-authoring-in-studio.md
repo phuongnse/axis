@@ -160,12 +160,12 @@ Result, Started and Duration.
   “<comment>”" and "Asked for changes: “<comment>”".
 - The results read "Plan written", "Saved", "All scenarios pass", "No changes requested", "Refused" or
   "Ran out of time". The only free text is the author's own comment in a step.
-- **Writes that follow each other** _(planned for M35)_. Writes that follow each other fold into one group row, as
+- **Writes that follow each other.** Writes that follow each other fold into one group row, as
   [folding group rows](actions-and-controls.md#tables) says. The row reads "Wrote 3 resources", or "Changed 3
   resources" when one of them is a delete. Its Result is the outcome the writes share, or "Results differ". Its
   Duration runs from the first write's start to the last write's end.
-- **Each write** _(planned for M35)_. Each write is a row under its group, with its own Result, Started and Duration.
-  It reads "Wrote <resource>" and names its resource with [`ResourceReference`](shared-widgets.md#which-widget), so the
+- **Each write.** Each write is a row under its group, with its own Result, Started and Duration.
+  It reads "Wrote <resource>", or "Deleted <resource>" for a delete, and names its resource with [`ResourceReference`](shared-widgets.md#which-widget), so the
   name is the only link and the kind is muted.
 - **An outside app's steps** _(planned for M35)_. For an outside app, the plan step reads "Proposed a plan".
 

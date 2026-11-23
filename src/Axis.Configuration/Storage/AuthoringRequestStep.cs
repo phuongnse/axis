@@ -24,6 +24,9 @@ public sealed class AuthoringRequestStep
     /// <summary>The results of a check step as JSON, or null.</summary>
     public string? Checks { get; init; }
 
+    /// <summary>The resource of a <c>write</c> step as JSON, <c>{ kind, id, name }</c>, or null.</summary>
+    public string? Resource { get; init; }
+
     public DateTimeOffset StartedAt { get; init; }
 
     public DateTimeOffset? FinishedAt { get; init; }

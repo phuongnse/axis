@@ -57,7 +57,7 @@ loses no work.
 - **Tables.** `axis.authoring_requests` holds one row per request: its id, application, author,
   request text, binding, state, draft, plan, round, token use, the auto-accept flag and its times.
   `axis.authoring_request_steps` holds one row per step of the loop, in order: its kind, input
-  summary, outcome, tokens, checks and times. The columns are in [authoring request storage](authoring-request-storage.md#authoring-requests).
+  summary, outcome, tokens, checks, resource and times. The columns are in [authoring request storage](authoring-request-storage.md#authoring-requests).
 - **Model messages.** A step's full model messages, resource contents included, are kept in its row
   in `messages`.
 - **Deleting model messages** _(planned for M35)_. A step's model messages are deleted after 30 days,
@@ -132,8 +132,10 @@ an accept, which [accepting](#accepting) describes.
   `GET /api/studio/apps/{application}/requests/{id}`, and a `Location` for that route. The other
   routes answer a request, which has its `id`, `application`, `author`, `authorName`, `text`, `state`, `plan`,
   `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt` and `finishedAt`. The read route adds `steps`,
-  each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt`, `finishedAt` and `checks`, which is
-  the results of a `check` step or the review of a `review` step, and null on any other step.
+  each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt`, `finishedAt`, `checks` and `resource`.
+  `checks` is the results of a `check` step or the review of a `review` step, and null on any other step.
+  `resource` is `{ kind, id, name }` on a `write` step and null on any other step, and the `summary` of a `write`
+  step is the name of its tool.
 - **Paging the list** _(planned for M35)_. The list route takes the record API's `page`, `pageSize`, `sort`, `search`
   and `filter`, as [paging and sorting](record-api.md#paging-and-sorting) defines them. The columns are `title` and
   `author` (the author's name), which are text, `sentAt`, which is a date, and `state`, an enum column whose values are the state names. `state` sorts in the order a request goes through its states. The order is newest
@@ -177,8 +179,7 @@ an accept, which [accepting](#accepting) describes.
   before it), `app` as `{ client, name }` (`studio` with a null name for a request sent in Studio), `coAuthors`
   (the apps that wrote to the draft, in the shape of `app`, in order of first write), `aiConnected` (the AI status
   rule, for the request's author, so the page can say that no review will run), `draft` (the draft's id, or null)
-  and `plan` as [the plan's shape](#states). Each step answers `resource`, `{ kind, id, name }` on a `write` step
-  and null on the others.
+  and `plan` as [the plan's shape](#states).
 - **Approving an outside app's request** _(planned for M35)_. The approve route also gets the agent host's
   [token](#acting-for-the-author), as a send does and with the same refusals, so the agent host can run the checks
   and the review for the author. The agent host runs no plan or change step of such a request.
@@ -215,6 +216,13 @@ the checks, an independent review and fix rounds.
   `validate_draft`, `diff_draft`, `write_package_file`, `delete_package_file` and `test_package`, and only for the request's application and its draft. A call without a
   draft gets the request's draft. Any other call gets a tool error from the agent host and never reaches the
   MCP server. When the model ends its turn, the request moves to `checking`.
+- **Writes.** Each call of `write_resource`, `delete_resource` or `write_layer` on the draft of a request in
+  `working` or `fixing` stores a finished `write` step, whoever makes the call: the agent host or an outside app.
+  The MCP server stores it in its own transaction after the call, so a call on any other draft, on a request in
+  another state or on one of another author stores none. Its outcome is `saved` or `refused`, its `input_summary`
+  is the name of the tool, and its `resource` is `{ kind, id, name }`, where a part the call did not name is null.
+  A call that the agent host refuses never reaches the MCP server and stores no step. A package file has no
+  resource, so `write_package_file` and `delete_package_file` store none.
 - **Packages.** Planning is also offered `list_package_files` and `read_package_file`, and any write tool it
   calls, the package ones included, gets a tool error from the agent host and never reaches the MCP server.
   Working and fixing are also offered `write_package_file`, `delete_package_file` and `test_package`, always
@@ -353,8 +361,6 @@ Each step of a request has a kind that belongs to one step of [the frame](#state
 | `fix`           | Change     | `unfinished`                                      | null                               |
 | `changeRequest` | Ready      | none, the comment is in `input_summary`           | null                               |
 | `accept`        | Ready      | `accepted`, `refused`, `conflict`, `notAccepted`  | null                               |
-
-Each write tool call of an outside app stores a `write` step, with its `resource` as `{ kind, id, name }`.
 
 Any step may also end `interrupted`, `tokenEnded`, `overBudget`, `timedOut`, `keyRefused`, `noKey` or
 `authorDisabled`.

@@ -61,8 +61,12 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         Assert.True(Guid.TryParse(draft, out _), "The request holds no draft.");
         Assert.Matches(@"^\d+:work:-:160:true$", await StepsAsync(id, "work"));
         Assert.Equal(["list_applications", "list_applications", "create_draft", "write_layer", "write_resource"], server.ToolCalls.Take(5));
-        // The steps are plan, work and check in that order, whatever state the check step leaves the request in. The host has no fixing step, so a failed check cannot add a fix step before it stops.
-        Assert.Equal("plan,work,check", await ScalarAsync($"SELECT string_agg(kind, ',' ORDER BY ordinal) FROM axis.authoring_request_steps WHERE request_id = '{id}'"));
+        // The steps are plan, work, one write for each write call and check in that order, whatever state the check step leaves the request in. The host has no fixing step, so a failed check cannot add a fix step before it stops.
+        Assert.Equal("plan,work,write,write,check", await ScalarAsync($"SELECT string_agg(kind, ',' ORDER BY ordinal) FROM axis.authoring_request_steps WHERE request_id = '{id}'"));
+        Assert.Equal(
+            $"write_layer:saved:process:BudgetApproval:{ProcessId},write_resource:saved:scenario:FinanceReviewAdded",
+            (await ScalarAsync(
+                $"SELECT string_agg(input_summary || ':' || outcome || ':' || (resource->>'kind') || ':' || (resource->>'name') || CASE WHEN input_summary = 'write_layer' THEN ':' || (resource->>'id') ELSE '' END, ',' ORDER BY ordinal) FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'write'")));
         foreach (var tool in new[] { "create_draft", "write_layer", "write_resource" })
         {
             Assert.Equal(
