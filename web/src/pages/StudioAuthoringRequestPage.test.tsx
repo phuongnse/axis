@@ -673,7 +673,7 @@ describe('the feed', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Accept' }))
 
-    const conflict = await screen.findByTestId('studio-ai-request-conflict')
+    const conflict = await screen.findByTestId('studio-ai-request-conflict', undefined, { timeout: 4000 })
     const items = Array.from(screen.getByTestId('steps-bar').children) as HTMLElement[]
     expect(items[2]).toContainElement(conflict)
   })

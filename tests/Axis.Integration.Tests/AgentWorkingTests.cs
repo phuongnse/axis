@@ -164,7 +164,7 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         using var client = await _realm.SignInAsync();
         var id = await SendAsync(client);
         var stored = Guid.NewGuid();
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'ready', plan = 'A plan.', draft_id = '{stored}', round = 2 WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'ready', plan = '{PlanJson}', draft_id = '{stored}', round = 2 WHERE id = '{id}' RETURNING 1");
         using var requested = await StudioPublishTests.SendAsync(
             client, HttpMethod.Post, $"{Url}/{id}/request-changes", Host, """{ "comment": "Rename the field to Cost centre." }""");
         Assert.Equal(HttpStatusCode.OK, requested.StatusCode);
