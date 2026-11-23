@@ -32,8 +32,8 @@ public sealed class CheckingStepTests
             },
         }.ToJsonString();
 
-    // The session opening, then list_applications, which the step reads first.
-    private static RecordingHandler Opened(RecordingHandler handler) =>
+    // The session opening.
+    private static RecordingHandler Session(RecordingHandler handler) =>
         handler
             .Answer(HttpStatusCode.OK, new JsonObject
             {
@@ -41,8 +41,31 @@ public sealed class CheckingStepTests
                 ["id"] = 1,
                 ["result"] = new JsonObject { ["protocolVersion"] = McpProtocol.Version, ["capabilities"] = new JsonObject { ["tools"] = new JsonObject() } },
             }.ToJsonString(), response => response.Headers.Add("Mcp-Session-Id", "session-1"))
-            .Answer(HttpStatusCode.Accepted)
+            .Answer(HttpStatusCode.Accepted);
+
+    // The session opening, then list_applications, which the step reads first.
+    private static RecordingHandler Opened(RecordingHandler handler) =>
+        Session(handler)
             .Answer(HttpStatusCode.OK, Message(2, $$"""{"items":[{"id":"{{_applicationId}}","name":"PurchaseRequests"}]}"""));
+
+    // An output cut in two pages of { part, cursor } at the index <cut>, the way the server pages an output over 1 MiB, with ids from <firstId>.
+    private static RecordingHandler Paged(RecordingHandler handler, int firstId, string output, int cut) =>
+        handler
+            .Answer(HttpStatusCode.OK, PageMessage(firstId, output[..cut], "c1"))
+            .Answer(HttpStatusCode.OK, PageMessage(firstId + 1, output[cut..], null));
+
+    private static string PageMessage(int id, string part, string? cursor) =>
+        new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = id,
+            ["result"] = new JsonObject
+            {
+                ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "page" }),
+                ["structuredContent"] = new JsonObject { ["part"] = part, ["cursor"] = cursor },
+                ["isError"] = false,
+            },
+        }.ToJsonString();
 
     private static AuthoringStepContext NewContext(RecordingHandler handler, Guid? draft = null)
     {
@@ -351,5 +374,96 @@ public sealed class CheckingStepTests
 
         Assert.Equal(new AuthoringStepResult("failed", "unfinished"), result);
         Assert.DoesNotContain("run_scenarios", Tools(handler));
+    }
+
+    [Fact]
+    public async Task A_validate_draft_answer_in_two_pages_with_an_error_on_the_second_moves_the_request_to_fixing()
+    {
+        const string Output = """{"diagnostics":[{"code":"AX2","severity":"warning","message":"odd","file":"a.json","path":"","resourceId":null},{"code":"AX1","severity":"error","message":"broken","file":"a.json","path":"","resourceId":null}]}""";
+        var handler = Paged(Opened(new RecordingHandler()), 3, Output, Output.IndexOf("{\"code\":\"AX1\"", StringComparison.Ordinal));
+        var step = new CheckingStep(new CheckingOptions(TimeSpan.Zero, 2), TimeProvider.System);
+
+        var result = await step.RunAsync(NewContext(handler), CancellationToken);
+
+        Assert.Equal("fixing", result.NextState);
+        Assert.Equal("failed", result.Outcome);
+        var compile = JsonNode.Parse(result.Checks!)!["compile"]!;
+        Assert.Equal("failed", compile["outcome"]!.GetValue<string>());
+        Assert.Equal(["AX2", "AX1"], compile["diagnostics"]!.AsArray().Select(diagnostic => diagnostic!["code"]!.GetValue<string>()));
+        Assert.Equal(["list_applications", "validate_draft", "validate_draft"], Tools(handler));
+        var calls = Calls(handler, "validate_draft");
+        Assert.Null(calls[0]["params"]!["arguments"]!["cursor"]);
+        Assert.Equal("c1", calls[1]["params"]!["arguments"]!["cursor"]!.GetValue<string>());
+        Assert.Equal("PurchaseRequests", calls[1]["params"]!["arguments"]!["application"]!.GetValue<string>());
+        Assert.Equal(_draftId.ToString("D"), calls[1]["params"]!["arguments"]!["draft"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_list_package_files_answer_in_two_pages_tests_a_package_listed_only_on_the_second()
+    {
+        const string Output = """{"items":[{"package":"other","path":"adapter.py","version":"v1"},{"package":"tools","path":"adapter.py","version":"v1"}]}""";
+        var handler = Then(Compiled(new RecordingHandler()), Diff("null", "packages/tools/adapter.py"));
+        Paged(handler, 5, Output, Output.IndexOf("{\"package\":\"tools\"", StringComparison.Ordinal));
+        handler
+            .Answer(HttpStatusCode.OK, Message(7, PackageRun("queued")))
+            .Answer(HttpStatusCode.OK, Message(8, PackageRun("succeeded")))
+            .Answer(HttpStatusCode.OK, Message(9, ScenarioRun("queued")))
+            .Answer(HttpStatusCode.OK, Message(10, ScenarioRun("succeeded")));
+        var step = new CheckingStep(new CheckingOptions(TimeSpan.Zero, 5), TimeProvider.System);
+
+        var result = await step.RunAsync(NewContext(handler), CancellationToken);
+
+        Assert.Equal("reviewing", result.NextState);
+        Assert.Equal("tools", Calls(handler, "test_package")[0]["params"]!["arguments"]!["package"]!.GetValue<string>());
+        Assert.Equal("c1", Calls(handler, "list_package_files")[1]["params"]!["arguments"]!["cursor"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_list_applications_answer_in_two_pages_still_gives_the_name_of_the_application()
+    {
+        var output = $$"""{"items":[{"id":"{{Guid.NewGuid()}}","name":"Other"},{"id":"{{_applicationId}}","name":"PurchaseRequests"}]}""";
+        var handler = Paged(Session(new RecordingHandler()), 2, output, output.IndexOf("PurchaseRequests", StringComparison.Ordinal) - 5)
+            .Answer(HttpStatusCode.OK, Message(4, """{"diagnostics":[{"code":"AX1","severity":"error","message":"broken","file":"a.json","path":"","resourceId":null}]}"""));
+        var step = new CheckingStep(new CheckingOptions(TimeSpan.Zero, 2), TimeProvider.System);
+
+        var result = await step.RunAsync(NewContext(handler), CancellationToken);
+
+        Assert.Equal("fixing", result.NextState);
+        Assert.Equal(["list_applications", "list_applications", "validate_draft"], Tools(handler));
+        var calls = Calls(handler, "list_applications");
+        Assert.Equal("""{"cursor":"c1"}""", calls[1]["params"]!["arguments"]!.ToJsonString());
+        Assert.Equal("PurchaseRequests", Calls(handler, "validate_draft")[0]["params"]!["arguments"]!["application"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_page_that_is_a_tool_error_stops_the_request_as_failed_and_unfinished()
+    {
+        var handler = Opened(new RecordingHandler())
+            .Answer(HttpStatusCode.OK, PageMessage(3, """{"diagnostics":[""", "c1"))
+            .Answer(HttpStatusCode.OK, new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = 4,
+                ["result"] = new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "The cursor is not one this output gave." }), ["isError"] = true },
+            }.ToJsonString());
+        var step = new CheckingStep(new CheckingOptions(TimeSpan.Zero, 2), TimeProvider.System);
+
+        var result = await step.RunAsync(NewContext(handler), CancellationToken);
+
+        Assert.Equal(new AuthoringStepResult("failed", "unfinished"), result);
+        Assert.Equal(["list_applications", "validate_draft", "validate_draft"], Tools(handler));
+    }
+
+    [Fact]
+    public async Task Pages_that_join_into_something_other_than_JSON_stop_the_request_as_failed_and_unfinished()
+    {
+        var handler = Opened(new RecordingHandler())
+            .Answer(HttpStatusCode.OK, PageMessage(3, """{"diagnostics":[""", "c1"))
+            .Answer(HttpStatusCode.OK, PageMessage(4, "not json", null));
+        var step = new CheckingStep(new CheckingOptions(TimeSpan.Zero, 2), TimeProvider.System);
+
+        var result = await step.RunAsync(NewContext(handler), CancellationToken);
+
+        Assert.Equal(new AuthoringStepResult("failed", "unfinished"), result);
     }
 }

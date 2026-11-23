@@ -9,7 +9,8 @@ namespace Axis.Agent;
 /// <c>{ compile, packages, scenarios }</c> on its step and moves the request to <c>reviewing</c> when the compile, the package tests and the scenarios
 /// passed, or to <c>fixing</c> when one failed. A run that has not ended within <see cref="CheckingOptions.MaxPolls"/> polls, a tool error, a request
 /// without a draft and an application the author can no longer list stop the request as <c>failed</c> with the outcome <c>unfinished</c>, see
-/// <c>docs/reference/authoring-requests.md#budgets</c>.
+/// <c>docs/reference/authoring-requests.md#budgets</c>. It reads every page of <c>validate_draft</c> and <c>list_package_files</c> and joins them,
+/// see <see cref="AuthorMcpClient.ReadToolAsync"/>.
 /// </summary>
 internal sealed class CheckingStep(CheckingOptions options, TimeProvider time) : IAuthoringStep
 {
@@ -28,7 +29,7 @@ internal sealed class CheckingStep(CheckingOptions options, TimeProvider time) :
         }
 
         var arguments = new JsonObject { ["application"] = application, ["draft"] = draft.ToString("D") };
-        var validated = await context.Mcp.CallToolAsync("validate_draft", arguments, cancellationToken);
+        var validated = await context.Mcp.ReadToolAsync("validate_draft", arguments, cancellationToken);
         if (validated.IsError || validated.StructuredContent?["diagnostics"] is not JsonArray diagnostics)
         {
             return Unfinished();
@@ -128,7 +129,7 @@ internal sealed class CheckingStep(CheckingOptions options, TimeProvider time) :
             return NotRunPackages();
         }
 
-        var listed = await context.Mcp.CallToolAsync("list_package_files", (JsonObject)arguments.DeepClone(), cancellationToken);
+        var listed = await context.Mcp.ReadToolAsync("list_package_files", (JsonObject)arguments.DeepClone(), cancellationToken);
         if (listed.IsError || listed.StructuredContent?["items"] is not JsonArray files)
         {
             return null;

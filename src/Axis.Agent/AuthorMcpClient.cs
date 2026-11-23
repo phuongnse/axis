@@ -26,10 +26,14 @@ public sealed class AuthorMcpClient
     /// <summary>The name of the HTTP client that calls a tenant's MCP server.</summary>
     public const string HttpClientName = "AgentMcp";
 
+    /// <summary>The most pages <see cref="ReadToolAsync"/> reads of one output, so a server that never ends its pages cannot hold a step forever.</summary>
+    internal const int MaxPages = 64;
+
     private const string SessionHeader = "Mcp-Session-Id";
     private const string VersionHeader = "MCP-Protocol-Version";
 
     private static readonly string _clientVersion = typeof(AuthorMcpClient).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+    private static readonly AuthorMcpToolResult _notJoined = new(true, null, "The tool's pages did not join into one output.");
 
     private readonly HttpClient _http;
     private readonly string? _host;
@@ -82,6 +86,87 @@ public sealed class AuthorMcpClient
             result["isError"] is JsonValue flag && flag.TryGetValue<bool>(out var isError) && isError,
             result["structuredContent"]?.DeepClone(),
             string.Join('\n', texts));
+    }
+
+    /// <summary>
+    /// Calls <paramref name="tool"/> for an output that the agent host parses itself, and reads every page of it, see <c>docs/reference/mcp-server.md#limits</c>.
+    /// A page is <c>{ part, cursor }</c>. The client sends the same input again with the page's cursor until the cursor is null, joins the parts and answers
+    /// the parsed output. An output that is not paged is answered as <see cref="CallToolAsync"/> answers it. A tool error, an answer that is not a page
+    /// after the first, parts that are not JSON and an output that does not end within <see cref="MaxPages"/> pages each answer a result with
+    /// <see cref="AuthorMcpToolResult.IsError"/>.
+    /// </summary>
+    /// <exception cref="AuthoringTokenEndedException">The server refused the author's token twice, or refused the author.</exception>
+    /// <exception cref="InvalidOperationException">The tenant has no host, or the server did not answer as expected.</exception>
+    public async Task<AuthorMcpToolResult> ReadToolAsync(string tool, JsonObject? arguments, CancellationToken cancellationToken)
+    {
+        var result = await CallToolAsync(tool, arguments, cancellationToken);
+        if (result.IsError || !TryReadPage(result, out var part, out var cursor))
+        {
+            return result;
+        }
+
+        var joined = new StringBuilder(part);
+        var next = (JsonObject?)arguments?.DeepClone() ?? new JsonObject();
+        for (var pages = 1; cursor is not null; pages++)
+        {
+            if (pages >= MaxPages)
+            {
+                return new AuthorMcpToolResult(true, null, $"The tool's output did not end within {MaxPages} pages.");
+            }
+
+            next["cursor"] = cursor;
+            result = await CallToolAsync(tool, (JsonObject)next.DeepClone(), cancellationToken);
+            if (result.IsError)
+            {
+                return result;
+            }
+
+            if (!TryReadPage(result, out part, out cursor))
+            {
+                return _notJoined;
+            }
+
+            joined.Append(part);
+        }
+
+        try
+        {
+            var text = joined.ToString();
+            return new AuthorMcpToolResult(false, JsonNode.Parse(text), text);
+        }
+        catch (JsonException)
+        {
+            return _notJoined;
+        }
+    }
+
+    // A page has exactly a string part and a cursor that is a string or null, so no output that is not paged is taken for one.
+    private static bool TryReadPage(AuthorMcpToolResult result, out string part, out string? cursor)
+    {
+        part = "";
+        cursor = null;
+        if (result.StructuredContent is not JsonObject page
+            || page.Count != 2
+            || page["part"] is not JsonValue partValue
+            || !partValue.TryGetValue<string>(out var text)
+            || !page.ContainsKey("cursor"))
+        {
+            return false;
+        }
+
+        switch (page["cursor"])
+        {
+            case null:
+                break;
+            case JsonValue cursorValue when cursorValue.TryGetValue<string>(out var value):
+                cursor = value;
+                break;
+            default:
+                return false;
+        }
+
+        part = text;
+        return true;
     }
 
     private async Task<JsonObject> CallAsync(string method, JsonObject? parameters, CancellationToken cancellationToken)
