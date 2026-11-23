@@ -17,6 +17,7 @@ import {
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { useBulletList } from './useBulletList'
 import { useFollowJob } from './useFollowJob'
 
 type Phase = 'idle' | 'uploading' | 'checking' | 'checked' | 'committing' | 'failed'
@@ -46,6 +47,7 @@ interface ImportDialogProps {
 export function ImportDialog({ importsPath, fields, onClose, onCommitted }: ImportDialogProps) {
   const t = useText()
   const { size } = useDesignTokens()
+  const bullets = useBulletList()
   const [form] = Form.useForm<{ file: UploadFile[] }>()
   const file = Form.useWatch('file', form)?.[0]?.originFileObj ?? null
   const chooseRef = useRef<HTMLButtonElement>(null)
@@ -259,9 +261,11 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
         <div aria-live="polite" data-testid="import-status">
           {status !== null && <Typography.Text>{status}</Typography.Text>}
           {errors.length > 0 && (
-            <ul>
+            <ul style={bullets.list}>
               {errors.map((error, index) => (
-                <li key={index}>{describe(error)}</li>
+                <li key={index} style={bullets.item}>
+                  {describe(error)}
+                </li>
               ))}
             </ul>
           )}

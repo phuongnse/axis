@@ -104,12 +104,67 @@ describe('the Which widget table', () => {
   })
 })
 
+const spaSources = import.meta.glob(['../**/*.{ts,tsx}', '!../**/*.test.{ts,tsx}', '!../test/**'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
+/** A `<ul>` opening tag, which may span lines. */
+const listTag = /<ul\b[^>]*>/g
+
+/**
+ * The `<ul>` tags that show bullets without `useBulletList`, each as `path: first line of the tag`. A tag passes when it
+ * is a plain list with `listStyle: 'none'`, or when its style is `NAME.list` and the file has `NAME = useBulletList()`.
+ */
+function rawBulletLists(sources: Record<string, string>): string[] {
+  const refused: string[] = []
+  for (const [path, text] of Object.entries(sources)) {
+    for (const [tag] of text.matchAll(listTag)) {
+      if (/listStyle:\s*'none'/.test(tag)) continue
+      const name = /style=\{(\w+)\.list\}/.exec(tag)?.[1]
+      if (name !== undefined && new RegExp(`\\b${name}\\s*=\\s*useBulletList\\(\\)`).test(text)) continue
+      refused.push(`${path}: ${tag.split('\n')[0]}`)
+    }
+  }
+  return refused
+}
+
+describe('bulleted lists', () => {
+  const hook = 'const bullets = useBulletList()\n'
+
+  it('accepts a list that draws through useBulletList, also when its tag spans lines', () => {
+    expect(
+      rawBulletLists({
+        'a.tsx': hook + '<ul style={bullets.list}>',
+        'b.tsx': hook + '<ul\n  data-testid="x"\n  style={bullets.list}\n>',
+      }),
+    ).toEqual([])
+  })
+
+  it("accepts a plain list with listStyle: 'none'", () => {
+    expect(rawBulletLists({ 'a.tsx': "<ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>" })).toEqual([])
+  })
+
+  it('refuses a bare list', () => {
+    expect(rawBulletLists({ 'a.tsx': '<ul>' })).toEqual(['a.tsx: <ul>'])
+  })
+
+  it('refuses a list with a style of its own', () => {
+    expect(rawBulletLists({ 'a.tsx': '<ul style={{ margin: 0 }}>' })).toEqual(['a.tsx: <ul style={{ margin: 0 }}>'])
+  })
+
+  it('refuses a list that names a style its file does not take from useBulletList', () => {
+    expect(rawBulletLists({ 'a.tsx': '<ul style={bullets.list}>' })).toEqual(['a.tsx: <ul style={bullets.list}>'])
+  })
+
+  it('finds no list in the SPA that skips useBulletList', () => {
+    expect(rawBulletLists(spaSources)).toEqual([])
+  })
+})
+
 describe('the Which widget table against the SPA', () => {
-  const sources = import.meta.glob(['../**/*.{ts,tsx}', '!../**/*.test.{ts,tsx}', '!../test/**'], {
-    query: '?raw',
-    import: 'default',
-    eager: true,
-  }) as Record<string, string>
+  const sources = spaSources
 
   const tables = docsTables(tableHeader)
 

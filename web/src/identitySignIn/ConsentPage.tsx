@@ -3,6 +3,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { FilledText } from '../platform/FilledText'
 import { useDesignTokens } from '../platform/themeMode'
+import { useBulletList } from '../platform/useBulletList'
 import { IdentityFrame } from './IdentityFrame'
 import type { ConsentContext } from './signInContext'
 
@@ -16,6 +17,7 @@ import type { ConsentContext } from './signInContext'
 export function ConsentPage({ context }: { context: ConsentContext }) {
   const { texts, error, oauthAction, code, clientName, homeUrl, scopes } = context
   const { colour } = useDesignTokens()
+  const bullets = useBulletList()
   return (
     <IdentityFrame title={texts.title} frame={context}>
       {error && <AxisAlert kind="error" message={error} />}
@@ -27,9 +29,11 @@ export function ConsentPage({ context }: { context: ConsentContext }) {
           {homeUrl}
         </Typography.Link>
       )}
-      <ul style={{ margin: 0 }}>
+      <ul style={bullets.list}>
         {scopes.map((scope, index) => (
-          <li key={index}>{scope}</li>
+          <li key={index} style={bullets.item}>
+            {scope}
+          </li>
         ))}
       </ul>
       <form method="post" action={oauthAction}>

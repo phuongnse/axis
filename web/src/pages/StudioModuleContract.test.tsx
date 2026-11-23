@@ -427,6 +427,25 @@ describe('StudioModuleContract', () => {
       expect(within(errorItem).getByText('Error')).toHaveAttribute('data-tone', 'danger')
       expect(within(warningItem).getByText('Warning')).toHaveAttribute('data-tone', 'attention')
     })
+
+    it('lists an error before a warning, as the Problems panel does', async () => {
+      const diagnostic = {
+        code: 'AXC0370',
+        severity: 'error' as const,
+        message: 'The transition enters a protected state.',
+        file: layer.file,
+        path: '/changes/lifecycle/transitions/3/to',
+        resourceId: 'layer-id',
+      }
+      renderLayered([{ ...diagnostic, code: 'AXC0371', severity: 'warning' as const }, diagnostic])
+
+      const list = await screen.findByTestId('studio-contract-diagnostics')
+      const [first, second] = within(list).getAllByRole('listitem')
+      expect(first).toHaveTextContent('AXC0370')
+      expect(within(first).getByText('Error')).toHaveAttribute('data-tone', 'danger')
+      expect(second).toHaveTextContent('AXC0371')
+      expect(within(second).getByText('Warning')).toHaveAttribute('data-tone', 'attention')
+    })
   })
 
   describe('relaxing a point', () => {
