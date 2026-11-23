@@ -126,13 +126,13 @@ A text that holds a value reads as a whole sentence in every locale.
   an entity's label, keeps its own capitals: "Tham chiếu tới Phòng ban".
 - A count reads naturally: English needs "1 field" and "3 fields"; a language without plural forms writes one text.
 - Dates, times and numbers come from the locale's formats, never from words in a text.
-- **A text that holds a value is one text.** _(planned for M35)_ An announcement or an accessible name is one text with
+- **A text that holds a value is one text.** An announcement or an accessible name is one text with
   placeholders, never words and names joined in code: "Added step {name} after {after}." / "Đã thêm bước {name} sau
   {after}.". `fillText` fills a string text, and `FilledText` fills a text with nodes. A text that already holds
   placeholders is never a piece of another text.
 - **A list of marks joins through the locale's list format.** _(planned for M35)_ `Intl.ListFormat` joins the items, so
   each language writes its own "and" or its own comma.
-- **A kind in a text is its name, never its code.** _(planned for M35)_ The name comes from `kindSingular` or from
+- **A kind in a text is its name, never its code.** The name comes from `kindSingular` or from
   `shell.studio.nav.kindOne.<kind>`: "{kind}, from {module}" / "{kind}, từ {module}". The capitals rule above applies.
 
 ## The glossary

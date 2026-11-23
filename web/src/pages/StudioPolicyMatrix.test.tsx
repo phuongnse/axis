@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioMatrixCell, StudioMatrixRole, StudioNames, StudioPolicyMatrix } from '../platform/studio'
 import { studioResourceAddress } from '../platform/studioAddress'
@@ -146,12 +147,12 @@ function patches(fetchMock: ReturnType<typeof stubFetch>) {
   return fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')
 }
 
-function renderMatrix(overrides: Partial<StudioPolicyMatrix> = {}) {
+function renderMatrix(overrides: Partial<StudioPolicyMatrix> = {}, texts: Record<string, string> = platformEnglish) {
   const onWritten = vi.fn()
   render(
     <MemoryRouter>
       <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <TextProvider catalogs={[{ texts, fallbackTexts: platformEnglish }]} development={false}>
           <StudioPolicyMatrixTable
             application={application}
             matrix={{ ...matrix, ...overrides }}
@@ -169,6 +170,48 @@ function renderMatrix(overrides: Partial<StudioPolicyMatrix> = {}) {
 afterEach(() => {
   localStorage.clear()
   vi.unstubAllGlobals()
+})
+
+describe.each([
+  {
+    locale: 'English',
+    texts: platformEnglish,
+    filter: 'Filter',
+    column: 'Column',
+    plain: 'Entity',
+    moduleHeader: 'Entity, from approvals',
+    option: 'Entity PurchaseRequest',
+    moduleOption: 'Entity PurchaseRequest, from approvals',
+  },
+  {
+    locale: 'Vietnamese',
+    texts: platformVietnamese,
+    filter: 'Lọc',
+    column: 'Cột',
+    plain: 'Đối tượng',
+    moduleHeader: 'Đối tượng, từ approvals',
+    option: 'Đối tượng PurchaseRequest',
+    moduleOption: 'Đối tượng PurchaseRequest, từ approvals',
+  },
+])('StudioPolicyMatrixTable names a target by its kind in $locale', (labels) => {
+  it('names a plain target by its kind alone, and its filter option by kind and name', async () => {
+    renderMatrix({}, labels.texts)
+
+    // The table draws a column's header more than once, so take the first match.
+    expect(screen.getAllByText(labels.plain)[0]).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: labels.filter }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: labels.column }))
+    expect(optionTexts()).toContain(labels.option)
+  })
+
+  it('names a module target by its kind and module, in its header and its filter option', async () => {
+    renderMatrix({ targets: [{ ...matrix.targets[0], module: 'approvals' }] }, labels.texts)
+
+    expect(screen.getAllByText(labels.moduleHeader)[0]).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: labels.filter }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: labels.column }))
+    expect(optionTexts()).toContain(labels.moduleOption)
+  })
 })
 
 describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) => {
@@ -189,7 +232,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
     await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
     expect(optionTexts()).toContain('Role')
-    expect(optionTexts()).toContain('PurchaseRequest, entity')
+    expect(optionTexts()).toContain('Entity PurchaseRequest')
     await chooseOption('Role')
     await pick('Operator', 0, 'is')
     await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'employee')

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AxisButton } from './AxisButton'
 import { AxisField } from './AxisField'
 import { DialogFooter } from './DialogFooter'
+import { fillText } from './fillText'
 import {
   commitImport,
   fetchImport,
@@ -176,13 +177,17 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
   const describe = (error: ImportError): string => {
     switch (error.kind) {
       case 'field':
-        return `${t('shell.table.importRow')} ${error.row}, ${label(error.field)}: ${error.message}`
+        return fillText(t('shell.table.importFieldError'), {
+          row: error.row,
+          field: label(error.field),
+          message: error.message,
+        })
       case 'row':
-        return `${t('shell.table.importRow')} ${error.row}: ${error.message}`
+        return fillText(t('shell.table.importRowError'), { row: error.row, message: error.message })
       case 'column':
-        return `${t('shell.table.importColumn')} ${error.column}: ${error.message}`
+        return fillText(t('shell.table.importColumnError'), { column: error.column, message: error.message })
       default:
-        return `${t('shell.table.importFile')}: ${error.message}`
+        return fillText(t('shell.table.importFileError'), { message: error.message })
     }
   }
 

@@ -13,6 +13,7 @@ import { AxisFieldRow } from '../platform/AxisFieldRow'
 import { AxisTable, RowActions, type AxisColumn } from '../platform/AxisTable'
 import { datePickerChevrons } from '../platform/datePickerChevrons'
 import { EmptyDash } from '../platform/EmptyValue'
+import { fillText } from '../platform/fillText'
 import { FilledText } from '../platform/FilledText'
 import { booleanText } from '../platform/formatValue'
 import {
@@ -1596,7 +1597,7 @@ function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Con
     <AxisFieldGroup {...groupTexts(t, 'fields.valueLabels')}>
       <Flex vertical gap="small">
         {values.map((value) => {
-          const name = `${t('shell.studio.entity.valueLabel')} ${value}`
+          const name = fillText(t('shell.studio.entity.valueLabel'), { value })
           const current = labels[value]
           const key = isContent(current) && typeof current.textKey === 'string' ? current.textKey : undefined
           return (

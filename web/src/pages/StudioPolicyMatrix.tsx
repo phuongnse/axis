@@ -12,6 +12,7 @@ import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { diffPatch, setAt } from '../platform/jsonPatch'
 import { SectionPart } from '../platform/SectionParts'
+import { kindSingular } from '../platform/studioKinds'
 import {
   createStudioResource,
   fetchStudioPolicyMatrix,
@@ -108,32 +109,41 @@ export function StudioPolicyMatrixTable({
       render: (_, row) => <RoleHeader role={row} />,
       filter: { kind: 'text', value: (row) => row.name },
     },
-    ...matrix.targets.map((item, index) => ({
-      key: `${item.kind}-${item.name}`,
-      kind: 'fixed' as const,
-      title: (
-        <Flex vertical>
-          <span>{item.name}</span>
-          <Typography.Text type="secondary">{item.module ? `${item.kind}, ${item.module}` : item.kind}</Typography.Text>
-        </Flex>
-      ),
-      filter: {
-        kind: 'text' as const,
-        title: item.module ? `${item.name}, ${item.kind}, ${item.module}` : `${item.name}, ${item.kind}`,
-        value: (row: StudioMatrixRole) => row.cells[index]?.actions.join(', ') || null,
-      },
-      render: (_: unknown, row: StudioMatrixRole) => (
-        <MatrixCell
-          role={row}
-          cell={row.cells[index]}
-          selected={selection?.role === row.name && selection.index === index}
-          onSelect={() => {
-            setSaved(false)
-            setSelection({ role: row.name, index })
-          }}
-        />
-      ),
-    })),
+    ...matrix.targets.map((item, index) => {
+      const kind = kindSingular(item.kind, t)
+      return {
+        key: `${item.kind}-${item.name}`,
+        kind: 'fixed' as const,
+        title: (
+          <Flex vertical>
+            <span>{item.name}</span>
+            <Typography.Text type="secondary">
+              {item.module ? fillText(t('shell.studio.matrix.targetFrom'), { kind, module: item.module }) : kind}
+            </Typography.Text>
+          </Flex>
+        ),
+        filter: {
+          kind: 'text' as const,
+          title: fillText(t(item.module ? 'shell.studio.matrix.grantTargetFrom' : 'shell.studio.matrix.grantTarget'), {
+            kind,
+            name: item.name,
+            module: item.module ?? '',
+          }),
+          value: (row: StudioMatrixRole) => row.cells[index]?.actions.join(', ') || null,
+        },
+        render: (_: unknown, row: StudioMatrixRole) => (
+          <MatrixCell
+            role={row}
+            cell={row.cells[index]}
+            selected={selection?.role === row.name && selection.index === index}
+            onSelect={() => {
+              setSaved(false)
+              setSelection({ role: row.name, index })
+            }}
+          />
+        ),
+      }
+    }),
   ]
 
   return (

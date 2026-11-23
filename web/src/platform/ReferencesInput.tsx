@@ -2,6 +2,7 @@ import { Flex } from 'antd'
 import { useRef, useState } from 'react'
 import { Announcement } from './Announcement'
 import { AxisButton } from './AxisButton'
+import { fillText } from './fillText'
 import { RecordLink } from './RecordLink'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { RecordItem } from './records'
@@ -53,7 +54,7 @@ export function ReferencesInput({
     }
     const label = display ? String(record.values[display] ?? '') : record.id
     onChange([...ids, record.id], [...ids.map((_, index) => labels[index] ?? null), label])
-    setAnnouncement(`${t('shell.form.added')} ${label}`)
+    setAnnouncement(fillText(t('shell.form.added'), { name: label }))
   }
 
   const remove = (index: number) => {
@@ -62,7 +63,7 @@ export function ReferencesInput({
       ids.filter((_, position) => position !== index),
       ids.map((_, position) => labels[position] ?? null).filter((_, position) => position !== index),
     )
-    setAnnouncement(`${t('shell.form.removed')} ${label}`)
+    setAnnouncement(fillText(t('shell.form.removed'), { name: label }))
     add.current?.focus()
   }
 
@@ -78,7 +79,7 @@ export function ReferencesInput({
                   role="secondary"
                   destructive
                   size="small"
-                  aria-label={`${t('shell.form.removeReference')} ${labelAt(index)}`}
+                  aria-label={fillText(t('shell.form.removeReferenceNamed'), { name: labelAt(index) })}
                   onClick={() => remove(index)}
                 >
                   {t('shell.form.removeReference')}
@@ -93,7 +94,7 @@ export function ReferencesInput({
         role="secondary"
         id={field.name}
         ref={add}
-        aria-label={`${t('shell.form.add')} ${title}`}
+        aria-label={fillText(t('shell.form.addNamed'), { field: title })}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid || undefined}
         onClick={() => setOpen(true)}

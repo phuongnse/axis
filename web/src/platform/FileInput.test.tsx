@@ -2,10 +2,13 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { FileInput } from './FileInput'
 import type { FileValue } from './records'
 import type { FieldMetadata } from './site'
 import { TextProvider } from './TextProvider'
+import type { TextCatalog } from './texts'
 
 const fileId = '3c1d5e7f-9a2b-4c4d-8e6f-0a1b2c3d4e5f'
 const uploadPath = '/api/apps/E2eApp/entities/Asset/fields/receipt/files'
@@ -40,9 +43,11 @@ function fileField(overrides: Partial<FieldMetadata> = {}): FieldMetadata {
 
 const texts = {
   'shell.form.upload': 'Upload',
-  'shell.form.uploaded': 'Uploaded',
-  'shell.form.removed': 'Removed',
+  'shell.form.uploadNamed': 'Upload {field}',
+  'shell.form.uploaded': 'Uploaded {name}',
+  'shell.form.removed': 'Removed {name}',
   'shell.form.removeFile': 'Remove',
+  'shell.form.removeFileNamed': 'Remove {field}',
   'shell.form.fileTooLarge': 'The file is too large.',
   'shell.form.fileTypeRefused': 'This type of file is not accepted.',
   'shell.form.uploadFailed': 'The file could not be uploaded.',
@@ -54,14 +59,16 @@ function Harness({
   field,
   initial,
   changes,
+  textCatalogs,
 }: {
   field: FieldMetadata
   initial: FileValue | null
   changes: (FileValue | null)[]
+  textCatalogs: readonly TextCatalog[]
 }) {
   const [value, setValue] = useState(initial)
   return (
-    <TextProvider catalogs={catalogs} development={false}>
+    <TextProvider catalogs={textCatalogs} development={false}>
       <FileInput
         field={field}
         value={value}
@@ -76,9 +83,9 @@ function Harness({
   )
 }
 
-function renderInput(field: FieldMetadata, initial: FileValue | null = null) {
+function renderInput(field: FieldMetadata, initial: FileValue | null = null, textCatalogs = catalogs) {
   const changes: (FileValue | null)[] = []
-  render(<Harness field={field} initial={initial} changes={changes} />)
+  render(<Harness field={field} initial={initial} changes={changes} textCatalogs={textCatalogs} />)
   return changes
 }
 
@@ -93,6 +100,38 @@ const answered =
   '{"id":"3c1d5e7f-9a2b-4c4d-8e6f-0a1b2c3d4e5f","name":"receipt.pdf","mediaType":"application/pdf","size":14}'
 
 afterEach(() => vi.unstubAllGlobals())
+
+describe.each([
+  {
+    locale: 'en',
+    textCatalogs: [{ texts: platformEnglish, fallbackTexts: platformEnglish }],
+    upload: 'Upload Receipt',
+    uploaded: 'Uploaded receipt.pdf',
+    remove: 'Remove Receipt',
+    removed: 'Removed receipt.pdf',
+  },
+  {
+    locale: 'vi',
+    textCatalogs: [{ texts: platformVietnamese, fallbackTexts: platformEnglish }],
+    upload: 'Tải lên Receipt',
+    uploaded: 'Đã tải lên receipt.pdf',
+    remove: 'Gỡ Receipt',
+    removed: 'Đã xóa receipt.pdf',
+  },
+])('FileInput in $locale', ({ textCatalogs, upload, uploaded, remove, removed }) => {
+  it('names its buttons and announces an upload and a removal through one text each', async () => {
+    stubUpload(201, answered)
+    renderInput(fileField(), null, textCatalogs)
+
+    expect(screen.getByRole('button', { name: upload })).toBeInTheDocument()
+    await userEvent.upload(screen.getByTestId('file-picker-receipt'), pdf())
+    await screen.findByRole('link', { name: 'receipt.pdf' })
+    expect(screen.getByTestId('file-receipt-announcement')).toHaveTextContent(uploaded)
+
+    await userEvent.click(screen.getByRole('button', { name: remove }))
+    expect(screen.getByTestId('file-receipt-announcement')).toHaveTextContent(removed)
+  })
+})
 
 describe('FileInput', () => {
   it('uploads a picked file, shows its name as a download link and reports the stored file', async () => {

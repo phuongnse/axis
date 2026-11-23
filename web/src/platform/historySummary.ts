@@ -1,3 +1,4 @@
+import { fillText } from './fillText'
 import type { HistoryItem } from './records'
 import type { FieldMetadata } from './site'
 
@@ -18,13 +19,13 @@ export function historySummary(
       const field = fields.find((candidate) => candidate.name === name)
       return field?.labelKey ? t(field.labelKey) : String(name)
     })
-    lines.push(`${t('shell.history.fields')}: ${labels.join(', ')}`)
+    lines.push(fillText(t('shell.history.fields'), { fields: labels.join(', ') }))
   }
   if (typeof details.outcome === 'string') {
-    lines.push(`${t('shell.history.outcome')}: ${details.outcome}`)
+    lines.push(fillText(t('shell.history.outcome'), { outcome: details.outcome }))
   }
   if (typeof details.step === 'string') {
-    lines.push(`${t('shell.history.step')}: ${details.step}`)
+    lines.push(fillText(t('shell.history.step'), { step: details.step }))
   }
   return lines
 }

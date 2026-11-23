@@ -3,6 +3,7 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import { Announcement } from './Announcement'
 import { AxisButton } from './AxisButton'
 import { fileUrl, uploadFile } from './files'
+import { fillText } from './fillText'
 import type { FileValue } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
@@ -85,7 +86,7 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false,
       const result = await uploadFile(field.uploadPath, file)
       if (result.ok) {
         onChange(result.file)
-        setAnnouncement(`${t('shell.form.uploaded')} ${result.file.name}`)
+        setAnnouncement(fillText(t('shell.form.uploaded'), { name: result.file.name }))
       } else {
         setError(result.title ?? t(errorKey(result.status)))
       }
@@ -102,7 +103,7 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false,
     }
     setError(null)
     onChange(null)
-    setAnnouncement(`${t('shell.form.removed')} ${value.name}`)
+    setAnnouncement(fillText(t('shell.form.removed'), { name: value.name }))
     upload.current?.focus()
   }
 
@@ -128,7 +129,7 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false,
               id={id}
               ref={upload}
               loading={uploading}
-              aria-label={`${t('shell.form.upload')} ${label}`}
+              aria-label={fillText(t('shell.form.uploadNamed'), { field: label })}
               aria-invalid={ariaInvalid || undefined}
               onClick={() => picker.current?.click()}
             >
@@ -140,7 +141,7 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false,
           <AxisButton
             role="secondary"
             destructive
-            aria-label={`${t('shell.form.removeFile')} ${label}`}
+            aria-label={fillText(t('shell.form.removeFileNamed'), { field: label })}
             onClick={remove}
           >
             {t('shell.form.removeFile')}
