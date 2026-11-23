@@ -5,7 +5,6 @@ import {
   EditorView,
   gutter,
   GutterMarker,
-  lineNumbers,
   ViewPlugin,
   type DecorationSet,
   type ViewUpdate,
@@ -17,8 +16,8 @@ import {
  * the "−" and "+" marks and the tints of the editor's theme show each change. Two columns number the lines: the text
  * before's numbers, then the text after's, and a removed line has only the first, an added line only the second. The
  * changed words are underlined only in a line that changed in part: a line added or removed whole is not. A file added
- * or removed whole, whose `original` is empty, is drawn as its lines, each marked, with no diff: a removed file is its
- * own text, each line drawn removed and numbered in the first column only.
+ * or removed whole, whose `original` is empty, is drawn as its lines, each marked, with no diff and one column of
+ * numbers: a removed file is its own text, each line drawn removed.
  */
 export function lineDiff(original: string, removed: boolean): Extension {
   if (original === '') {
@@ -43,8 +42,7 @@ const changedLine = Decoration.line({ class: 'cm-changedLine' })
 
 /**
  * A file added or removed whole: each line of the editor's text marked added, or removed, as the merge view marks a
- * changed line, with no diff to compute. A removed file's numbers are in the first column, an added file's in the
- * second.
+ * changed line, with no diff to compute. Its lines are numbered in the editor's one column, as only one text has them.
  */
 function wholeFile(removed: boolean): Extension {
   return [
@@ -57,15 +55,6 @@ function wholeFile(removed: boolean): Extension {
       }
       return builder.finish()
     }),
-    removed ? lineNumbers({ formatNumber: () => '' }) : [],
-    Prec.high(
-      gutter({
-        class: 'cm-beforeLineNumbers',
-        lineMarker: (view, line) => (removed ? new LineNumbers(view.state.doc.lineAt(line.from).number) : null),
-        lineMarkerChange: (update) => update.docChanged,
-        initialSpacer: (view) => new LineNumbers(view.state.doc.lines),
-      }),
-    ),
   ]
 }
 
