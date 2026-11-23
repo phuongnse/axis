@@ -75,7 +75,8 @@ component holds a number of its own.
 - **Sizes.** The size group holds `bar`, the height of the shell's header, a page's band and Studio's application row,
   `smallControl`, a small icon button and the line of text beside it, `tableRow`, a table's row and header, and
   `sidePanel`, the width a side panel opens at until a person sets one and its least width, see [layout](shell.md#layout).
-  It also holds `chevron`, the 12 px icon size that every chevron draws at.
+  It also holds `chevron`, the 12 px icon size that every chevron draws at, and `menu`, the least width of a dropdown
+  menu, see [menus](actions-and-controls.md#menus).
 - **Dialog sizes.** The size group also holds `dialog`, the dialog widths `small` (400 px), `medium` (560 px) and
   `large` (880 px), see [dialogs](actions-and-controls.md#dialogs).
 - **No value of its own.** No size, space, type, radius or colour is a number of its own in a component, and a layout

@@ -297,7 +297,9 @@ export function Shell({
             )}
             <Layout>
               {/* The row always wraps the content and the column, so claiming the column never remounts the page. */}
-              <Layout hasSider style={{ minWidth: 0, flexDirection: narrow ? 'column' : undefined }}>
+              {/* At narrow width the row is no sider layout: antd gives a sider layout's content `width: 0`, which would
+                  collapse the page in a column, see docs/reference/shell.md#layout. */}
+              <Layout hasSider={!narrow} style={{ minWidth: 0, flexDirection: narrow ? 'column' : undefined }}>
                 <Layout style={{ minWidth: 0 }}>
                   {!hasAccount && <ReadOnlyBanner />}
                   <Layout.Content style={{ background: colour.surface, padding: inset }}>

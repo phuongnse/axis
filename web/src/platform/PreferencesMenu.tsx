@@ -33,7 +33,6 @@ export function PreferencesMenu({
       label: t('shell.locale.label'),
       children: locales.map((tag) => option(`locale:${tag}`, t(`shell.locale.${tag}`), tag === locale)),
     },
-    { type: 'divider' },
     {
       type: 'group',
       key: 'theme',

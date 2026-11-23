@@ -109,7 +109,9 @@ test('the shell fills the window on canvas in light and dark mode', async ({ pag
     await page.getByRole('banner').getByRole('button', { name: 'Language and theme', exact: true }).click()
     const menu = page.getByRole('menu', { name: 'Language and theme', exact: true })
     await expect(menu).toBeVisible()
-    expect(await style(menu, 'padding')).toBe('8px')
+    // Ant Design's own inset, with no spacing-xs padding of Axis's round it, see
+    // docs/reference/shell.md#app-switcher-and-preferences.
+    expect(await style(menu, 'padding')).toBe('4px')
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
   }

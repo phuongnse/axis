@@ -122,7 +122,7 @@ choices.
   items one way, whether Ant Design draws the list or the page does, such as the sidebar's menu, a select
   or the notification bell. An item sits inset from its list's edge, with rounded corners. Groups are set
   apart by their heading, with no divider between them.
-- **A menu's minimum width** _(planned for M35)_. Every dropdown menu is at least as wide as the `menu`
+- **A menu's minimum width.** Every dropdown menu is at least as wide as the `menu`
   size token, and wider when an item needs the room.
 - **One threshold everywhere**. One or two actions show as buttons in a table's row or a list's item. From three
   on, or when the row runs out of room, they fold into one "…" menu.

@@ -104,8 +104,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       Cascader: fieldBorder,
       TreeSelect: fieldBorder,
       // A selected item draws in primaryText on the selected tint, see docs/reference/actions-and-controls.md#menus.
-      // Every dropdown menu keeps spacing-xs round its items, see docs/reference/shell.md#app-switcher-and-preferences.
-      Dropdown: { colorError: colour.dangerText, colorPrimary: colour.primaryText, paddingXXS: spacing.xs },
+      // A dropdown menu keeps Ant Design's own inset round its items, see docs/reference/shell.md#app-switcher-and-preferences.
+      Dropdown: { colorError: colour.dangerText, colorPrimary: colour.primaryText },
       Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
       // A tab's label starts at the top of its bar, so the padding above it is removed and the one below is kept.
       Tabs: {
@@ -161,19 +161,22 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
 /**
  * The props every Axis `ConfigProvider` gets, see docs/reference/actions-and-controls.md#dialogs: the theme; every
  * dialog centred, no taller or wider than the window less its `spacing-xl` margins, with a scrolling body and its
- * buttons `spacing-lg` below the body; and checkboxes and radios that sit at the top of their box, level with the first
- * line of a label that wraps.
+ * buttons `spacing-lg` below the body; checkboxes and radios that sit at the top of their box, level with the first
+ * line of a label that wraps; and every dropdown menu at least `menu` wide, see
+ * docs/reference/actions-and-controls.md#menus.
  * See docs/reference/actions-and-controls.md#dialogs.
  */
 export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMotion = false): ConfigProviderProps {
   const config = antThemeFor(mode, page, reducedMotion)
   const token = theme.getDesignToken(config)
-  const { spacing } = designTokensFor(mode, page)
+  const { spacing, size } = designTokensFor(mode, page)
   // Ant Design centres a box on the label's line. Half the gap between the line and the box puts its top on that line.
   const firstLineOffset = (boxSize: number) => (token.fontSize * token.lineHeight - boxSize) / 2
   const margins = 2 * spacing.xl
   return {
     theme: config,
+    // The one place a menu's width is set, so no menu sets its own, see docs/reference/actions-and-controls.md#menus.
+    dropdown: { styles: { root: { minWidth: size.menu } } },
     modal: {
       centered: true,
       style: { maxWidth: `calc(100vw - ${margins}px)` },
