@@ -121,7 +121,7 @@ period.
 - **Source.** Each row keeps its source. It is `process` for a `notify` step or a task escalation, and `quota` for a quota notice.
 - **Kind**. Each row keeps its kind. A `notify` step or a task escalation gives the kind its step gives, see [the `notify` operation](#notify-operation). A quota notice is a `warning`. A notification stored before kinds existed reads as `info`, except a quota notice, which reads as `warning`.
 - **Read is not done**. Reading a notification marks nothing done. An `info` or `warning` notification is always done. A process's `action` notification is done only when it is cleared, because Axis cannot tell whether its action was taken.
-- **Clearing** _(planned for M35)_. A clear sets `cleared_at` on the caller's read row, and sets `read_at` too when it is missing. A cleared notification is no longer listed or counted for that caller. Other recipients see no change, and nothing is deleted before the retention period ends.
+- **Clearing**. A clear sets `cleared_at` on the caller's read row, and sets `read_at` too when it is missing. A cleared notification is no longer listed or counted for that caller. Other recipients see no change, and nothing is deleted before the retention period ends.
 - **Kept for.** The worker deletes the notifications whose `created_at` is older than
   `Notifications:RetentionDays`, a [worker setting](process-execution.md#worker-settings) of 90 days
   by default, by its own clock. It deletes their `axis.notification_reads` rows in the same
@@ -142,15 +142,15 @@ The routes list a user's notifications of one application and mark them read. Th
 | `GET /api/apps/{app}/notifications`                                 | Lists the user's notifications of an application, see [notification routes](#notification-routes)                                           |
 | `POST /api/apps/{app}/notifications/{id}/read`                      | Marks one notification read, see [notification routes](#notification-routes)                                                                |
 | `POST /api/apps/{app}/notifications/read-all`                       | Marks every notification the user sees read, see [notification routes](#notification-routes)                                                |
-| `POST /api/apps/{app}/notifications/{id}/clear` _(planned for M35)_ | Clears one notification for the caller, see [notification routes](#notification-routes)                                                     |
-| `POST /api/apps/{app}/notifications/clear-all` _(planned for M35)_  | Clears the notifications the user sees now, except the `action` notifications not yet done, see [notification routes](#notification-routes) |
+| `POST /api/apps/{app}/notifications/{id}/clear` | Clears one notification for the caller, see [notification routes](#notification-routes)                                                     |
+| `POST /api/apps/{app}/notifications/clear-all` | Clears the notifications the user sees now, except the `action` notifications not yet done, see [notification routes](#notification-routes) |
 
 - **List.** `GET /api/apps/{app}/notifications?page=&pageSize=&unread=` lists the user's
   notifications, newest first. It answers `items`, `page`, `pageSize`, `totalCount` and `unreadCount`.
   With `unread=true` the items and `totalCount` are the unread ones only, and `unreadCount` always
   counts every unread one. A notification sent to the user and to a role the user holds is listed once.
   A bad `page`, `pageSize` or `unread` (`true` or `false`) is a `400` that lists every bad parameter.
-- **Needs action** _(planned for M35)_. `needsAction=true` lists only the `action` notifications that are not yet done. `totalCount` follows that filter. `needsAction` takes `true` or `false`, and any other value is a `400`, as `unread` is.
+- **Needs action**. `needsAction=true` lists only the `action` notifications that are not yet done. `totalCount` follows that filter. `needsAction` takes `true` or `false`, and any other value is a `400`, as `unread` is.
 - **Item.** An item has `id`, `releaseId`, `subject`, `body`, `open`, `read` and `createdAt`. `open` is
   `{ "page", "parameters" }` with the stored raw parameters, or null when the notification opens no
   page.
@@ -165,7 +165,7 @@ The routes list a user's notifications of one application and mark them read. Th
   write read rows for the caller only, so another recipient's unread count does not change. Both answer
   `204` with no body, and so does marking a notification that is already read. A notification the user
   does not see, or that does not exist, is a `404`.
-- **Clear** _(planned for M35)_. Both routes answer `204` with no body. `clear-all` clears every notification the user sees now, except the `action` notifications not yet done. An id the user does not see, or that does not exist, is a `404`.
+- **Clear**. Both routes answer `204` with no body. `clear-all` clears every notification the user sees now, except the `action` notifications not yet done. An id the user does not see, or that does not exist, is a `404`.
 
 ### Tenant notices
 
@@ -178,17 +178,19 @@ recipient kind `platformRole`, and no application lists it.
 | `GET /api/notifications`                                 | Lists the tenant notices of the user, see [tenant notices](#tenant-notices)                                                  |
 | `POST /api/notifications/{id}/read`                      | Marks one tenant notice read, see [tenant notices](#tenant-notices)                                                          |
 | `POST /api/notifications/read-all`                       | Marks every tenant notice the user sees read, see [tenant notices](#tenant-notices)                                          |
-| `POST /api/notifications/{id}/clear` _(planned for M35)_ | Clears one tenant notice for the user, see [tenant notices](#tenant-notices)                                                 |
-| `POST /api/notifications/clear-all` _(planned for M35)_  | Clears the tenant notices the user sees now, except the `action` notices not yet done, see [tenant notices](#tenant-notices) |
+| `POST /api/notifications/{id}/clear` | Clears one tenant notice for the user, see [tenant notices](#tenant-notices)                                                 |
+| `POST /api/notifications/clear-all` | Clears the tenant notices the user sees now, except the `action` notices not yet done, see [tenant notices](#tenant-notices) |
 
-- **Routes.** `GET /api/notifications?page=&pageSize=&unread=`, `POST /api/notifications/{id}/read`
-  and `POST /api/notifications/read-all` list tenant notices and mark them read. They answer in the
+- **Routes.** `GET /api/notifications?page=&pageSize=&unread=&needsAction=`,
+  `POST /api/notifications/{id}/read`, `POST /api/notifications/read-all`,
+  `POST /api/notifications/{id}/clear` and `POST /api/notifications/clear-all` list tenant notices,
+  mark them read and clear them. They answer in the
   same shape as the [application routes](#notification-routes), with `releaseId` and `open` always
   null. They are served on the tenant's platform host only, need a session (`401`), and the POSTs
   follow the CSRF rule.
 - **Who sees one.** A user sees a notice for the `administrator` kind only while they hold the role
   that `Users:AdministratorRole` names. Anyone else gets an empty list with zero counts and a `404`
-  when marking a notice read, and read-all writes nothing for them.
+  when marking a notice read or clearing it, and read-all and clear-all write nothing for them.
 - **To one person** _(planned for M35)_. A tenant notice may go to one person. Its recipient kind is `platformUser`, and its recipient is the person's user id. Only that user sees it, and only on the platform host.
 - **Texts.** The texts are platform texts in the user's profile locale, matched by the whole tag
   ignoring letter case, with `en` as the fallback, so `vi-VN` shows `en`. Numbers are formatted in the

@@ -367,7 +367,7 @@ filtered index of the same columns without `application_id`,
 | `notification_id` | `uuid` | The notification's id |
 | `user_id` | `text` | The user who read it |
 | `read_at` | `timestamptz` | When the user read it, `now()` |
-| `cleared_at` _(planned for M35)_ | `timestamptz`, null | When the user cleared it, null while it is listed, see [In-app notifications](notifications.md#in-app-notifications) |
+| `cleared_at` | `timestamptz`, null | When the user cleared it, null while it is listed, see [In-app notifications](notifications.md#in-app-notifications) |
 
 `axis.email_outbox` holds one row per email that a `notify` step with the `email` channel staged, see
 [Email](notifications.md#email).
