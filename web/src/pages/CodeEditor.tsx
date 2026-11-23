@@ -127,6 +127,9 @@ export default function CodeEditor({
   }))
   // A removed file shows the text it had, each line marked removed, see lineDiff.
   const removedFile = original !== undefined && original !== '' && value === ''
+  // A file added or removed whole, which its diff draws with no comparison, or null for a file that changed in part.
+  const whole: 'added' | 'removed' | null =
+    original === undefined ? null : removedFile ? 'removed' : diffText(original) === '' ? 'added' : null
   const text = original === undefined ? value : diffText(removedFile ? original : value)
   const shownLanguage: FileLanguage = removedFile ? 'plain' : language
   const selectedTint = useSelectedItemTint()
@@ -147,7 +150,7 @@ export default function CodeEditor({
     theme,
     language: shownLanguage,
     original,
-    removedFile,
+    whole,
     onDiffCounts,
     readOnly,
     phrases,
@@ -164,7 +167,7 @@ export default function CodeEditor({
       theme,
       language: shownLanguage,
       original,
-      removedFile,
+      whole,
       onDiffCounts,
       readOnly,
       phrases,
@@ -215,7 +218,7 @@ export default function CodeEditor({
           EditorView.contentAttributes.of({ 'aria-label': label }),
           initial.original === undefined
             ? []
-            : lineDiff(initial.removedFile ? '' : diffText(initial.original), initial.removedFile),
+            : lineDiff(initial.whole === null ? diffText(initial.original) : '', initial.whole === 'removed'),
           initial.lint
             ? [
                 lintGutter(),
@@ -240,8 +243,7 @@ export default function CodeEditor({
     })
     viewRef.current = view
     if (initial.original !== undefined) {
-      const whole = initial.removedFile ? 'removed' : diffText(initial.original) === '' ? 'added' : null
-      initial.onDiffCounts?.(diffCounts(view.state, whole))
+      initial.onDiffCounts?.(diffCounts(view.state, initial.whole))
     }
     initial.onCursor?.(cursorOf(view.state))
     return () => {

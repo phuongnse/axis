@@ -14,7 +14,7 @@ import {
 } from 'react'
 import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
-import { Chevron } from './Chevron'
+import { FoldButton } from './FoldButton'
 import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
 import { nameCompare } from './listOrder'
@@ -781,16 +781,7 @@ function RowFold({ group, open, onToggle }: { group: boolean; open: boolean; onT
   const names = group
     ? { show: 'shell.table.showRows', hide: 'shell.table.hideRows' }
     : { show: 'shell.table.showDetails', hide: 'shell.table.hideDetails' }
-  return (
-    <AxisButton
-      role="subtle"
-      size="small"
-      icon={<Chevron point={open ? 'down' : 'right'} />}
-      nameKey={open ? names.hide : names.show}
-      aria-expanded={open}
-      onClick={onToggle}
-    />
-  )
+  return <FoldButton open={open} showKey={names.show} hideKey={names.hide} size="small" onToggle={onToggle} />
 }
 
 /**

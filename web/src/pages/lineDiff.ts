@@ -21,16 +21,14 @@ import {
  * numbers: a removed file is its own text, each line drawn removed.
  */
 export function lineDiff(original: string, removed: boolean): Extension {
-  return [flush, original === '' ? wholeFile(removed) : changedFile(original)]
+  return [noFocusRing, original === '' ? wholeFile(removed) : changedFile(original)]
 }
 
 /**
- * Proposed: a diff fills its file's block flush, as #3263 agreed, with no frame, corners or focus ring of its own: the
- * block draws one ring around the whole file while the diff has focus, see #4623.
+ * Proposed: a diff draws no focus ring of its own, as its file's block draws one round the whole file, see #4623. A
+ * diff grows with its text, so `CodeEditor`'s `grow` already takes its frame away.
  */
-const flush = Prec.high(
-  EditorView.theme({ '&': { border: 'none', borderRadius: 'unset' }, '&.cm-focused': { outline: 'none' } }),
-)
+const noFocusRing = Prec.high(EditorView.theme({ '&.cm-focused': { outline: 'none' } }))
 
 /** The lines a diff adds and removes, for its file's header. */
 export interface DiffCounts {

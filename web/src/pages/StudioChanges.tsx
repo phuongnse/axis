@@ -1,7 +1,6 @@
 import { Flex, Typography } from 'antd'
-import { lazy, Suspense, useContext, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useContext, useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { AxisButton } from '../platform/AxisButton'
 import { FilledText } from '../platform/FilledText'
 import { fillText } from '../platform/fillText'
 import { keyedListsOf, layerMarks } from '../platform/layerMarks'
@@ -18,7 +17,9 @@ import { packageFileOf, studioRequestAddress } from '../platform/studioAddress'
 import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { Chevron } from '../platform/Chevron'
+import { addedMark, removedMark } from '../platform/changeTint'
+import { FoldButton } from '../platform/FoldButton'
+import { visuallyHidden } from '../platform/visuallyHidden'
 import { PlatformContext } from './context'
 import { fileLanguage } from './fileLanguage'
 import type { DiffCounts } from './lineDiff'
@@ -158,6 +159,17 @@ function LayerMarks({ module }: { module: AuthoringRequestLayerChange }) {
 }
 
 /**
+ * Proposed: the focus ring of a file's block, round the whole file while its diff has focus, as a CSS rule since inline
+ * styles cannot reach focus, as `TileFocusStyle` draws a tile's; the diff draws no ring of its own, see #4623.
+ */
+function DiffFocusStyle() {
+  const { colour } = useDesignTokens()
+  return (
+    <style>{`[data-diff-file]:has(.cm-focused) { outline: 2px solid ${colour.focusRing}; outline-offset: -1px; }`}</style>
+  )
+}
+
+/**
  * Proposed: one changed file as #3263 agreed it, see #4623 and docs/reference/ai-authoring-in-studio.md#revisions: a
  * block with its own border, whose header holds the fold's chevron, the file's name in bold, its kind muted, its change
  * and the lines it adds and removes, then who changed it, then its line diff flush in the block. A package file's kind
@@ -179,8 +191,7 @@ function ChangeFile({
   const { colour, radius, spacing } = useDesignTokens()
   const [open, setOpen] = useState(!folded)
   const [counts, setCounts] = useState<DiffCounts>()
-  // Proposed: the block's one focus ring, drawn around the whole file while its diff has focus, see #4623.
-  const [ringed, setRinged] = useState(false)
+  const diffId = useId()
   const module = file?.module
   const packageFile = module === undefined && file !== undefined && packageFileOf(file.file) !== undefined
   const kind =
@@ -192,15 +203,13 @@ function ChangeFile({
     <section
       data-testid="studio-changes-file"
       data-file={file?.file}
+      data-diff-file
       // The block clips its diff to its rounded corners.
       style={{
         border: rule,
         borderRadius: radius.base,
         background: colour.surface,
         overflow: 'hidden',
-        outline: ringed ? `2px solid ${colour.focusRing}` : undefined,
-        // The ring covers the block's own border, so no region around the block clips it.
-        outlineOffset: -1,
       }}
     >
       <Flex
@@ -212,27 +221,27 @@ function ChangeFile({
           borderBottom: open || changedBy !== null || module !== undefined ? rule : undefined,
         }}
       >
-        <AxisButton
-          role="subtle"
-          nameKey={open ? 'shell.studio.changes.hideDiffName' : 'shell.studio.changes.showDiffName'}
+        <FoldButton
+          open={open}
+          showKey="shell.studio.changes.showDiffName"
+          hideKey="shell.studio.changes.hideDiffName"
           nameValues={{ name: row.name }}
-          icon={<Chevron point={open ? 'down' : 'right'} />}
-          aria-expanded={open}
-          onClick={() => setOpen((current) => !current)}
+          controls={diffId}
+          onToggle={() => setOpen((current) => !current)}
         />
         <Typography.Text strong>{row.name}</Typography.Text>
         {kind !== null && <Typography.Text style={{ color: colour.textMuted }}>{kind}</Typography.Text>}
         <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
         {counts !== undefined && (
-          <span
-            style={{ marginInlineStart: 'auto' }}
-            aria-label={fillText(t('shell.studio.changes.counts'), {
-              added: String(counts.added),
-              removed: String(counts.removed),
-            })}
-          >
-            <span aria-hidden style={{ color: colour.successText }}>{`+${counts.added}`}</span>{' '}
-            <span aria-hidden style={{ color: colour.dangerText }}>{`−${counts.removed}`}</span>
+          <span style={{ marginInlineStart: 'auto' }}>
+            <span style={visuallyHidden}>
+              {fillText(t('shell.studio.changes.counts'), {
+                added: String(counts.added),
+                removed: String(counts.removed),
+              })}
+            </span>
+            <span aria-hidden style={{ color: colour.successText }}>{`${addedMark}${counts.added}`}</span>{' '}
+            <span aria-hidden style={{ color: colour.dangerText }}>{`${removedMark}${counts.removed}`}</span>
           </span>
         )}
       </Flex>
@@ -247,7 +256,7 @@ function ChangeFile({
         </Flex>
       )}
       {/* The diff stays drawn while folded, so the header counts its lines. */}
-      <div hidden={!open} onFocus={() => setRinged(true)} onBlur={() => setRinged(false)}>
+      <div id={diffId} hidden={!open}>
         <LineDiff
           path={file?.file ?? ''}
           name={row.name}
@@ -292,6 +301,7 @@ export function StudioChanges<File extends StudioChangedFile>({
   const byKey = new Map(files.map((file) => [`${file.change}:${file.file}`, file]))
   return (
     <Flex vertical gap="middle">
+      <DiffFocusStyle />
       {changeRows(changes, resources, locale, t).map((row) => {
         const file = byKey.get(row.key)
         const authors = file && changedBy ? changedBy.authors(file) : []

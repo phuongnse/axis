@@ -1,7 +1,7 @@
 import { Flex, Typography } from 'antd'
 import { Children, createContext, isValidElement, useContext, useId, useState, type ReactNode } from 'react'
-import { AxisButton, TitleRowActions } from './AxisButton'
-import { Chevron } from './Chevron'
+import { TitleRowActions } from './AxisButton'
+import { FoldButton } from './FoldButton'
 import { ContentInsetContext } from './contentInsetContext'
 import { useDesignTokens } from './themeMode'
 
@@ -130,14 +130,13 @@ export function SectionPart({
           {fold ? (
             <Flex align="center" gap="small">
               {/* Outside the heading, so the region's name from the heading holds no button name. */}
-              <AxisButton
-                role="subtle"
-                icon={<Chevron point={fold.open ? 'down' : 'right'} />}
-                nameKey={fold.open ? 'shell.section.hide' : 'shell.section.show'}
+              <FoldButton
+                open={fold.open}
+                showKey="shell.section.show"
+                hideKey="shell.section.hide"
                 nameValues={{ title: fold.title }}
-                aria-expanded={fold.open}
-                aria-controls={bodyId}
-                onClick={fold.onToggle}
+                controls={bodyId}
+                onToggle={fold.onToggle}
               />
               {headingBlock}
             </Flex>
