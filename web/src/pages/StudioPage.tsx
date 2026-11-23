@@ -177,7 +177,8 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * `&view=releases` shows only the Releases heading and the release list. `&view=release&release=<number>` shows that
  * release's `StudioReleasePage` in place of the list, under the Releases entry, and its Activate… sends the same request as the list's.
  * `&view=requests` shows the AI requests table under a heading, and `&view=requests&request=<id>` shows that authoring request's page
- * in place of the content. Neither marks a sidebar entry, so Overview is not marked for them.
+ * in place of the content. Both sit under the sidebar's AI requests entry, which shows only with `studioAi`: All requests is marked for
+ * them, and Needs action only while the table shows exactly its filter, see docs/reference/ai-authoring-in-studio.md#the-request-panel.
  * An unknown request's Ask AI opens the request panel when `studioAi` is true.
  * Run tests sits beside Validate and shows only when `GET /api/me` answers `studioTest: true`. A selected scenario
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
@@ -260,6 +261,7 @@ function StudioWorkspace() {
   const [canDevelop, setCanDevelop] = useState(false)
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
   const [activityState, setActivityState] = useState<ActivityState>()
@@ -282,6 +284,7 @@ function StudioWorkspace() {
         setCanDevelop(user?.studioDeveloper === true)
         setPreviewHost(user?.studioPreviewHost ?? null)
         setUserId(user?.id ?? null)
+        setUserName(user?.displayName ?? null)
       },
       () => {
         if (!controller.signal.aborted) {
@@ -292,6 +295,7 @@ function StudioWorkspace() {
           setCanDevelop(false)
           setPreviewHost(null)
           setUserId(null)
+          setUserName(null)
         }
       },
     )
@@ -566,11 +570,14 @@ function StudioWorkspace() {
 
   const publishView = requestedPublish && canPublish
   const overviewApp = apps.find((item) => item.name === application)
-  const entries = studioNavigation(application, resources, allModuleGroups, t)
+  // The AI requests entry and its marked view show only for a person who may ask AI, see docs/reference/ai-authoring-in-studio.md#the-request-panel.
+  const reader = canAskAi ? userName : null
+  const entries = studioNavigation(application, resources, allModuleGroups, t, reader)
   const activeKey = studioActiveEntry(
     params,
     resources,
     allModuleGroups.flatMap((group) => group.items),
+    reader,
   )
 
   return (
