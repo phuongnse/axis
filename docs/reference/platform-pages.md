@@ -131,6 +131,7 @@ sorts and pages them, see [the list route](user-administration.md#read-routes).
 - **Filter.** Filter, in the toolbar, filters by any column: the text of the name, the email and the
   sign-in, the status (`invited`, `active` or `disabled`) and the day of the last sign-in. An account has no
   provider, so the filter "is empty" on Sign-in finds the accounts.
+- **Refresh.** Refresh, in the toolbar, loads the list again.
 - **Paging.** The pager says "1–20 of N" and has a page size picker.
 - **The address.** The view lives in the address as `search`, `filter`, `sort`, `page`, `pageSize` and
   `columns`, so a reload or the Back button keeps it. See [tables](actions-and-controls.md#tables).

@@ -416,6 +416,17 @@ describe('CellTenantsPage', () => {
     expect(document.querySelector('.ant-card')).toBeNull()
   })
 
+  it('loads the tenants again when Refresh is pressed', async () => {
+    const urls = stubTenants(200, [acme, beta, gamma])
+    renderPage()
+
+    await loadedTable()
+    await userEvent.click(within(screen.getByTestId('cell-tenants')).getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() => expect(urls).toHaveLength(2))
+    expect(urls[1]).toBe(urls[0])
+  })
+
   it('reports a refusal to the console', async () => {
     stubTenants(401)
     const onRefused = renderPage()

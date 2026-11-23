@@ -492,10 +492,10 @@ be kept right.
 - **Inline edit** _(planned for M42)_. An editable cell shows its input on click or Enter. It saves on Enter or when it
   loses focus, and it cancels on Escape. A refused save keeps the old value with the reason. A cell that cannot be
   edited shows its value as text, with no input.
-- **The growth test** _(planned for M35)_. A table whose rows grow as people use the application, such as
+- **The growth test**. A table whose rows grow as people use the application, such as
   records, requests or releases, has the full standard toolbar above. A table whose rows do not grow may
   show fewer of its controls, as the toolbar bullet says.
-- **Named exceptions** _(planned for M35)_. A table that is part of one thing is the exception to the growth
+- **Named exceptions**. A table that is part of one thing is the exception to the growth
   test. Its rows belong to that one thing, such as the lines of a child collection on a form, so a search or
   a filter of its own would split them from it.
 - **No control of its own**. A table gets no control for one view. A view is a filter
