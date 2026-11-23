@@ -181,6 +181,7 @@ public sealed class StorageQuotaRouteTests
 
         // Validate, preview, test, build, run and activate store a request and go on over the quota.
         "POST /api/studio/apps/{application}/build",
+        "POST /api/studio/apps/{application}/drafts/{draft}/preview",
         "POST /api/studio/apps/{application}/preview",
         "POST /api/studio/apps/{application}/releases/{id}/activate",
         "POST /api/studio/apps/{application}/run",

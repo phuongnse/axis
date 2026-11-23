@@ -30,6 +30,7 @@ const request = (
   sentAt: '2026-11-02T09:30:00Z',
   approvedAt: null,
   finishedAt: null,
+  draft: null,
   ...overrides,
 })
 

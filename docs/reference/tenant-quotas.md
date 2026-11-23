@@ -138,7 +138,8 @@ nothing:
   before it, because only a body that turns packages on is refused, so the body must be read first.
   A Studio `publish` or `preview` of a folder that holds a file under `packages/` is refused the same way. Its
   check comes after the publisher role, the application and the manifest check, and before the body. An application
-  without `packages/` is not refused.
+  without `packages/` is not refused. A [draft preview](authoring-requests.md#routes) of a draft that holds a file
+  under `packages/` is refused the same way, after the manifest check.
 - **The provisioning API.** The platform operator's `PUT /api/cell/tenants/{id}/quotas` is never
   refused over the `storage` quota. It writes platform rows and no tenant data, so the operator can
   raise a quota that a tenant has reached.

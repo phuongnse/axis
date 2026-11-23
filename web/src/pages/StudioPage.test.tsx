@@ -1098,6 +1098,7 @@ describe('StudioPage', () => {
           sentAt: '2026-11-18T09:30:00Z',
           approvedAt: null,
           finishedAt: null,
+          draft: null,
         })
       }
       return base(input, init)
@@ -1782,6 +1783,7 @@ describe('StudioPage publishing', () => {
           file: 'sites/purchasing.json',
           version: 'e',
           usedBy: 0,
+          titles: { en: 'Purchasing' },
         }
         return json({ items: [...resources, site] })
       }
@@ -2350,6 +2352,8 @@ describe('StudioPage publishing', () => {
     const link = await screen.findByTestId('studio-preview-link')
     expect(link.getAttribute('href')).toContain('//preview.example.test')
     expect(link.getAttribute('href')).toMatch(/\/purchasing$/)
+    expect(link).toHaveTextContent('Open Purchasing')
+    expect(screen.getByTestId('studio-request-status')).toHaveTextContent('The preview is ready. Open Purchasing')
     expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
     expect(screen.getByTestId('studio-preview')).toBeEnabled()
     const posts = fetchMock.mock.calls.filter(
