@@ -273,7 +273,15 @@ export function StudioAuthoringRequestPage({
           request.state === 'fixing'
             ? fillText(t('shell.studio.aiRequest.work.fixRound'), { round: request.round })
             : undefined,
-        body: <WorkBody key={request.id} request={request} failure={mark === 'stopped' ? failure : null} />,
+        body: (
+          <WorkBody
+            key={request.id}
+            application={application}
+            request={request}
+            resources={resources}
+            failure={mark === 'stopped' ? failure : null}
+          />
+        ),
       }
     }
     if (key === 'result') {
@@ -534,9 +542,21 @@ export function StudioAuthoringRequestPage({
 /**
  * The body of the Work item, see docs/reference/ai-authoring-in-studio.md#the-work-item: the failure of a request that stopped
  * here, its line, then Show the steps or Hide the steps once it has steps. That button folds in the History, closed at
- * first, a table of every step with no paging, newest first, see docs/reference/ai-authoring-in-studio.md#the-history.
+ * first, a table of every step with no paging, newest first, see docs/reference/ai-authoring-in-studio.md#the-history. A
+ * run of writes is one row that opens to each write, and a write names its resource, a link when `resources`, the
+ * application's resource list, holds it.
  */
-function WorkBody({ request, failure }: { request: AuthoringRequest; failure: ReactNode }) {
+function WorkBody({
+  application,
+  request,
+  resources,
+  failure,
+}: {
+  application: string
+  request: AuthoringRequest
+  resources: StudioResourceItem[]
+  failure: ReactNode
+}) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { spacing } = useDesignTokens()
@@ -548,7 +568,27 @@ function WorkBody({ request, failure }: { request: AuthoringRequest; failure: Re
       key: 'step',
       title: t('shell.studio.aiRequest.history.step'),
       kind: 'freeText',
-      render: (_, row) => (row.step === null ? null : fillText(t(row.step.key), row.step.values)),
+      render: (_, row) => {
+        if (row.step === null) {
+          return null
+        }
+        const words = fillText(t(row.step.key), row.step.values)
+        if (row.resource === null) {
+          return words
+        }
+        const { kind, id, name } = row.resource
+        const found = resources.find((item) => item.id === id)
+        return (
+          <>
+            {words}{' '}
+            <ResourceReference
+              file={found?.file ?? id ?? ''}
+              resource={found ?? (kind && name ? { kind, name } : undefined)}
+              href={found ? studioResourceAddress(application, found.id) : undefined}
+            />
+          </>
+        )
+      },
     },
     {
       key: 'result',
@@ -603,6 +643,7 @@ function WorkBody({ request, failure }: { request: AuthoringRequest; failure: Re
           pagination={false}
           rowKey={(row) => row.key}
           dataSource={requestHistory(request)}
+          rowsIn={(row) => row.rows}
           columns={columns}
         />
       )}

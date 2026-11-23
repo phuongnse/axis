@@ -2097,9 +2097,17 @@ export interface AuthoringRequestReviewChecks {
   review: { outcome: 'passed' | 'findings'; findings: string | null }
 }
 
+/** The resource a `write` step wrote or deleted. A part the call did not name is null. */
+export interface AuthoringRequestStepResource {
+  kind: string | null
+  id: string | null
+  name: string | null
+}
+
 /**
- * One step of an authoring request, in order. `outcome` says how the step ended, and `checks` holds the checks of a `check`
- * or `review` step, null on any other. See docs/reference/authoring-requests.md#states.
+ * One step of an authoring request, in order. `outcome` says how the step ended, `checks` holds the checks of a `check`
+ * or `review` step, and `resource` the resource of a `write` step, each null on any other. A `write` step's `summary` is the
+ * name of the tool that made it. See docs/reference/authoring-requests.md#states.
  */
 export interface AuthoringRequestStep {
   kind: string
@@ -2109,6 +2117,7 @@ export interface AuthoringRequestStep {
   startedAt: string
   finishedAt: string | null
   checks: AuthoringRequestChecks | AuthoringRequestReviewChecks | null
+  resource: AuthoringRequestStepResource | null
 }
 
 /**

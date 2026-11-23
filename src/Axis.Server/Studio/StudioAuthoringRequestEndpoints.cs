@@ -728,7 +728,7 @@ internal static class StudioAuthoringRequestEndpoints
         {
             await using var command = new NpgsqlCommand(
                 """
-                SELECT kind, input_summary, outcome, tokens, started_at, finished_at, checks
+                SELECT kind, input_summary, outcome, tokens, started_at, finished_at, checks, resource
                 FROM axis.authoring_request_steps WHERE request_id = @id ORDER BY ordinal
                 """,
                 connection);
@@ -743,7 +743,8 @@ internal static class StudioAuthoringRequestEndpoints
                     reader.GetInt64(3),
                     reader.GetFieldValue<DateTimeOffset>(4),
                     reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5),
-                    reader.IsDBNull(6) ? null : JsonDocument.Parse(reader.GetString(6)).RootElement.Clone()));
+                    reader.IsDBNull(6) ? null : JsonDocument.Parse(reader.GetString(6)).RootElement.Clone(),
+                    reader.IsDBNull(7) ? null : JsonDocument.Parse(reader.GetString(7)).RootElement.Clone()));
             }
         }
 
@@ -880,7 +881,7 @@ internal sealed record AuthoringRequestResponse(
     string? Draft,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AuthoringRequestStepResponse>? Steps);
 
-/// <summary>One step of a request: its kind, the summary of its input, its outcome, its tokens, its times and the checks of a <c>check</c> or <c>review</c> step, null on any other.</summary>
+/// <summary>One step of a request: its kind, the summary of its input, its outcome, its tokens, its times, the checks of a <c>check</c> or <c>review</c> step, null on any other, and the resource of a <c>write</c> step, null on any other.</summary>
 internal sealed record AuthoringRequestStepResponse(
     string Kind,
     string? Summary,
@@ -888,7 +889,8 @@ internal sealed record AuthoringRequestStepResponse(
     long Tokens,
     DateTimeOffset StartedAt,
     DateTimeOffset? FinishedAt,
-    JsonElement? Checks);
+    JsonElement? Checks,
+    JsonElement? Resource);
 
 /// <summary>The newest requests of an application, newest first.</summary>
 internal sealed record AuthoringRequestListResponse(IReadOnlyList<AuthoringRequestResponse> Items);

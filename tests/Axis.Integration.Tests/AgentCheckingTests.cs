@@ -65,15 +65,17 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
         Assert.Equal("passed", await ScalarAsync($"SELECT checks->'compile'->>'outcome' FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'check'"));
         Assert.Equal("passed", await ScalarAsync($"SELECT checks->'scenarios'->>'outcome' FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'check'"));
 
-        // The read route answers the checks of the check step, and null on the steps before it.
+        // The read route answers the checks of the check step, and null on the steps before it, the write steps among them.
         using var read = await StudioPublishTests.SendAsync(client, HttpMethod.Get, $"{Url}/{id}", Host);
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
         using var request = await StudioPublishTests.ReadAsync(read);
         var steps = request.RootElement.GetProperty("steps").EnumerateArray().ToList();
-        Assert.Equal(["plan", "work", "check", "review"], steps.Select(step => step.GetProperty("kind").GetString()));
+        Assert.Equal(["plan", "work", "write", "write", "check", "review"], steps.Select(step => step.GetProperty("kind").GetString()));
         Assert.Equal(JsonValueKind.Null, steps[0].GetProperty("checks").ValueKind);
         Assert.Equal(JsonValueKind.Null, steps[1].GetProperty("checks").ValueKind);
-        var checks = steps[2].GetProperty("checks");
+        Assert.Equal(JsonValueKind.Null, steps[2].GetProperty("checks").ValueKind);
+        Assert.Equal(JsonValueKind.Null, steps[3].GetProperty("checks").ValueKind);
+        var checks = steps[4].GetProperty("checks");
         Assert.Equal("passed", checks.GetProperty("compile").GetProperty("outcome").GetString());
         var scenarios = checks.GetProperty("scenarios");
         Assert.Equal("passed", scenarios.GetProperty("outcome").GetString());
@@ -82,7 +84,7 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
         Assert.Equal("passed", items["FinanceReviewAdded"]);
         Assert.Equal("passed", items["department-budgets/ApprovalRecordsDecision"]);
         Assert.DoesNotContain(items.Values, outcome => outcome == "failed");
-        Assert.Equal("passed", steps[3].GetProperty("checks").GetProperty("review").GetProperty("outcome").GetString());
+        Assert.Equal("passed", steps[5].GetProperty("checks").GetProperty("review").GetProperty("outcome").GetString());
     }
 
     [Fact]

@@ -57,7 +57,7 @@ public sealed class AgentFixingTests(KeycloakFixture keycloak, PostgreSqlFixture
         await host.StopAsync(CancellationToken);
 
         Assert.Equal("1", await ScalarAsync($"SELECT round FROM axis.authoring_requests WHERE id = '{id}'"));
-        Assert.Equal("work,check:failed,fix,check:passed,review:passed", await StepsAsync(id));
+        Assert.Equal("work,write:saved,check:failed,fix,write:saved,write:saved,check:passed,review:passed", await StepsAsync(id));
         Assert.Equal(5, script.Calls.Count);
 
         // The first message of the fix step holds the compile diagnostics of the failed check, and the step offers the tools of working.
@@ -99,7 +99,7 @@ public sealed class AgentFixingTests(KeycloakFixture keycloak, PostgreSqlFixture
         await host.StopAsync(CancellationToken);
 
         Assert.Equal("1", await ScalarAsync($"SELECT round FROM axis.authoring_requests WHERE id = '{id}'"));
-        Assert.Equal("work,check:failed,fix,check:failed", await StepsAsync(id));
+        Assert.Equal("work,write:saved,check:failed,fix,check:failed", await StepsAsync(id));
         Assert.Equal(3, script.Calls.Count);
         Assert.Equal("true", await ScalarAsync($"SELECT (refresh_token IS NULL)::text FROM axis.authoring_requests WHERE id = '{id}'"));
         Assert.Equal("true", await ScalarAsync($"SELECT (finished_at IS NOT NULL)::text FROM axis.authoring_requests WHERE id = '{id}'"));

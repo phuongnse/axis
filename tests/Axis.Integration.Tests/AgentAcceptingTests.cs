@@ -59,7 +59,7 @@ public sealed class AgentAcceptingTests(KeycloakFixture keycloak, PostgreSqlFixt
 
         Assert.True(await StateAsync(id) == "accepted", await DescribeAsync(id));
         Assert.Equal(
-            "work:-,check:passed,review:passed,accept:conflict,work:-,check:passed,review:passed,accept:accepted",
+            "work:-,write:saved,check:passed,review:passed,accept:conflict,work:-,write:saved,check:passed,review:passed,accept:accepted",
             await ScalarAsync($"SELECT string_agg(kind || ':' || coalesce(outcome, '-'), ',' ORDER BY ordinal) FROM axis.authoring_request_steps WHERE request_id = '{id}'"));
         // The first accept failed with the conflict, the second is of a new draft, and the request keeps the new one.
         Assert.Equal(

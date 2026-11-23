@@ -179,6 +179,8 @@ A tool with an optional draft reads the working folder without it and the person
   and nothing an outside client read elsewhere, gives an agent more than its tools allow.
 - **Errors.** A refused call answers a tool error with the authoring API's problem title and
   diagnostics, never a stack trace or a path on disk.
+- **Steps of writes.** A call of `write_resource`, `delete_resource` or `write_layer` stores a `write` step on the
+  authoring request that holds the draft, under the rules of [writes](authoring-requests.md#states).
 - **Plans first** _(planned for M35)_. `propose_plan` replaces `create_draft`, which goes. The first write on an
   approved request makes its draft.
 - **Write tools take the request** _(planned for M35)_. `write_resource`, `write_layer`, `delete_resource`,

@@ -227,6 +227,10 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("request_id");
 
+                    b.Property<string>("Resource")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("resource");
+
                     b.Property<DateTimeOffset>("StartedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
