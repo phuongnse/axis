@@ -589,6 +589,21 @@ describe('AxisTable', () => {
         expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
       })
+
+      it('draws a lone action as a button, with no Actions menu, even when the row is asked to fold', () => {
+        renderRowActions([openAction], true)
+
+        expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+      })
+
+      it('draws a lone known Remove as the trash icon, even when the row is asked to fold', () => {
+        renderRowActions([removeAction], true)
+
+        const remove = screen.getByRole('button', { name: 'Delete' })
+        expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+        expect(screen.queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+      })
     })
 
     it('draws a known Remove as the trash icon in dangerText, named by its label', () => {
