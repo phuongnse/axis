@@ -164,7 +164,7 @@ describe.each(['light', 'dark'] as const)('the shared dialog frame in %s mode', 
 
 describe.each(['light', 'dark'] as const)('the shared field rules in %s mode', (mode) => {
   const { colour } = designTokensFor(mode)
-  const { theme: themeConfig, checkbox, radio } = antConfigFor(mode)
+  const { theme: themeConfig, checkbox, radio, form } = antConfigFor(mode)
 
   it('draws the border of an input, number input, select, date picker, mentions, cascader and tree select in dangerText on an error', () => {
     for (const name of [
@@ -211,12 +211,12 @@ describe.each(['light', 'dark'] as const)('the shared field rules in %s mode', (
     expect(radio).toMatchObject(box)
   })
 
-  it('gives a message a 4px gap and a 14/20 line, and leaves the item its own gap below it', () => {
-    const rules = fieldRules(mode)
-    expect(rules).toContain(
-      '.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: 14px; line-height: 20px; }',
-    )
-    expect(rules).toContain('.ant-form-item-margin-offset { display: none; }')
+  it("gives a form's messages a 4px gap and a 14/20 line through the form's help part", () => {
+    expect(form?.styles).toEqual({ help: { marginTop: 4, fontSize: 14, lineHeight: '20px' } })
+  })
+
+  it('names no Ant Design form message class, so an item grows by its message', () => {
+    expect(fieldRules(mode)).not.toMatch(/\.ant-form-item-(explain|margin-offset)/)
   })
 
   it('gives a text button of AxisButton the light fill of its hover on keyboard focus', () => {

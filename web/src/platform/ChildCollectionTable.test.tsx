@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ConfigProvider } from 'antd'
+import { ConfigProvider, Form } from 'antd'
 import { useState } from 'react'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
@@ -12,6 +12,7 @@ import type { FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 import type { ThemeMode } from './themeMode'
+import { formMessages } from '../test/antd'
 import { withAntdStyles } from '../test/antdStyles'
 
 const texts = {
@@ -144,11 +145,17 @@ describe('the cells of a child collection', () => {
     withAntdStyles()
 
     it('shows a cell message as a left-aligned block 4px under its input, with no gap below', () => {
-      renderIn('light', <Harness initial={oneRow} errors={{ '0/quantity': ['Bad'] }} />)
+      // The cells sit in the record's form, whose messages the shared ConfigProvider styles.
+      renderIn(
+        'light',
+        <Form>
+          <Harness initial={oneRow} errors={{ '0/quantity': ['Bad'] }} />
+        </Form>,
+      )
 
       const message = screen.getByTestId('field-error-lines-0-quantity')
       expect(message).toHaveStyle({ display: 'block', textAlign: 'left' })
-      expect(message.closest('.ant-form-item-explain')).toHaveStyle({ marginTop: '4px' })
+      expect(formMessages(message)).toHaveStyle({ marginTop: '4px', fontSize: '14px', lineHeight: '20px' })
       const item = message.closest('.ant-form-item')
       expect(item && getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
     })
