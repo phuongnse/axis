@@ -25,11 +25,11 @@ export function lineDiff(original: string, removed: boolean): Extension {
 }
 
 /**
- * Proposed: a diff fills its file's block flush, as #3263 agreed, with no frame or corners of its own, and keyboard
- * focus stays visible inside the block's edge, see #4623.
+ * Proposed: a diff fills its file's block flush, as #3263 agreed, with no frame, corners or focus ring of its own: the
+ * block draws one ring around the whole file while the diff has focus, see #4623.
  */
 const flush = Prec.high(
-  EditorView.theme({ '&': { border: 'none', borderRadius: 'unset' }, '&.cm-focused': { outlineOffset: '-2px' } }),
+  EditorView.theme({ '&': { border: 'none', borderRadius: 'unset' }, '&.cm-focused': { outline: 'none' } }),
 )
 
 /** The lines a diff adds and removes, for its file's header. */

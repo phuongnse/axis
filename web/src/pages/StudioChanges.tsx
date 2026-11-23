@@ -176,6 +176,8 @@ function ChangeFile({
   const { colour, radius, spacing } = useDesignTokens()
   const [open, setOpen] = useState(!folded)
   const [counts, setCounts] = useState<DiffCounts>()
+  // Proposed: the block's one focus ring, drawn around the whole file while its diff has focus, see #4623.
+  const [ringed, setRinged] = useState(false)
   const module = file?.module
   const packageFile = module === undefined && file !== undefined && packageFileOf(file.file) !== undefined
   const kind =
@@ -188,7 +190,15 @@ function ChangeFile({
       data-testid="studio-changes-file"
       data-file={file?.file}
       // The block clips its diff to its rounded corners.
-      style={{ border: rule, borderRadius: radius.base, background: colour.surface, overflow: 'hidden' }}
+      style={{
+        border: rule,
+        borderRadius: radius.base,
+        background: colour.surface,
+        overflow: 'hidden',
+        outline: ringed ? `2px solid ${colour.focusRing}` : undefined,
+        // The ring covers the block's own border, so no region around the block clips it.
+        outlineOffset: -1,
+      }}
     >
       <Flex
         wrap
@@ -234,7 +244,7 @@ function ChangeFile({
         </Flex>
       )}
       {/* The diff stays drawn while folded, so the header counts its lines. */}
-      <div hidden={!open}>
+      <div hidden={!open} onFocus={() => setRinged(true)} onBlur={() => setRinged(false)}>
         <LineDiff
           path={file?.file ?? ''}
           name={row.name}
