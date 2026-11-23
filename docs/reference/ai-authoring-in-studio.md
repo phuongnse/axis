@@ -157,7 +157,7 @@ Result, Started and Duration.
   shows an em dash.
 - The words of a step come from its kind and its outcome, and never from AI. Examples are "Wrote a plan",
   "Changed the draft", "Checked the draft", "Fixed the draft", "Reviewed the draft", "Asked for another plan:
-  “<comment>”" and "Asked for changes: “<comment>”".
+  “<comment>”", "Asked for changes: “<comment>”" and "Asked AI to make the change again".
 - The results read "Plan written", "Saved", "All scenarios pass", "No changes requested", "Refused" or
   "Ran out of time". The only free text is the author's own comment in a step.
 - **Writes that follow each other** _(planned for M35)_. Writes that follow each other fold into one group row, as

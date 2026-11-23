@@ -2637,6 +2637,7 @@
   "shell.studio.aiRequest.history.step.review": "Đã đánh giá bản nháp",
   "shell.studio.aiRequest.history.step.fix": "Đã sửa bản nháp",
   "shell.studio.aiRequest.history.step.changeRequest": "Đã yêu cầu thay đổi: “{comment}”",
+  "shell.studio.aiRequest.history.step.retry": "Đã nhờ AI làm lại thay đổi",
   "shell.studio.aiRequest.history.step.accept": "Chấp nhận",
   "shell.studio.aiRequest.history.result.planWritten": "Đã viết kế hoạch",
   "shell.studio.aiRequest.history.result.saved": "Đã lưu",

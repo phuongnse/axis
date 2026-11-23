@@ -2637,6 +2637,7 @@
   "shell.studio.aiRequest.history.step.review": "Reviewed the draft",
   "shell.studio.aiRequest.history.step.fix": "Fixed the draft",
   "shell.studio.aiRequest.history.step.changeRequest": "Asked for changes: “{comment}”",
+  "shell.studio.aiRequest.history.step.retry": "Asked AI to make the change again",
   "shell.studio.aiRequest.history.step.accept": "Accept",
   "shell.studio.aiRequest.history.result.planWritten": "Plan written",
   "shell.studio.aiRequest.history.result.saved": "Saved",
