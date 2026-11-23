@@ -49,7 +49,7 @@ request opens its own page.
   the order a request goes through its states; paging such as "1–7 of 7", with a page size; and Refresh.
   Search, filters, sort and paging all live in the address. The page has no control of its own, so Ask AI
   stays on the band.
-- **The sidebar's AI requests entry** _(planned for M35)_. AI requests is a parent entry in the sidebar,
+- **The sidebar's AI requests entry**. AI requests is a parent entry in the sidebar,
   right after History, which opens and folds. Under it are two views of the same table, each a filter kept
   in the address:
   - **All requests** shows every request.
@@ -58,7 +58,7 @@ request opens its own page.
 
   The sidebar marks Needs action only while the table shows exactly that filter, and All requests otherwise,
   a request's page included. The entry opens by itself while one of its views is open, and a person's choice
-  to open or fold it holds until the page changes.
+  to open or fold it holds until another sidebar entry is marked.
 
 ## A request's page
 

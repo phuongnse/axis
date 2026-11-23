@@ -30,10 +30,11 @@ them. It has no entry back to the list, because Studio in the header's app switc
 row and the band stay in place while the page scrolls, and only the sidebar's entries scroll, under
 the row. How the sidebar and the page scroll is in [layout](shell.md#layout).
 
-Under the row come Overview, Releases, History and Settings, which concern the whole application.
+Under the row come Overview, Releases, History, AI requests and Settings, which concern the whole application.
+AI requests shows only to a person who may ask AI, see its bullet below.
 History lists the application's revisions, see [revisions](ai-authoring-in-studio.md#revisions).
 
-- **AI requests** _(planned for M35)_. A parent entry right after History, shown to a person who may ask AI.
+- **AI requests**. A parent entry right after History, shown to a person who may ask AI.
   Its two views, All requests and Needs action, are filters of the [AI requests](ai-authoring-in-studio.md#the-request-panel)
   table.
 

@@ -1,22 +1,45 @@
-import type { ShellNavigationEntry, ShellNavigationGroup } from '../platform/ShellNavigation'
+import type { ShellNavigationEntry, ShellNavigationNode } from '../platform/ShellNavigation'
 import type { ModuleResourceGroup, ModuleResourceItem, StudioResourceItem } from '../platform/studio'
 import {
   studioApplicationAddress,
   studioKindAddress,
+  studioRequestsAddress,
   studioResourceAddress,
   studioViewAddress,
 } from '../platform/studioAddress'
 import { kindGroup, kindGroupNames, kindName, studioKind, studioKinds } from '../platform/studioKinds'
+import { type FilterGroup, parseFilter } from '../platform/tableFilter'
+import { requestFields } from './studioAuthoringRequest'
+
+/**
+ * The filter of the Needs action view: the reader's own requests that wait for them, in Awaiting approval or Ready. Its
+ * keys are in the order `parseFilter` writes them, so the address's filter compares equal to it.
+ */
+export function needsActionFilter(reader: string): FilterGroup {
+  return {
+    all: [
+      { field: 'author', op: 'eq', value: reader },
+      {
+        any: [
+          { field: 'state', op: 'eq', value: 'awaitingApproval' },
+          { field: 'state', op: 'eq', value: 'ready' },
+        ],
+      },
+    ],
+  }
+}
 
 /**
  * The sidebar entries of an open application, in the order that docs/reference/studio-workspace.md#workspace gives.
+ * `reader` is the display name of a person who may ask AI, or `null`: the AI requests entry shows only for a name.
  */
 export function studioNavigation(
   application: string,
   resources: readonly StudioResourceItem[],
   moduleGroups: readonly ModuleResourceGroup[],
   t: (key: string) => string,
-): (ShellNavigationEntry | ShellNavigationGroup)[] {
+  reader: string | null = null,
+): ShellNavigationNode[] {
   const manifest = resources.find((item) => item.kind === 'application')
   const kinds = new Set([
     ...resources.map((item) => item.kind),
@@ -41,7 +64,7 @@ export function studioNavigation(
     label: t('shell.studio.nav.packages'),
   }
 
-  const entries: (ShellNavigationEntry | ShellNavigationGroup)[] = [
+  const entries: ShellNavigationNode[] = [
     {
       key: 'overview',
       path: studioApplicationAddress(application),
@@ -61,6 +84,27 @@ export function studioNavigation(
       label: t('shell.studio.history'),
     },
   ]
+  if (reader !== null) {
+    entries.push({
+      key: 'requests',
+      icon: 'inbox',
+      label: t('shell.studio.aiRequests.title'),
+      children: [
+        {
+          key: 'requests:all',
+          path: studioRequestsAddress(application),
+          icon: 'list',
+          label: t('shell.studio.aiRequests.all'),
+        },
+        {
+          key: 'requests:needsAction',
+          path: studioRequestsAddress(application, needsActionFilter(reader)),
+          icon: 'tasks',
+          label: t('shell.studio.aiRequests.needsAction'),
+        },
+      ],
+    })
+  }
   if (manifest !== undefined) {
     entries.push({
       key: 'settings',
@@ -100,6 +144,7 @@ export function studioActiveEntry(
   params: URLSearchParams,
   resources: readonly StudioResourceItem[],
   moduleItems: readonly ModuleResourceItem[],
+  reader: string | null = null,
 ): string {
   const resource = params.get('resource')?.toLowerCase()
   if (resource) {
@@ -126,9 +171,16 @@ export function studioActiveEntry(
   if (view === 'releases' || view === 'history' || view === 'policies' || view === 'packages') {
     return view
   }
-  // The AI requests table and a request's page have no entry of their own, so no entry is marked for them, not even Overview.
+  // The AI requests table and a request's page are under the AI requests entry, see docs/reference/ai-authoring-in-studio.md#the-request-panel.
+  // Needs action is marked only while the table shows exactly its filter, so search, sort and paging do not count.
   if (view === 'requests') {
-    return 'requests'
+    const filter = parseFilter(
+      params.get('filter') ?? '',
+      requestFields.map((field) => field.name),
+    )
+    const needsAction =
+      reader !== null && !params.has('request') && JSON.stringify(filter) === JSON.stringify(needsActionFilter(reader))
+    return needsAction ? 'requests:needsAction' : 'requests:all'
   }
   return 'overview'
 }
