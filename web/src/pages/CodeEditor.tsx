@@ -13,7 +13,7 @@ import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/s
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
 import { useSelectedItemTint } from '../platform/antTheme'
-import { changeTint } from '../platform/changeTint'
+import { addedMark, changeTint, removedMark } from '../platform/changeTint'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
@@ -374,7 +374,11 @@ const editorTheme = sharedTheme((tokens, mode, selectedTint: string, height: Edi
         border: 'none',
         borderInlineEnd: `1px solid ${colour.borderSubtle}`,
       },
-      '.cm-lineNumbers .cm-gutterElement': { paddingInline: `${spacing.sm}px` },
+      // A line diff's column of the text before's numbers looks as the line numbers do, see lineDiff.ts.
+      '.cm-lineNumbers .cm-gutterElement, .cm-beforeLineNumbers .cm-gutterElement': {
+        paddingInline: `${spacing.sm}px`,
+        textAlign: 'right',
+      },
       '.cm-foldGutter .cm-gutterElement': { color: colour.textMuted },
       // The current line and a matching bracket use existing tokens,
       // see docs/reference/studio-packages.md#a-packages-files.
@@ -417,9 +421,8 @@ const editorTheme = sharedTheme((tokens, mode, selectedTint: string, height: Edi
         insetInlineStart: `${spacing.sm}px`,
         color: colour.text,
       },
-      '&.cm-merge-b .cm-changedLine::before': { content: '"+"' },
-      '&.cm-removedFile .cm-changedLine::before': { content: '"−"' },
-      '.cm-deletedLine::before': { content: '"−"' },
+      '&.cm-merge-b .cm-changedLine::before': { content: `"${addedMark}"` },
+      '&.cm-removedFile .cm-changedLine::before, .cm-deletedLine::before': { content: `"${removedMark}"` },
       // The changed words of a changed line are underlined in the state's text colour, as a stronger tint under coloured
       // code falls below 4.5:1.
       '&.cm-merge-b .cm-changedText': { background: changedWords(colour.successText) },
@@ -427,7 +430,6 @@ const editorTheme = sharedTheme((tokens, mode, selectedTint: string, height: Edi
       '.cm-deletedChunk .cm-deletedText': { background: changedWords(colour.dangerText) },
       // A line added or removed whole shows no underline: every word of it changed.
       '.cm-wholeLineChange .cm-changedText, .cm-wholeLineChange.cm-deletedLine .cm-deletedText': { background: 'none' },
-      '.cm-beforeLineNumbers .cm-gutterElement': { paddingInline: `${spacing.sm}px`, textAlign: 'right' },
       '.cm-collapsedLines': {
         color: colour.textMuted,
         background: colour.fillSubtle,

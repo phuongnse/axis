@@ -6,3 +6,9 @@
 export function changeTint(seed: string): string {
   return `color-mix(in srgb, ${seed} 16%, transparent)`
 }
+
+/** The mark before a removed line, which a run's changed field and a line diff both draw. */
+export const removedMark = '−'
+
+/** The mark before an added line, which a run's changed field and a line diff both draw. */
+export const addedMark = '+'

@@ -3,7 +3,7 @@ import { Flex } from 'antd'
 import type { ReactNode } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { BodyView } from './BodyView'
-import { changeTint } from './changeTint'
+import { addedMark, changeTint, removedMark } from './changeTint'
 import { CopyableId } from './CopyableId'
 import { EventTime } from './EventTime'
 import { EmptyState } from './EmptyState'
@@ -158,8 +158,8 @@ function ChangeDiff({ change }: { change: RunChange }) {
   return (
     <div>
       <span style={visuallyHidden}>{fillText(t('shell.inspector.run.changedFrom'), { before, after })}</span>
-      <div aria-hidden style={{ ...line, background: changeTint(colour.danger) }}>{`− ${before}`}</div>
-      <div aria-hidden style={{ ...line, background: changeTint(colour.success) }}>{`+ ${after}`}</div>
+      <div aria-hidden style={{ ...line, background: changeTint(colour.danger) }}>{`${removedMark} ${before}`}</div>
+      <div aria-hidden style={{ ...line, background: changeTint(colour.success) }}>{`${addedMark} ${after}`}</div>
     </div>
   )
 }

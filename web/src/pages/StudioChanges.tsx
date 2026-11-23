@@ -10,14 +10,13 @@ import { keyedListsOf, layerMarks } from '../platform/layerMarks'
 import {
   type AuthoringRequestLayerChange,
   changeRows,
-  isPackageFile,
   type StudioChangeAuthor,
   type StudioChangeRow,
   type StudioReleaseChange,
   type StudioResourceItem,
   type StudioRevisionChange,
 } from '../platform/studio'
-import { studioRequestAddress } from '../platform/studioAddress'
+import { packageFileOf, studioRequestAddress } from '../platform/studioAddress'
 import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -224,7 +223,7 @@ function ChangeFile({
         {changedBy}
         {module !== undefined && <LayerMarks module={module} />}
         {(!folded || open) &&
-          (module === undefined && file !== undefined && isPackageFile(file.file) ? (
+          (module === undefined && file !== undefined && packageFileOf(file.file) !== undefined ? (
             <LineDiff path={file.file} name={row.name} before={file.before} after={file.after} />
           ) : (
             <JsonDiff

@@ -42,10 +42,19 @@ export function studioPackageAddress(application: string, packageId: string, fil
   })}`
 }
 
+/**
+ * The package and the path in it of a folder file that is a package's file, `packages/<id>/<path>`, and undefined for
+ * any other file. It is the one test of a package's file, which an address and a diff both take.
+ */
+export function packageFileOf(file: string): { packageId: string; path: string } | undefined {
+  const match = /^packages\/([^/]+)\/(.+)$/.exec(file)
+  return match ? { packageId: match[1], path: match[2] } : undefined
+}
+
 /** The address of a folder file at its line when it is a package's file, `packages/<id>/<path>`, and undefined otherwise. */
 export function studioFileAddress(application: string, file: string, line?: number): string | undefined {
-  const match = /^packages\/([^/]+)\/(.+)$/.exec(file)
-  return match ? studioPackageAddress(application, match[1], match[2], line) : undefined
+  const packageFile = packageFileOf(file)
+  return packageFile ? studioPackageAddress(application, packageFile.packageId, packageFile.path, line) : undefined
 }
 
 /** The views of a Studio application that have an address of their own, besides a resource, a kind and a package. */
