@@ -53,9 +53,10 @@ their own controls where they expect them.
   matches no entry, such as a form at `/<site>/request/new` opened from a table, marks the entry of the address it was
   opened from, its `from`, which a table or a record link passes in history state. A page opened with no `from`, such as
   in a new tab, marks no entry.
-- **Parent entries**. A `ShellNavigation` entry that holds entries is a parent entry, drawn as Ant
-  Design's inline submenu. It opens by itself while it holds the marked entry. A person's open or fold of it
-  holds until another entry is marked or the parents that hold the marked entry change.
+- **Parent entries**. A `ShellNavigation` entry that holds entries is a parent entry, drawn as Ant Design's inline
+  submenu. It opens and folds in place with a caret, and its entries sit one step indented under it. It opens by itself
+  while it holds the marked entry. A person's open or fold of it holds until another entry is marked or the parents
+  that hold the marked entry change. A collapsed sidebar shows it as its icon, with its entries in a menu beside it.
 - **Menu groups** _(planned for M42)_. A site's navigation entry with `entries` is a menu group, as
   [sites and pages](resource-files.md#sites-and-pages) sets out. It stays open while it holds the current page, and it
   shows in the narrow-width menu too. A parent left with no entry by policies is left out, see

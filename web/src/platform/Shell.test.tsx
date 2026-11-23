@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider, DatePicker, Drawer, Table, theme } from 'antd'
 import viVN from 'antd/locale/vi_VN'
@@ -794,6 +794,42 @@ describe('ShellNavigation groups', () => {
 })
 
 describe('ShellNavigation parent entries', () => {
+  // rc-menu reads the legacy `which` of a key event, which userEvent leaves at 0, so the keys go in with it.
+  const press = (key: string, which: number) =>
+    fireEvent.keyDown(document.activeElement!, { key, keyCode: which, which })
+  const focus = (element: HTMLElement) => act(() => element.focus())
+
+  const requests = {
+    key: 'requests',
+    label: 'Requests',
+    icon: 'inbox',
+    children: [
+      { key: 'all', path: '/r/all', label: 'All' },
+      { key: 'mine', path: '/r/mine', label: 'Mine' },
+    ],
+  }
+
+  it('opens and folds in place with the keyboard', async () => {
+    render(
+      <MemoryRouter>
+        <ShellNavigation entries={[requests]} />
+      </MemoryRouter>,
+    )
+    const parent = screen.getByRole('menuitem', { name: 'Requests' })
+    expect(parent).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'All' })).toBeNull()
+
+    focus(parent)
+    press('Enter', 13)
+    expect(parent).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'All' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Mine' })).toBeInTheDocument()
+
+    press('Enter', 13)
+    expect(parent).toHaveAttribute('aria-expanded', 'false')
+    await waitFor(() => expect(screen.getByRole('link', { name: 'All', hidden: true })).not.toBeVisible())
+  })
+
   const parents = [
     { key: 'history', path: '/studio?view=history', label: 'History' },
     {
@@ -867,6 +903,19 @@ describe('ShellNavigation parent entries', () => {
     expect(
       screen.getByRole('menuitem', { name: 'AI requests' }).querySelector('.anticon[aria-hidden="true"]'),
     ).not.toBeNull()
+  })
+
+  it('shows a collapsed parent as its icon, with none of its entries in place', () => {
+    render(
+      <MemoryRouter>
+        <ShellNavigation entries={[requests]} activeKey="mine" collapsed />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('menuitem', { name: 'Requests' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { hidden: true })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'All' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Mine' })).toBeNull()
   })
 })
 
