@@ -410,6 +410,23 @@ describe('theme values', () => {
     expect(unfocused({ '../pages/Sample.tsx': '<Form layout="vertical">' })).toEqual(['../pages/Sample.tsx'])
   })
 
+  /** The files that render Ant Design's `<Form>` outside AxisForm, the form widget and the filter bar. */
+  function antForms(files: Record<string, string>) {
+    return Object.entries(files)
+      .filter(([file]) => !/^\.\/(AxisForm|FormWidget|FilterBar)\.tsx$/.test(file))
+      .filter(([, text]) => /<Form[\s>]/.test(text))
+      .map(([file]) => file)
+  }
+
+  it('draws every form through AxisForm, see docs/reference/actions-and-controls.md#fields', () => {
+    expect(antForms(sources)).toEqual([])
+  })
+
+  it("names a file that renders Ant Design's form, and not one that only uses its hooks and items", () => {
+    expect(antForms({ '../pages/Sample.tsx': '<Form layout="vertical">' })).toEqual(['../pages/Sample.tsx'])
+    expect(antForms({ '../pages/Sample.tsx': 'const [form] = Form.useForm()\n<Form.Item name="a" />' })).toEqual([])
+  })
+
   it('keeps theme values in the token file and the mapping only', () => {
     const found = Object.entries(sources).flatMap(([file, text]) =>
       Object.entries(forbidden)

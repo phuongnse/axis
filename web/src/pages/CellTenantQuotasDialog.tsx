@@ -1,10 +1,10 @@
-import { Flex, Form, InputNumber, Modal } from 'antd'
+import { Form, InputNumber, Modal } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { AxisAlert } from '../platform/AxisAlert'
 import { Fragment, useState } from 'react'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { setCellTenantQuotas, type CellQuota } from '../platform/cell'
-import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { currentChoice, quotaChanges, type QuotaChoice } from './cellQuotaChoices'
@@ -27,7 +27,7 @@ interface CellTenantQuotasDialogProps {
  */
 export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onClose }: CellTenantQuotasDialogProps) {
   const t = useText()
-  const { size, spacing } = useDesignTokens()
+  const { size } = useDesignTokens()
   const [start] = useState<Record<string, QuotaChoice>>(() =>
     Object.fromEntries(Object.entries(quotas).map(([key, quota]) => [key, currentChoice(quota)])),
   )
@@ -78,58 +78,53 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
       }
       onCancel={onClose}
     >
-      <Form
+      <AxisForm
         form={form}
-        layout="vertical"
-        requiredMark={requiredMark}
         initialValues={start}
-        scrollToFirstError={{ focus: true }}
         onValuesChange={(_changed, all) => setChoices(all)}
         onFinish={() => void save()}
       >
-        <Flex vertical gap={spacing.lg}>
-          {Object.keys(quotas).map((key) => {
-            const label = t(`shell.cell.tenant.quota.${key}`)
-            const choice = choices[key]!
-            return (
-              <Fragment key={key}>
-                <AxisChoiceField
-                  name={[key, 'kind']}
-                  label={label}
-                  help={t('shell.cell.tenant.quota.kindHelp')}
-                  requiredMessage={t('shell.cell.tenant.quota.kindRequired')}
-                  options={[
-                    {
-                      value: 'value',
-                      label: t('shell.cell.tenant.quota.choice'),
-                      help: t('shell.cell.tenant.quota.choiceHelp'),
-                    },
-                    {
-                      value: 'none',
-                      label: t('shell.cell.tenant.quota.noLimit'),
-                      help: t('shell.cell.tenant.quota.noLimitHelp'),
-                    },
-                    {
-                      value: 'default',
-                      label: t('shell.cell.tenant.quota.default'),
-                      help: t('shell.cell.tenant.quota.defaultHelp'),
-                    },
-                  ]}
-                />
-                <AxisField
-                  name={[key, 'value']}
-                  label={t('shell.cell.tenant.quota.valueLabel').replace('{quota}', label)}
-                  help={t('shell.cell.tenant.quota.valueHelp')}
-                  requiredMessage={choice.kind === 'value' ? t('shell.cell.tenant.quota.valueRequired') : undefined}
-                >
-                  <InputNumber min={0} precision={0} disabled={choice.kind !== 'value'} />
-                </AxisField>
-              </Fragment>
-            )
-          })}
-          {error && <AxisAlert data-testid="cell-tenant-quotas-error" kind="error" message={error} />}
-        </Flex>
-      </Form>
+        {Object.keys(quotas).map((key) => {
+          const label = t(`shell.cell.tenant.quota.${key}`)
+          const choice = choices[key]!
+          return (
+            <Fragment key={key}>
+              <AxisChoiceField
+                name={[key, 'kind']}
+                label={label}
+                help={t('shell.cell.tenant.quota.kindHelp')}
+                requiredMessage={t('shell.cell.tenant.quota.kindRequired')}
+                options={[
+                  {
+                    value: 'value',
+                    label: t('shell.cell.tenant.quota.choice'),
+                    help: t('shell.cell.tenant.quota.choiceHelp'),
+                  },
+                  {
+                    value: 'none',
+                    label: t('shell.cell.tenant.quota.noLimit'),
+                    help: t('shell.cell.tenant.quota.noLimitHelp'),
+                  },
+                  {
+                    value: 'default',
+                    label: t('shell.cell.tenant.quota.default'),
+                    help: t('shell.cell.tenant.quota.defaultHelp'),
+                  },
+                ]}
+              />
+              <AxisField
+                name={[key, 'value']}
+                label={t('shell.cell.tenant.quota.valueLabel').replace('{quota}', label)}
+                help={t('shell.cell.tenant.quota.valueHelp')}
+                requiredMessage={choice.kind === 'value' ? t('shell.cell.tenant.quota.valueRequired') : undefined}
+              >
+                <InputNumber min={0} precision={0} disabled={choice.kind !== 'value'} />
+              </AxisField>
+            </Fragment>
+          )
+        })}
+        {error && <AxisAlert data-testid="cell-tenant-quotas-error" kind="error" message={error} />}
+      </AxisForm>
     </Modal>
   )
 }

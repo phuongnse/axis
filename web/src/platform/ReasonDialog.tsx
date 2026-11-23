@@ -1,10 +1,10 @@
 import { Flex, Form, Input, Modal } from 'antd'
+import { AxisForm } from './AxisForm'
 import { AxisAlert } from './AxisAlert'
 import { AxisField } from './AxisField'
 import { DialogFooter } from './DialogFooter'
 import { useState, type ReactNode } from 'react'
 import type { CommandResult } from './inspection'
-import { requiredMark } from './requiredMark'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
@@ -106,14 +106,7 @@ export function ReasonDialog({
     >
       <Flex vertical gap="middle">
         {children}
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={requiredMark}
-          scrollToFirstError={{ focus: true }}
-          initialValues={{ reason: initialValue }}
-          onFinish={({ reason }) => void send(reason)}
-        >
+        <AxisForm form={form} initialValues={{ reason: initialValue }} onFinish={({ reason }) => void send(reason)}>
           <AxisField
             name="reason"
             label={label ?? t('shell.inspector.commands.reason')}
@@ -123,7 +116,7 @@ export function ReasonDialog({
           >
             <Input.TextArea rows={3} showCount maxLength={maxLength} />
           </AxisField>
-        </Form>
+        </AxisForm>
         {error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />}
       </Flex>
     </Modal>

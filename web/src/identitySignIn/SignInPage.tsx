@@ -1,4 +1,5 @@
 import { Checkbox, Divider, Flex, Form, Input, Typography } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { useId, useRef } from 'react'
@@ -45,57 +46,53 @@ function SignInBody({ context }: { context: SignInContext }) {
 
 function AccountForm({ context }: { context: SignInContext }) {
   const { username, error, loginAction, rememberMe, forgotPasswordUrl, texts } = context
-  const { colour, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const formId = useId()
   const labelStyle = { fontWeight: 500, color: colour.textMuted }
   const credentialRef = useRef<HTMLInputElement>(null)
   return (
-    <Form
+    <AxisForm
       name={formId}
       method="post"
       action={loginAction}
-      layout="vertical"
-      requiredMark={false}
-      scrollToFirstError={{ focus: true }}
+      unmarked
       initialValues={{ username }}
       // Ant Design validates and stops the submit event, so the native post happens here.
       onFinish={() => credentialRef.current?.form?.submit()}
     >
-      <Flex vertical gap={spacing.lg}>
+      <Form.Item
+        name="username"
+        label={<span style={labelStyle}>{texts.username}</span>}
+        rules={[{ required: true, message: texts.usernameRequired }]}
+      >
+        <Input name="username" autoComplete="username" />
+      </Form.Item>
+      {/* The link sits beside the label, not inside it, so the label's name stays "Password". */}
+      {/* The label row and its input stay together, so the form's gap does not come between them. */}
+      <div>
+        <Flex justify="space-between" align="baseline" style={{ paddingBottom: 8 }}>
+          <label htmlFor={`${formId}_password`} style={labelStyle}>
+            {texts.password}
+          </label>
+          {forgotPasswordUrl && <Typography.Link href={forgotPasswordUrl}>{texts.forgotPassword}</Typography.Link>}
+        </Flex>
         <Form.Item
-          name="username"
-          label={<span style={labelStyle}>{texts.username}</span>}
-          rules={[{ required: true, message: texts.usernameRequired }]}
+          name="password"
+          rules={[{ required: true, message: texts.passwordRequired }]}
+          validateStatus={error ? 'error' : undefined}
         >
-          <Input name="username" autoComplete="username" />
+          <Input.Password name="password" autoComplete="current-password" />
         </Form.Item>
-        {/* The link sits beside the label, not inside it, so the label's name stays "Password". */}
-        {/* The label row and its input stay together, so the form's gap does not come between them. */}
-        <div>
-          <Flex justify="space-between" align="baseline" style={{ paddingBottom: 8 }}>
-            <label htmlFor={`${formId}_password`} style={labelStyle}>
-              {texts.password}
-            </label>
-            {forgotPasswordUrl && <Typography.Link href={forgotPasswordUrl}>{texts.forgotPassword}</Typography.Link>}
-          </Flex>
-          <Form.Item
-            name="password"
-            rules={[{ required: true, message: texts.passwordRequired }]}
-            validateStatus={error ? 'error' : undefined}
-          >
-            <Input.Password name="password" autoComplete="current-password" />
-          </Form.Item>
-        </div>
-        {rememberMe && (
-          <Form.Item name="rememberMe" valuePropName="checked">
-            <Checkbox name="rememberMe">{texts.keepSignedIn}</Checkbox>
-          </Form.Item>
-        )}
-        <input ref={credentialRef} type="hidden" name="credentialId" value="" />
-        <AxisButton role="finish" htmlType="submit" block>
-          {texts.signIn}
-        </AxisButton>
-      </Flex>
-    </Form>
+      </div>
+      {rememberMe && (
+        <Form.Item name="rememberMe" valuePropName="checked">
+          <Checkbox name="rememberMe">{texts.keepSignedIn}</Checkbox>
+        </Form.Item>
+      )}
+      <input ref={credentialRef} type="hidden" name="credentialId" value="" />
+      <AxisButton role="finish" htmlType="submit" block>
+        {texts.signIn}
+      </AxisButton>
+    </AxisForm>
   )
 }

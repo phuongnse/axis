@@ -1,4 +1,5 @@
-import { Flex, Form, Input, Typography } from 'antd'
+import { Form, Input, Typography } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { useId, useRef } from 'react'
@@ -15,7 +16,7 @@ import type { UpdatePasswordContext } from './signInContext'
  */
 export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext }) {
   const { texts, error, loginAction, appInitiated } = context
-  const { colour, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const formId = useId()
   const labelStyle = { fontWeight: 500, color: colour.textMuted }
   const submitRef = useRef<HTMLInputElement>(null)
@@ -23,47 +24,43 @@ export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext
     <IdentityFrame title={texts.title} frame={context}>
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
       {error && <AxisAlert kind="error" message={error} />}
-      <Form
+      <AxisForm
         name={formId}
         method="post"
         action={loginAction}
-        layout="vertical"
-        requiredMark={false}
-        scrollToFirstError={{ focus: true }}
+        unmarked
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <Flex vertical gap={spacing.lg}>
-          <Form.Item
-            name="password-new"
-            label={<span style={labelStyle}>{texts.newPassword}</span>}
-            rules={[{ required: true, message: texts.newPasswordRequired }]}
-            validateStatus={error ? 'error' : undefined}
-          >
-            <Input.Password name="password-new" autoComplete="new-password" />
-          </Form.Item>
-          <Form.Item
-            name="password-confirm"
-            label={<span style={labelStyle}>{texts.confirmPassword}</span>}
-            dependencies={['password-new']}
-            rules={[
-              { required: true, message: texts.passwordsDiffer },
-              ({ getFieldValue }) => ({
-                validator: (_, value) =>
-                  !value || getFieldValue('password-new') === value
-                    ? Promise.resolve()
-                    : Promise.reject(new Error(texts.passwordsDiffer)),
-              }),
-            ]}
-          >
-            <Input.Password name="password-confirm" autoComplete="new-password" />
-          </Form.Item>
-          <input ref={submitRef} type="hidden" name="logout-sessions" value="on" />
-          <AxisButton role="finish" htmlType="submit" block>
-            {texts.setPassword}
-          </AxisButton>
-        </Flex>
-      </Form>
+        <Form.Item
+          name="password-new"
+          label={<span style={labelStyle}>{texts.newPassword}</span>}
+          rules={[{ required: true, message: texts.newPasswordRequired }]}
+          validateStatus={error ? 'error' : undefined}
+        >
+          <Input.Password name="password-new" autoComplete="new-password" />
+        </Form.Item>
+        <Form.Item
+          name="password-confirm"
+          label={<span style={labelStyle}>{texts.confirmPassword}</span>}
+          dependencies={['password-new']}
+          rules={[
+            { required: true, message: texts.passwordsDiffer },
+            ({ getFieldValue }) => ({
+              validator: (_, value) =>
+                !value || getFieldValue('password-new') === value
+                  ? Promise.resolve()
+                  : Promise.reject(new Error(texts.passwordsDiffer)),
+            }),
+          ]}
+        >
+          <Input.Password name="password-confirm" autoComplete="new-password" />
+        </Form.Item>
+        <input ref={submitRef} type="hidden" name="logout-sessions" value="on" />
+        <AxisButton role="finish" htmlType="submit" block>
+          {texts.setPassword}
+        </AxisButton>
+      </AxisForm>
       {appInitiated && (
         <form method="post" action={loginAction}>
           <input type="hidden" name="cancel-aia" value="true" />

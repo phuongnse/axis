@@ -137,8 +137,8 @@ choices.
 These rules hold for every Ant Design form in the SPA and in the identity provider's pages. The shared
 `ConfigProvider` carries the field look, so no widget keeps its own copy, and a Vitest check holds the layout.
 
-- **A field keeps no gap of its own.** The message sits just under its control. In a form, the form's
-  layout gives `spacing-lg` between fields, so the next field stays `spacing-lg` below a message. In a table
+- **A field keeps no gap of its own.** The message sits just under its control. In a form, `AxisForm`
+  gives `spacing-lg` between fields, so the next field stays `spacing-lg` below a message. In a table
   cell there is none.
 - **A box sits on its label's first line.** A checkbox or a radio keeps its box level with the first
   line of its label, so a label that wraps leaves the box at the top.
@@ -149,8 +149,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **A warning takes the warning text colour.** A field's warning message and the
   border of a field with a warning take `warningText`, as an error's take `dangerText`, so both pass
   contrast.
-- **A label is above its input, everywhere**, as the form widget has it, never beside it. Each form
-  names Ant Design's vertical layout, and a Vitest check refuses a form that does not. In a table cell whose row
+- **A label is above its input, everywhere**, as the form widget has it, never beside it. Every form on
+  a platform screen is an `AxisForm`, which is always vertical, and a Vitest check refuses Ant Design's `Form` outside
+  `AxisForm`, the form widget and the filter bar, which name the vertical layout themselves. In a table cell whose row
   and column name the control, such as a switch in a row of settings, the label is visually hidden and still
   names the input, through `hideLabel` on a field the screen holds the value of.
 - **One field for the platform's screens.** `AxisField` draws a field: its label, its help and its input, as a
@@ -203,8 +204,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **Every required field is marked**. A platform field follows the form widget's
   [required mark](form-widget.md#field-look), in every form and dialog, even where every field is
   required, such as New resource. The sign-in pages mark none, since everyone knows their fields are needed.
-  A field never says "(optional)". Each form names the shared `requiredMark`, and a Vitest check refuses a form
-  outside the sign-in pages that does not.
+  A field never says "(optional)". `AxisForm` takes the shared `requiredMark`, and the sign-in pages
+  pass `unmarked` to take it off. The form widget and the filter bar name the shared `requiredMark` themselves, and a
+  Vitest check refuses a form outside the sign-in pages that does not.
 - **A field is checked on click**. A finish button is never disabled because the
   input is not valid: that says nothing of what is missing, has low contrast and cannot be focused. A
   click checks the fields, shows under each one that is wrong what to do, such as "Enter a name.", and
@@ -229,9 +231,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   line, such as the text table, gives its boxes the same error look and `aria-invalid` too.
 - **AxisFieldGroup's required and fold** _(planned, #5049)_. `AxisFieldGroup` also takes `required` and `fold`, for #3264's build.
 - **One way to the first error**. A refused action that submits what a person typed, such as Save, Add, Done or Next,
-  moves the focus to the first box in error and scrolls it into view. An Ant Design form sets
-  `scrollToFirstError={{ focus: true }}`, and a Vitest check refuses a form in `web/src` that does not, the sign-in
-  pages included. A button that sends a dialog's form submits the form, so a refused click focuses the field. A file
+  moves the focus to the first box in error and scrolls it into view. `AxisForm` sets
+  `scrollToFirstError={{ focus: true }}`, as the form widget and the filter bar do, and a Vitest check refuses a form
+  in `web/src` that does not, the sign-in pages included. A button that sends a dialog's form submits the form, so a refused click focuses the field. A file
   picker cannot take the focus, so its dialog focuses its Choose button.
 - **A screen that holds its fields focuses its first error**. Such a screen calls `focusFirstError` after a refused
   action, such as Done, so the focus moves to the first box in error and scrolls it into view. The resource form's

@@ -548,6 +548,136 @@ describe('the plan and the guide', () => {
   })
 })
 
+describe("the plan's groups", () => {
+  const fullPlan: AuthoringPlan = {
+    summary: 'Add a supplier field.',
+    questions: [
+      { question: 'Which type is the supplier?', options: ['Text', 'Reference', 'List'], recommended: 2 },
+      { question: 'Is it required?', options: ['Yes', 'No'], recommended: 0 },
+    ],
+    changes: ['Add a Supplier field.'],
+    decisions: [{ decision: 'Use a reference', reason: 'It keeps one supplier name.' }],
+    risks: ['Old requests have no supplier.'],
+    checks: ['A request saves with a supplier.'],
+    checklist: [{ item: 'The draft does what the plan says.', how: 'It adds only the field.' }],
+    details: ['Add the field to the Request entity.'],
+  }
+  const asking = (overrides: Partial<AuthoringRequest> = {}) =>
+    request({ author: 'u1', state: 'awaitingApproval', plan: fullPlan, ...overrides })
+  const button = (name: string) => screen.queryByRole('button', { name })
+
+  it('shows the seven groups in the documented order', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    const groups = await screen.findAllByTestId('studio-ai-request-plan-group')
+    expect(groups.map((group) => group.firstElementChild?.textContent)).toEqual([
+      'Questions',
+      'What changes',
+      'Decisions to check',
+      'Risks and limits',
+      'Acceptance criteria',
+      'Checklist',
+      'Implementation notes',
+    ])
+  })
+
+  it('shows no heading for an empty group', async () => {
+    vi.stubGlobal('fetch', serverOf(asking({ plan: { ...fullPlan, risks: [] } })).fetch)
+    renderPage()
+
+    await screen.findAllByTestId('studio-ai-request-plan-group')
+    expect(screen.queryByText('Risks and limits')).toBeNull()
+    expect(screen.getByText('Decisions to check')).toBeVisible()
+  })
+
+  it('shows each decision with its reason and each checklist item with how the plan meets it', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    const items = (await screen.findAllByRole('listitem')).map((item) => item.textContent)
+    expect(items).toContain('Use a referenceIt keeps one supplier name.')
+    expect(items).toContain('The draft does what the plan says.It adds only the field.')
+  })
+
+  it('lists the options of each question and marks the recommended one', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    expect(await screen.findByText('Reference (recommended)')).toBeVisible()
+    expect(screen.getByText('Text')).toBeVisible()
+    expect(screen.getAllByText(/\(recommended\)/)).toHaveLength(1)
+  })
+
+  it('keeps the implementation notes hidden until their button is clicked', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    expect(screen.queryByText('Add the field to the Request entity.')).toBeNull()
+    await userEvent.click(await screen.findByRole('button', { name: 'Show the implementation notes' }))
+    expect(screen.getByText('Add the field to the Request entity.')).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: 'Hide the implementation notes' }))
+    expect(screen.queryByText('Add the field to the Request entity.')).toBeNull()
+  })
+
+  it('tells its author that two questions wait and offers Answer… in place of Approve plan', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    const guide = await screen.findByTestId('studio-ai-request-guide')
+    expect(within(guide).getByText('2 questions to answer')).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Answer…' })).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Drop…' })).toBeVisible()
+    expect(button('Approve plan')).toBeNull()
+    expect(button('Change the plan…')).toBeNull()
+  })
+
+  it('says "1 question to answer" for one question', async () => {
+    vi.stubGlobal('fetch', serverOf(asking({ plan: { ...fullPlan, questions: [fullPlan.questions[0]] } })).fetch)
+    renderPage()
+
+    expect(await screen.findByText('1 question to answer')).toBeVisible()
+  })
+
+  it('sends the answers as a change of plan', async () => {
+    const server = serverOf(asking())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Answer…' }))
+    const dialog = await screen.findByRole('dialog', { name: "Answer the plan's questions" })
+    expect(within(dialog).getByText('AI writes the plan again with your answers, and you approve it.')).toBeVisible()
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Your answers' }), 'A reference, required')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ask for a new plan' }))
+
+    expect(await screen.findByText('AI is writing the plan')).toBeVisible()
+    expect(server.calls).toEqual([{ action: 'change-plan', body: { comment: 'A reference, required' } }])
+  })
+
+  it('asks for the answers before it sends them', async () => {
+    const server = serverOf(asking())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Answer…' }))
+    const dialog = await screen.findByRole('dialog', { name: "Answer the plan's questions" })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ask for a new plan' }))
+
+    expect(await within(dialog).findByText('Write your answers.')).toBeInTheDocument()
+    expect(server.calls).toEqual([])
+  })
+
+  it('gives another reader no Answer… and the words of a plan that waits for its author', async () => {
+    vi.stubGlobal('fetch', serverOf(asking({ author: 'u2' })).fetch)
+    renderPage()
+
+    expect(await screen.findByText("Waiting for its author's approval")).toBeVisible()
+    expect(button('Answer…')).toBeNull()
+    expect(button('Approve plan')).toBeNull()
+    expect(button('Drop…')).toBeNull()
+  })
+})
+
 describe('the feed', () => {
   const plan = planOf('Add a supplier field.')
   const approvedAt = '2026-11-18T09:05:00Z'
