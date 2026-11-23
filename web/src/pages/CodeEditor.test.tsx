@@ -1,10 +1,12 @@
+import { foldedRanges } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { ConfigProvider, theme } from 'antd'
 import { createRef, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { antThemeFor } from '../platform/antTheme'
+import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import type { ThemeMode } from '../platform/themeMode'
@@ -161,6 +163,53 @@ describe('CodeEditor', () => {
 
     expect(document.querySelector('.cm-foldGutter')).not.toBeNull()
     expect(editorView().state.phrase('Fold line')).toBe('Fold lines')
+  })
+
+  describe('the fold marks', () => {
+    // The first line folds, so a click on the gutter, which jsdom maps to the first line, reaches the part.
+    const foldable = { language: 'csharp', value: 'class A {\n    int x;\n}' } as const
+    const gutter = () => document.querySelector<HTMLElement>('.cm-foldGutter')!
+    // CodeMirror's hidden spacer, which sizes the gutter, carries a mark's name too, so the visible mark is the one found.
+    const foldMark = (name: string) =>
+      within(gutter())
+        .getAllByTitle(name)
+        .find((mark) => mark.closest<HTMLElement>('.cm-gutterElement')?.style.visibility !== 'hidden')!
+
+    describe.each(['light', 'dark'] as const)('in %s mode', (mode) => {
+      it('are the chevron at 12 px in the muted text colour, down when open and right when folded', () => {
+        renderEditor(foldable, { initialMode: mode })
+
+        const open = foldMark('Fold lines')
+        expect(open.querySelector('.anticon-down')).toHaveStyle({
+          fontSize: '12px',
+          color: designTokensFor(mode).colour.textMuted,
+        })
+        expect(open.querySelector<SVGElement>('svg')?.style.transform).toBe('')
+
+        fireEvent.click(open)
+
+        const folded = foldMark('Unfold lines')
+        expect(folded.querySelector('.anticon-down')).toHaveStyle({
+          fontSize: '12px',
+          color: designTokensFor(mode).colour.textMuted,
+        })
+        expect(folded.querySelector<SVGElement>('svg')?.style.transform).toBe('rotate(270deg)')
+      })
+    })
+
+    it('folds the part on a click and unfolds it on a second click', () => {
+      renderEditor(foldable)
+      const view = editorView()
+
+      fireEvent.click(foldMark('Fold lines'))
+
+      expect(foldedRanges(view.state).size).toBe(1)
+
+      fireEvent.click(foldMark('Unfold lines'))
+
+      expect(foldedRanges(view.state).size).toBe(0)
+      expect(foldMark('Fold lines')).toBeInTheDocument()
+    })
   })
 
   it('marks the current line', () => {
