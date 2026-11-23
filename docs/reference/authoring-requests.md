@@ -24,6 +24,12 @@ no shortcut of its own.
   tenant whose role can change the schema. It writes claims, steps and tokens there with the same role.
 - **Models.** It calls a model through an adapter, by the binding the request uses, see
   [model bindings](model-bindings.md). A request that stores no binding uses `Ai:DefaultBinding`.
+- **NexKit's engine** _(planned for M35)_. The loop of each request is NexKit's engine, which runs as a
+  program beside `axis-agent`, at the version Axis pins. The agent host is its host: it keeps the
+  engine's state in the request's row, sends it what happens to the request, carries out what it
+  answers through the MCP server and the publisher, and runs each model session itself, so the engine
+  never sees a key. The policies on this page are the ones Axis gives the engine. The reason is in
+  [D171](../decisions/d171-axis-owns-the-engines-that-run-an-application-and-runs-authoring-requests-on-nexkits-engine.md).
 
 ## Acting for the author
 
@@ -293,6 +299,10 @@ the checks, an independent review and fix rounds.
   and every comment of the request, oldest first. Its plan replaces the earlier one.
 - **Plans need approval**. No request leaves `awaitingApproval` without the author, also when the
   application allows auto-accept.
+- **Splits** _(planned for M35)_. A plan may find a request too large for one change and propose its
+  parts, each with the parts before it that it needs. The author approves the split as any plan. Each
+  part is then a request of its own, which waits for the parts it needs, and the request ends when its
+  parts end.
 - **Key failures** _(planned for M35)_. When the provider refuses the author's key with `401` or `403`, the
   request stops as `failed` with the outcome `keyRefused`. When the key is removed, or no longer opens, the
   request stops as `failed` with the outcome `noKey`. The draft is kept in both cases.
