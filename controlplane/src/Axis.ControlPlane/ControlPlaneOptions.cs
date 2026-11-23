@@ -19,6 +19,8 @@ namespace Axis.ControlPlane;
 /// The sign-up disposable domain list is optional as a pair, and once one of its settings is set, both are required, as an https URL and a 64-character hex SHA-256.
 /// The plans are optional, and each needs a code, a version, both names, included users, and every quota except the users. A number is plain digits.
 /// The billing client's settings are optional as a group, and once one is set, all of them are required, with an https authority.
+/// The billing events address is optional, and once it is set, it must be an absolute https URL and the secret is required.
+/// The billing page is optional and, once set, is an absolute https URL, see <see cref="BillingPage"/>.
 /// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
@@ -70,11 +72,20 @@ public sealed partial class ControlPlaneOptions
     /// </summary>
     public string? PublicUrl { get; set; }
 
+    /// <summary>
+    /// The operator's billing page, an absolute https URL that may hold <c>{tenantId}</c>, see <see cref="BillingPage"/>. Optional:
+    /// without it the emails that point to billing have no billing line.
+    /// </summary>
+    public string? BillingPageUrl { get; set; }
+
     /// <summary>The DNS server that holds the tenant subdomains. Optional.</summary>
     public ControlPlaneDnsOptions Dns { get; set; } = new();
 
     /// <summary>The identity provider and client that the operator's billing system signs in with. Optional.</summary>
     public ControlPlaneBillingOptions Billing { get; set; } = new();
+
+    /// <summary>The address and the secret for the signed events that the operator's billing system receives. Optional.</summary>
+    public ControlPlaneBillingEventsOptions BillingEvents { get; set; } = new();
 
     /// <summary>What the sign-up page offers. Optional.</summary>
     public SignUpOptions SignUp { get; set; } = new();
@@ -180,8 +191,14 @@ public sealed partial class ControlPlaneOptions
             }
         }
 
+        if (!string.IsNullOrWhiteSpace(options.BillingPageUrl) && !BillingPage.IsValid(options.BillingPageUrl))
+        {
+            problems.Add($"The setting {SectionName}:{nameof(BillingPageUrl)} must be an absolute https URL.");
+        }
+
         problems.AddRange(DnsProblems(options.Dns, RequiresVerifiedTls(environment)));
         problems.AddRange(BillingProblems(options.Billing));
+        problems.AddRange(BillingEventsProblems(options.BillingEvents));
         problems.AddRange(SignUpProblems(options.SignUp));
         problems.AddRange(PlanCatalogue.Problems(options.Plans));
         problems.AddRange(PlanCatalogue.SettingProblems(configuration.GetSection($"{SectionName}:{nameof(Plans)}")));
@@ -354,6 +371,37 @@ public sealed partial class ControlPlaneOptions
         if (string.IsNullOrWhiteSpace(billing.ClientId))
         {
             problems.Add($"The setting {prefix}:{nameof(ControlPlaneBillingOptions.ClientId)} is required.");
+        }
+
+        return problems;
+    }
+
+    private static List<string> BillingEventsProblems(ControlPlaneBillingEventsOptions events)
+    {
+        var problems = new List<string>();
+        if (!events.IsSet)
+        {
+            return problems;
+        }
+
+        var prefix = $"{SectionName}:{nameof(BillingEvents)}";
+        AddHttpsUrlProblem(problems, $"{prefix}:{nameof(ControlPlaneBillingEventsOptions.Url)}", events.Url);
+        var secret = $"{prefix}:{nameof(ControlPlaneBillingEventsOptions.Secret)}";
+        if (string.IsNullOrWhiteSpace(events.Secret))
+        {
+            problems.Add($"The setting {secret} is required when {prefix}:{nameof(ControlPlaneBillingEventsOptions.Url)} is set.");
+            return problems;
+        }
+
+        // The signature takes the part after whsec_ as base64, so a bad one would only show as failed deliveries of every event.
+        const string signingPrefix = Axis.Processes.Instances.WebhookSignature.SecretPrefix;
+        foreach (var part in events.Secret.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (part.StartsWith(signingPrefix, StringComparison.Ordinal) && !Convert.TryFromBase64String(part[signingPrefix.Length..], new byte[part.Length], out _))
+            {
+                problems.Add($"The setting {secret} holds a secret that starts with {signingPrefix} and is not followed by base64.");
+                break;
+            }
         }
 
         return problems;

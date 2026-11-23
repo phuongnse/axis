@@ -304,7 +304,7 @@ The link of the confirm email opens `/sign-up/verify#<token>`, titled "Confirm y
 
 Each is plain text, as every control plane email is, in the sign-up's language and sent from the control
 plane's mail domain. They are the templates `signUpConfirm.<language>.txt`,
-`signUpTrialUsedSignIn.<language>.txt` and `signUpTrialUsedBillingPortal.<language>.txt`, see
+`signUpTrialUsedSignIn.<language>.txt` and `signUpTrialUsedBillingPage.<language>.txt`, see
 [control plane](control-plane.md#its-own-work).
 They follow [UI writing](ui-writing.md#principles): each names the address the person signs in at, or the
 trial, never "your Axis".
@@ -342,8 +342,10 @@ Liên kết chỉ dùng được một lần, trong 24 giờ. Nếu bạn không
 
 The trial-used email goes to an address that already had a trial, instead of the confirm email. It is two
 templates with the same text but one middle paragraph: `signUpTrialUsedSignIn` holds the sign-in one, with
-`{{tenantAddress}}`, while the region directory holds the tenant, and `signUpTrialUsedBillingPortal` holds
-the other one, whose link is `{{billingPortalUrl}}`.
+`{{tenantAddress}}`, while the region directory holds the tenant, and `signUpTrialUsedBillingPage` holds
+the other one, whose link is `{{billingPageUrl}}`, the operator's billing page from
+[`ControlPlane:BillingPageUrl`](control-plane.md#settings). Without that setting the billing paragraph is left out
+of the email.
 
 ```
 Subject: This email already had an Axis trial
@@ -355,8 +357,8 @@ Someone, maybe you, tried to sign up for Axis with this email. It already had a 
 Sign in at:
 {{tenantAddress}}
 
-To go on after the trial, choose a plan in the billing portal:
-{{billingPortalUrl}}
+To go on after the trial, choose a plan on the billing page:
+{{billingPageUrl}}
 
 If this was not you, ignore this email.
 
@@ -374,7 +376,7 @@ Có người, có thể là bạn, vừa đăng ký Axis bằng email này. Emai
 {{tenantAddress}}
 
 Để tiếp tục sau khi hết dùng thử, hãy chọn gói dịch vụ tại trang thanh toán:
-{{billingPortalUrl}}
+{{billingPageUrl}}
 
 Nếu không phải bạn, hãy bỏ qua email này.
 

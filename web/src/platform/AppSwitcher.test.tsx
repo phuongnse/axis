@@ -174,14 +174,14 @@ describe('AppSwitcher', () => {
   })
 
   it('lists Billing after Users for an administrator with a billing address, linking to it', async () => {
-    stubServer({ ...una, billingUrl: 'https://account.vn.example.test/tenants/quiz' })
+    stubServer({ ...una, billingUrl: 'https://billing.example.test/tenants/quiz' })
     renderSwitcher()
 
     const menu = await openSwitcher()
 
     expect(menu.getByRole('link', { name: 'Billing' })).toHaveAttribute(
       'href',
-      'https://account.vn.example.test/tenants/quiz',
+      'https://billing.example.test/tenants/quiz',
     )
     expect(
       menu

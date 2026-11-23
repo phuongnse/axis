@@ -74,10 +74,11 @@
       "status": "proposed"
     },
     {
-      "concept": "Billing portal",
-      "en": "billing portal",
+      "concept": "Billing page",
+      "en": "billing page",
       "vi": "trang thanh toán",
-      "status": "proposed"
+      "status": "proposed",
+      "note": "The operator's own billing page, outside Axis, see D168."
     },
     {
       "concept": "Model key",

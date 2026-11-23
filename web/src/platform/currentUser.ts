@@ -27,7 +27,7 @@ export interface CurrentUser {
   users: boolean
   /** The tenant's status: `readOnly` while it is read-only, otherwise `active`. A suspended tenant is never served. */
   tenantStatus: 'active' | 'readOnly'
-  /** The tenant's page in the billing portal, or `null` outside a cell, for a user without the administrator role and in a preview tenant. */
+  /** The operator's billing page, or `null` outside a cell, without the cell's billing page setting, for a user without the administrator role and in a preview tenant. */
   billingUrl: string | null
   /** Whether the user may export the tenant's data: an administrator in a cell tenant that is not a preview tenant. */
   tenantExports: boolean

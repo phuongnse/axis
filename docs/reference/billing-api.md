@@ -101,9 +101,20 @@ Content-Type: application/json
   also answers `422` for a trial plan, for a quantity below 1 and for a repeated add-on code. The check
   comes after the replay check, so a retry still gets the first answer.
 - **`409`** for a subscription that is `deleting` or `deleted`.
-- **A plan the use does not fit** _(planned for M34)_. The call answers `409` for a smaller plan, or fewer
-  packs, that the tenant's use does not fit. The answer names each quota and the amount over, see
-  [changing a plan](plans.md#changing-a-plan).
+- **A plan the use does not fit.** The call answers `409` with the title "The tenant's use is over the plan's
+  quotas." for a smaller plan, or fewer packs, that the tenant's use does not fit, and changes nothing. The
+  check comes after the `422` checks and the `409` for a subscription that is `deleting` or `deleted`. It reads
+  the tenant's usage from its cell as [reading a tenant](#reading-a-tenant) does, and compares `storage`,
+  `users` and `applications`. `emailsPerDay` is a daily count that resets, so it is not compared. The new limits
+  are the ones `writeQuotas` writes: the plan's quotas, `users` with the packs, and each override that has not
+  ended. A quota is over when its new limit is below the use and also below the limit the cell holds now, so a
+  tenant that is already over a quota the new plan raises or keeps is not refused. A `users` use of `null` is
+  never over. The problem details hold a `quotas` list, and each item holds `quota`, the new `limit`, `used` and
+  `over`, the amount over. The refused call keeps nothing under its key, so after the use goes down the same key
+  is checked again, see [changing a plan](plans.md#changing-a-plan).
+- **`502`** with the title "The tenant's cell could not be read." when the cell gives no usage, for the same
+  reasons as [reading a tenant](#reading-a-tenant). Without the usage the call cannot tell whether the tenant
+  fits, so it changes nothing.
 - **The audit record.** `subscription.planSet`, see [audit records](#audit-records).
 
 ## Setting the paid-through date
@@ -230,8 +241,6 @@ Each billing client has a limit of its own, so a billing system in a loop cannot
 
 ## Events
 
-_(planned for M34)_
-
 The control plane tells the operator's billing system what happens to each tenant, so the billing system can
 start a customer, ask for a payment or charge for usage without polling, as
 [D168](../decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md)
@@ -265,7 +274,10 @@ is final.
 
 ### Tenant created
 
-`tenant.created` is written when a sign-up is confirmed and its trialing subscription is made.
+`tenant.created` is written when a sign-up is confirmed and its trialing subscription is made. `tenantId` is the
+id that the billing routes take, which is the tenant's subdomain, and `host` is that subdomain on the region's
+tenant domain. The business name and the administrator's name, email and language are read from the sign-up when
+the event is sent, and every attempt sends the same ones.
 
 ```json
 {
@@ -285,6 +297,8 @@ is final.
 ```
 
 ### Subscription state changed
+
+_(planned for M34)_
 
 `subscription.stateChanged` is written with every move that writes a `subscription.<state>` audit record,
 see [audit records](#audit-records). A plan call, or a paid-through call that leaves the state as it was,
@@ -307,6 +321,8 @@ writes none.
 ```
 
 ### Daily usage
+
+_(planned for M34)_
 
 `usage.daily` is written once for each tenant that is not `deleted` and each finished UTC day, once the day's
 row is final. It reads the row from the cell's [usage days](tenant-lifecycle.md#routes) route, and

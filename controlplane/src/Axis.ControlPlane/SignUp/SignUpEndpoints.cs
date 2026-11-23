@@ -4,11 +4,13 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.ControlPlane.Audit;
+using Axis.ControlPlane.BillingEvents;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.Subscriptions;
 using Axis.Server.Http;
+using Axis.Tenancy;
 using MimeKit;
 using Npgsql;
 
@@ -379,7 +381,7 @@ internal static class SignUpEndpoints
     }
 
     // Queues the trial-used email to the address of the form: the sign-in address while the region directory holds the tenant of the
-    // earlier sign-up, else the billing portal link. See docs/reference/sign-up.md#the-emails.
+    // earlier sign-up, else the operator's billing page, which the email leaves out when it is not set. See docs/reference/sign-up.md#the-emails.
     private static async Task QueueTrialUsedAsync(
         IServiceProvider services,
         NpgsqlConnection connection,
@@ -399,7 +401,7 @@ internal static class SignUpEndpoints
 
         var (template, values) = running
             ? ("signUpTrialUsedSignIn", new Dictionary<string, string> { ["name"] = fullName, ["tenantAddress"] = SignUpAddress.Of(options, tenantId) })
-            : ("signUpTrialUsedBillingPortal", new Dictionary<string, string> { ["name"] = fullName, ["billingPortalUrl"] = SignUpAddress.BillingPortalOf(options, tenantId) });
+            : ("signUpTrialUsedBillingPage", new Dictionary<string, string> { ["name"] = fullName, ["billingPageUrl"] = BillingPage.Of(options.BillingPageUrl, tenantId) ?? string.Empty });
         await EmailJobs.EnqueueAsync(connection, transaction, templates, template, language, email, values, cancellationToken);
     }
 
@@ -429,7 +431,7 @@ internal static class SignUpEndpoints
         };
     }
 
-    private static async Task<IResult> ConfirmAsync(HttpContext context, NpgsqlDataSource controlPlane, TimeProvider clock, CancellationToken cancellationToken)
+    private static async Task<IResult> ConfirmAsync(HttpContext context, NpgsqlDataSource controlPlane, ControlPlaneOptions options, TimeProvider clock, CancellationToken cancellationToken)
     {
         var (body, refused) = await ReadBodyAsync(context.Request, cancellationToken);
         if (body is null)
@@ -502,7 +504,8 @@ internal static class SignUpEndpoints
                 }
 
                 var subscriptionId = Guid.CreateVersion7();
-                var trialEndsAt = clock.GetUtcNow() + SubscriptionClock.TrialLength;
+                var now = clock.GetUtcNow();
+                var trialEndsAt = now + SubscriptionClock.TrialLength;
                 await using (var insert = new NpgsqlCommand(
                     """
                     INSERT INTO control_plane.subscriptions (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id)
@@ -521,6 +524,22 @@ internal static class SignUpEndpoints
 
                 // The sign-up is the person who confirmed: billing portal accounts do not exist yet.
                 await AuditRecords.AppendAsync(transaction, AuditActorKind.Account, id.ToString(), "subscription.trialing", subscriptionId.ToString(), cancellationToken);
+
+                // The event holds no personal data in its payload: the job reads it from the sign-up when it runs, as provisioning does. See docs/reference/billing-api.md#events.
+                await BillingEventQueue.EnqueueAsync(
+                    transaction,
+                    options,
+                    BillingEventQueue.TenantCreated,
+                    now,
+                    new JsonObject
+                    {
+                        ["tenantId"] = subdomain,
+                        ["region"] = options.Region,
+                        ["host"] = $"{subdomain}.{options.TenantDomain!.ToLowerInvariant()}",
+                        ["trialEndsAt"] = BillingEventQueue.Timestamp(trialEndsAt),
+                    },
+                    id,
+                    cancellationToken);
 
                 // The payload is only the id: the job reads the rest from the sign-up, as a payload is stored in the database.
                 await JobQueue.EnqueueAsync(connection, transaction, ProvisionTenantJobHandler.JobKind, new JsonObject { ["signUpId"] = id.ToString() }, null, cancellationToken);

@@ -555,7 +555,7 @@ export function AxisTable<T extends object>({
       onCell: () => ({ style: { ...cell.style, ...staysRoom } }),
       render: (_value: unknown, row: T) => {
         const actions = rowActions.actions(row)
-        return <RowActions actions={actions} fold={rowActions.configured >= foldFrom && (actions?.length ?? 0) > 1} />
+        return <RowActions actions={actions} fold={rowActions.configured >= foldFrom} />
       },
     })
   }
@@ -906,10 +906,10 @@ function MovedCells({
 
 /**
  * A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. A row folds from three actions
- * on, and at narrow width from two on, so a menu never holds one entry. A known Remove, `meaning: 'remove'`, is the trash
- * icon in `dangerText` and a red entry in a menu. It is exported for a list that is not a table. A list that passes
- * `fold` keeps its "…" menu, even with one action, until its own part removes `fold`, see
- * docs/reference/actions-and-controls.md#tables.
+ * on, and at narrow width from two on, so a menu never holds one entry. `fold` folds a row with two or more actions, as
+ * `AxisTable` asks for a table set up for three or more, so a menu never holds one entry either. A known Remove,
+ * `meaning: 'remove'`, is the trash icon in `dangerText` and a red entry in a menu. It is exported for a list that is
+ * not a table, see docs/reference/actions-and-controls.md#tables.
  */
 export function RowActions({ actions, fold = false }: { actions: AxisRowAction[] | null; fold?: boolean }) {
   const t = useText()
@@ -920,7 +920,7 @@ export function RowActions({ actions, fold = false }: { actions: AxisRowAction[]
   const shown = actions.map((action) =>
     action.meaning === 'remove' ? { ...action, icon: <DeleteOutlined />, destructive: true } : action,
   )
-  const folded = fold || (shown.length > 1 && (narrow || shown.length >= foldFrom))
+  const folded = shown.length > 1 && (fold || narrow || shown.length >= foldFrom)
   if (folded) {
     return (
       <Dropdown

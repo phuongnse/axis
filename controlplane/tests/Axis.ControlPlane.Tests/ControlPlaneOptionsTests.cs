@@ -748,6 +748,68 @@ public sealed class ControlPlaneOptionsTests
         Assert.True(factory.Services.GetRequiredService<ControlPlaneOptions>().Billing.IsComplete);
     }
 
+    [Theory]
+    [InlineData("http://billing-4f9c.example/events", "plain-secret-4f9c", "Url")]
+    [InlineData("/events-4f9c", "plain-secret-4f9c", "Url")]
+    [InlineData("not a url 4f9c", "plain-secret-4f9c", "Url")]
+    [InlineData("https://billing-4f9c.example/events", null, "Secret")]
+    [InlineData("https://billing-4f9c.example/events", "   ", "Secret")]
+    [InlineData("https://billing-4f9c.example/events", "whsec_not-valid-4f9c", "Secret")]
+    [InlineData("https://billing-4f9c.example/events", "plain-secret-4f9c whsec_%%%4f9c", "Secret")]
+    public void A_billing_events_address_that_is_not_https_or_has_no_usable_secret_stops_the_start_and_the_message_holds_no_value(
+        string url,
+        string? secret,
+        string refused)
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:BillingEvents:Url"] = url,
+            ["ControlPlane:BillingEvents:Secret"] = secret,
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains($"ControlPlane:BillingEvents:{refused}", exception.Message, StringComparison.Ordinal);
+        foreach (var value in new[] { url, secret }.OfType<string>().Where(value => value.Trim().Length > 0))
+        {
+            Assert.DoesNotContain(value, exception.Message, StringComparison.Ordinal);
+        }
+
+        foreach (var part in (secret ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            Assert.DoesNotContain(part, exception.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void A_billing_events_address_with_a_secret_of_two_values_loads_and_registers_the_delivery()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:BillingEvents:Url"] = "https://billing.example/events",
+            ["ControlPlane:BillingEvents:Secret"] = "whsec_c2VjcmV0LW9uZQ== plain-second",
+        });
+
+        using var client = factory.CreateClient();
+
+        Assert.True(factory.Services.GetRequiredService<ControlPlaneOptions>().BillingEvents.IsSet);
+        Assert.Contains(factory.Services.GetServices<IJobHandler>(), handler => handler.Kind == "sendBillingEvent");
+    }
+
+    [Fact]
+    public void Without_the_billing_events_address_the_start_succeeds_whatever_the_secret_and_no_delivery_is_registered()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:BillingEvents:Secret"] = "whsec_not base64",
+        });
+
+        using var client = factory.CreateClient();
+
+        Assert.False(factory.Services.GetRequiredService<ControlPlaneOptions>().BillingEvents.IsSet);
+        Assert.DoesNotContain(factory.Services.GetServices<IJobHandler>(), handler => handler.Kind == "sendBillingEvent");
+    }
+
     [Fact]
     public async Task Without_the_billing_settings_every_billing_route_answers_401_with_a_bearer_challenge()
     {
@@ -829,6 +891,38 @@ public sealed class ControlPlaneOptionsTests
 
         Assert.Contains("ControlPlane:PublicUrl", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("ControlPlane:ConnectionString", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Without_a_billing_page_the_setting_is_empty()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.Null(factory.Services.GetRequiredService<ControlPlaneOptions>().BillingPageUrl);
+    }
+
+    [Fact]
+    public void A_billing_page_that_is_an_absolute_https_URL_loads()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:BillingPageUrl"] = "https://billing.example.com/tenants/{tenantId}" });
+
+        using var client = factory.CreateClient();
+
+        Assert.Equal("https://billing.example.com/tenants/{tenantId}", factory.Services.GetRequiredService<ControlPlaneOptions>().BillingPageUrl);
+    }
+
+    [Theory]
+    [InlineData("http://billing.example.com/{tenantId}")]
+    [InlineData("billing.example.com")]
+    public void A_billing_page_that_is_not_an_absolute_https_URL_stops_the_start_naming_the_setting(string address)
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:BillingPageUrl"] = address });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:BillingPageUrl", exception.Message, StringComparison.Ordinal);
     }
 
     private static Dictionary<string, string?> SignUpApplicationSettings(string id, string en, string vi) => new()

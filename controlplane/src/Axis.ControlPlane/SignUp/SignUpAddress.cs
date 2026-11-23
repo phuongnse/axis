@@ -4,7 +4,4 @@ namespace Axis.ControlPlane.SignUp;
 internal static class SignUpAddress
 {
     public static string Of(ControlPlaneOptions options, string subdomain) => $"https://{subdomain}.{options.TenantDomain!.ToLowerInvariant()}";
-
-    /// <summary>The billing portal link of a tenant, shown in the timeline emails and the trial-used email.</summary>
-    public static string BillingPortalOf(ControlPlaneOptions options, string tenantId) => $"{options.PublicUrl}/tenants/{Uri.EscapeDataString(tenantId)}";
 }

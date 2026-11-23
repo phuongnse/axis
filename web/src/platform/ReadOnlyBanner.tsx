@@ -6,7 +6,7 @@ import { useText } from './texts'
 /**
  * The banner at the top of the shell's content while the tenant is read-only: a warning with the alert role that says
  * the workspace is read-only and why. When the user has a billing address, which only an administrator in a cell has,
- * it links to the billing portal. It renders nothing while the user loads, when loading fails, with nobody signed in
+ * it links to the operator's billing page. It renders nothing while the user loads, when loading fails, with nobody signed in
  * and while the tenant is active.
  */
 export function ReadOnlyBanner() {
