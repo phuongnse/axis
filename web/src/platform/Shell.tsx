@@ -93,7 +93,7 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * and the sidebar's navigation stays under it with a scroll of its own. A site with two or more navigation entries
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
- * A page can claim a column on the right with `ShellAside`, as wide as the panel it holds, beside the content column, from under the header to the footer.
+ * A page can claim a column on the right with `ShellAside`, as wide as the panel it holds, beside the content column, from under the header to the footer. At narrow width the column is the window's width and stacks under the content column.
  * A page draws a bar at the foot of the content column with `ShellBarSlot`, which sticks to the window's foot and rests above the footer.
  * A footer runs under the page, with the copyright at the start and the legal links at the end. Without a sidebar it
  * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
@@ -297,7 +297,7 @@ export function Shell({
             )}
             <Layout>
               {/* The row always wraps the content and the column, so claiming the column never remounts the page. */}
-              <Layout hasSider style={{ minWidth: 0 }}>
+              <Layout hasSider style={{ minWidth: 0, flexDirection: narrow ? 'column' : undefined }}>
                 <Layout style={{ minWidth: 0 }}>
                   {!hasAccount && <ReadOnlyBanner />}
                   <Layout.Content style={{ background: colour.surface, padding: inset }}>
@@ -314,11 +314,20 @@ export function Shell({
                 {asideClaimed && (
                   <div
                     id="shell-aside"
-                    style={{
-                      flex: 'none',
-                      background: colour.surface,
-                      borderInlineStart: `1px solid ${colour.borderSubtle}`,
-                    }}
+                    style={
+                      narrow
+                        ? {
+                            flex: 'none',
+                            width: '100%',
+                            background: colour.surface,
+                            borderBlockStart: `1px solid ${colour.borderSubtle}`,
+                          }
+                        : {
+                            flex: 'none',
+                            background: colour.surface,
+                            borderInlineStart: `1px solid ${colour.borderSubtle}`,
+                          }
+                    }
                   >
                     <div ref={setAsideTarget} style={{ position: 'sticky', top: headerHeight }} />
                   </div>

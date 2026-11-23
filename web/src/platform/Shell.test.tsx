@@ -250,6 +250,21 @@ describe('Shell at narrow width', () => {
     vi.unstubAllGlobals()
   })
 
+  it('stacks the right column under the content at the width of the window', async () => {
+    renderShell(
+      'en',
+      ['/'],
+      notesNavigation.slice(0, 1),
+      <ShellAside>
+        <p>Side</p>
+      </ShellAside>,
+    )
+
+    const column = (await screen.findByText('Side')).closest('#shell-aside')!
+    expect(column).toHaveStyle({ width: '100%' })
+    expect(column.parentElement).toHaveStyle({ flexDirection: 'column' })
+  })
+
   it('hides the navigation behind a closed Menu button', () => {
     renderShell('en', ['/'], notesNavigation)
 

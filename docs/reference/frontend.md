@@ -750,7 +750,8 @@ narrow one.
   widget, so the page never does.
 - **The shell header** folds the navigation and the language and theme menu into a Menu panel, see
   [layout](shell.md#layout).
-- **Side panels** _(planned for M35)_. At narrow width a side panel takes the window's width, see [layout](shell.md#layout).
+- **Side panels.** At narrow width the right column stacks under the page, and a side panel takes the window's
+  width with no resize handle, see [layout](shell.md#layout).
 
 ## Platform field help
 
