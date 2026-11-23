@@ -205,41 +205,32 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
   }
 }
 
-/** The class `AxisField` puts on its wrapper, which `fieldRules` sizes the input the field holds by. */
+/** The class `AxisField` puts on each field. `fieldRules` sizes the input in its `fieldInputClass` wrapper by it. */
 export const fieldClass = 'axis-field'
+
+/**
+ * The class `AxisField` puts on the wrapper it draws round an input that fills the field. A checkbox, a switch, an upload
+ * and a radio group get no wrapper and keep their own width.
+ */
+export const fieldInputClass = 'axis-field-input'
 
 /** The class `AxisButton` puts on every text button it draws, which `fieldRules` gives its light fill on keyboard focus. */
 export const textButtonClass = 'axis-text-button'
 
-/** The inputs that fill their field. A checkbox, a switch and an upload keep their own width. */
-const fieldInputs = [
-  '.ant-select',
-  '.ant-input-number',
-  '.ant-input-number-affix-wrapper',
-  '.ant-picker',
-  '.ant-input',
-  '.ant-input-affix-wrapper',
-  '.ant-input-group-wrapper',
-  '.ant-space-compact',
-]
-
-/** Where such an input sits: directly in the field a screen holds, or in the content of a form item. */
-const fieldParents = [`.${fieldClass}`, `.${fieldClass} .ant-form-item-control-input-content`]
-
 /**
  * The CSS every Axis form and message shares, rendered once beside each provider's ConfigProvider. Ant Design has no
- * token for the gap under a message, so a rule carries it. An input of an `AxisField` fills the field's width, and a
- * select joined with its action fills it together with the action, see docs/reference/shell.md#layout. A text button
- * that `AxisButton` draws, such as a subtle button, takes the light fill on keyboard focus that it takes on hover, see
- * docs/reference/actions-and-controls.md#buttons.
+ * token for the gap under a message, so a rule carries it. The input inside an `AxisField`'s `fieldInputClass` wrapper
+ * fills the field's width, and a select joined with its action fills it together with the action, see
+ * docs/reference/shell.md#layout. A text button that `AxisButton` draws, such as a subtle button, takes the light fill
+ * on keyboard focus that it takes on hover, see docs/reference/actions-and-controls.md#buttons.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
   const { type } = designTokensFor(mode, page)
   const hoverFill = theme.getDesignToken(antThemeFor(mode, page)).colorBgTextHover
-  const fieldWidth = fieldParents.flatMap((parent) => fieldInputs.map((input) => `${parent} > ${input}`)).join(', ')
   return [
-    // An input fills its field, and a select joined with its action fills it too, see docs/reference/shell.md#layout.
-    `${fieldWidth} { width: 100%; }`,
+    // The input in a field's wrapper fills the field, and a select joined with its action fills it too,
+    // see docs/reference/shell.md#layout.
+    `.${fieldClass} .${fieldInputClass} > * { width: 100%; }`,
     // A message sits 4px under its control. The gap under the message is the form's.
     `.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: ${type.fontSize}px; line-height: 20px; }`,
     '.ant-form-item-margin-offset { display: none; }',

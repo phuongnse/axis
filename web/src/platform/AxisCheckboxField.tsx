@@ -1,6 +1,7 @@
 import { Checkbox, Form, Switch, type CheckboxProps, type FormItemProps } from 'antd'
 import { AxisField, type AxisFieldStatus } from './AxisField'
 import { useErrorBoxStyles } from './antTheme'
+import { keepsOwnWidth } from './ownWidth'
 
 type Shared = {
   label: string
@@ -53,6 +54,7 @@ export function FormItemCheckbox(props: CheckboxProps) {
   const boxStyles = useErrorBoxStyles()
   return <Checkbox {...props} styles={boxStyles(status === 'error', props.checked === true)} />
 }
+keepsOwnWidth(FormItemCheckbox)
 
 /**
  * A yes-or-no field of a platform screen, a checkbox or a switch: its label above, its help under the label, then

@@ -1,5 +1,5 @@
 import { Flex, Select, Tabs } from 'antd'
-import { lazy, Suspense, useCallback, useContext, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useContext, useEffect, useState, type ComponentProps } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisButton } from '../platform/AxisButton'
@@ -11,6 +11,7 @@ import { FieldInput } from '../platform/FieldInput'
 import { fillText } from '../platform/fillText'
 import { formatDuration } from '../platform/formatValue'
 import { setOwn } from '../platform/ownProperty'
+import { keepsOwnWidth } from '../platform/ownWidth'
 import { PaneHeader } from '../platform/PaneHeader'
 import { QuotaRefusedError } from '../platform/quota'
 import type { RecordValue } from '../platform/records'
@@ -115,6 +116,14 @@ function ValueInput({
     />
   )
 }
+
+/**
+ * The input for a boolean field, a checkbox. It is a component of its own, so `AxisField` gives it no wrapper and the
+ * checkbox keeps its own width, see docs/reference/shell.md#layout.
+ */
+const BooleanValueInput = keepsOwnWidth(function BooleanValueInput(props: ComponentProps<typeof ValueInput>) {
+  return <ValueInput {...props} />
+})
 
 /**
  * The input as the JSON tab shows it and Run sends it: each field of the operation, in its order, with `null` for a
@@ -444,21 +453,24 @@ export function StudioPackageRun({
                   label: t('shell.studio.form'),
                   children: (
                     <Flex vertical gap={spacing.lg} style={{ paddingBlock: spacing.md }}>
-                      {fields.map((field) => (
-                        <AxisField
-                          key={`${operation.name}/${field.name}`}
-                          label={field.name}
-                          help={t(`shell.studio.entity.typeOf.${knownTypes.has(field.type) ? field.type : 'text'}`)}
-                          required={field.required}
-                        >
-                          <ValueInput
-                            field={fieldOf(field)}
-                            value={input[field.name]}
-                            locale={locale}
-                            onChange={(value) => changeInput({ ...input, [field.name]: value })}
-                          />
-                        </AxisField>
-                      ))}
+                      {fields.map((field) => {
+                        const Input = field.type === 'boolean' ? BooleanValueInput : ValueInput
+                        return (
+                          <AxisField
+                            key={`${operation.name}/${field.name}`}
+                            label={field.name}
+                            help={t(`shell.studio.entity.typeOf.${knownTypes.has(field.type) ? field.type : 'text'}`)}
+                            required={field.required}
+                          >
+                            <Input
+                              field={fieldOf(field)}
+                              value={input[field.name]}
+                              locale={locale}
+                              onChange={(value) => changeInput({ ...input, [field.name]: value })}
+                            />
+                          </AxisField>
+                        )
+                      })}
                     </Flex>
                   ),
                 },

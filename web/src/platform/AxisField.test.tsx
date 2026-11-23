@@ -1,8 +1,22 @@
-import { Checkbox, ConfigProvider, Form, Input, InputNumber, Select, Upload } from 'antd'
+import {
+  Checkbox,
+  ConfigProvider,
+  DatePicker,
+  Form,
+  Input,
+  InputNumber,
+  Radio,
+  Select,
+  Space,
+  Switch,
+  Upload,
+} from 'antd'
+import type { FormItemProps } from 'antd'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { AxisButton } from './AxisButton'
 import { AxisField, type AxisFieldStatus } from './AxisField'
 import { requiredMark } from './requiredMark'
 import { TextProvider } from './TextProvider'
@@ -509,35 +523,140 @@ describe('AxisField error outside a form', () => {
 })
 
 describe('AxisField input width', () => {
-  // Each input, the role that finds it and the root that fills the field.
+  // Each input, the role and name that find it and the root that fills the field.
   const inputs = [
     {
       kind: 'a select',
       input: <Select options={[{ value: 'open', label: 'Open' }]} onChange={() => {}} />,
       role: 'combobox',
+      name: 'Status',
       root: '.ant-select',
     },
-    { kind: 'a number box', input: <InputNumber onChange={() => {}} />, role: 'spinbutton', root: '.ant-input-number' },
-    { kind: 'a text box', input: <Input onChange={() => {}} />, role: 'textbox', root: 'input' },
+    {
+      kind: 'a number box',
+      input: <InputNumber onChange={() => {}} />,
+      role: 'spinbutton',
+      name: 'Status',
+      root: '.ant-input-number',
+    },
+    { kind: 'a text box', input: <Input onChange={() => {}} />, role: 'textbox', name: 'Status', root: 'input' },
+    {
+      kind: 'a date picker',
+      input: <DatePicker onChange={() => {}} />,
+      role: 'textbox',
+      name: 'Status',
+      root: '.ant-picker',
+    },
+    {
+      kind: 'a select joined with its action',
+      input: (
+        <Space.Compact>
+          <Select
+            options={[{ value: 'open', label: 'Open' }]}
+            aria-label="Status"
+            style={{ flex: 1 }}
+            onChange={() => {}}
+          />
+          <AxisButton role="secondary">Open</AxisButton>
+        </Space.Compact>
+      ),
+      role: 'combobox',
+      name: 'Status',
+      root: '.ant-space-compact',
+    },
   ]
 
-  it.each(inputs)('makes $kind as wide as the field inside a form', ({ input, role, root }) => {
+  it.each(inputs)('makes $kind as wide as the field inside a form', ({ input, role, name, root }) => {
     renderForm(
       <AxisField label="Status" help="Pick one." name="status">
         {input}
       </AxisField>,
     )
 
-    expect(screen.getByRole(role, { name: 'Status' }).closest(root)).toHaveStyle({ width: '100%' })
+    expect(screen.getByRole(role, { name }).closest(root)).toHaveStyle({ width: '100%' })
   })
 
-  it.each(inputs)('makes $kind as wide as the field outside a form', ({ input, role, root }) => {
+  it.each(inputs)('makes $kind as wide as the field outside a form', ({ input, role, name, root }) => {
     renderOutside(
       <AxisField label="Status" help="Pick one.">
         {input}
       </AxisField>,
     )
 
-    expect(screen.getByRole(role, { name: 'Status' }).closest(root)).toHaveStyle({ width: '100%' })
+    expect(screen.getByRole(role, { name }).closest(root)).toHaveStyle({ width: '100%' })
+  })
+})
+
+describe('AxisField input that keeps its own width', () => {
+  // Each box, the role and name that find it, the root that would fill the field and the form props it needs. A radio
+  // group is drawn inline, so it keeps its own width too.
+  const boxes: {
+    kind: string
+    input: React.JSX.Element
+    role: string
+    name: string
+    root: string
+    formProps: Pick<FormItemProps, 'valuePropName' | 'getValueFromEvent'>
+  }[] = [
+    {
+      kind: 'a checkbox',
+      input: <Checkbox />,
+      role: 'checkbox',
+      name: 'Status',
+      root: '.ant-checkbox-wrapper',
+      formProps: { valuePropName: 'checked' },
+    },
+    {
+      kind: 'a radio group',
+      input: (
+        <Radio.Group aria-label="Status">
+          <Radio value="open">Open</Radio>
+        </Radio.Group>
+      ),
+      role: 'radiogroup',
+      name: 'Status',
+      root: '.ant-radio-group',
+      formProps: {},
+    },
+    {
+      kind: 'a switch',
+      input: <Switch />,
+      role: 'switch',
+      name: 'Status',
+      root: '.ant-switch',
+      formProps: { valuePropName: 'checked' },
+    },
+    {
+      kind: 'an upload',
+      input: (
+        <Upload beforeUpload={() => false}>
+          <button type="button">Choose</button>
+        </Upload>
+      ),
+      role: 'button',
+      name: 'Choose',
+      root: '.ant-upload-wrapper',
+      formProps: { valuePropName: 'fileList', getValueFromEvent: (event: { fileList?: unknown }) => event.fileList },
+    },
+  ]
+
+  it.each(boxes)('keeps $kind its own width inside a form', ({ input, role, name, root, formProps }) => {
+    renderForm(
+      <AxisField label="Status" help="Pick one." name="status" {...formProps}>
+        {input}
+      </AxisField>,
+    )
+
+    expect(screen.getByRole(role, { name }).closest(root)).not.toHaveStyle({ width: '100%' })
+  })
+
+  it.each(boxes)('keeps $kind its own width outside a form', ({ input, role, name, root }) => {
+    renderOutside(
+      <AxisField label="Status" help="Pick one.">
+        {input}
+      </AxisField>,
+    )
+
+    expect(screen.getByRole(role, { name }).closest(root)).not.toHaveStyle({ width: '100%' })
   })
 })
