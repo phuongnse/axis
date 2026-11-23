@@ -60,7 +60,8 @@ export const radiusTokens = { base: 6 }
 /**
  * Fixed sizes in px: the shell header (`bar`), a small control and the line a table row holds, and a table row. A
  * dialog's width (`dialog`) is one of three, picked by what the dialog holds: a confirmation, a short form or a list.
- * A side panel is `sidePanel` wide. A chevron draws at `chevron` px, see the Chevron widget.
+ * A side panel is `sidePanel` wide. A chevron draws at `chevron` px, see the Chevron widget. A dropdown menu is at least
+ * `menu` wide.
  */
 export const sizeTokens = {
   bar: 48,
@@ -68,6 +69,7 @@ export const sizeTokens = {
   tableRow: 40,
   sidePanel: 320,
   chevron: 12,
+  menu: 160,
   dialog: { small: 400, medium: 560, large: 880 },
 }
 
