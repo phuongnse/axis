@@ -442,9 +442,10 @@ const editorTheme = sharedTheme((tokens, mode, selectedTint: string, height: Edi
       '.cm-deletedChunk .cm-deletedText': { background: changedWords(colour.dangerText) },
       // A line added or removed whole, or changed only in its spaces, shows no underline, see lineDiff.ts.
       '.cm-noChangedWords .cm-changedText, .cm-noChangedWords.cm-deletedLine .cm-deletedText': { background: 'none' },
+      // Proposed: the row that opens a folded run of unchanged lines reads as an action, as #3263 agreed, see #4623.
       '.cm-collapsedLines': {
-        color: colour.textMuted,
-        background: colour.fillSubtle,
+        color: colour.primaryText,
+        background: colour.canvas,
         padding: `0 ${spacing.sm}px 0 calc(${spacing.sm}px + 2ch)`,
         '&:before, &:after': { content: 'none' },
       },
