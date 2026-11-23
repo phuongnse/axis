@@ -327,12 +327,11 @@ function Operation({
         </Flex>
         {componentDisabled ? null : (
           <RowActions
-            fold
             actions={[
               {
                 key: 'remove',
                 labelKey: 'shell.studio.connector.removeOperation',
-                destructive: true,
+                meaning: 'remove',
                 onClick: () => onChange(pointer, undefined),
               },
             ]}
@@ -370,8 +369,9 @@ function changeFieldType(
 
 /**
  * The input or output fields of an operation as rows of name, type and required, with a placement or a source. Add sits on
- * the group's title row, and each row's Delete is in its "…" menu, which removes the fields nested in the row too. A
- * read-only editor, Ant Design's `componentDisabled`, shows neither, see docs/reference/studio-editors-by-kind.md#connector-editor.
+ * the group's title row, and each row's Delete is the trash icon, which removes the fields nested in the row too. A
+ * read-only editor, Ant Design's `componentDisabled`, shows neither, see
+ * docs/reference/studio-editors-by-kind.md#connector-editor.
  */
 function FieldRows({
   kind,
@@ -477,12 +477,11 @@ function FieldRows({
                 </Flex>
                 {componentDisabled ? null : (
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',
                         labelKey: 'shell.studio.connector.removeField',
-                        destructive: true,
+                        meaning: 'remove',
                         onClick: () => onChange(rowPointer, undefined),
                       },
                     ]}
@@ -576,12 +575,11 @@ function NestedFields({
                 </Flex>
                 {componentDisabled ? null : (
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',
                         labelKey: 'shell.studio.connector.removeField',
-                        destructive: true,
+                        meaning: 'remove',
                         onClick: () => onChange(rowPointer, undefined),
                       },
                     ]}

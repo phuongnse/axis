@@ -12,7 +12,7 @@ import { setAt } from '../platform/jsonPatch'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, emptyDescription, flexOf, optionTexts, selectRoot } from '../test/antd'
+import { chooseOption, chooseRowAction, emptyDescription, flexOf, optionTexts, selectRoot } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { forbiddenOperationKeys, operationJsonOnlyKeys, withOperation } from './operationKeys'
 import { ProcessEditor } from './ProcessEditor'
@@ -373,12 +373,6 @@ describe('The operations of the process schema', () => {
   })
 })
 
-/** Opens a row's Actions menu and chooses its entry, the way an author removes a row. */
-async function chooseRowAction(row: ReturnType<typeof within>, name: string) {
-  await userEvent.click(row.getByRole('button', { name: 'Actions' }))
-  await userEvent.click(await screen.findByRole('menuitem', { name }))
-}
-
 describe('A notify step', () => {
   const notify = {
     name: 'tell',
@@ -422,8 +416,9 @@ describe('A notify step', () => {
 
     await userEvent.click(field('/steps/0/to').getByRole('button', { name: 'Add recipient' }))
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/to', [{ user: 'requester' }, { user: '' }])
-    expect(field('/steps/0/to').queryByRole('button', { name: 'Remove recipient' })).toBeNull()
-    await chooseRowAction(field('/steps/0/to/0'), 'Remove recipient')
+    expect(field('/steps/0/to/0').getByRole('button', { name: 'Remove recipient' })).toBeVisible()
+    expect(field('/steps/0/to/0').queryByRole('button', { name: 'Actions' })).toBeNull()
+    await chooseRowAction(screen.getByTestId('studio-field-/steps/0/to/0'), 'Remove recipient')
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0', undefined)
   })
 
@@ -598,9 +593,9 @@ describe('A read-only operation panel', () => {
       '/steps/1/input/address/fields/city',
       '/steps/1/output/orderNumber',
     ]) {
-      expect(
-        within(screen.getByTestId(`studio-field-${pointer}`)).queryByRole('button', { name: 'Actions' }),
-      ).toBeNull()
+      const row = within(screen.getByTestId(`studio-field-${pointer}`))
+      expect(row.queryByRole('button', { name: 'Actions' })).toBeNull()
+      expect(row.queryByRole('button', { name: /^Remove/ })).toBeNull()
     }
     expect(screen.getByTestId('studio-field-/steps/1/input/address/fields')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Add recipient' })).toBeNull()
@@ -616,7 +611,7 @@ describe('A read-only operation panel', () => {
       within(screen.getByTestId('studio-field-/steps/1/input')).getAllByRole('button', { name: 'Add row' }),
     ).toHaveLength(2)
     expect(
-      within(screen.getByTestId('studio-field-/steps/0/to/0')).getByRole('button', { name: 'Actions' }),
+      within(screen.getByTestId('studio-field-/steps/0/to/0')).getByRole('button', { name: 'Remove recipient' }),
     ).toBeVisible()
   })
 })
@@ -631,8 +626,8 @@ describe('An updateRecord step', () => {
       const row = within(screen.getByTestId(`studio-field-/steps/0/set/${key}`))
       expect(row.getByRole('combobox', { name: 'Field' })).toBeVisible()
       expect(row.getByRole('textbox', { name: 'Expression' })).toBeVisible()
-      expect(row.getByRole('button', { name: 'Actions' })).toBeVisible()
-      expect(row.queryByRole('button', { name: 'Remove' })).toBeNull()
+      expect(row.getByRole('button', { name: 'Remove' })).toBeVisible()
+      expect(row.queryByRole('button', { name: 'Actions' })).toBeNull()
     }
     expect(step(0).queryByTestId('studio-json-only')).toBeNull()
   })
@@ -660,7 +655,7 @@ describe('An updateRecord step', () => {
     })
     expect(Object.keys(onChange.mock.calls[0][1] as object)).toEqual(['purchaseOrderNumber', 'totalAmount'])
 
-    await chooseRowAction(row, 'Remove')
+    await chooseRowAction(screen.getByTestId('studio-field-/steps/0/set/status'), 'Remove')
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/set/status', undefined)
   })
 
@@ -681,7 +676,7 @@ describe('An updateRecord step', () => {
 
     const row = within(screen.getByTestId('studio-field-/steps/0/set/status'))
     await userEvent.type(row.getByRole('textbox', { name: 'Expression' }), 'a')
-    await chooseRowAction(row, 'Remove')
+    await chooseRowAction(screen.getByTestId('studio-field-/steps/0/set/status'), 'Remove')
 
     const pointers = onChange.mock.calls.map(([pointer]) => pointer as string)
     expect(pointers.length).toBeGreaterThan(0)
@@ -739,7 +734,7 @@ describe('A callConnector step', () => {
   it('draws an input row as a name, a kind and an expression, one to a line, each with its label and help', () => {
     renderEditor(false)
     const row = screen.getByTestId('studio-field-/steps/1/input/amount')
-    // The fields sit in a column that fills the row, and the row's menu is beside it.
+    // The fields sit in a column that fills the row, and the row's Remove is beside it.
     const fields = row.children[0] as HTMLElement
     const [name, kind, expression] = Array.from(fields.children) as HTMLElement[]
     const texts = platformEnglish as Record<string, string>
@@ -761,7 +756,7 @@ describe('A callConnector step', () => {
     )
     expect(fields.children).toHaveLength(3)
     expect(row.children).toHaveLength(2)
-    expect(row.children[1]).toBe(within(row).getByRole('button', { name: 'Actions' }))
+    expect(row.children[1]).toContainElement(within(row).getByRole('button', { name: 'Remove' }))
   })
 
   it('marks the name, the kind and the expression of an input row required, and says so to a screen reader', () => {
@@ -946,7 +941,7 @@ describe('A callConnector step', () => {
       within(screen.getByTestId('studio-field-/steps/1/input')).getByRole('button', { name: 'Add row' }),
     )
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/', '')
-    await chooseRowAction(within(screen.getByTestId('studio-field-/steps/1/input/amount')), 'Remove')
+    await chooseRowAction(screen.getByTestId('studio-field-/steps/1/input/amount'), 'Remove')
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/amount', undefined)
   })
 

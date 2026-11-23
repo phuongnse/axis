@@ -158,7 +158,7 @@ removal.
 ## Step panel
 
 Selecting a node opens the step's card of the Form tab beside the canvas, with a "…" menu that holds Move up,
-Move down and Delete. A read-only tab shows no menu. Each move is one change of `steps`, so one Undo reverses it,
+Move down and Delete, with Delete last after a divider. A read-only tab shows no menu. Each move is one change of `steps`, so one Undo reverses it,
 and an edit in the panel redraws the graph. With no step selected, the panel says "Select a step on the canvas."
 The panel is drawn in [`SidePanel`](shell.md#layout), titled Step, with no close button, and it gives way while the
 Problems or Ask AI panel is open and comes back when that panel closes.
@@ -186,7 +186,8 @@ field of the picked entity, as the `updateRecord` panel has for the subject enti
 
 ### Notify
 
-The operation picker offers `notify`. Its recipients are rows, with Add recipient on the recipients' title row and Remove recipient in each row's "…" menu, and a read-only tab shows neither. Each row stacks
+The operation picker offers `notify`. Its recipients are rows, with Add recipient on the recipients' title row and each row's Remove recipient as the trash icon, named by its
+tooltip, and a read-only tab shows neither. Each row stacks
 a Recipient type choice of User, Role or Email, with a help line under each option, then the one field of that
 type: a user expression, a role picker or an email expression. Each field has its label and help, one field to
 a line, and the required fields are marked. Its `inApp` and `email` channels are two checkboxes, and
@@ -226,7 +227,7 @@ from the step names. Remove deadline is on the same title row, in the danger col
 [Lists](studio-editors-by-kind.md#process-editor) bullet says where these actions sit, and a read-only tab shows none.
 
 Add escalation is on the Escalations title row and appends an escalation with the first free name `escalation1`,
-`escalation2` and so on, and an empty `after`. Each escalation's Remove escalation is in its "…" menu, at the end
+`escalation2` and so on, and an empty `after`. Each escalation's Remove escalation is the trash icon, named by its tooltip, at the end
 of its first line beside Escalate after. Each escalation has a Reassign switch, which adds
 `reassign` with the task's assignee editor, and a Notify switch, which adds `notify` with the
 [notify](#notify) editor. Turning a switch off removes its key, and removing the last escalation removes

@@ -177,7 +177,7 @@ function withoutSubject(schema: JsonSchema): JsonSchema {
 /**
  * The subject of a process: a choice of an entity or parameters. A choice replaces the draft, so that it holds only the
  * chosen key, and one undo step brings the other back. Parameters are rows with Add on their title row and each row's
- * Remove in its "…" menu. A read-only editor shows neither, see docs/reference/studio-editors-by-kind.md#process-editor.
+ * Remove is the trash icon. A read-only editor shows neither, see docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
   const t = useText()
@@ -254,12 +254,11 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
                     </Flex>
                     {componentDisabled ? null : (
                       <RowActions
-                        fold
                         actions={[
                           {
                             key: 'remove',
                             labelKey: 'shell.studio.process.removeParameter',
-                            destructive: true,
+                            meaning: 'remove',
                             onClick: () => onChange(pointer, undefined),
                           },
                         ]}
@@ -279,7 +278,7 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
 
 /**
  * The card of one step of a process, as the Form tab shows it, for the Design tab's side panel. Move up, Move down and
- * Delete are entries of the card's "…" menu, which a read-only editor does not show, see
+ * Delete are entries of the card's "…" menu, Delete last after a divider, which a read-only editor does not show, see
  * docs/reference/process-designer.md#step-panel. Move up and Move down call `onMove`, and Delete calls `onRemove`.
  * Each owns the change, the selection and what is said.
  */
@@ -357,7 +356,6 @@ function Step({
           componentDisabled ? undefined : (
             <span data-testid={`studio-step-actions-${index}`}>
               <RowActions
-                fold
                 actions={[
                   {
                     key: 'moveUp',
@@ -371,7 +369,7 @@ function Step({
                     disabled: last,
                     onClick: () => onMove(1),
                   },
-                  { key: 'delete', labelKey: 'shell.studio.delete', destructive: true, onClick: onRemove },
+                  { key: 'delete', labelKey: 'shell.studio.delete', meaning: 'remove', onClick: onRemove },
                 ]}
               />
             </span>
@@ -689,7 +687,7 @@ const emptyNotify = { to: [], channels: [], message: { subject: { textKey: '' },
  * The escalations of a task as rows. Each has an `after` duration, and Reassign and Notify switches that add or remove
  * its `reassign` and `notify`. A new escalation holds only an empty `after`, which the diagnostics mark until one of
  * the switches is on. Removing the last escalation removes the `escalations` key. Add escalation is on the title row, and
- * each escalation's Remove is in its "…" menu. A read-only editor shows neither, see
+ * each escalation's Remove is the trash icon. A read-only editor shows neither, see
  * docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Escalations({ pointer, step, onChange }: { pointer: string; step: Content; onChange: ChangeHandler }) {
@@ -746,12 +744,11 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
                   </div>
                   {componentDisabled ? null : (
                     <RowActions
-                      fold
                       actions={[
                         {
                           key: 'remove',
                           labelKey: 'shell.studio.process.removeEscalation',
-                          destructive: true,
+                          meaning: 'remove',
                           onClick: () =>
                             onChange(escalations.length === 1 ? escalationsPointer : rowPointer, undefined),
                         },
@@ -1089,7 +1086,7 @@ function SubProcess({
 
 /**
  * A decision's branches, each a row of a `when` expression, a label and a target. Add branch sits on the title row as a
- * secondary button, and each row's Remove is in its "…" menu. A read-only editor shows neither, see
+ * secondary button, and each row's Remove is the trash icon. A read-only editor shows neither, see
  * docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Decision({
@@ -1165,12 +1162,11 @@ function Decision({
                   </Flex>
                   {componentDisabled ? null : (
                     <RowActions
-                      fold
                       actions={[
                         {
                           key: 'remove',
                           labelKey: 'shell.studio.process.removeBranch',
-                          destructive: true,
+                          meaning: 'remove',
                           onClick: () => onChange(branchPointer, undefined),
                         },
                       ]}
@@ -1196,7 +1192,7 @@ function Decision({
 
 /**
  * The outcomes of a task as rows of name, label and target step. Each value is edited through its own pointer. Add
- * outcome sits on the title row as a secondary button, and each row's Remove is in its "…" menu. A read-only editor
+ * outcome sits on the title row as a secondary button, and each row's Remove is the trash icon. A read-only editor
  * shows neither, see docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Outcomes({
@@ -1264,12 +1260,11 @@ function Outcomes({
                 </Flex>
                 {componentDisabled ? null : (
                   <RowActions
-                    fold
                     actions={[
                       {
                         key: 'remove',
                         labelKey: 'shell.studio.process.removeOutcome',
-                        destructive: true,
+                        meaning: 'remove',
                         onClick: () => onChange(outcomePointer, undefined),
                       },
                     ]}

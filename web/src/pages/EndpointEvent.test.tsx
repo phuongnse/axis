@@ -112,8 +112,8 @@ describe('EndpointEvent', () => {
     const row = screen.getByTestId('studio-field-/event/fields/amount')
     expect(within(row).getByRole('combobox', { name: 'Event field' })).toBeVisible()
     expect(within(row).getByRole('textbox', { name: 'Expression' })).toBeVisible()
-    expect(within(row).getByRole('button', { name: 'Actions' })).toBeVisible()
-    expect(within(row).queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(within(row).getByRole('button', { name: 'Remove' })).toBeVisible()
+    expect(within(row).queryByRole('button', { name: 'Actions' })).toBeNull()
   })
 
   it('lists the payload fields that have no row as the add choices', async () => {
@@ -164,9 +164,8 @@ describe('EndpointEvent', () => {
     const onChange = renderEvent({ name: 'PaymentReceived', fields: { amount: 'a' } })
 
     await userEvent.click(
-      within(screen.getByTestId('studio-field-/event/fields/amount')).getByRole('button', { name: 'Actions' }),
+      within(screen.getByTestId('studio-field-/event/fields/amount')).getByRole('button', { name: 'Remove' }),
     )
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/event/fields/amount', undefined)
   })

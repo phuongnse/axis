@@ -833,9 +833,8 @@ describe('StudioEditor for an endpoint', () => {
     )
     await chooseOption('note')
     await userEvent.click(
-      within(screen.getByTestId('studio-field-/event/fields/reference')).getByRole('button', { name: 'Actions' }),
+      within(screen.getByTestId('studio-field-/event/fields/reference')).getByRole('button', { name: 'Remove' }),
     )
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove' }))
 
     const row = screen.getByTestId('studio-field-/event/fields/note')
     let view: EditorView | null = null

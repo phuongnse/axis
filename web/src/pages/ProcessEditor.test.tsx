@@ -1198,28 +1198,37 @@ describe('ProcessEditor choices, rows and required fields', () => {
     expect(column).not.toContainElement(remove)
   })
 
-  it('puts the fields of a parameter, branch and outcome row in one column, with the "…" menu beside it', () => {
+  it('puts the fields of a parameter, branch and outcome row in one column, with its trash icon beside them', () => {
     renderEditor({ ...complete, entity: undefined, parameters: [{ name: 'daysOverdue', type: 'integer' }] })
 
-    const rows: [HTMLElement, string[]][] = [
-      [screen.getByTestId('studio-field-/parameters/0'), ['/parameters/0/name', '/parameters/0/type']],
+    const rows: [HTMLElement, string, string[]][] = [
+      [
+        screen.getByTestId('studio-field-/parameters/0'),
+        'Remove parameter',
+        ['/parameters/0/name', '/parameters/0/type'],
+      ],
       [
         screen.getByTestId('studio-field-/steps/1/branches/0'),
+        'Remove branch',
         ['/steps/1/branches/0/when', '/steps/1/branches/0/label/textKey', '/steps/1/branches/0/next'],
       ],
       [
         screen.getByTestId('studio-field-/steps/0/outcomes/0'),
+        'Remove outcome',
         ['/steps/0/outcomes/0/name', '/steps/0/outcomes/0/label/textKey', '/steps/0/outcomes/0/next'],
       ],
     ]
-    for (const [row, fields] of rows) {
+    for (const [row, name, fields] of rows) {
       expect(row).not.toHaveClass('ant-flex-vertical')
       const column = row.firstElementChild as HTMLElement
       expect(column).toHaveClass('ant-flex-vertical')
       for (const field of fields) {
         expect(screen.getByTestId(`studio-field-${field}`).parentElement).toBe(column)
       }
-      expect(row.lastElementChild).toContainElement(within(row).getByRole('button', { name: 'Actions' }))
+      const remove = within(row).getByRole('button', { name })
+      expect(row.lastElementChild).toContainElement(remove)
+      expect(remove.querySelector('.anticon-delete')).not.toBeNull()
+      expect(within(row).queryByRole('button', { name: 'Actions' })).toBeNull()
     }
   })
 
@@ -1265,13 +1274,16 @@ describe('ProcessEditor choices, rows and required fields', () => {
 })
 
 describe('ProcessEditor step actions', () => {
-  it("keeps a step's Move up, Move down and Delete in its menu, with Move up off on the first step", async () => {
+  it("keeps a step's Move up, Move down and Delete in its menu, Delete last after a divider, with Move up off on the first step", async () => {
     renderEditor()
     const menu = await openRowMenu(screen.getByTestId('studio-step-actions-0'))
 
+    const entries = menu.querySelectorAll('[role="menuitem"], [role="separator"]')
+    expect(
+      Array.from(entries, (entry) => (entry.getAttribute('role') === 'separator' ? '---' : entry.textContent)),
+    ).toEqual(['Move up', 'Move down', '---', 'Delete'])
     expect(within(menu).getByRole('menuitem', { name: 'Move up' })).toHaveAttribute('aria-disabled', 'true')
     expect(within(menu).getByRole('menuitem', { name: 'Move down' })).not.toHaveAttribute('aria-disabled', 'true')
-    expect(within(menu).getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
   })
 
   it("removes that step when Delete is chosen in the step's menu", async () => {
@@ -1295,7 +1307,7 @@ describe('ProcessEditor step actions', () => {
 })
 
 describe('ProcessEditor lists', () => {
-  it('puts Add outcome on the outcomes title row as a secondary button, and removes an outcome from its menu', async () => {
+  it('puts Add outcome on the outcomes title row as a secondary button, and removes an outcome by its trash icon', async () => {
     const latest = renderEditor()
     const outcomes = screen.getByTestId('studio-field-/steps/1/outcomes')
     const add = within(outcomes).getByRole('button', { name: 'Add outcome' })
@@ -1332,7 +1344,7 @@ describe('ProcessEditor lists', () => {
   it('shows no Remove deadline, Remove timeout or Remove escalation while the editor is read-only', () => {
     renderEditor(complete, false, true)
 
-    for (const name of ['Remove deadline', 'Remove timeout']) {
+    for (const name of ['Remove deadline', 'Remove timeout', 'Remove escalation']) {
       expect(screen.queryByRole('button', { name })).toBeNull()
     }
     expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
@@ -1347,6 +1359,9 @@ describe('ProcessEditor lists', () => {
     )
 
     for (const name of ['Add parameter', 'Add branch', 'Add outcome']) {
+      expect(screen.queryByRole('button', { name })).toBeNull()
+    }
+    for (const name of ['Remove parameter', 'Remove branch', 'Remove outcome']) {
       expect(screen.queryByRole('button', { name })).toBeNull()
     }
     expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
