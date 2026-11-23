@@ -77,18 +77,20 @@ const feedTitles: Record<FeedEntry['key'], string> = {
  * The words of the guide bar for a state, or `null` while the bar is not built for it yet, see
  * docs/reference/ai-authoring-in-studio.md#the-guide. `accepting` is true while the author's accept is queued or running,
  * or has succeeded and the request still reads ready. `conflicted` is true when the accept the page follows met a conflict.
+ * `questions` is how many questions the plan has, which the author's words count while the plan waits.
  */
 function guideWords(
   state: AuthoringRequestState,
   isAuthor: boolean,
   accepting: boolean,
   conflicted: boolean,
+  questions: number,
 ): string | null {
   if (state === 'planning') return 'shell.studio.aiRequest.guide.planning'
   if (state === 'awaitingApproval') {
-    return isAuthor
-      ? 'shell.studio.aiRequest.guide.awaitingApproval'
-      : 'shell.studio.aiRequest.guide.awaitingApprovalOther'
+    if (!isAuthor) return 'shell.studio.aiRequest.guide.awaitingApprovalOther'
+    if (questions === 0) return 'shell.studio.aiRequest.guide.awaitingApproval'
+    return questions === 1 ? 'shell.studio.aiRequest.guide.questionsOne' : 'shell.studio.aiRequest.guide.questions'
   }
   if (workingStates.has(state)) return 'shell.studio.aiRequest.guide.working'
   if (state === 'ready') {
@@ -107,7 +109,9 @@ function guideWords(
  * the Plan, Work, Result and Dropped items that the request has, each with its mark. A failed request shows its failure
  * in the item where it stopped, and the Result item of a ready, failed or accepted request ends with the status of the
  * accept that the page follows. The Work item's Show the steps folds open the request's History, a table of its steps. The
- * guide bar at the foot of the window gives the request's author Approve plan, Change the plan… and Drop…, and Accept,
+ * guide bar at the foot of the window gives the request's author Approve plan, Change the plan… and Drop…, or, while the plan
+ * has questions, Answer… and Drop…, where Answer… opens a dialog for the author's answers that sends them as a change of
+ * plan, and Accept,
  * Ask for other changes… and Drop… on a ready request, where Ask for other changes… opens a dialog for a comment that
  * sends the request back to work. Accept sends the accept route and follows its publish request with
  * `fetchStudioRequest`, kept in memory for this visit, and reads the request again when the accept ends. An accept that
@@ -117,8 +121,8 @@ function guideWords(
  * Until the request waits for its author or ends, the page asks for it every second and keeps the last answer when a read
  * fails. A request that does not exist shows its line and, when `onAskAi` is given, an Ask AI link that opens the request
  * panel. `resources` is the application's resource list, which names the resources of a conflict. See
- * docs/reference/ai-authoring-in-studio.md#the-heading, #the-feed, #the-work-item, #the-plan, #the-diff, #accepting and
- * #the-guide and #the-history.
+ * docs/reference/ai-authoring-in-studio.md#the-heading, #the-feed, #the-work-item, #the-plan, #the-plans-groups, #the-diff, #accepting and
+ * #the-guide, #replies and #the-history.
  */
 export function StudioAuthoringRequestPage({
   application,
@@ -142,6 +146,7 @@ export function StudioAuthoringRequestPage({
   const [round, setRound] = useState(0)
   const [actionError, setActionError] = useState(false)
   const [changePlanOpen, setChangePlanOpen] = useState(false)
+  const [answerOpen, setAnswerOpen] = useState(false)
   const [requestChangesOpen, setRequestChangesOpen] = useState(false)
   const [dropOpen, setDropOpen] = useState(false)
   const [acting, setActing] = useState(false)
@@ -214,7 +219,11 @@ export function StudioAuthoringRequestPage({
       ? followed.diagnostics.filter((diagnostic) => diagnostic.code === acceptConflict)
       : []
   const conflicted = conflicts.length > 0
-  const words = guideWords(request.state, isAuthor, accepting, conflicted)
+  // While the plan has questions its author answers them in place of approving it, see
+  // docs/reference/ai-authoring-in-studio.md#the-plans-groups.
+  const questions = request.plan?.questions.length ?? 0
+  const asking = isAuthor && request.state === 'awaitingApproval' && questions > 0
+  const words = guideWords(request.state, isAuthor, accepting, conflicted, questions)
   const result = requestResult(request, isAuthor)
   const time = formatValue({ name: 'sentAt', type: 'date-time' }, request.sentAt, {}, { locale, text: t })
   const sender = (
@@ -300,7 +309,7 @@ export function StudioAuthoringRequestPage({
     }
   }
   const fold: AxisFoldAction[] = []
-  if (isAuthor && request.state === 'awaitingApproval') {
+  if (isAuthor && request.state === 'awaitingApproval' && !asking) {
     fold.push({
       key: 'changePlan',
       labelKey: 'shell.studio.aiRequest.changePlan',
@@ -353,10 +362,19 @@ export function StudioAuthoringRequestPage({
           <ShellBarSlot>
             <ActionBar
               data-testid="studio-ai-request-guide"
-              start={<span>{t(words)}</span>}
+              start={<span>{fillText(t(words), { count: questions })}</span>}
               fold={fold}
               end={
-                isAuthor && request.state === 'awaitingApproval' ? (
+                asking ? (
+                  <AxisButton
+                    role="finish"
+                    data-testid="studio-ai-request-answer"
+                    disabled={acting}
+                    onClick={() => setAnswerOpen(true)}
+                  >
+                    {t('shell.studio.aiRequest.answer')}
+                  </AxisButton>
+                ) : isAuthor && request.state === 'awaitingApproval' ? (
                   <AxisButton
                     role="finish"
                     data-testid="studio-ai-request-approve"
@@ -418,6 +436,26 @@ export function StudioAuthoringRequestPage({
               return { ok: true }
             }}
             onClose={() => setChangePlanOpen(false)}
+            onChanged={() => setActionError(false)}
+          />
+        )}
+        {answerOpen && (
+          <ReasonDialog
+            size="medium"
+            title={t('shell.studio.aiRequest.answer.title')}
+            label={t('shell.studio.aiRequest.answer.label')}
+            help={t('shell.studio.aiRequest.answer.help')}
+            finishText={t('shell.studio.aiRequest.changePlan.send')}
+            cancelText={t('shell.studio.cancel')}
+            requiredMessage={t('shell.studio.aiRequest.answer.required')}
+            tooLongMessage={t('shell.studio.aiRequest.changePlan.tooLong')}
+            maxLength={2000}
+            failedText={t('shell.studio.aiRequest.failed')}
+            onSend={async (answers) => {
+              adopt(await changeAuthoringRequestPlan(application, requestId, answers))
+              return { ok: true }
+            }}
+            onClose={() => setAnswerOpen(false)}
             onChanged={() => setActionError(false)}
           />
         )}
@@ -549,7 +587,10 @@ function WorkBody({ request, failure }: { request: AuthoringRequest; failure: Re
  * The body of the Plan item, see docs/reference/ai-authoring-in-studio.md#the-plan: the failure of a request that stopped
  * here, the comments that asked for another plan, oldest first, then what AI is doing while it writes the plan, or the
  * plan's summary with Show the plan or Hide the plan after it. The rest of the plan is open while the plan waits for its
- * author and folded in any other state, until the reader folds it.
+ * author and folded in any other state, until the reader folds it. Open, it shows the plan's groups in the order of
+ * docs/reference/ai-authoring-in-studio.md#the-plans-groups, each only when it has something: the questions with their
+ * options and the recommended one marked, what changes, the decisions, the risks, the acceptance criteria, the checklist
+ * and the implementation notes, which stay behind Show the implementation notes until the reader opens them.
  */
 function PlanBody({ request, failure }: { request: AuthoringRequest; failure: ReactNode }) {
   const t = useText()
@@ -557,7 +598,29 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
   const [toggled, setToggled] = useState<boolean>()
   const open = toggled ?? request.state === 'awaitingApproval'
   const summary = request.plan?.summary ?? ''
-  const changes = request.plan?.changes ?? []
+  const [notesOpen, setNotesOpen] = useState(false)
+  const plan = request.plan
+  const changes = plan?.changes ?? []
+  const group = (key: string, heading: string, content: ReactNode) => (
+    <Flex vertical gap={spacing.xs} key={key} data-testid="studio-ai-request-plan-group">
+      <Typography.Text strong>{t(heading)}</Typography.Text>
+      {content}
+    </Flex>
+  )
+  const list = (items: ReactNode[]) => (
+    <ul style={{ margin: 0 }}>
+      {items.map((item, index) => (
+        <li key={index}>{item}</li>
+      ))}
+    </ul>
+  )
+  const lines = (first: string, second: string) => (
+    <>
+      {first}
+      <br />
+      {second}
+    </>
+  )
   return (
     <Flex vertical gap={spacing.md} data-testid="studio-ai-request-plan">
       {failure}
@@ -583,12 +646,62 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
                 </AxisButton>
               )}
             </Flex>
-            {open && changes.length > 0 && (
-              <ul style={{ margin: 0 }}>
-                {changes.map((change, index) => (
-                  <li key={index}>{change}</li>
-                ))}
-              </ul>
+            {open && plan !== null && changes.length > 0 && (
+              <Flex vertical gap={spacing.md}>
+                {plan.questions.length > 0 &&
+                  group(
+                    'questions',
+                    'shell.studio.aiRequest.plan.questions',
+                    <ul style={{ margin: 0 }}>
+                      {plan.questions.map((question, index) => (
+                        <li key={index}>
+                          {question.question}
+                          <ul>
+                            {question.options.map((option, position) => (
+                              <li key={position}>
+                                {question.recommended === position + 1
+                                  ? fillText(t('shell.studio.aiRequest.plan.recommended'), { option })
+                                  : option}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>,
+                  )}
+                {group('changes', 'shell.studio.aiRequest.plan.changes', list(changes))}
+                {plan.decisions.length > 0 &&
+                  group(
+                    'decisions',
+                    'shell.studio.aiRequest.plan.decisions',
+                    list(plan.decisions.map((entry) => lines(entry.decision, entry.reason))),
+                  )}
+                {plan.risks.length > 0 && group('risks', 'shell.studio.aiRequest.plan.risks', list(plan.risks))}
+                {plan.checks.length > 0 && group('checks', 'shell.studio.aiRequest.plan.checks', list(plan.checks))}
+                {plan.checklist.length > 0 &&
+                  group(
+                    'checklist',
+                    'shell.studio.aiRequest.plan.checklist',
+                    list(plan.checklist.map((entry) => lines(entry.item, entry.how))),
+                  )}
+                {plan.details.length > 0 &&
+                  group(
+                    'notes',
+                    'shell.studio.aiRequest.plan.notes',
+                    <>
+                      <div>
+                        <AxisButton role="secondary" aria-expanded={notesOpen} onClick={() => setNotesOpen(!notesOpen)}>
+                          {t(
+                            notesOpen
+                              ? 'shell.studio.aiRequest.plan.notes.hide'
+                              : 'shell.studio.aiRequest.plan.notes.show',
+                          )}
+                        </AxisButton>
+                      </div>
+                      {notesOpen && list(plan.details)}
+                    </>,
+                  )}
+              </Flex>
             )}
           </>
         )

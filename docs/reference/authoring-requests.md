@@ -304,7 +304,7 @@ the checks, an independent review and fix rounds.
   The whole plan is at most 64 KiB. The planning step ends by calling `propose_plan` for its own request, see
   [tools](mcp-server.md#tools). A turn that ends without a valid call has no plan (`noPlan`). The author answers
   `questions` through a change of plan.
-- **No approval while the plan has questions** _(planned for M35)_. The page offers no approval while the plan has questions.
+- **No approval while the plan has questions**. The page offers no approval while the plan has questions.
 
 - **Axis's checklist**. The plan answers it, and the planning step asks for these four items:
   1. The draft does what the request and the approved plan say, and nothing more.
