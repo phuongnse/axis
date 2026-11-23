@@ -7,7 +7,7 @@ Status: **Agreed**
 The SPA needs a component library. Published applications and extension packages outlive any version
 of it, so a library name in configuration or in the custom widget API would let an upgrade break
 them. Axis already renders UI from metadata with its own presentation runtime
-([D2](d2-axis-owns-its-engines.md)).
+([D171](d171-axis-owns-the-engines-that-run-an-application-and-runs-authoring-requests-on-nexkits-engine.md)).
 
 ## Decision
 

@@ -13,7 +13,7 @@ the files agree, title and status included.
 | Decision | Title | Status |
 | --- | --- | --- |
 | [D1](decisions/d1-applications-are-configuration.md) | Applications are configuration | **Agreed** |
-| [D2](decisions/d2-axis-owns-its-engines.md) | Axis owns its engines | **Agreed** |
+| D2 | Axis owns its engines | Superseded by [D171](decisions/d171-axis-owns-the-engines-that-run-an-application-and-runs-authoring-requests-on-nexkits-engine.md), [last text](https://github.com/phuongnse/axis/blob/3161659a15e820dfd341b219fb9b1a08b28ab001/docs/decisions/d2-axis-owns-its-engines.md) |
 | [D3](decisions/d3-technology-stack.md) | Technology stack | **Agreed** |
 | [D4](decisions/d4-modular-monolith.md) | Modular monolith | **Agreed** |
 | [D5](decisions/d5-configuration-is-authored-as-files-first.md) | Configuration is authored as files first | **Agreed** |
@@ -182,3 +182,4 @@ the files agree, title and status included.
 | [D168](decisions/d168-billing-is-the-operators-own-system-and-axis-keeps-plans-as-quotas-the-clock-and-a-billing-api.md) | Billing is the operator's own system, and Axis keeps plans as quotas, the clock and a billing API | **Agreed** |
 | [D169](decisions/d169-the-billing-client-signs-in-with-oauth-client-credentials-from-the-operators-identity-provider.md) | The billing client signs in with OAuth client credentials from the operator's identity provider | **Agreed** |
 | [D170](decisions/d170-axis-is-under-the-agpl-and-what-others-build-on-is-under-the-mit-licence-with-no-commercial-licence.md) | Axis is under the AGPL, and what others build on is under the MIT licence, with no commercial licence | **Agreed** |
+| [D171](decisions/d171-axis-owns-the-engines-that-run-an-application-and-runs-authoring-requests-on-nexkits-engine.md) | Axis owns the engines that run an application, and runs authoring requests on NexKit's engine | **Agreed** |
