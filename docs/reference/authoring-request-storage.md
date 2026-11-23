@@ -26,7 +26,8 @@ when the author approves, changes the plan or drops it. The publisher moves a `r
 - **`axis.authoring_request_steps`.** One row per step: `id` (`uuid`), `request_id` (`uuid`, deleted
   with its request), `ordinal` (`integer`, unique per request), `kind`, `input_summary` and `outcome`
   (`text`, null), `tokens` (`bigint`), `messages` (`jsonb`, null), `checks` (`jsonb`, null), `resource` (`jsonb`, null), `started_at` (`timestamptz`) and
-  `finished_at` (`timestamptz`, null). A comment that asks for another plan is a `planChange` step. A `write` step holds
+  `finished_at` (`timestamptz`, null). The worker sets `messages` to null 30 days after `finished_at` and keeps the row, see
+  [durable requests](authoring-requests.md#durable-requests). A comment that asks for another plan is a `planChange` step. A `write` step holds
   the resource it wrote or deleted in `resource`, `{ kind, id, name }`, and `resource` is null on every other step, see
   [writes](authoring-requests.md#states). A step that
   never finished has the `outcome` `interrupted` once a later host closes it, see
