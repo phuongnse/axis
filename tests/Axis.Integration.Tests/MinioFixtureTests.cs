@@ -7,8 +7,8 @@ using Amazon.S3.Model;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The helpers that create a bucket, read an object from MinIO and upload one to it try again when MinIO drops a connection or answers that the client
-/// disconnected, and fail when every try does. The waits between tries grow from half a second. A create or an upload that fails with any other S3 error
+/// The helpers that create a bucket, read an object from MinIO, upload one to it and list a bucket's keys try again when MinIO drops a connection or answers that the client
+/// disconnected, and fail when every try does. The waits between tries grow from half a second. A create, an upload or a list that fails with any other S3 error
 /// fails at once. A bucket create that finds the bucket already owned fails on its first try, but counts as created on a retry.
 /// </summary>
 public sealed class MinioFixtureTests
@@ -323,6 +323,64 @@ public sealed class MinioFixtureTests
 
         Assert.NotNull(created);
         Assert.True(created.ObjectLockEnabledForBucket);
+    }
+
+    [Fact]
+    public async Task A_list_whose_connection_is_reset_once_returns_the_keys()
+    {
+        var calls = 0;
+
+        var keys = await MinioFixture.ListKeysAsync(
+            (_, _) =>
+            {
+                calls++;
+                return calls == 1
+                    ? throw new IOException("Connection reset by peer", new SocketException((int)SocketError.ConnectionReset))
+                    : Task.FromResult(new ListObjectsV2Response { S3Objects = [new S3Object { Key = "b" }, new S3Object { Key = "a" }] });
+            },
+            "bucket",
+            CancellationToken,
+            _noWait);
+
+        Assert.Equal(["a", "b"], keys);
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task A_list_whose_connection_is_dropped_every_time_fails_after_five_attempts()
+    {
+        var calls = 0;
+
+        await Assert.ThrowsAsync<IOException>(() => MinioFixture.ListKeysAsync(
+            (_, _) =>
+            {
+                calls++;
+                throw new IOException("Connection reset by peer", new SocketException((int)SocketError.ConnectionReset));
+            },
+            "bucket",
+            CancellationToken,
+            _noWait));
+
+        Assert.Equal(5, calls);
+    }
+
+    [Fact]
+    public async Task A_list_failing_with_another_S3_error_fails_after_one_attempt()
+    {
+        var calls = 0;
+
+        var exception = await Assert.ThrowsAsync<AmazonS3Exception>(() => MinioFixture.ListKeysAsync(
+            (_, _) =>
+            {
+                calls++;
+                throw new AmazonS3Exception("The specified bucket does not exist") { ErrorCode = "NoSuchBucket" };
+            },
+            "bucket",
+            CancellationToken,
+            _noWait));
+
+        Assert.Equal("NoSuchBucket", exception.ErrorCode);
+        Assert.Equal(1, calls);
     }
 
     private static Func<TimeSpan, CancellationToken, Task> Recording(List<TimeSpan> waits) =>

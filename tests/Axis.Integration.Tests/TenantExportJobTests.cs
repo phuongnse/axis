@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Amazon.S3;
-using Amazon.S3.Model;
 using Axis.Admin;
 using Axis.Administration;
 using Axis.Configuration.Model;
@@ -581,11 +580,8 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         return bucket;
     }
 
-    private static async Task<List<string>> KeysAsync(IAmazonS3 s3, string bucket)
-    {
-        var response = await s3.ListObjectsV2Async(new ListObjectsV2Request { BucketName = bucket }, CancellationToken);
-        return [.. (response.S3Objects ?? []).Select(item => item.Key).Order(StringComparer.Ordinal)];
-    }
+    private static Task<List<string>> KeysAsync(IAmazonS3 s3, string bucket) =>
+        MinioFixture.ListKeysAsync(s3, bucket, CancellationToken);
 
     private static async Task<Dictionary<string, string>> ReadZipAsync(IAmazonS3 s3, string bucket, string key)
     {
