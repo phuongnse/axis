@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Tests;
 using Axis.Server.Studio;
@@ -27,6 +28,7 @@ public sealed class McpReadToolTests(KeycloakFixture keycloak, PostgreSqlFixture
     private const string NoApplication = "No Studio folder holds an application with this name.";
     private const string NoDraft = "The application has no draft with this id.";
     private const string NoResource = "The application has no resource with this id.";
+    private const string McpForeignCursor = "The cursor is not one this output gave.";
     private const string InputMismatch = "The input does not match the tool's input schema.";
 
     private readonly List<string> _bodies = [];
@@ -111,6 +113,73 @@ public sealed class McpReadToolTests(KeycloakFixture keycloak, PostgreSqlFixture
             call.Output["layer"]!["version"]!.GetValue<string>());
         Assert.NotEmpty(call.Output["marks"]!.AsArray());
         Assert.Single(call.Output["removed"]!.AsArray());
+    }
+
+    [Fact]
+    public async Task A_resource_over_one_mebibyte_is_read_page_by_page()
+    {
+        var draft = (await Drafts(_user!).CreateAsync(Revisions(_user!), CancellationToken)).Value!;
+        var policy = new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString("D"),
+            ["kind"] = "policy",
+            ["name"] = "BigPolicy",
+            ["description"] = string.Concat(Enumerable.Repeat("A \"big\" <policy> with Tiếng Việt, é and 😀. ", 30_000)),
+        };
+        Assert.Null((await Drafts(_user!).WriteAsync(draft.Id, policy, CancellationToken)).Refusal);
+        var arguments = Arguments(("id", policy["id"]!.GetValue<string>()), ("draft", draft.Id));
+
+        var whole = await ReadPagesAsync("read_resource", arguments);
+
+        Assert.Equal("BigPolicy", whole["name"]!.GetValue<string>());
+        Assert.True(JsonNode.DeepEquals(policy, whole["content"]));
+        await AssertForeignCursorAsync("read_resource", arguments);
+    }
+
+    [Fact]
+    public async Task A_module_resource_over_one_mebibyte_is_read_page_by_page()
+    {
+        var steps = new JsonArray(Enumerable.Range(1, 8).Select(number => (JsonNode)new JsonObject
+        {
+            ["name"] = "extra" + number,
+            ["after"] = "markRejected",
+            ["type"] = "operation",
+            ["operation"] = "updateRecord",
+            ["set"] = new JsonObject { ["status"] = "'" + new string((char)('a' + number), 150_000) + "'" },
+            ["next"] = "done",
+        }).ToArray());
+        var layer = new JsonObject
+        {
+            ["id"] = "6f1d9c2a-3b4e-4d58-9a7c-1e2f3a4b5c6d",
+            ["kind"] = "layer",
+            ["formatVersion"] = 1,
+            ["target"] = "department-budgets/BudgetApproval",
+            ["changes"] = new JsonObject { ["steps"] = steps },
+        };
+        var path = Path.Combine(Folder, BudgetLayerFile);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, layer.ToJsonString(), CancellationToken);
+        var arguments = Arguments(("module", "department-budgets"), ("id", BudgetApprovalId));
+
+        var whole = await ReadPagesAsync("read_module_resource", arguments);
+
+        Assert.Equal(BudgetLayerFile, whole["layer"]!["file"]!.GetValue<string>());
+        Assert.Equal(
+            ["review", "markApproved", "markRejected", "extra8", "extra7", "extra6", "extra5", "extra4", "extra3", "extra2", "extra1", "done"],
+            whole["content"]!["steps"]!.AsArray().Select(step => step!["name"]!.GetValue<string>()));
+        await AssertForeignCursorAsync("read_module_resource", arguments);
+    }
+
+    [Fact]
+    public async Task A_cursor_on_an_output_that_gave_none_is_refused()
+    {
+        var process = StudioFolder.List(Folder).Single(file => file.Kind == "process" && file.Name == "PurchaseRequestApproval");
+
+        Assert.Equal(
+            McpForeignCursor,
+            (await CallAsync("read_resource", Arguments(("id", process.Id.ToString("D")), ("cursor", "garbage")))).Error);
+        Assert.Equal(McpForeignCursor, (await CallAsync("read_reference", """{"topic":"policy","cursor":"garbage"}""")).Error);
+        Assert.Equal(InputMismatch, (await CallAsync("list_resources", Arguments(("cursor", "garbage")))).Error);
     }
 
     [Fact]
@@ -247,6 +316,38 @@ public sealed class McpReadToolTests(KeycloakFixture keycloak, PostgreSqlFixture
         return result["isError"]!.GetValue<bool>()
             ? new ToolAnswer(true, null, result["content"]![0]!["text"]!.GetValue<string>())
             : new ToolAnswer(false, result["structuredContent"], null);
+    }
+
+    // The pages of a tool call joined: each is at most one page of 1 MiB and there is more than one, the parts joined are the output's JSON text.
+    private async Task<JsonNode> ReadPagesAsync(string tool, string arguments)
+    {
+        var parts = new List<string>();
+        string? cursor = null;
+        do
+        {
+            var call = await CallAsync(tool, cursor is null ? arguments : WithCursor(arguments, cursor));
+            Assert.False(call.IsError, call.Error);
+            Assert.True(Encoding.UTF8.GetByteCount(call.Output!.ToJsonString()) <= StudioDiffPages.PageBytes);
+            parts.Add(call.Output["part"]!.GetValue<string>());
+            cursor = call.Output["cursor"]?.GetValue<string>();
+            Assert.True(parts.Count <= 10, "The pages do not end.");
+        }
+        while (cursor is not null);
+
+        Assert.True(parts.Count > 1);
+        return JsonNode.Parse(string.Concat(parts))!;
+    }
+
+    private async Task AssertForeignCursorAsync(string tool, string arguments)
+    {
+        Assert.Equal(McpForeignCursor, (await CallAsync(tool, WithCursor(arguments, "garbage"))).Error);
+    }
+
+    private static string WithCursor(string arguments, string cursor)
+    {
+        var withCursor = JsonNode.Parse(arguments)!.AsObject();
+        withCursor["cursor"] = cursor;
+        return withCursor.ToJsonString();
     }
 
     private sealed record ToolAnswer(bool IsError, JsonNode? Output, string? Error);

@@ -1,8 +1,11 @@
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Resources;
 using Axis.Server.Mcp;
+using Axis.Studio;
 
 namespace Axis.Server.Tests;
 
@@ -73,6 +76,18 @@ public sealed partial class McpReferenceTopicsDocumentationTests
         {
             var (output, error) = McpReference.Read(topic);
             Assert.True(output is not null && error is null, $"Topic '{topic}' cannot be read.");
+        }
+    }
+
+    [Fact]
+    public void Every_topic_answers_at_most_one_mebibyte()
+    {
+        foreach (var topic in McpReference.Pages.Keys)
+        {
+            var (output, _) = McpReference.Read(topic);
+            var size = Encoding.UTF8.GetByteCount(JsonSerializer.SerializeToNode(output, JsonSerializerOptions.Web)!.ToJsonString());
+
+            Assert.True(size <= StudioDiffPages.PageBytes, $"Topic '{topic}' answers {size} bytes, over the 1 MiB of a page.");
         }
     }
 
