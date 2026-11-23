@@ -100,6 +100,30 @@ public sealed class MinioFixtureTests
     }
 
     [Fact]
+    public async Task A_read_whose_error_keeps_only_the_words_client_disconnected_is_tried_again()
+    {
+        byte[] bytes = [1, 2, 3];
+        var calls = 0;
+
+        var result = await MinioFixture.ReadWholeAsync(
+            _ =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    throw new AmazonS3Exception("Client disconnected before response was ready");
+                }
+
+                return Task.FromResult(new GetObjectResponse { ResponseStream = new MemoryStream(bytes) });
+            },
+            CancellationToken,
+            _noWait);
+
+        Assert.Equal(bytes, result);
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
     public async Task An_upload_whose_connection_is_dropped_once_stores_the_whole_object()
     {
         byte[] bytes = [1, 2, 3, 4, 5, 6, 7, 8];

@@ -473,6 +473,12 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
     }
 
     await expect(page.getByTestId('studio-ai-request-checks')).toContainText('Passed')
+    // The feed marks the approved plan done, and the result waits for its author's accept.
+    const feed = page.getByTestId('studio-ai-request-feed')
+    const item = (title: string) =>
+      feed.getByRole('listitem').filter({ has: page.getByText(title, { exact: true }) })
+    await expect(item('Plan').getByRole('img', { name: 'Done', exact: true })).toBeVisible()
+    await expect(item('Result').getByRole('img', { name: 'Waiting', exact: true })).toBeVisible()
     // The diff lists the module's Department once, with the field the layer added marked.
     const changed = page.getByTestId('studio-changes-file').filter({ hasText: 'Department' })
     await expect(changed).toHaveCount(1)

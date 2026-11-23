@@ -1,16 +1,18 @@
 import { Flex, Modal, Spin, Typography } from 'antd'
-import { useContext, useState } from 'react'
+import { type ReactNode, useContext, useState } from 'react'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, type AxisFoldAction } from '../platform/AxisButton'
 import { DialogFooter } from '../platform/DialogFooter'
 import { FilledText } from '../platform/FilledText'
+import { fillText } from '../platform/fillText'
 import { PersonName } from '../platform/PersonName'
-import { formatValue } from '../platform/formatValue'
+import { formatDuration, formatValue } from '../platform/formatValue'
 import { PageLayout } from '../platform/PageLayout'
 import { ReasonDialog } from '../platform/ReasonDialog'
 import { ShellBarSlot } from '../platform/shellBarSlot'
 import { StatusTag } from '../platform/StatusTag'
+import { StepsBar, type StepsBarItem } from '../platform/StepsBar'
 import { useStudioConnection } from '../platform/studioConnection'
 import {
   acceptAuthoringRequest,
@@ -33,9 +35,13 @@ import { useFollowJob } from '../platform/useFollowJob'
 import { PlatformContext } from './context'
 import {
   authoringRequestStates,
+  type FeedEntry,
   endedAuthoringRequestStates,
+  planChanges,
+  requestFeed,
   requestResult,
   requestTitle,
+  workLine,
 } from './studioAuthoringRequest'
 import { StudioAuthoringRequestResult } from './StudioAuthoringRequestResult'
 import { StudioRequestStatus } from './StudioRequestStatus'
@@ -52,6 +58,14 @@ const workingStates: ReadonlySet<AuthoringRequestState> = new Set<AuthoringReque
  * docs/reference/ai-authoring-in-studio.md#accepting.
  */
 const acceptConflict = 'AXC0377'
+
+/** The title of each item of the feed. */
+const feedTitles: Record<FeedEntry['key'], string> = {
+  plan: 'shell.studio.aiRequest.plan',
+  work: 'shell.studio.aiRequest.work',
+  result: 'shell.studio.aiRequest.result',
+  dropped: 'shell.studio.aiRequest.dropped',
+}
 
 /**
  * The words of the guide bar for a state, or `null` while the bar is not built for it yet, see
@@ -83,16 +97,18 @@ function guideWords(
 
 /**
  * One authoring request, from its name to its state. The heading shows the name, the state as a status tag and the words
- * in full, then the sender's line. Under it come the plan, then the failure alert of a failed request and the Result part
- * of a ready, failed or accepted request, then the status of the accept that the page follows, and the guide bar at the
- * foot of the window, which gives the request's author Approve plan, Change the plan… and Drop…, and Accept and Drop… on
+ * in full, then the sender's line and the alert of an action that failed. Under them comes the feed, one `StepsBar` of
+ * the Plan, Work, Result and Dropped items that the request has, each with its mark. A failed request shows its failure
+ * in the item where it stopped, and the Result item of a ready, failed or accepted request ends with the status of the
+ * accept that the page follows. The guide bar at the foot of the window gives the request's author Approve plan, Change the plan… and Drop…, and Accept and Drop… on
  * a ready request. Accept sends the accept route and follows its publish request with `fetchStudioRequest`, kept in
  * memory for this visit, and reads the request again when the accept ends. An accept that met conflicts shows a warning
  * in place of its status, which names each changed resource with who changed it and when, and the bar offers Drop… only.
  * Until the request waits for its author or ends, the page asks for it every second and keeps the last answer when a read
  * fails. A request that does not exist shows its line and, when `onAskAi` is given, an Ask AI link that opens the request
  * panel. `resources` is the application's resource list, which names the resources of a conflict. See
- * docs/reference/ai-authoring-in-studio.md#the-heading, #the-plan, #the-diff, #accepting and #the-guide.
+ * docs/reference/ai-authoring-in-studio.md#the-heading, #the-feed, #the-work-item, #the-plan, #the-diff, #accepting and
+ * #the-guide.
  */
 export function StudioAuthoringRequestPage({
   application,
@@ -189,9 +205,6 @@ export function StudioAuthoringRequestPage({
   const conflicted = conflicts.length > 0
   const words = guideWords(request.state, isAuthor, accepting, conflicted)
   const result = requestResult(request, isAuthor)
-  const showResult =
-    request.state === 'accepted' ||
-    ((request.state === 'ready' || request.state === 'failed') && result.checks !== null)
   const time = formatValue({ name: 'sentAt', type: 'date-time' }, request.sentAt, {}, { locale, text: t })
   const sender = (
     <FilledText
@@ -199,6 +212,81 @@ export function StudioAuthoringRequestPage({
       parts={{ name: <PersonName id={request.author} name={request.authorName ?? request.author} />, time }}
     />
   )
+
+  const feed = requestFeed(request)
+  const failure =
+    result.failureKey === null ? null : (
+      <AxisAlert
+        kind="error"
+        data-testid="studio-ai-request-failure"
+        message={fillText(t('shell.studio.aiRequest.failure.line'), { reason: t(result.failureKey) })}
+      />
+    )
+  const formatTime = (name: string, value: string | null) =>
+    formatValue({ name, type: 'date-time' }, value, {}, { locale, text: t })
+  /** The mark, standing and body of one item of the feed. */
+  const feedItem = ({ key, mark }: FeedEntry): StepsBarItem => {
+    if (key === 'plan') {
+      return {
+        mark,
+        standing:
+          request.approvedAt === null
+            ? undefined
+            : fillText(t('shell.studio.aiRequest.plan.approved'), {
+                time: formatTime('approvedAt', request.approvedAt),
+              }),
+        body: <PlanBody key={request.id} request={request} failure={mark === 'stopped' ? failure : null} />,
+      }
+    }
+    if (key === 'work') {
+      const line = workLine(request)
+      return {
+        mark,
+        standing:
+          request.state === 'fixing'
+            ? fillText(t('shell.studio.aiRequest.work.fixRound'), { round: request.round })
+            : undefined,
+        body: (
+          <Flex vertical gap={spacing.xs}>
+            {mark === 'stopped' && failure}
+            {line !== null && (
+              <Typography.Text>
+                {'key' in line
+                  ? t(line.key)
+                  : fillText(
+                      t(line.count === 1 ? 'shell.studio.aiRequest.work.doneOne' : 'shell.studio.aiRequest.work.done'),
+                      {
+                        count: line.count,
+                        duration: formatDuration(line.ms, locale, t),
+                      },
+                    )}
+              </Typography.Text>
+            )}
+          </Flex>
+        ),
+      }
+    }
+    if (key === 'result') {
+      return {
+        mark,
+        body: (
+          <Flex vertical gap={spacing.sm}>
+            <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />
+            {followed !== null &&
+              (conflicted ? (
+                <AcceptConflict conflicts={conflicts} resources={resources} />
+              ) : (
+                <StudioRequestStatus request={followed} releaseNumber={null} />
+              ))}
+          </Flex>
+        ),
+      }
+    }
+    return {
+      mark,
+      standing: request.finishedAt === null ? undefined : formatTime('finishedAt', request.finishedAt),
+    }
+  }
 
   /** Keeps the request that an action answered and follows it again. */
   const adopt = (answered: AuthoringRequest) => {
@@ -257,43 +345,9 @@ export function StudioAuthoringRequestPage({
         {actionError && (
           <AxisAlert data-testid="studio-ai-request-error" kind="error" message={t('shell.studio.aiRequest.failed')} />
         )}
-        {(request.state === 'planning' || request.plan !== null) && (
-          <Flex vertical gap={spacing.xs} data-testid="studio-ai-request-plan">
-            <Typography.Text strong>{t('shell.studio.aiRequest.plan')}</Typography.Text>
-            {request.state === 'planning' ? (
-              <Flex gap="small" align="center">
-                <Spin size="small" />
-                <Typography.Text>{t('shell.studio.aiRequest.plan.writing')}</Typography.Text>
-              </Flex>
-            ) : (
-              <>
-                <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                  {request.plan?.summary}
-                </Typography.Paragraph>
-                <ul style={{ margin: 0 }}>
-                  {request.plan?.changes.map((change, index) => (
-                    <li key={index}>{change}</li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </Flex>
-        )}
-        {result.failureKey !== null && (
-          <AxisAlert
-            kind="error"
-            data-testid="studio-ai-request-failure"
-            message={t('shell.studio.aiRequest.failure')}
-            description={t(result.failureKey)}
-          />
-        )}
-        {showResult && <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />}
-        {followed !== null &&
-          (conflicted ? (
-            <AcceptConflict conflicts={conflicts} resources={resources} />
-          ) : (
-            <StudioRequestStatus request={followed} releaseNumber={null} />
-          ))}
+        <div data-testid="studio-ai-request-feed">
+          <StepsBar vertical titles={feed.map((entry) => t(feedTitles[entry.key]))} items={feed.map(feedItem)} />
+        </div>
         {words !== null && (
           <ShellBarSlot>
             <ActionBar
@@ -371,6 +425,58 @@ export function StudioAuthoringRequestPage({
         </Modal>
       </PageLayout>
     </div>
+  )
+}
+
+/**
+ * The body of the Plan item, see docs/reference/ai-authoring-in-studio.md#the-plan: the failure of a request that stopped
+ * here, the comments that asked for another plan, oldest first, then what AI is doing while it writes the plan, or the
+ * plan's summary with Show the plan or Hide the plan after it. The rest of the plan is open while the plan waits for its
+ * author and folded in any other state, until the reader folds it.
+ */
+function PlanBody({ request, failure }: { request: AuthoringRequest; failure: ReactNode }) {
+  const t = useText()
+  const { spacing } = useDesignTokens()
+  const [toggled, setToggled] = useState<boolean>()
+  const open = toggled ?? request.state === 'awaitingApproval'
+  const summary = request.plan?.summary ?? ''
+  const changes = request.plan?.changes ?? []
+  return (
+    <Flex vertical gap={spacing.md} data-testid="studio-ai-request-plan">
+      {failure}
+      {planChanges(request).length > 0 && (
+        <Flex vertical gap={spacing.xs}>
+          {planChanges(request).map((comment, index) => (
+            <Typography.Text key={index} style={{ whiteSpace: 'pre-wrap' }}>
+              {fillText(t('shell.studio.aiRequest.plan.asked'), { comment })}
+            </Typography.Text>
+          ))}
+        </Flex>
+      )}
+      {request.state === 'planning' ? (
+        <Typography.Text>{t('shell.studio.aiRequest.plan.writing')}</Typography.Text>
+      ) : (
+        request.plan !== null && (
+          <>
+            <Flex wrap gap="small" align="center">
+              <Typography.Text style={{ whiteSpace: 'pre-wrap' }}>{summary}</Typography.Text>
+              {changes.length > 0 && (
+                <AxisButton role="secondary" aria-expanded={open} onClick={() => setToggled(!open)}>
+                  {t(open ? 'shell.studio.aiRequest.plan.hide' : 'shell.studio.aiRequest.plan.show')}
+                </AxisButton>
+              )}
+            </Flex>
+            {open && changes.length > 0 && (
+              <ul style={{ margin: 0 }}>
+                {changes.map((change, index) => (
+                  <li key={index}>{change}</li>
+                ))}
+              </ul>
+            )}
+          </>
+        )
+      )}
+    </Flex>
   )
 }
 
