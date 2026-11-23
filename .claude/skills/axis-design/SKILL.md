@@ -10,7 +10,7 @@ The rules are in [Design changes](../../../docs/delivery.md#design-changes) and
 
 - **The artifact's link** is in Design changes.
 - **The artifact's file layout and how to publish** are in the Design System
-  type's own instructions in Claude. Follow them.
+  type's instructions in Claude. Follow them.
 - **Token names and the widget list** are in the
   [frontend reference](../../../docs/reference/frontend.md) under "Design
   tokens and previews". The preview names are in
@@ -32,20 +32,23 @@ another.
    [how issues run](../../../docs/delivery.md#how-issues-run) says. Its title names
    one subject. Its body states the scope and build notes, and says NexKit writes the docs change
    from the rule comments. Set the body with
-   `gh issue edit <n> --body-file <file>`. Before the branch is made, list the
-   `_(planned…)_` markers and earlier `design-review/*` tags of the subject's pages and widgets; an unbuilt
-   earlier agreed design stops the review.
+   `gh issue edit <n> --body-file <file>`, and if it has a plan, comment the change, as
+   [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue) says. Before the branch
+   is made, list the `_(planned…)_` markers and earlier `design-review/*` tags of the subject's
+   pages and widgets. If an earlier agreed design of them is not built, say so and stop.
 2. Check the issue's scope against the one-subject rule in
    [Design changes](../../../docs/delivery.md#design-changes). If it holds more than one subject,
    propose the split to the owner. When the owner agrees, open each other subject with
    `gh issue create ... --label design,on-hold` and no milestone, and mark it *blocked by* this issue
-   only when it builds on what this one agrees. Then edit this issue's title and body to its own
-   subject with `gh issue edit`.
+   only when it builds on what this one agrees, as
+   [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) step 4 says. Then edit this issue's
+   title and body to its own subject with `gh issue edit`, and comment it if it has a plan, as step
+   1 says.
 3. Put the prototype branch on the current `origin/main`, named as
    [writing on GitHub](../../../docs/delivery.md#writing-on-github) says. Work
    only on that branch. It gets no pull request, no CI and no `/nexkit review`,
    as Design changes says.
-   - If the branch exists, as when a review goes on in a new session: run
+   - If the branch exists, as in a resumed review: run
      `git fetch origin`, `git switch design/<yyyy-mm-dd>-<topic>`, then follow
      [merging-main.md](merging-main.md).
    - Otherwise: run `git fetch origin`,
@@ -55,18 +58,15 @@ another.
    names the branch, the `main` commit it stands on, each agreed step with a link
    to its rule comment, what waits for the owner, what comes next and the parts
    list of the step in hand. It holds the present only. Its id is the
-   `#issuecomment-<id>` at the end of the URL. Edit it from then on:
+   `#issuecomment-<id>` at the URL's end. Edit it from then on:
    `gh api --method PATCH repos/{owner}/{repo}/issues/comments/<id> -F body=@<file>`.
 
 ### Each change
 
-Take one change at a time. Start the next only after the owner has seen this
-one. What the build must do beyond the docs goes in the design
-issue's body, with `gh issue edit`. A change outside the subject goes where the owner
-chooses, as step 2 says. A new design issue is held, and blocked by this one only when it
-builds on what this one agrees: `gh issue create ... --label design,on-hold`, with the
-blocked-by mark as [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) step 4 says.
-The step goes on without it.
+Take one change at a time. Start the next only after the owner has seen it.
+What the build must do beyond the docs goes in the design issue's body, with
+`gh issue edit`, and is commented if the issue has a plan. A change outside the subject goes
+where the owner chooses, as Start step 2 says. The step goes on without it.
 
 1. Follow [merging-main.md](merging-main.md), so the prototype stands on the
    current `main`.
@@ -100,8 +100,7 @@ The step goes on without it.
    in Start step 4. When the owner agrees, have an agent audit this step's diff,
    `git diff <step's first commit>^..HEAD -- web/src`, for one concern done by two
    mechanisms. Merge what it finds, then commit and push before the next step.
-   Then edit the state comment in place: link this step's rule comment and hold
-   the present only.
+   Then edit the state comment in place to link this step's rule comment.
 
 ### End
 

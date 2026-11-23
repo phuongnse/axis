@@ -325,10 +325,17 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   for closes an issue of its own, with the `hand-made` label, and the follow-ups are *blocked by* that
   issue. A follow-up and a part of a split take their milestone by the same test, as
   [how issues run](#how-issues-run) says.
+- **An edit of a planned issue is commented.** NexKit plans an issue again only on a collaborator's
+  comment after its latest plan, never on an edit of its body or title. So whoever edits the body or
+  the title of an issue that has a plan comments the change on the issue in the same step, one line
+  for each change. With autopilot, that comment makes NexKit plan the issue again. Without autopilot,
+  the comment is `/nexkit plan`. Once `/nexkit go` has started, the change goes on the pull request as
+  `/nexkit fix <change>`, or into a follow-up, as the next rule says.
 - **An issue with an open pull request keeps its criteria.** NexKit's review checks the pull request
   against the issue as it reads at each round, so a criterion added after the plan leaves the pull
   request short on every round. New scope that comes up while the work runs is a follow-up, *blocked
-  by* the issue, as above. When the work in flight is wrong, comment `/nexkit plan` to plan the issue
+  by* the issue, as above. A correction that stays within the plan goes on the pull request as
+  `/nexkit fix <change>`. When the work in flight is wrong, comment `/nexkit plan` to plan the issue
   again, as NexKit's [rules for changing a plan][nexkit-how] say. Fixing a word that misleads is not
   new scope.
 
