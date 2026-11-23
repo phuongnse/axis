@@ -51,6 +51,14 @@ export function requestName(text: string): string {
   return sentence.length > maxNameLength ? `${sentence.slice(0, maxNameLength).trimEnd()}…` : sentence
 }
 
+/**
+ * What a request is called on the screens: the title AI gave it with its plan, or the first sentence of its words until then,
+ * see docs/reference/ai-authoring-in-studio.md#the-heading.
+ */
+export function requestTitle(request: Pick<AuthoringRequest, 'title' | 'text'>): string {
+  return request.title ?? requestName(request.text)
+}
+
 /** The Checks line of a request: its verdict, and the text key of its summary with the values that fill the key. */
 export interface ChecksResult {
   passed: boolean
@@ -279,19 +287,6 @@ export function planChanges(request: AuthoringRequest): string[] {
   return (request.steps ?? []).flatMap((step) =>
     step.kind === 'planChange' && step.summary !== null && step.summary !== '' ? [step.summary] : [],
   )
-}
-
-/**
- * The summary of a plan that is still plain text, its first paragraph, and the rest after the first blank line. This holds
- * until the plan has its own shape, see docs/reference/ai-authoring-in-studio.md#the-plan.
- */
-export function planSummary(plan: string): { summary: string; rest: string } {
-  const text = plan.trim()
-  const blank = /\r?\n[ \t]*\r?\n/.exec(text)
-  if (blank === null) {
-    return { summary: text, rest: '' }
-  }
-  return { summary: text.slice(0, blank.index).trimEnd(), rest: text.slice(blank.index + blank[0].length).trim() }
 }
 
 /**

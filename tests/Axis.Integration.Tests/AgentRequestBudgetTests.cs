@@ -151,7 +151,7 @@ public sealed class AgentRequestBudgetTests(KeycloakFixture keycloak, PostgreSql
 
     // The request is approved without the step before it, as the approval leaves it. The approval's time is an SQL expression.
     private async Task ApprovedAsync(Guid id, string approvedAt) =>
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = 'A plan.', approved_at = {approvedAt} WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = '{PlanJson}', approved_at = {approvedAt} WHERE id = '{id}' RETURNING 1");
 
     private async Task<string> ScalarAsync(string sql) =>
         Convert.ToString(await PostgreSqlServer.AdminScalarAsync(_realm.SchemaConnection, sql, CancellationToken), System.Globalization.CultureInfo.InvariantCulture) ?? "";

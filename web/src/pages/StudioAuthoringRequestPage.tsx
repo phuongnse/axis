@@ -43,11 +43,10 @@ import {
   type HistoryRow,
   endedAuthoringRequestStates,
   planChanges,
-  planSummary,
   requestFeed,
   requestHistory,
-  requestName,
   requestResult,
+  requestTitle,
   workLine,
 } from './studioAuthoringRequest'
 import { StudioAuthoringRequestResult } from './StudioAuthoringRequestResult'
@@ -335,7 +334,7 @@ export function StudioAuthoringRequestPage({
   return (
     <div data-testid="studio-ai-request">
       <PageLayout
-        title={requestName(request.text)}
+        title={requestTitle(request)}
         tags={
           <StatusTag tone={state.tone} data-testid="studio-ai-request-state">
             {t(state.word)}
@@ -557,7 +556,8 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
   const { spacing } = useDesignTokens()
   const [toggled, setToggled] = useState<boolean>()
   const open = toggled ?? request.state === 'awaitingApproval'
-  const { summary, rest } = planSummary(request.plan ?? '')
+  const summary = request.plan?.summary ?? ''
+  const changes = request.plan?.changes ?? []
   return (
     <Flex vertical gap={spacing.md} data-testid="studio-ai-request-plan">
       {failure}
@@ -577,14 +577,18 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
           <>
             <Flex wrap gap="small" align="center">
               <Typography.Text style={{ whiteSpace: 'pre-wrap' }}>{summary}</Typography.Text>
-              {rest !== '' && (
+              {changes.length > 0 && (
                 <AxisButton role="secondary" aria-expanded={open} onClick={() => setToggled(!open)}>
                   {t(open ? 'shell.studio.aiRequest.plan.hide' : 'shell.studio.aiRequest.plan.show')}
                 </AxisButton>
               )}
             </Flex>
-            {open && rest !== '' && (
-              <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{rest}</Typography.Paragraph>
+            {open && changes.length > 0 && (
+              <ul style={{ margin: 0 }}>
+                {changes.map((change, index) => (
+                  <li key={index}>{change}</li>
+                ))}
+              </ul>
             )}
           </>
         )

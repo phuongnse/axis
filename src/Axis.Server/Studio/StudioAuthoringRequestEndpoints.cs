@@ -66,7 +66,7 @@ internal static class StudioAuthoringRequestEndpoints
     private const string NoChanges = "The request has no draft and no accept.";
 
     private const string Columns =
-        "id, author, text, state, plan, round, tokens, auto_accept, sent_at, approved_at, finished_at";
+        "id, author, text, title, state, plan::text, round, tokens, auto_accept, sent_at, approved_at, finished_at";
 
     private enum Action
     {
@@ -756,14 +756,15 @@ internal static class StudioAuthoringRequestEndpoints
         reader.GetGuid(0),
         reader.GetString(1),
         reader.GetString(2),
-        reader.GetString(3),
-        reader.IsDBNull(4) ? null : reader.GetString(4),
-        reader.GetInt32(5),
-        reader.GetInt64(6),
-        reader.GetBoolean(7),
-        reader.GetFieldValue<DateTimeOffset>(8),
-        reader.IsDBNull(9) ? null : reader.GetFieldValue<DateTimeOffset>(9),
-        reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10));
+        reader.IsDBNull(3) ? null : reader.GetString(3),
+        reader.GetString(4),
+        reader.IsDBNull(5) ? null : reader.GetString(5),
+        reader.GetInt32(6),
+        reader.GetInt64(7),
+        reader.GetBoolean(8),
+        reader.GetFieldValue<DateTimeOffset>(9),
+        reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10),
+        reader.IsDBNull(11) ? null : reader.GetFieldValue<DateTimeOffset>(11));
 
     private static bool HasJsonBody(HttpRequest request) =>
         MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
@@ -837,6 +838,7 @@ internal static class StudioAuthoringRequestEndpoints
         Guid Id,
         string Author,
         string Text,
+        string? Title,
         string State,
         string? Plan,
         int Round,
@@ -847,13 +849,14 @@ internal static class StudioAuthoringRequestEndpoints
         DateTimeOffset? FinishedAt)
     {
         public AuthoringRequestResponse ToResponse(string application, string? authorName) => new(
-            Id.ToString("D"), application, Author, authorName, Text, State, Plan, Round, Tokens, AutoAccept, SentAt, ApprovedAt, FinishedAt, null);
+            Id.ToString("D"), application, Author, authorName, Text, Title, State, Plan is null ? null : JsonDocument.Parse(Plan).RootElement.Clone(), Round, Tokens, AutoAccept, SentAt, ApprovedAt, FinishedAt, null);
     }
 }
 
 /// <summary>
 /// An authoring request as the authoring API shows it. <c>Application</c> is the application name of the route.
-/// <c>AuthorName</c> is the name in the author's profile, else the session's name, else null. <c>Steps</c>
+/// <c>AuthorName</c> is the name in the author's profile, else the session's name, else null. <c>Title</c> is the title AI gave the request with its
+/// plan, null before it, and <c>Plan</c> is the plan's object of <c>docs/reference/authoring-requests.md#states</c>, null before it. <c>Steps</c>
 /// is null except on the read route, where it holds the steps in order.
 /// </summary>
 internal sealed record AuthoringRequestResponse(
@@ -862,8 +865,9 @@ internal sealed record AuthoringRequestResponse(
     string Author,
     string? AuthorName,
     string Text,
+    string? Title,
     string State,
-    string? Plan,
+    JsonElement? Plan,
     int Round,
     long Tokens,
     bool AutoAccept,

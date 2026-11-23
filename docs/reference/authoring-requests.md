@@ -131,8 +131,9 @@ an accept, which [accepting](#accepting) describes.
   plan or a request for changes takes `{ comment }` of 1 to 2,000 characters. The other routes take no body.
 - **Answer.** Accept answers `202` with the queued publish request, in the shape of
   `GET /api/studio/apps/{application}/requests/{id}`, and a `Location` for that route. The other
-  routes answer a request, which has its `id`, `application`, `author`, `authorName`, `text`, `state`, `plan`,
-  `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt` and `finishedAt`. The read route adds `steps`,
+  routes answer a request, which has its `id`, `application`, `author`, `authorName`, `text`, `title`, `state`, `plan`,
+  `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt` and `finishedAt`. `title` is at most 80 characters and from the plan, and `plan` is
+  [the plan's shape](#states), an object. Both are null until AI has proposed a plan. The read route adds `steps`,
   each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt`, `finishedAt` and `checks`, which is
   the results of a `check` step or the review of a `review` step, and null on any other step.
 - **Paging the list** _(planned for M35)_. The list route takes the record API's `page`, `pageSize`, `sort`, `search`
@@ -175,12 +176,11 @@ an accept, which [accepting](#accepting) describes.
 - **Draft preview** _(planned for M35)_. The route follows the rules of [preview](authoring-publishing.md#preview) and takes its
   snapshot from the draft's tip. It answers `404` for a draft that is not the person's, and `409` when the tenant
   has no preview tenant.
-- **New answer fields** _(planned for M35)_. A request answers `title` (at most 80 characters, from the plan, null
-  before it), `app` as `{ client, name }` (`studio` with a null name for a request sent in Studio), `coAuthors`
-  (the apps that wrote to the draft, in the shape of `app`, in order of first write), `aiConnected` (the AI status
-  rule, for the request's author, so the page can say that no review will run), `draft` (the draft's id, or null)
-  and `plan` as [the plan's shape](#states). Each step answers `resource`, `{ kind, id, name }` on a `write` step
-  and null on the others.
+- **New answer fields** _(planned for M35)_. A request answers `app` as `{ client, name }` (`studio` with a null name
+  for a request sent in Studio), `coAuthors` (the apps that wrote to the draft, in the shape of `app`, in order of first
+  write), `aiConnected` (the AI status rule, for the request's author, so the page can say that no review will run) and
+  `draft` (the draft's id, or null). Each step answers `resource`, `{ kind, id, name }` on a `write` step and null on the
+  others.
 - **Approving an outside app's request** _(planned for M35)_. The approve route also gets the agent host's
   [token](#acting-for-the-author), as a send does and with the same refusals, so the agent host can run the checks
   and the review for the author. The agent host runs no plan or change step of such a request.
@@ -192,7 +192,7 @@ the checks, an independent review and fix rounds.
 
 | State              | What happens                                                                                                                                      | Next                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `planning`         | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add           | `awaitingApproval`                                          |
+| `planning`         | The agent reads the application through the tools and proposes a plan in [the plan's shape](#states): what it will change and which scenarios it will add | `awaitingApproval`                                          |
 | `awaitingApproval` | The author reads the plan and approves it, or asks for another plan with a comment                                                                | `working`, or `planning` again                              |
 | `working`          | The agent creates the draft and makes the change through the tools                                                                                | `checking`                                                  |
 | `checking`         | The compiler, the tests of each package the draft changed, the application's scenarios and the contract scenarios of its modules run on the draft | `reviewing`, or `fixing` on a failure                       |
@@ -208,9 +208,11 @@ the checks, an independent review and fix rounds.
   application keeps the module's upgrades and its contract. It adds scenarios for what it adds.
 - **Planning reads only.** The model is offered `read_reference`, `list_resources`, `read_resource`,
   `read_module_resource`, `read_names`, `list_package_files` and `read_package_file`, and only for the request's application. Any other call gets a
-  tool error from the agent host and never reaches the MCP server. The plan is the text of the model's
-  last answer, which ends its turn: an answer that stops at the output limit, or has no text, is no plan.
-  The plan goes into the request's `plan` and the request moves to `awaitingApproval`.
+  tool error from the agent host and never reaches the MCP server. The model is also offered `propose_plan`, which the agent
+  host answers itself with the input of [the tool](mcp-server.md#tools), so the call never reaches the MCP server. A valid call stores
+  the plan in the request's `plan` and its title in `title`, ends the step and moves the request to `awaitingApproval`. An invalid call
+  gets a tool error that says what is wrong, and the model may call again. A turn that ends, or is cut off at the output limit,
+  without a valid call has no plan.
 - **Working writes only its draft.** The step makes the draft with `create_draft` and keeps its id in
   `draft_id` before the first model call, and a step that runs again uses the same draft. The model is offered
   the seven read tools of planning plus `write_resource`, `delete_resource`, `write_layer`, `check_expression`,
@@ -288,23 +290,28 @@ the checks, an independent review and fix rounds.
   changes, see [routes](#routes). The next working step works in the same draft and sees every
   `changeRequest` comment, oldest first.
 - **Requesting changes and the review** _(planned for M35)_. The next working step also sees the open findings of the review.
-- **The plan's shape** _(planned for M35)_. The plan is an object, and `title` is stored beside it:
+- **The plan's shape**. The plan is an object, and `title` is stored beside it:
 
   ```
   { summary, questions: [{ question, options, recommended }], changes: [text], decisions: [{ decision, reason }],
     risks: [text], checks: [text], checklist: [{ item, how }], details: [text] }
   ```
 
-  `summary` and `changes` are required. `checklist` has one entry for each item of Axis's checklist. The whole plan
-  is at most 64 KiB. The planning step ends by calling `propose_plan` for its own request, see
+  `summary` and `changes` are required, and `changes` has at least one text. `title` is not blank and at most 80
+  characters. A question's `recommended` is the number of one of its `options` counting from 1, or 0 for none. A property that
+  the shape does not name is refused. `checklist` has one entry for each item of Axis's checklist, in its order and with the
+  item word for word. A group that the call leaves out is stored as `[]`, so a stored plan has all eight groups.
+  The whole plan is at most 64 KiB. The planning step ends by calling `propose_plan` for its own request, see
   [tools](mcp-server.md#tools). A turn that ends without a valid call has no plan (`noPlan`). The author answers
-  `questions` through a change of plan. The page offers no approval while the plan has questions.
+  `questions` through a change of plan.
+- **No approval while the plan has questions** _(planned for M35)_. The page offers no approval while the plan has questions.
 
-- **Axis's checklist** _(planned for M35)_. The plan answers it and the review checks it:
+- **Axis's checklist**. The plan answers it, and the planning step asks for these four items:
   1. The draft does what the request and the approved plan say, and nothing more.
   2. A change that a built-in module covers uses it, with a customization layer.
   3. Each behaviour that the draft adds or changes has a scenario.
   4. Every text the draft adds has each locale the application offers.
+- **The review checks the checklist** _(planned for M35)_. The review checks the draft against each item of Axis's checklist.
 - **The review's shape** _(planned for M35)_. The review model's last answer is
   `{ outcome, summary, findings: [{ severity, text, file, path }], criteria: [{ check, outcome, note }], checklist: [{ item, outcome, note }], open }`,
   and the review step stores it as `checks.review`. `summary` is a sentence or two. `severity` is `blocking` or
@@ -366,7 +373,7 @@ Any step may also end `interrupted`, `tokenEnded`, `overBudget`, `timedOut`, `ke
 
 Each request has limits on its rounds, tokens and time, so the cost of one request is bounded.
 
-- **Planning calls.** At most 25 model calls in one planning step. A step that has no plan by then stops
+- **Planning calls.** At most 25 model calls in one planning step. A step that has no valid `propose_plan` call by then stops
   the request as `failed` with the outcome `noPlan`, and so does a request whose application the author
   can no longer list.
 - **Working calls.** At most 50 model calls in one working or fix step. A step whose model has not ended its turn

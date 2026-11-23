@@ -2060,15 +2060,34 @@ export interface AuthoringRequestStep {
   checks: AuthoringRequestChecks | AuthoringRequestReviewChecks | null
 }
 
-/** An authoring request as the read route answers it. `steps` is set only by the read route, and the other routes leave it out. */
+/**
+ * A plan as the routes answer it, see docs/reference/authoring-requests.md#states. Every group is there, empty when AI left it out.
+ * A question's `recommended` is the number of an option counting from 1, or 0 for none.
+ */
+export interface AuthoringPlan {
+  summary: string
+  questions: { question: string; options: string[]; recommended: number }[]
+  changes: string[]
+  decisions: { decision: string; reason: string }[]
+  risks: string[]
+  checks: string[]
+  checklist: { item: string; how: string }[]
+  details: string[]
+}
+
+/**
+ * An authoring request as the read route answers it. `title` is the title AI gave it with its plan, and `plan` is the plan, both null
+ * until AI has proposed a plan. `steps` is set only by the read route, and the other routes leave it out.
+ */
 export interface AuthoringRequest {
   id: string
   application: string
   author: string
   authorName: string | null
   text: string
+  title: string | null
   state: AuthoringRequestState
-  plan: string | null
+  plan: AuthoringPlan | null
   round: number
   tokens: number
   autoAccept: boolean

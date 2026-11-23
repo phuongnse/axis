@@ -6,7 +6,16 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { judgeCase, passBar, writeReport } from './lib/ai-eval.mjs'
 import { casesFolder, parseArguments, readCases } from './lib/ai-eval-run.mjs'
-import { agentEnvironment, agentHostSettings, applicationName, startingTemplate, tenantHost, tunnelTarget } from './lib/ai-eval-stack.mjs'
+import {
+  agentEnvironment,
+  agentHostSettings,
+  applicationName,
+  planAnswer,
+  planChecklist,
+  startingTemplate,
+  tenantHost,
+  tunnelTarget,
+} from './lib/ai-eval-stack.mjs'
 
 const refusalCase = {
   name: 'approver-is-requester',
@@ -295,6 +304,21 @@ describe('the settings of the eval stack', () => {
     assert.ok(settings.SSL_CERT_DIR.startsWith('/tmp/trust:'), settings.SSL_CERT_DIR)
     assert.equal(settings.Ai__DefaultBinding, 'scripted')
     assert.equal(settings.Ai__ScriptedAnswersFile, '/tmp/answers.json')
+  })
+})
+
+describe('the scripted plan answer', () => {
+  test('is one propose_plan call with the summary, one change and Axis\'s checklist', () => {
+    const answer = planAnswer('ApprovalsEvalSmoke', 'Change nothing.', { input_tokens: 1, output_tokens: 1 })
+
+    assert.equal(answer.stop_reason, 'tool_use')
+    const [call] = answer.content
+    assert.equal(call.name, 'propose_plan')
+    assert.equal(call.input.application, 'ApprovalsEvalSmoke')
+    assert.equal(call.input.plan.summary, 'Change nothing.')
+    assert.deepEqual(call.input.plan.changes, ['Change: Change nothing.'])
+    assert.deepEqual(call.input.plan.checklist.map(({ item }) => item), planChecklist)
+    assert.equal(planChecklist.length, 4)
   })
 })
 

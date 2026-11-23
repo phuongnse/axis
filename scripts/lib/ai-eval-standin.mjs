@@ -2,8 +2,8 @@
 // scripts/ai-eval-run.test.mjs and scripts/ai-eval-refusal.test.mjs both run scripts/ai-eval.sh --binding standin against it,
 // so no paid model is called. Each run starts the eval stack, so the two tests run one at a time.
 //
-// The stand-in plays a model that changes nothing. It answers each step of the agent host by the step's system text: a plan for
-// the planning step, no tool call for the working step and PASSED for the review. A draft with no change is accepted, so every
+// The stand-in plays a model that changes nothing. It answers each step of the agent host by the step's system text: a plan, as a
+// `propose_plan` call, for the planning step, no tool call for the working step and PASSED for the review. A draft with no change is accepted, so every
 // case ends with an accepted draft. In the relaxing run the stand-in also writes a `relax` entry for the point of the refusal case
 // `requester-approves-own-small-request`, because a fixed answers file cannot: each new application has a fresh manifest id.
 import assert from 'node:assert/strict'
@@ -13,6 +13,7 @@ import http from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { readCases } from './ai-eval-run.mjs'
+import { planAnswer } from './ai-eval-stack.mjs'
 
 const root = path.resolve(import.meta.dirname, '..', '..')
 const usage = { input_tokens: 10, output_tokens: 5 }
@@ -39,7 +40,7 @@ function standIn({ relax }) {
   }
 
   const answer = ({ system, messages }) => {
-    if (system.startsWith('You plan')) return say('Change nothing.')
+    if (system.startsWith('You plan')) return planAnswer(/'([^']+)'/.exec(system)[1], 'Change nothing.', usage)
     if (system.startsWith('You review')) return say('PASSED')
     if (!system.startsWith('You make')) throw new Error(`An unknown step: ${system.slice(0, 40)}`)
 

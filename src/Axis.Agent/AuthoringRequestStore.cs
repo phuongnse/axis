@@ -8,7 +8,7 @@ using NpgsqlTypes;
 namespace Axis.Agent;
 
 /// <summary>
-/// A request whose state needs work, as the agent host lists it: the application it is about, its text, its current plan and binding, the
+/// A request whose state needs work, as the agent host lists it: the application it is about, its text, its current plan as JSON and its binding, the
 /// comments of every change of plan, oldest first, the draft the request works in, once the working step has made it, the <c>checks</c> of its newest
 /// <c>check</c> step as JSON, once a check has stored them, the tokens its steps have used, when the time limit starts, its <c>round</c>, the
 /// findings of its newest <c>review</c> step after that check, if the review had any, and the comments of every <c>changeRequest</c> step, oldest first.
@@ -49,7 +49,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
     // The columns of a listed or claimed request, in the order of ReadRequest. The findings are those of the newest review step after the newest check step.
     private const string RequestColumns =
         """
-        a.id, a.state, a.sent_at, a.application_id, a.text, a.plan, a.binding,
+        a.id, a.state, a.sent_at, a.application_id, a.text, a.plan::text, a.binding,
         ARRAY(SELECT s.input_summary FROM axis.authoring_request_steps s
               WHERE s.request_id = a.id AND s.kind = 'planChange' AND s.input_summary IS NOT NULL ORDER BY s.ordinal),
         a.draft_id,
@@ -299,7 +299,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
 
     /// <summary>
     /// Commits a finished step with the request's next state in one transaction. The commit frees the request, so a later claim runs the
-    /// next step. A move to <c>fixing</c> adds 1 to the request's <c>round</c>. A next state that ends the request, <c>accepted</c>, <c>dropped</c> or <c>failed</c>, also erases its refresh token.
+    /// next step. A <paramref name="plan"/> is JSON, and a <see langword="null"/> plan or title leaves the request's as it is. A move to <c>fixing</c> adds 1 to the request's <c>round</c>. A next state that ends the request, <c>accepted</c>, <c>dropped</c> or <c>failed</c>, also erases its refresh token.
     /// With <paramref name="dropDraft"/> it clears the request's <c>draft_id</c> in the same commit. It answers <c>false</c> and writes nothing when the host no longer holds the claim,
     /// and also when the request is <c>accepted</c> and the next state is not: no step moves an accepted request.
     /// </summary>
@@ -312,6 +312,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         string? outcome,
         string? inputSummary,
         string? plan,
+        string? title,
         string? messages,
         string? checks,
         bool dropDraft = false,
@@ -325,6 +326,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             SET state = @next,
                 draft_id = CASE WHEN @dropDraft THEN NULL ELSE draft_id END,
                 plan = coalesce(@plan, plan),
+                title = coalesce(@title, title),
                 round = CASE WHEN @next = 'fixing' THEN round + 1 ELSE round END,
                 finished_at = CASE WHEN @next = 'failed' THEN now() ELSE finished_at END,
                 refresh_token = CASE WHEN @next IN ('accepted', 'dropped', 'failed') THEN NULL ELSE refresh_token END,
@@ -337,7 +339,8 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         {
             command.Parameters.AddWithValue("next", nextState);
             command.Parameters.AddWithValue("dropDraft", dropDraft);
-            command.Parameters.Add(new NpgsqlParameter("plan", NpgsqlDbType.Text) { Value = (object?)plan ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("plan", NpgsqlDbType.Jsonb) { Value = (object?)plan ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("title", NpgsqlDbType.Text) { Value = (object?)title ?? DBNull.Value });
             command.Parameters.AddWithValue("id", requestId);
             command.Parameters.AddWithValue("me", claimedBy);
             if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)

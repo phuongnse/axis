@@ -67,7 +67,7 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
 ### The heading
 
 - The heading is the request's name: the first sentence of its words, cut at 80 characters with an ellipsis.
-- **AI's name** _(planned for M35)_. Once AI names the request, the heading shows AI's name in place of the
+- **AI's name**. Once AI names the request, the heading shows AI's name in place of the
   first sentence, as [the request's answer](authoring-requests.md#routes) gives it.
 - The state sits beside the name as a [status tag](shared-widgets.md#which-widget), with its word from
   [the states](#the-states).
@@ -235,11 +235,12 @@ The Plan item shows the plan in each of its states.
 - While AI writes the plan, the mark turns, and the item reads "AI is reading the application and writing a plan. Nothing changes
   until the plan is approved."
 - While the plan waits for its author, nothing sits beside its title, and the plan is open.
+- The open plan shows its summary, then its changes, one bullet each, under **Show the plan** or **Hide the plan**. Its
+  other groups wait for [the plan's groups](#the-plans-groups).
 - **Once the plan is approved.** The item reads "Approved on <time>", and the plan is folded
   under its summary.
 - **The summary.** The summary is under the title in every state once AI has written the
-  plan. **Show the plan** or **Hide the plan** follows it on the same line. Until the plan has its own shape, its
-  summary is its first paragraph, and Show the plan shows only when more text follows that paragraph.
+  plan. **Show the plan** or **Hide the plan** follows it on the same line, and shows only when the plan has changes.
 - **Earlier comments.** The author's comments that asked for another plan come first, oldest
   first, as "Asked for another plan: “…”", in the text colour.
 - **A failure before approval.** A request that failed before its plan was approved stops
@@ -471,7 +472,7 @@ changed what and can undo it.
 - **Publishing.** The publish page lists every file that differs from the live release, under "`<n>` files
   changed since the live release". Each file shows "Changed by" and each person who changed it since the release,
   in the order of their first change. An AI request is "the AI request “`<name>`”", a
-  link to its page. A change the server recorded reads System, as it does in History. An AI request that cannot
+  link to its page, with the request's name as [the heading](#the-heading) gives it. A change the server recorded reads System, as it does in History. An AI request that cannot
   be read names the person who accepted it instead. A file that no revision changed since the release has no
   Changed by line. The list comes from the [live diff](authoring-revisions.md#live-diff). The page is described
   in [publishing](studio.md#publishing).

@@ -46,7 +46,7 @@ public sealed class AgentAcceptingTests(KeycloakFixture keycloak, PostgreSqlFixt
         var (id, first) = await SeedReadyAsync(client, ReadAndWrite());
         // The draft read the supplier, so a change to its file on main is a conflict when the publisher accepts it.
         File.AppendAllText(Path.Combine(_folder, SupplierFile), "\n");
-        var script = new ScriptedModelAdapter([.. ReadAndWrite(), Plan("PASSED\nThe draft does the request.")]);
+        var script = new ScriptedModelAdapter([.. ReadAndWrite(), Answer("PASSED\nThe draft does the request.")]);
         await using var publisher = RunPublisher();
         await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
         await host.StartAsync(CancellationToken);
@@ -186,7 +186,7 @@ public sealed class AgentAcceptingTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
         using var body = await StudioPublishTests.ReadAsync(sent);
         var id = Guid.Parse(body.RootElement.GetProperty("id").GetString()!);
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'awaitingApproval', plan = 'A plan.' WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'awaitingApproval', plan = '{PlanJson}' WHERE id = '{id}' RETURNING 1");
         await AllowAutoAcceptAsync(id);
         await using var host = BuildAgent(_realm, new ScriptedModelAdapter([]), new RecordingHandler(_realm.Factory.Server.CreateHandler()));
         var store = StoreOf(host);
@@ -239,7 +239,7 @@ public sealed class AgentAcceptingTests(KeycloakFixture keycloak, PostgreSqlFixt
 
     private static AuthoringRequestStore StoreOf(WebApplication host) => host.Services.GetRequiredService<AuthoringRequestStore>();
 
-    private static ModelAnswer EndTurn() => Plan("Done.", 1, 1);
+    private static ModelAnswer EndTurn() => Answer("Done.", 1, 1);
 
     // The working step reads the supplier in its draft, which the draft records, and adds a scenario.
     private static ModelAnswer[] ReadAndWrite() =>
@@ -257,7 +257,7 @@ public sealed class AgentAcceptingTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
         using var body = await StudioPublishTests.ReadAsync(sent);
         var id = Guid.Parse(body.RootElement.GetProperty("id").GetString()!);
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = 'A plan.' WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = '{PlanJson}' WHERE id = '{id}' RETURNING 1");
         await using (var host = BuildAgent(_realm, new ScriptedModelAdapter(work), new RecordingHandler(_realm.Factory.Server.CreateHandler()), without: ["CheckingStep"]))
         {
             await host.StartAsync(CancellationToken);
