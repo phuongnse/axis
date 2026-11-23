@@ -2060,15 +2060,34 @@ export interface AuthoringRequestStep {
   checks: AuthoringRequestChecks | AuthoringRequestReviewChecks | null
 }
 
-/** An authoring request as the read route answers it. `steps` is set only by the read route, and the other routes leave it out. */
+/**
+ * A plan as the routes answer it, see docs/reference/authoring-requests.md#states. Every group is there, empty when AI left it out.
+ * A question's `recommended` is the number of an option counting from 1, or 0 for none.
+ */
+export interface AuthoringPlan {
+  summary: string
+  questions: { question: string; options: string[]; recommended: number }[]
+  changes: string[]
+  decisions: { decision: string; reason: string }[]
+  risks: string[]
+  checks: string[]
+  checklist: { item: string; how: string }[]
+  details: string[]
+}
+
+/**
+ * An authoring request as the read route answers it. `title` is the title AI gave it with its plan, and `plan` is the plan, both null
+ * until AI has proposed a plan. `steps` is set only by the read route, and the other routes leave it out.
+ */
 export interface AuthoringRequest {
   id: string
   application: string
   author: string
   authorName: string | null
   text: string
+  title: string | null
   state: AuthoringRequestState
-  plan: string | null
+  plan: AuthoringPlan | null
   round: number
   tokens: number
   autoAccept: boolean
@@ -2162,13 +2181,13 @@ export async function fetchAuthoringRequestDiff(
 }
 
 /**
- * Posts an action on one authoring request, `approve`, `change-plan`, `request-changes` or `drop`, and answers the request. A 401 shows the
+ * Posts an action on one authoring request, `approve`, `change-plan`, `request-changes`, `retry` or `drop`, and answers the request. A 401 shows the
  * sign-in prompt and throws, as any other failed status does.
  */
 async function postAuthoringRequestAction(
   application: string,
   id: string,
-  action: 'approve' | 'change-plan' | 'request-changes' | 'drop',
+  action: 'approve' | 'change-plan' | 'request-changes' | 'retry' | 'drop',
   body?: { comment: string },
 ): Promise<AuthoringRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}/${action}`
@@ -2206,6 +2225,14 @@ export function requestAuthoringRequestChanges(
   comment: string,
 ): Promise<AuthoringRequest> {
   return postAuthoringRequestAction(application, id, 'request-changes', { comment })
+}
+
+/**
+ * Has AI make the change again after an accept met a conflict, which clears the draft and moves the request back to
+ * `working` with its round at 0, see docs/reference/authoring-requests.md#routes.
+ */
+export function retryAuthoringRequest(application: string, id: string): Promise<AuthoringRequest> {
+  return postAuthoringRequestAction(application, id, 'retry')
 }
 
 /** Drops a request, which ends it as `dropped`. */

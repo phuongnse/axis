@@ -3,6 +3,7 @@ import { type ReactNode, useContext, useState } from 'react'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, type AxisFoldAction } from '../platform/AxisButton'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { DialogFooter } from '../platform/DialogFooter'
 import { FilledText } from '../platform/FilledText'
 import { fillText } from '../platform/fillText'
@@ -13,6 +14,7 @@ import { ReasonDialog } from '../platform/ReasonDialog'
 import { ShellBarSlot } from '../platform/shellBarSlot'
 import { StatusTag } from '../platform/StatusTag'
 import { StepsBar, type StepsBarItem } from '../platform/StepsBar'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { useStudioConnection } from '../platform/studioConnection'
 import {
   acceptAuthoringRequest,
@@ -24,7 +26,7 @@ import {
   fetchAuthoringRequest,
   fetchStudioRequest,
   requestAuthoringRequestChanges,
-  resourceTitle,
+  retryAuthoringRequest,
   ServerUnreachableError,
   type StudioDiagnostic,
   type StudioRequest,
@@ -34,15 +36,17 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFollowJob } from '../platform/useFollowJob'
 import { PlatformContext } from './context'
+import { ResourceReference } from './ResourceReference'
 import {
   authoringRequestStates,
   type FeedEntry,
+  type HistoryRow,
   endedAuthoringRequestStates,
   planChanges,
-  planSummary,
   requestFeed,
-  requestName,
+  requestHistory,
   requestResult,
+  requestTitle,
   workLine,
 } from './studioAuthoringRequest'
 import { StudioAuthoringRequestResult } from './StudioAuthoringRequestResult'
@@ -73,18 +77,20 @@ const feedTitles: Record<FeedEntry['key'], string> = {
  * The words of the guide bar for a state, or `null` while the bar is not built for it yet, see
  * docs/reference/ai-authoring-in-studio.md#the-guide. `accepting` is true while the author's accept is queued or running,
  * or has succeeded and the request still reads ready. `conflicted` is true when the accept the page follows met a conflict.
+ * `questions` is how many questions the plan has, which the author's words count while the plan waits.
  */
 function guideWords(
   state: AuthoringRequestState,
   isAuthor: boolean,
   accepting: boolean,
   conflicted: boolean,
+  questions: number,
 ): string | null {
   if (state === 'planning') return 'shell.studio.aiRequest.guide.planning'
   if (state === 'awaitingApproval') {
-    return isAuthor
-      ? 'shell.studio.aiRequest.guide.awaitingApproval'
-      : 'shell.studio.aiRequest.guide.awaitingApprovalOther'
+    if (!isAuthor) return 'shell.studio.aiRequest.guide.awaitingApprovalOther'
+    if (questions === 0) return 'shell.studio.aiRequest.guide.awaitingApproval'
+    return questions === 1 ? 'shell.studio.aiRequest.guide.questionsOne' : 'shell.studio.aiRequest.guide.questions'
   }
   if (workingStates.has(state)) return 'shell.studio.aiRequest.guide.working'
   if (state === 'ready') {
@@ -102,17 +108,21 @@ function guideWords(
  * in full, then the sender's line and the alert of an action that failed. Under them comes the feed, one `StepsBar` of
  * the Plan, Work, Result and Dropped items that the request has, each with its mark. A failed request shows its failure
  * in the item where it stopped, and the Result item of a ready, failed or accepted request ends with the status of the
- * accept that the page follows. The guide bar at the foot of the window gives the request's author Approve plan, Change
- * the plan… and Drop…, and Accept, Ask for other changes… and Drop… on a ready request, where Ask for other changes…
- * opens a dialog for a comment that sends the request back to work. Accept sends the accept route and follows its
- * publish request with `fetchStudioRequest`, kept in
- * memory for this visit, and reads the request again when the accept ends. An accept that met conflicts shows a warning
- * in place of its status, which names each changed resource with who changed it and when, and the bar offers Drop… only.
+ * accept that the page follows. The Work item's Show the steps folds open the request's History, a table of its steps. The
+ * guide bar at the foot of the window gives the request's author Approve plan, Change the plan… and Drop…, or, while the plan
+ * has questions, Answer… and Drop…, where Answer… opens a dialog for the author's answers that sends them as a change of
+ * plan, and Accept,
+ * Ask for other changes… and Drop… on a ready request, where Ask for other changes… opens a dialog for a comment that
+ * sends the request back to work. Accept sends the accept route and follows its publish request with
+ * `fetchStudioRequest`, kept in memory for this visit, and reads the request again when the accept ends. An accept that
+ * met conflicts shows a warning in place of its status, which names each changed resource with who changed it and when,
+ * and the bar offers Make the change again and Drop…. Make the change again sends the retry route, which clears the
+ * draft and sends the request back to work, and the page forgets that accept.
  * Until the request waits for its author or ends, the page asks for it every second and keeps the last answer when a read
  * fails. A request that does not exist shows its line and, when `onAskAi` is given, an Ask AI link that opens the request
  * panel. `resources` is the application's resource list, which names the resources of a conflict. See
- * docs/reference/ai-authoring-in-studio.md#the-heading, #the-feed, #the-work-item, #the-plan, #the-diff, #accepting and
- * #the-guide.
+ * docs/reference/ai-authoring-in-studio.md#the-heading, #the-feed, #the-work-item, #the-plan, #the-plans-groups, #the-diff, #accepting and
+ * #the-guide, #replies and #the-history.
  */
 export function StudioAuthoringRequestPage({
   application,
@@ -136,6 +146,7 @@ export function StudioAuthoringRequestPage({
   const [round, setRound] = useState(0)
   const [actionError, setActionError] = useState(false)
   const [changePlanOpen, setChangePlanOpen] = useState(false)
+  const [answerOpen, setAnswerOpen] = useState(false)
   const [requestChangesOpen, setRequestChangesOpen] = useState(false)
   const [dropOpen, setDropOpen] = useState(false)
   const [acting, setActing] = useState(false)
@@ -201,14 +212,18 @@ export function StudioAuthoringRequestPage({
   const isAuthor = request.author === userId
   const accepting =
     isAuthor && request.state === 'ready' && followed !== null && (pending || followed.status === 'succeeded')
-  // The conflicts of the accept the page follows, which only the author sees. The bar then offers no Accept until the
-  // retry route exists, see docs/reference/ai-authoring-in-studio.md#accepting.
+  // The conflicts of the accept the page follows, which only the author sees. The bar then offers Make the change again
+  // and Drop… and no Accept, see docs/reference/ai-authoring-in-studio.md#accepting.
   const conflicts =
     isAuthor && request.state === 'ready' && followed?.status === 'failed'
       ? followed.diagnostics.filter((diagnostic) => diagnostic.code === acceptConflict)
       : []
   const conflicted = conflicts.length > 0
-  const words = guideWords(request.state, isAuthor, accepting, conflicted)
+  // While the plan has questions its author answers them in place of approving it, see
+  // docs/reference/ai-authoring-in-studio.md#the-plans-groups.
+  const questions = request.plan?.questions.length ?? 0
+  const asking = isAuthor && request.state === 'awaitingApproval' && questions > 0
+  const words = guideWords(request.state, isAuthor, accepting, conflicted, questions)
   const result = requestResult(request, isAuthor)
   const time = formatValue({ name: 'sentAt', type: 'date-time' }, request.sentAt, {}, { locale, text: t })
   const sender = (
@@ -244,31 +259,13 @@ export function StudioAuthoringRequestPage({
       }
     }
     if (key === 'work') {
-      const line = workLine(request)
       return {
         mark,
         standing:
           request.state === 'fixing'
             ? fillText(t('shell.studio.aiRequest.work.fixRound'), { round: request.round })
             : undefined,
-        body: (
-          <Flex vertical gap={spacing.xs}>
-            {mark === 'stopped' && failure}
-            {line !== null && (
-              <Typography.Text>
-                {'key' in line
-                  ? t(line.key)
-                  : fillText(
-                      t(line.count === 1 ? 'shell.studio.aiRequest.work.doneOne' : 'shell.studio.aiRequest.work.done'),
-                      {
-                        count: line.count,
-                        duration: formatDuration(line.ms, locale, t),
-                      },
-                    )}
-              </Typography.Text>
-            )}
-          </Flex>
-        ),
+        body: <WorkBody key={request.id} request={request} failure={mark === 'stopped' ? failure : null} />,
       }
     }
     if (key === 'result') {
@@ -279,7 +276,7 @@ export function StudioAuthoringRequestPage({
             <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />
             {followed !== null &&
               (conflicted ? (
-                <AcceptConflict conflicts={conflicts} resources={resources} />
+                <AcceptConflict application={application} conflicts={conflicts} resources={resources} />
               ) : (
                 <StudioRequestStatus request={followed} releaseNumber={null} />
               ))}
@@ -312,7 +309,7 @@ export function StudioAuthoringRequestPage({
     }
   }
   const fold: AxisFoldAction[] = []
-  if (isAuthor && request.state === 'awaitingApproval') {
+  if (isAuthor && request.state === 'awaitingApproval' && !asking) {
     fold.push({
       key: 'changePlan',
       labelKey: 'shell.studio.aiRequest.changePlan',
@@ -346,7 +343,7 @@ export function StudioAuthoringRequestPage({
   return (
     <div data-testid="studio-ai-request">
       <PageLayout
-        title={requestName(request.text)}
+        title={requestTitle(request)}
         tags={
           <StatusTag tone={state.tone} data-testid="studio-ai-request-state">
             {t(state.word)}
@@ -365,10 +362,19 @@ export function StudioAuthoringRequestPage({
           <ShellBarSlot>
             <ActionBar
               data-testid="studio-ai-request-guide"
-              start={<span>{t(words)}</span>}
+              start={<span>{fillText(t(words), { count: questions })}</span>}
               fold={fold}
               end={
-                isAuthor && request.state === 'awaitingApproval' ? (
+                asking ? (
+                  <AxisButton
+                    role="finish"
+                    data-testid="studio-ai-request-answer"
+                    disabled={acting}
+                    onClick={() => setAnswerOpen(true)}
+                  >
+                    {t('shell.studio.aiRequest.answer')}
+                  </AxisButton>
+                ) : isAuthor && request.state === 'awaitingApproval' ? (
                   <AxisButton
                     role="finish"
                     data-testid="studio-ai-request-approve"
@@ -390,6 +396,23 @@ export function StudioAuthoringRequestPage({
                     }
                   >
                     {t('shell.studio.aiRequest.accept')}
+                  </AxisButton>
+                ) : isAuthor && request.state === 'ready' && conflicted ? (
+                  <AxisButton
+                    role="finish"
+                    data-testid="studio-ai-request-retry"
+                    disabled={acting}
+                    onClick={() =>
+                      void act(
+                        () => retryAuthoringRequest(application, requestId),
+                        (answered) => {
+                          setAccept(undefined)
+                          adopt(answered)
+                        },
+                      )
+                    }
+                  >
+                    {t('shell.studio.aiRequest.retry')}
                   </AxisButton>
                 ) : undefined
               }
@@ -413,6 +436,26 @@ export function StudioAuthoringRequestPage({
               return { ok: true }
             }}
             onClose={() => setChangePlanOpen(false)}
+            onChanged={() => setActionError(false)}
+          />
+        )}
+        {answerOpen && (
+          <ReasonDialog
+            size="medium"
+            title={t('shell.studio.aiRequest.answer.title')}
+            label={t('shell.studio.aiRequest.answer.label')}
+            help={t('shell.studio.aiRequest.answer.help')}
+            finishText={t('shell.studio.aiRequest.changePlan.send')}
+            cancelText={t('shell.studio.cancel')}
+            requiredMessage={t('shell.studio.aiRequest.answer.required')}
+            tooLongMessage={t('shell.studio.aiRequest.changePlan.tooLong')}
+            maxLength={2000}
+            failedText={t('shell.studio.aiRequest.failed')}
+            onSend={async (answers) => {
+              adopt(await changeAuthoringRequestPlan(application, requestId, answers))
+              return { ok: true }
+            }}
+            onClose={() => setAnswerOpen(false)}
             onChanged={() => setActionError(false)}
           />
         )}
@@ -462,17 +505,122 @@ export function StudioAuthoringRequestPage({
 }
 
 /**
+ * The body of the Work item, see docs/reference/ai-authoring-in-studio.md#the-work-item: the failure of a request that stopped
+ * here, its line, then Show the steps or Hide the steps once it has steps. That button folds in the History, closed at
+ * first, a table of every step with no paging, newest first, see docs/reference/ai-authoring-in-studio.md#the-history.
+ */
+function WorkBody({ request, failure }: { request: AuthoringRequest; failure: ReactNode }) {
+  const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const { spacing } = useDesignTokens()
+  const [open, setOpen] = useState<boolean>(false)
+  const line = workLine(request)
+  const hasSteps = (request.steps ?? []).length > 0
+  const columns: AxisColumn<HistoryRow>[] = [
+    {
+      key: 'step',
+      title: t('shell.studio.aiRequest.history.step'),
+      kind: 'freeText',
+      render: (_, row) => (row.step === null ? null : fillText(t(row.step.key), row.step.values)),
+    },
+    {
+      key: 'result',
+      title: t('shell.studio.aiRequest.history.result'),
+      kind: 'freeText',
+      render: (_, row) => (row.result === null ? null : fillText(t(row.result.key), row.result.values)),
+    },
+    {
+      key: 'startedAt',
+      title: t('shell.studio.aiRequest.history.started'),
+      kind: 'fixed',
+      render: (_, row) => formatValue({ name: 'startedAt', type: 'date-time' }, row.startedAt, {}, { locale, text: t }),
+    },
+    {
+      key: 'duration',
+      title: t('shell.studio.aiRequest.history.duration'),
+      kind: 'fixed',
+      render: (_, row) => (row.ms === null ? null : formatDuration(row.ms, locale, t)),
+    },
+  ]
+  return (
+    <Flex vertical gap={spacing.xs}>
+      {failure}
+      <Flex wrap gap="small" align="center">
+        {line !== null && (
+          <Typography.Text>
+            {'key' in line
+              ? t(line.key)
+              : fillText(
+                  t(line.count === 1 ? 'shell.studio.aiRequest.work.doneOne' : 'shell.studio.aiRequest.work.done'),
+                  {
+                    count: line.count,
+                    duration: formatDuration(line.ms, locale, t),
+                  },
+                )}
+          </Typography.Text>
+        )}
+        {hasSteps && (
+          <AxisButton
+            role="secondary"
+            aria-expanded={open}
+            data-testid="studio-ai-request-steps-toggle"
+            onClick={() => setOpen(!open)}
+          >
+            {t(open ? 'shell.studio.aiRequest.history.hide' : 'shell.studio.aiRequest.history.show')}
+          </AxisButton>
+        )}
+      </Flex>
+      {open && (
+        <AxisTable<HistoryRow>
+          testId="studio-ai-request-history"
+          pagination={false}
+          rowKey={(row) => row.key}
+          dataSource={requestHistory(request)}
+          columns={columns}
+        />
+      )}
+    </Flex>
+  )
+}
+
+/**
  * The body of the Plan item, see docs/reference/ai-authoring-in-studio.md#the-plan: the failure of a request that stopped
  * here, the comments that asked for another plan, oldest first, then what AI is doing while it writes the plan, or the
  * plan's summary with Show the plan or Hide the plan after it. The rest of the plan is open while the plan waits for its
- * author and folded in any other state, until the reader folds it.
+ * author and folded in any other state, until the reader folds it. Open, it shows the plan's groups in the order of
+ * docs/reference/ai-authoring-in-studio.md#the-plans-groups, each only when it has something: the questions with their
+ * options and the recommended one marked, what changes, the decisions, the risks, the acceptance criteria, the checklist
+ * and the implementation notes, which stay behind Show the implementation notes until the reader opens them.
  */
 function PlanBody({ request, failure }: { request: AuthoringRequest; failure: ReactNode }) {
   const t = useText()
   const { spacing } = useDesignTokens()
   const [toggled, setToggled] = useState<boolean>()
   const open = toggled ?? request.state === 'awaitingApproval'
-  const { summary, rest } = planSummary(request.plan ?? '')
+  const summary = request.plan?.summary ?? ''
+  const [notesOpen, setNotesOpen] = useState(false)
+  const plan = request.plan
+  const changes = plan?.changes ?? []
+  const group = (key: string, heading: string, content: ReactNode) => (
+    <Flex vertical gap={spacing.xs} key={key} data-testid="studio-ai-request-plan-group">
+      <Typography.Text strong>{t(heading)}</Typography.Text>
+      {content}
+    </Flex>
+  )
+  const list = (items: ReactNode[]) => (
+    <ul style={{ margin: 0 }}>
+      {items.map((item, index) => (
+        <li key={index}>{item}</li>
+      ))}
+    </ul>
+  )
+  const lines = (first: string, second: string) => (
+    <>
+      {first}
+      <br />
+      {second}
+    </>
+  )
   return (
     <Flex vertical gap={spacing.md} data-testid="studio-ai-request-plan">
       {failure}
@@ -492,14 +640,68 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
           <>
             <Flex wrap gap="small" align="center">
               <Typography.Text style={{ whiteSpace: 'pre-wrap' }}>{summary}</Typography.Text>
-              {rest !== '' && (
+              {changes.length > 0 && (
                 <AxisButton role="secondary" aria-expanded={open} onClick={() => setToggled(!open)}>
                   {t(open ? 'shell.studio.aiRequest.plan.hide' : 'shell.studio.aiRequest.plan.show')}
                 </AxisButton>
               )}
             </Flex>
-            {open && rest !== '' && (
-              <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{rest}</Typography.Paragraph>
+            {open && plan !== null && changes.length > 0 && (
+              <Flex vertical gap={spacing.md}>
+                {plan.questions.length > 0 &&
+                  group(
+                    'questions',
+                    'shell.studio.aiRequest.plan.questions',
+                    <ul style={{ margin: 0 }}>
+                      {plan.questions.map((question, index) => (
+                        <li key={index}>
+                          {question.question}
+                          <ul>
+                            {question.options.map((option, position) => (
+                              <li key={position}>
+                                {question.recommended === position + 1
+                                  ? fillText(t('shell.studio.aiRequest.plan.recommended'), { option })
+                                  : option}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>,
+                  )}
+                {group('changes', 'shell.studio.aiRequest.plan.changes', list(changes))}
+                {plan.decisions.length > 0 &&
+                  group(
+                    'decisions',
+                    'shell.studio.aiRequest.plan.decisions',
+                    list(plan.decisions.map((entry) => lines(entry.decision, entry.reason))),
+                  )}
+                {plan.risks.length > 0 && group('risks', 'shell.studio.aiRequest.plan.risks', list(plan.risks))}
+                {plan.checks.length > 0 && group('checks', 'shell.studio.aiRequest.plan.checks', list(plan.checks))}
+                {plan.checklist.length > 0 &&
+                  group(
+                    'checklist',
+                    'shell.studio.aiRequest.plan.checklist',
+                    list(plan.checklist.map((entry) => lines(entry.item, entry.how))),
+                  )}
+                {plan.details.length > 0 &&
+                  group(
+                    'notes',
+                    'shell.studio.aiRequest.plan.notes',
+                    <>
+                      <div>
+                        <AxisButton role="secondary" aria-expanded={notesOpen} onClick={() => setNotesOpen(!notesOpen)}>
+                          {t(
+                            notesOpen
+                              ? 'shell.studio.aiRequest.plan.notes.hide'
+                              : 'shell.studio.aiRequest.plan.notes.show',
+                          )}
+                        </AxisButton>
+                      </div>
+                      {notesOpen && list(plan.details)}
+                    </>,
+                  )}
+              </Flex>
             )}
           </>
         )
@@ -511,9 +713,18 @@ function PlanBody({ request, failure }: { request: AuthoringRequest; failure: Re
 /**
  * The warning that stands in place of "Not accepted" when the accept the page follows met conflicts, see
  * docs/reference/ai-authoring-in-studio.md#accepting. Each conflict is one bullet: the resource's title, then who changed
- * it and when, or only the title when no change is found. A resource the list does not hold yet is named by its file.
+ * it and when, or only the title when no change is found. The title is a `ResourceReference` link to the resource in
+ * Studio, and a resource the list does not hold yet is named by its file, as plain muted text.
  */
-function AcceptConflict({ conflicts, resources }: { conflicts: StudioDiagnostic[]; resources: StudioResourceItem[] }) {
+function AcceptConflict({
+  application,
+  conflicts,
+  resources,
+}: {
+  application: string
+  conflicts: StudioDiagnostic[]
+  resources: StudioResourceItem[]
+}) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   return (
@@ -525,8 +736,17 @@ function AcceptConflict({ conflicts, resources }: { conflicts: StudioDiagnostic[
         <ul style={{ margin: 0 }}>
           {conflicts.map((conflict) => {
             const resource = resources.find((item) => item.id === conflict.resourceId)
-            const name =
-              resource !== undefined ? resourceTitle(resource, locale, t) : conflict.file || conflict.resourceId || ''
+            const name = (
+              <ResourceReference
+                file={conflict.file || conflict.resourceId || ''}
+                resource={resource}
+                href={
+                  resource !== undefined && conflict.resourceId
+                    ? studioResourceAddress(application, conflict.resourceId)
+                    : undefined
+                }
+              />
+            )
             const time = formatValue(
               { name: 'changedAt', type: 'date-time' },
               conflict.changedAt ?? null,

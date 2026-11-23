@@ -1,4 +1,5 @@
-import { Flex, Form, Input } from 'antd'
+import { Form, Input } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { useEffect, useId, useRef } from 'react'
@@ -14,7 +15,7 @@ import type { UpdateProfileContext } from './signInContext'
  */
 export function UpdateProfilePage({ context }: { context: UpdateProfileContext }) {
   const { texts, notice, error, loginAction, fields } = context
-  const { colour, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const formId = useId()
   const labelStyle = { fontWeight: 500, color: colour.textMuted }
   const submitRef = useRef<HTMLButtonElement>(null)
@@ -30,43 +31,39 @@ export function UpdateProfilePage({ context }: { context: UpdateProfileContext }
     <IdentityFrame title={context.title} frame={context}>
       {notice && <AxisAlert kind="info" message={notice} />}
       {error && <AxisAlert kind="error" message={error} />}
-      <Form
+      <AxisForm
         form={form}
         name={formId}
         method="post"
         action={loginAction}
-        layout="vertical"
-        requiredMark={false}
-        scrollToFirstError={{ focus: true }}
+        unmarked
         initialValues={initialValues}
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <Flex vertical gap={spacing.lg}>
-          {fields.map((field) => (
-            <Form.Item
-              key={field.name}
+        {fields.map((field) => (
+          <Form.Item
+            key={field.name}
+            name={field.name}
+            label={<span style={labelStyle}>{field.label}</span>}
+            rules={
+              field.required && !field.readOnly
+                ? [{ required: true, message: texts.fieldRequired.replace('{field}', field.label) }]
+                : []
+            }
+          >
+            <Input
               name={field.name}
-              label={<span style={labelStyle}>{field.label}</span>}
-              rules={
-                field.required && !field.readOnly
-                  ? [{ required: true, message: texts.fieldRequired.replace('{field}', field.label) }]
-                  : []
-              }
-            >
-              <Input
-                name={field.name}
-                readOnly={field.readOnly}
-                type={field.name === 'email' ? 'email' : 'text'}
-                autoComplete={field.autoComplete}
-              />
-            </Form.Item>
-          ))}
-          <AxisButton ref={submitRef} role="finish" htmlType="submit" block>
-            {texts.submit}
-          </AxisButton>
-        </Flex>
-      </Form>
+              readOnly={field.readOnly}
+              type={field.name === 'email' ? 'email' : 'text'}
+              autoComplete={field.autoComplete}
+            />
+          </Form.Item>
+        ))}
+        <AxisButton ref={submitRef} role="finish" htmlType="submit" block>
+          {texts.submit}
+        </AxisButton>
+      </AxisForm>
     </IdentityFrame>
   )
 }

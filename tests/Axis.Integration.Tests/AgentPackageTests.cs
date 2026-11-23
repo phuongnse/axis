@@ -39,7 +39,7 @@ public sealed class AgentPackageTests(KeycloakFixture keycloak, PostgreSqlFixtur
         await StartAsync(developerRole: "author");
         using var client = await Realm.SignInAsync();
         var id = await SendAsync(client);
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = 'Add a tools package.' WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = '{PlanJson}' WHERE id = '{id}' RETURNING 1");
         var script = new ScriptedModelAdapter(
         [
             new ModelAnswer(
@@ -94,7 +94,7 @@ public sealed class AgentPackageTests(KeycloakFixture keycloak, PostgreSqlFixtur
         await StartAsync(developerRole: "developer");
         using var client = await Realm.SignInAsync();
         var id = await SendAsync(client);
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = 'Add a tools package.' WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = '{PlanJson}' WHERE id = '{id}' RETURNING 1");
         var script = new ScriptedModelAdapter(
         [
             new ModelAnswer([PackageFile("manifest-1", "axis-package.json", McpTestPackageTests.Manifest)], ModelStopReason.ToolUse, new ModelTokens(10, 5)),

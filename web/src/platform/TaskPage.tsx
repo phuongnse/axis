@@ -1,4 +1,5 @@
-import { Flex, Form } from 'antd'
+import { Flex } from 'antd'
+import { AxisForm } from './AxisForm'
 import { AxisAlert } from './AxisAlert'
 import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
@@ -11,7 +12,6 @@ import { ReassignDialog } from './ReassignDialog'
 import { RecordLink } from './RecordLink'
 import { RecordList } from './recordList'
 import { RecordNotFound } from './RecordNotFound'
-import { requiredMark } from './requiredMark'
 import { SaveBar } from './SaveBar'
 import { SectionPart, SectionParts } from './SectionParts'
 import { StatusTag } from './StatusTag'
@@ -576,15 +576,9 @@ function OpenTaskForm({
         {form.formError}
         {steps.progress}
         {/* Enter acts as Next on a step before the last, and does nothing on the last. */}
-        <Form
-          id={formId}
-          layout="vertical"
-          requiredMark={requiredMark}
-          scrollToFirstError={{ focus: true }}
-          onFinish={() => void steps.next()}
-        >
+        <AxisForm id={formId} onFinish={() => void steps.next()}>
           {steps.fields}
-        </Form>
+        </AxisForm>
         {steps.last ? (
           back && <Flex gap="small">{back}</Flex>
         ) : (

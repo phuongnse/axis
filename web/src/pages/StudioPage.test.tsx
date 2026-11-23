@@ -1089,6 +1089,7 @@ describe('StudioPage', () => {
           author: 'author',
           authorName: null,
           text: 'Add a supplier field.',
+          title: null,
           state: 'awaitingApproval',
           plan: null,
           round: 0,

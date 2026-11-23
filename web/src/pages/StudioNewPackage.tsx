@@ -1,10 +1,10 @@
-import { Flex, Form, Input, Modal, Select } from 'antd'
+import { Form, Input, Modal, Select } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { packageLanguages, packageStarter } from '../platform/packageStarters'
 import { QuotaRefusedError } from '../platform/quota'
-import { requiredMark } from '../platform/requiredMark'
 import { createStudioPackageFile, ServerUnreachableError, type StudioDiagnostic } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
@@ -41,7 +41,7 @@ export function StudioNewPackage({
   onCreated: (diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
-  const { size, spacing } = useDesignTokens()
+  const { size } = useDesignTokens()
   const { lost } = useStudioConnection()
   const [open, setOpen] = useState(false)
   const [form] = Form.useForm<Values>()
@@ -113,49 +113,40 @@ export function StudioNewPackage({
         // Each opening starts with empty fields.
         afterClose={() => form.resetFields()}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={requiredMark}
-          initialValues={{ id: '' }}
-          scrollToFirstError={{ focus: true }}
-          onFinish={create}
-        >
-          <Flex vertical gap={spacing.lg}>
-            <AxisField
-              name="id"
-              label={t('shell.studio.newPackage.id')}
-              help={t('shell.studio.newPackage.id.help')}
-              requiredMessage={t('shell.studio.newPackage.idRequired')}
-              rules={[{ pattern: idPattern, message: t('shell.studio.newPackage.idInvalid') }]}
-            >
-              <Input
-                aria-label={t('shell.studio.newPackage.id')}
-                // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
-                onPressEnter={(event) => {
-                  event.preventDefault()
-                  form.submit()
-                }}
-              />
-            </AxisField>
-            <AxisField
-              name="language"
-              label={t('shell.studio.newPackage.language')}
-              help={t('shell.studio.newPackage.language.help')}
-              requiredMessage={t('shell.studio.newPackage.languageRequired')}
-            >
-              <Select
-                aria-label={t('shell.studio.newPackage.language')}
-                // All languages render, so each one can be reached without scrolling the list.
-                virtual={false}
-                options={packageLanguages.map((language) => ({
-                  value: language,
-                  label: t(`shell.studio.packages.language.${language}`),
-                }))}
-              />
-            </AxisField>
-          </Flex>
-        </Form>
+        <AxisForm form={form} initialValues={{ id: '' }} onFinish={create}>
+          <AxisField
+            name="id"
+            label={t('shell.studio.newPackage.id')}
+            help={t('shell.studio.newPackage.id.help')}
+            requiredMessage={t('shell.studio.newPackage.idRequired')}
+            rules={[{ pattern: idPattern, message: t('shell.studio.newPackage.idInvalid') }]}
+          >
+            <Input
+              aria-label={t('shell.studio.newPackage.id')}
+              // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
+              onPressEnter={(event) => {
+                event.preventDefault()
+                form.submit()
+              }}
+            />
+          </AxisField>
+          <AxisField
+            name="language"
+            label={t('shell.studio.newPackage.language')}
+            help={t('shell.studio.newPackage.language.help')}
+            requiredMessage={t('shell.studio.newPackage.languageRequired')}
+          >
+            <Select
+              aria-label={t('shell.studio.newPackage.language')}
+              // All languages render, so each one can be reached without scrolling the list.
+              virtual={false}
+              options={packageLanguages.map((language) => ({
+                value: language,
+                label: t(`shell.studio.packages.language.${language}`),
+              }))}
+            />
+          </AxisField>
+        </AxisForm>
       </Modal>
     </>
   )

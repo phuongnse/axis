@@ -8,7 +8,7 @@ namespace Axis.Agent;
 /// A turn claims one request of a tenant and runs one step, and the commit of the step frees the request. A step that needs the author's token and finds it ended
 /// stops the request as <c>failed</c> with the outcome <c>tokenEnded</c>, and so does a step whose MCP server refuses the author, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>.
 /// A request stops as <c>failed</c> with the outcome <c>overBudget</c> when a model call would pass the token budget, and with <c>timedOut</c> when its step starts after
-/// <c>Ai:RequestTimeout</c> from the approval or from the newest change request, whichever is later, or is still running then, see <c>docs/reference/authoring-requests.md#budgets</c>. The draft is kept. A host that stops, or a step that throws,
+/// <c>Ai:RequestTimeout</c> from the approval or from the newest change request or retry, whichever is later, or is still running then, see <c>docs/reference/authoring-requests.md#budgets</c>. The draft is kept. A host that stops, or a step that throws,
 /// writes nothing more: the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
 /// A step that moves a request to <c>fixing</c> when its <c>round</c> has reached <c>Ai:FixRounds</c> stops the request as <c>failed</c> instead and keeps its draft,
 /// see <c>docs/reference/authoring-requests.md#budgets</c>. A <c>ready</c> request is claimed for the accept step only under the rule of <see cref="AuthoringRequestStore.ClaimAsync"/>,
@@ -83,7 +83,7 @@ internal sealed partial class AuthoringRequestRunner(
                 return;
             }
 
-            // The time counts from the approval or the newest change request, so a request that is still planning has no deadline.
+            // The time counts from the approval or the newest change request or retry, so a request that is still planning has no deadline.
             DateTimeOffset? deadline = request.TimeLimitFrom + settings.RequestTimeout;
             AuthoringStepResult result;
             if (deadline <= time.GetUtcNow())
@@ -122,7 +122,7 @@ internal sealed partial class AuthoringRequestRunner(
                 throw new InvalidOperationException($"The authoring step '{step.Kind}' answered '{result.NextState}', which is not a state of a request.");
             }
 
-            if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, result.Plan, result.Messages, result.Checks, result.DropDraft, cancellationToken))
+            if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, result.Plan, result.Title, result.Messages, result.Checks, result.DropDraft, cancellationToken))
             {
                 LogClaimLost(request.Id);
             }

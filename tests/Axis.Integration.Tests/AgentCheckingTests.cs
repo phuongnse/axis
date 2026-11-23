@@ -45,7 +45,7 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
                 ModelStopReason.ToolUse,
                 new ModelTokens(100, 20)),
             new ModelAnswer([new ModelText("Done.")], ModelStopReason.EndTurn, new ModelTokens(30, 10)),
-            Plan("PASSED\nThe draft does the request."),
+            Answer("PASSED\nThe draft does the request."),
         ]);
         await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
         await host.StartAsync(CancellationToken);
@@ -90,7 +90,7 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
     {
         using var client = await _realm.SignInAsync();
         var id = await SendAsync(client);
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = 'A plan.' WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = '{PlanJson}' WHERE id = '{id}' RETURNING 1");
         var script = new ScriptedModelAdapter(
         [
             ToolUse("layer-1", "write_layer", LayerInput(Reroute), 100, 20),

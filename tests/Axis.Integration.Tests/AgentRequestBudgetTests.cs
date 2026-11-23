@@ -69,21 +69,23 @@ public sealed class AgentRequestBudgetTests(KeycloakFixture keycloak, PostgreSql
         Assert.Equal("true", await ScalarAsync($"SELECT (refresh_token IS NULL)::text FROM axis.authoring_requests WHERE id = '{id}'"));
     }
 
-    [Fact]
-    public async Task A_request_approved_longer_ago_than_the_time_limit_that_has_a_newer_change_request_runs_its_step_and_does_not_stop_as_timedOut()
+    [Theory]
+    [InlineData("changeRequest", "'Change it.'")]
+    [InlineData("retry", "NULL")]
+    public async Task A_request_approved_longer_ago_than_the_time_limit_that_has_a_newer_change_request_or_retry_runs_its_step_and_does_not_stop_as_timedOut(string kind, string input)
     {
         using var client = await _realm.SignInAsync();
         var id = await SendAsync(client);
         await ApprovedAsync(id, "now() - interval '31 minutes'");
         await ScalarAsync(
-            $"INSERT INTO axis.authoring_request_steps (id, request_id, ordinal, kind, input_summary, finished_at) VALUES (gen_random_uuid(), '{id}', 1, 'changeRequest', 'Change it.', now()) RETURNING 1");
+            $"INSERT INTO axis.authoring_request_steps (id, request_id, ordinal, kind, input_summary, finished_at) VALUES (gen_random_uuid(), '{id}', 1, '{kind}', {input}, now()) RETURNING 1");
         var step = new TestStep("working", "work", "checking");
         await using var host = BuildAgent(new ScriptedModelAdapter([]), new RecordingHandler(_realm.Factory.Server.CreateHandler()), new() { ["Ai:RequestTimeout"] = "00:30:00" }, step);
         await host.StartAsync(CancellationToken);
         await WaitUntilAsync(async () => await StateAsync(id) == "checking", "The host did not run the working step.");
         await host.StopAsync(CancellationToken);
 
-        Assert.Equal("1:changeRequest:-:0:true,2:work:done:0:true", await StepsAsync(id));
+        Assert.Equal($"1:{kind}:-:0:true,2:work:done:0:true", await StepsAsync(id));
     }
 
     [Fact]
@@ -149,7 +151,7 @@ public sealed class AgentRequestBudgetTests(KeycloakFixture keycloak, PostgreSql
 
     // The request is approved without the step before it, as the approval leaves it. The approval's time is an SQL expression.
     private async Task ApprovedAsync(Guid id, string approvedAt) =>
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = 'A plan.', approved_at = {approvedAt} WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = '{PlanJson}', approved_at = {approvedAt} WHERE id = '{id}' RETURNING 1");
 
     private async Task<string> ScalarAsync(string sql) =>
         Convert.ToString(await PostgreSqlServer.AdminScalarAsync(_realm.SchemaConnection, sql, CancellationToken), System.Globalization.CultureInfo.InvariantCulture) ?? "";

@@ -1,4 +1,5 @@
 import { Flex, Form, Input, Typography } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
@@ -6,7 +7,6 @@ import { SidePanel } from '../platform/SidePanel'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
-import { requiredMark } from '../platform/requiredMark'
 import { studioRequestAddress } from '../platform/studioAddress'
 import { fetchStudioSettings, sendAuthoringRequest, ServerUnreachableError } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
@@ -90,37 +90,29 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
         {sendFailed && (
           <AxisAlert data-testid="studio-ask-ai-error" kind="error" message={t('shell.studio.askAi.sendFailed')} />
         )}
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={requiredMark}
-          scrollToFirstError={{ focus: true }}
-          onFinish={send}
-        >
-          <Flex vertical gap="large">
-            <AxisField
-              name="text"
-              label={t('shell.studio.askAi.text')}
-              help={t('shell.studio.askAi.text.help')}
-              requiredMessage={t('shell.studio.askAi.text.required')}
-              rules={[{ max: maxTextLength, message: t('shell.studio.askAi.text.tooLong') }]}
-            >
-              <Input.TextArea rows={6} />
-            </AxisField>
-            {autoAcceptOn && (
-              <AxisCheckboxField
-                name="autoAccept"
-                label={t('shell.studio.askAi.autoAccept')}
-                help={t('shell.studio.askAi.autoAccept.help')}
-              />
-            )}
-            <div>
-              <AxisButton role="main" htmlType="submit" data-testid="studio-ask-ai-send" loading={sending}>
-                {t('shell.studio.askAi.send')}
-              </AxisButton>
-            </div>
-          </Flex>
-        </Form>
+        <AxisForm form={form} onFinish={send}>
+          <AxisField
+            name="text"
+            label={t('shell.studio.askAi.text')}
+            help={t('shell.studio.askAi.text.help')}
+            requiredMessage={t('shell.studio.askAi.text.required')}
+            rules={[{ max: maxTextLength, message: t('shell.studio.askAi.text.tooLong') }]}
+          >
+            <Input.TextArea rows={6} />
+          </AxisField>
+          {autoAcceptOn && (
+            <AxisCheckboxField
+              name="autoAccept"
+              label={t('shell.studio.askAi.autoAccept')}
+              help={t('shell.studio.askAi.autoAccept.help')}
+            />
+          )}
+          <div>
+            <AxisButton role="main" htmlType="submit" data-testid="studio-ask-ai-send" loading={sending}>
+              {t('shell.studio.askAi.send')}
+            </AxisButton>
+          </div>
+        </AxisForm>
         <Flex vertical gap="small" style={{ borderTop: `1px solid ${colour.borderSubtle}`, paddingTop: spacing.md }}>
           <Typography.Text strong>{t('shell.studio.askAi.ownApp')}</Typography.Text>
           <span style={{ color: colour.textMuted }}>

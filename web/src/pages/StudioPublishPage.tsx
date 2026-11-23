@@ -18,7 +18,7 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
-import { requestName } from './studioAuthoringRequest'
+import { requestTitle } from './studioAuthoringRequest'
 import { StudioChanges } from './StudioChanges'
 
 /** The files that differ from the live release, with the names of the AI requests among the revisions that made them. */
@@ -47,7 +47,7 @@ async function loadPublishChanges(application: string, signal: AbortSignal): Pro
   const requestNames = new Map<string, string>()
   requests.forEach((request, index) => {
     if (request.status === 'fulfilled' && request.value !== null) {
-      requestNames.set(ids[index], requestName(request.value.text))
+      requestNames.set(ids[index], requestTitle(request.value))
     }
   })
   return { diff, requestNames }

@@ -1,9 +1,9 @@
 import { Flex, Form, Input, Modal } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { DialogFooter } from '../platform/DialogFooter'
-import { requiredMark } from '../platform/requiredMark'
 import { useRef, useState } from 'react'
 import { CellJobTable } from '../platform/CellJobTable'
 import { createCellTenant, type CellJob, type CellTenantRequest } from '../platform/cell'
@@ -28,7 +28,7 @@ const idPattern = /^[a-z0-9-]{1,50}$/
  */
 export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => void; onEnded: () => void }) {
   const t = useText()
-  const { size, spacing } = useDesignTokens()
+  const { size } = useDesignTokens()
   const { locale } = usePlatform().current
   const { onRefused } = useCellConsole()
   const [form] = Form.useForm<CellTenantRequest>()
@@ -116,43 +116,34 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
       ) : (
         <Flex vertical gap="middle">
           {error && <AxisAlert data-testid="cell-create-error" kind="error" message={error} />}
-          <Form
-            form={form}
-            layout="vertical"
-            name="create-cell-tenant"
-            requiredMark={requiredMark}
-            scrollToFirstError={{ focus: true }}
-            onFinish={(values) => void create(values)}
-          >
-            <Flex vertical gap={spacing.lg}>
-              <AxisField
-                name="id"
-                label={t('shell.cell.create.id')}
-                help={t('shell.cell.create.id.help')}
-                requiredMessage={t('shell.cell.create.idRequired')}
-                rules={[{ pattern: idPattern }]}
-              >
-                <Input maxLength={50} />
-              </AxisField>
-              <AxisField
-                name="application"
-                label={t('shell.cell.create.application')}
-                help={t('shell.cell.create.application.help')}
-                requiredMessage={t('shell.cell.create.applicationRequired')}
-              >
-                <Input maxLength={200} />
-              </AxisField>
-              <AxisField
-                name="administrator"
-                label={t('shell.cell.create.administrator')}
-                help={t('shell.cell.create.administrator.help')}
-                requiredMessage={t('shell.cell.create.administratorRequired')}
-                rules={[{ type: 'email' }]}
-              >
-                <Input type="email" maxLength={200} />
-              </AxisField>
-            </Flex>
-          </Form>
+          <AxisForm form={form} name="create-cell-tenant" onFinish={(values) => void create(values)}>
+            <AxisField
+              name="id"
+              label={t('shell.cell.create.id')}
+              help={t('shell.cell.create.id.help')}
+              requiredMessage={t('shell.cell.create.idRequired')}
+              rules={[{ pattern: idPattern }]}
+            >
+              <Input maxLength={50} />
+            </AxisField>
+            <AxisField
+              name="application"
+              label={t('shell.cell.create.application')}
+              help={t('shell.cell.create.application.help')}
+              requiredMessage={t('shell.cell.create.applicationRequired')}
+            >
+              <Input maxLength={200} />
+            </AxisField>
+            <AxisField
+              name="administrator"
+              label={t('shell.cell.create.administrator')}
+              help={t('shell.cell.create.administrator.help')}
+              requiredMessage={t('shell.cell.create.administratorRequired')}
+              rules={[{ type: 'email' }]}
+            >
+              <Input type="email" maxLength={200} />
+            </AxisField>
+          </AxisForm>
         </Flex>
       )}
     </Modal>

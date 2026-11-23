@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
+import { AxisForm } from '../platform/AxisForm'
 import { DialogFooter } from '../platform/DialogFooter'
 import { maskedKey } from '../platform/maskedKey'
 import { connectOwnAi, fetchOwnAi, type OwnAi, type OwnAiProvider } from '../platform/ownAi'
-import { requiredMark } from '../platform/requiredMark'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { TermList } from '../platform/TermList'
 import { useText } from '../platform/texts'
@@ -115,7 +115,7 @@ function ConnectDialog({
   onCancel: () => void
 }) {
   const t = useText()
-  const { size, spacing } = useDesignTokens()
+  const { size } = useDesignTokens()
   const [form] = Form.useForm<ConnectValues>()
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -153,40 +153,31 @@ function ConnectDialog({
       }
       onCancel={onCancel}
     >
-      <Form
-        form={form}
-        layout="vertical"
-        requiredMark={requiredMark}
-        scrollToFirstError={{ focus: true }}
-        initialValues={{ provider: providers[0]?.id }}
-        onFinish={(values) => void connect(values)}
-      >
-        <Flex vertical gap={spacing.lg}>
-          <AxisField
-            name="provider"
-            label={t('shell.account.ai.provider')}
-            help={t('shell.account.ai.providerHelp')}
-            requiredMessage={t('shell.account.ai.providerRequired')}
-          >
-            <Select options={providers.map((provider) => ({ value: provider.id, label: provider.name }))} />
-          </AxisField>
-          <AxisField
-            name="key"
-            label={t('shell.account.ai.key')}
-            help={t('shell.account.ai.keyHelp')}
-            requiredMessage={t('shell.account.ai.keyRequired')}
-          >
-            <Input.Password autoComplete="off" />
-          </AxisField>
-          {failed && (
-            <AxisAlert
-              data-testid="account-ai-connect-failed"
-              kind="error"
-              message={t('shell.account.ai.connectFailed')}
-            />
-          )}
-        </Flex>
-      </Form>
+      <AxisForm form={form} initialValues={{ provider: providers[0]?.id }} onFinish={(values) => void connect(values)}>
+        <AxisField
+          name="provider"
+          label={t('shell.account.ai.provider')}
+          help={t('shell.account.ai.providerHelp')}
+          requiredMessage={t('shell.account.ai.providerRequired')}
+        >
+          <Select options={providers.map((provider) => ({ value: provider.id, label: provider.name }))} />
+        </AxisField>
+        <AxisField
+          name="key"
+          label={t('shell.account.ai.key')}
+          help={t('shell.account.ai.keyHelp')}
+          requiredMessage={t('shell.account.ai.keyRequired')}
+        >
+          <Input.Password autoComplete="off" />
+        </AxisField>
+        {failed && (
+          <AxisAlert
+            data-testid="account-ai-connect-failed"
+            kind="error"
+            message={t('shell.account.ai.connectFailed')}
+          />
+        )}
+      </AxisForm>
     </Modal>
   )
 }

@@ -1,11 +1,11 @@
 import { Checkbox, Flex, Form, Input, Modal, Typography } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { useEffect, useState } from 'react'
 import { EmptyDash } from '../platform/EmptyValue'
 import { fetchCurrentUser } from '../platform/currentUser'
-import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { fetchUserRoles, inviteUser, type RoleChange, type UserRoles } from '../platform/users'
@@ -42,7 +42,7 @@ export function InviteUserModal({
   onReload: () => void
 }) {
   const t = useText()
-  const { size, spacing } = useDesignTokens()
+  const { size } = useDesignTokens()
   const [form] = Form.useForm<InviteFields>()
   const [roles, setRoles] = useState<Pick<UserRoles, 'applications' | 'platformRoles'>>()
   const [rolesFailed, setRolesFailed] = useState(false)
@@ -145,34 +145,29 @@ export function InviteUserModal({
               message={t('shell.users.invite.rolesFailed')}
             />
           )}
-          <Form
+          <AxisForm
             form={form}
-            layout="vertical"
             name="invite"
-            requiredMark={requiredMark}
-            scrollToFirstError={{ focus: true }}
             onFinish={(values) => setPending({ email: values.email.trim(), displayName: values.displayName.trim() })}
           >
-            <Flex vertical gap={spacing.lg}>
-              <AxisField
-                name="email"
-                label={t('shell.users.invite.email')}
-                help={t('shell.users.invite.email.help')}
-                requiredMessage={t('shell.users.invite.emailRequired')}
-                rules={[{ type: 'email' }]}
-              >
-                <Input type="email" maxLength={200} />
-              </AxisField>
-              <AxisField
-                name="displayName"
-                label={t('shell.users.invite.displayName')}
-                help={t('shell.users.invite.displayName.help')}
-                requiredMessage={t('shell.users.invite.displayNameRequired')}
-              >
-                <Input maxLength={200} />
-              </AxisField>
-            </Flex>
-          </Form>
+            <AxisField
+              name="email"
+              label={t('shell.users.invite.email')}
+              help={t('shell.users.invite.email.help')}
+              requiredMessage={t('shell.users.invite.emailRequired')}
+              rules={[{ type: 'email' }]}
+            >
+              <Input type="email" maxLength={200} />
+            </AxisField>
+            <AxisField
+              name="displayName"
+              label={t('shell.users.invite.displayName')}
+              help={t('shell.users.invite.displayName.help')}
+              requiredMessage={t('shell.users.invite.displayNameRequired')}
+            >
+              <Input maxLength={200} />
+            </AxisField>
+          </AxisForm>
           {sections.length > 0 && (
             <AxisFieldGroup title={t('shell.users.invite.roles')} help={t('shell.users.invite.roles.help')}>
               {sections.map((section) => (

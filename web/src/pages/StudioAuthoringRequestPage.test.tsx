@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formatDuration, formatValue } from '../platform/formatValue'
 import type {
+  AuthoringPlan,
   AuthoringRequest,
   AuthoringRequestDiff,
   AuthoringRequestState,
@@ -14,6 +15,7 @@ import type {
   StudioRequestStatus,
   StudioResourceItem,
 } from '../platform/studio'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioAuthoringRequestPage } from './StudioAuthoringRequestPage'
@@ -22,6 +24,11 @@ import { requestName } from './studioAuthoringRequest'
 const application = 'PurchaseRequests'
 const sentAt = '2026-11-18T09:30:00Z'
 
+/** A plan of the plan's shape: its summary and changes, and every other group empty. */
+function planOf(summary: string, changes: string[] = []): AuthoringPlan {
+  return { summary, questions: [], changes, decisions: [], risks: [], checks: [], checklist: [], details: [] }
+}
+
 function request(overrides: Partial<AuthoringRequest> = {}): AuthoringRequest {
   return {
     id: 'r1',
@@ -29,6 +36,7 @@ function request(overrides: Partial<AuthoringRequest> = {}): AuthoringRequest {
     author: 'u2',
     authorName: 'Linh Nguyen',
     text: 'Add a supplier field.',
+    title: null,
     state: 'planning',
     plan: null,
     round: 0,
@@ -191,9 +199,13 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
       if (action === 'accept') {
         return json(acceptRequest('queued'), 202)
       }
-      const next = { approve: 'working', 'change-plan': 'planning', 'request-changes': 'working', drop: 'dropped' }[
-        action
-      ] as AuthoringRequestState
+      const next = {
+        approve: 'working',
+        'change-plan': 'planning',
+        'request-changes': 'working',
+        retry: 'working',
+        drop: 'dropped',
+      }[action] as AuthoringRequestState
       server.current = { ...server.current, state: next }
       return answer(server.current)
     }),
@@ -299,6 +311,30 @@ describe('StudioAuthoringRequestPage', () => {
     expect(screen.getByText(`Sent by Linh Nguyen on ${time}`)).toBeVisible()
   })
 
+  it("shows AI's title as the heading once AI has set one, in place of the first sentence of the words", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        answer(request({ title: 'Add a supplier', state: 'awaitingApproval', plan: planOf('Adds a supplier field.') })),
+      ),
+    )
+    renderPage()
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Add a supplier' })).toBeVisible()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Add a supplier field.' })).not.toBeInTheDocument()
+    expect(screen.getByText('Add a supplier field.')).toBeVisible()
+  })
+
+  it('shows the first sentence of the words as the heading while the title is null', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => answer(request({ title: null, text: 'Add a supplier field. It must be required.' }))),
+    )
+    renderPage()
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Add a supplier field.' })).toBeVisible()
+  })
+
   /** Answers `/api/me` with the signed-in person, and every other read with the request. */
   function stubAs(me: { id: string; users: boolean }, body = request({ author: 'u1' })) {
     vi.stubGlobal(
@@ -328,7 +364,10 @@ describe('StudioAuthoringRequestPage', () => {
 })
 
 describe('the plan and the guide', () => {
-  const plan = 'Add a supplier text field to the Request entity.\nShow it on the form.'
+  const plan = planOf('Add a supplier text field to the Request entity.', [
+    'Add a Supplier field.',
+    'Show it on the form.',
+  ])
   const waiting = () => request({ author: 'u1', state: 'awaitingApproval', plan })
   const button = (name: string) => screen.queryByRole('button', { name })
 
@@ -336,12 +375,23 @@ describe('the plan and the guide', () => {
     vi.stubGlobal('fetch', serverOf(waiting()).fetch)
     renderPage()
 
-    expect(await screen.findByText(/Add a supplier text field to the Request entity\./)).toBeVisible()
+    expect(await screen.findByText('Add a supplier text field to the Request entity.')).toBeVisible()
     const guide = screen.getByTestId('studio-ai-request-guide')
     expect(within(guide).getByText('Plan ready for your approval')).toBeVisible()
     expect(within(guide).getByRole('button', { name: 'Approve plan' })).toBeVisible()
     expect(within(guide).getByRole('button', { name: 'Change the plan…' })).toBeVisible()
     expect(within(guide).getByRole('button', { name: 'Drop…' })).toBeVisible()
+  })
+
+  it("shows the plan's summary, then each change as a bullet", async () => {
+    vi.stubGlobal('fetch', serverOf(waiting()).fetch)
+    renderPage()
+
+    const part = await screen.findByTestId('studio-ai-request-plan')
+    const summary = within(part).getByText('Add a supplier text field to the Request entity.')
+    const items = within(part).getAllByRole('listitem')
+    expect(items.map((item) => item.textContent)).toEqual(['Add a Supplier field.', 'Show it on the form.'])
+    expect(summary.compareDocumentPosition(items[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('shows another reader the plan and who it waits for, with no actions', async () => {
@@ -497,8 +547,138 @@ describe('the plan and the guide', () => {
   })
 })
 
+describe("the plan's groups", () => {
+  const fullPlan: AuthoringPlan = {
+    summary: 'Add a supplier field.',
+    questions: [
+      { question: 'Which type is the supplier?', options: ['Text', 'Reference', 'List'], recommended: 2 },
+      { question: 'Is it required?', options: ['Yes', 'No'], recommended: 0 },
+    ],
+    changes: ['Add a Supplier field.'],
+    decisions: [{ decision: 'Use a reference', reason: 'It keeps one supplier name.' }],
+    risks: ['Old requests have no supplier.'],
+    checks: ['A request saves with a supplier.'],
+    checklist: [{ item: 'The draft does what the plan says.', how: 'It adds only the field.' }],
+    details: ['Add the field to the Request entity.'],
+  }
+  const asking = (overrides: Partial<AuthoringRequest> = {}) =>
+    request({ author: 'u1', state: 'awaitingApproval', plan: fullPlan, ...overrides })
+  const button = (name: string) => screen.queryByRole('button', { name })
+
+  it('shows the seven groups in the documented order', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    const groups = await screen.findAllByTestId('studio-ai-request-plan-group')
+    expect(groups.map((group) => group.firstElementChild?.textContent)).toEqual([
+      'Questions',
+      'What changes',
+      'Decisions to check',
+      'Risks and limits',
+      'Acceptance criteria',
+      'Checklist',
+      'Implementation notes',
+    ])
+  })
+
+  it('shows no heading for an empty group', async () => {
+    vi.stubGlobal('fetch', serverOf(asking({ plan: { ...fullPlan, risks: [] } })).fetch)
+    renderPage()
+
+    await screen.findAllByTestId('studio-ai-request-plan-group')
+    expect(screen.queryByText('Risks and limits')).toBeNull()
+    expect(screen.getByText('Decisions to check')).toBeVisible()
+  })
+
+  it('shows each decision with its reason and each checklist item with how the plan meets it', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    const items = (await screen.findAllByRole('listitem')).map((item) => item.textContent)
+    expect(items).toContain('Use a referenceIt keeps one supplier name.')
+    expect(items).toContain('The draft does what the plan says.It adds only the field.')
+  })
+
+  it('lists the options of each question and marks the recommended one', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    expect(await screen.findByText('Reference (recommended)')).toBeVisible()
+    expect(screen.getByText('Text')).toBeVisible()
+    expect(screen.getAllByText(/\(recommended\)/)).toHaveLength(1)
+  })
+
+  it('keeps the implementation notes hidden until their button is clicked', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    expect(screen.queryByText('Add the field to the Request entity.')).toBeNull()
+    await userEvent.click(await screen.findByRole('button', { name: 'Show the implementation notes' }))
+    expect(screen.getByText('Add the field to the Request entity.')).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: 'Hide the implementation notes' }))
+    expect(screen.queryByText('Add the field to the Request entity.')).toBeNull()
+  })
+
+  it('tells its author that two questions wait and offers Answer… in place of Approve plan', async () => {
+    vi.stubGlobal('fetch', serverOf(asking()).fetch)
+    renderPage()
+
+    const guide = await screen.findByTestId('studio-ai-request-guide')
+    expect(within(guide).getByText('2 questions to answer')).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Answer…' })).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Drop…' })).toBeVisible()
+    expect(button('Approve plan')).toBeNull()
+    expect(button('Change the plan…')).toBeNull()
+  })
+
+  it('says "1 question to answer" for one question', async () => {
+    vi.stubGlobal('fetch', serverOf(asking({ plan: { ...fullPlan, questions: [fullPlan.questions[0]] } })).fetch)
+    renderPage()
+
+    expect(await screen.findByText('1 question to answer')).toBeVisible()
+  })
+
+  it('sends the answers as a change of plan', async () => {
+    const server = serverOf(asking())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Answer…' }))
+    const dialog = await screen.findByRole('dialog', { name: "Answer the plan's questions" })
+    expect(within(dialog).getByText('AI writes the plan again with your answers, and you approve it.')).toBeVisible()
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Your answers' }), 'A reference, required')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ask for a new plan' }))
+
+    expect(await screen.findByText('AI is writing the plan')).toBeVisible()
+    expect(server.calls).toEqual([{ action: 'change-plan', body: { comment: 'A reference, required' } }])
+  })
+
+  it('asks for the answers before it sends them', async () => {
+    const server = serverOf(asking())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Answer…' }))
+    const dialog = await screen.findByRole('dialog', { name: "Answer the plan's questions" })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ask for a new plan' }))
+
+    expect(await within(dialog).findByText('Write your answers.')).toBeInTheDocument()
+    expect(server.calls).toEqual([])
+  })
+
+  it('gives another reader no Answer… and the words of a plan that waits for its author', async () => {
+    vi.stubGlobal('fetch', serverOf(asking({ author: 'u2' })).fetch)
+    renderPage()
+
+    expect(await screen.findByText("Waiting for its author's approval")).toBeVisible()
+    expect(button('Answer…')).toBeNull()
+    expect(button('Approve plan')).toBeNull()
+    expect(button('Drop…')).toBeNull()
+  })
+})
+
 describe('the feed', () => {
-  const plan = 'Add a supplier field.'
+  const plan = planOf('Add a supplier field.')
   const approvedAt = '2026-11-18T09:05:00Z'
   const approved = { author: 'u1', plan, approvedAt }
   const ready = checkStep(passedChecks, 'passed')
@@ -628,7 +808,7 @@ describe('the feed', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Accept' }))
 
-    const conflict = await screen.findByTestId('studio-ai-request-conflict')
+    const conflict = await screen.findByTestId('studio-ai-request-conflict', undefined, { timeout: 4000 })
     const items = Array.from(screen.getByTestId('steps-bar').children) as HTMLElement[]
     expect(items[2]).toContainElement(conflict)
   })
@@ -636,7 +816,7 @@ describe('the feed', () => {
 
 describe('the Work item', () => {
   const approvedAt = '2026-11-18T09:05:00Z'
-  const approved = { author: 'u1', plan: 'Add a supplier field.', approvedAt }
+  const approved = { author: 'u1', plan: planOf('Add a supplier field.'), approvedAt }
   const work = async () => {
     const items = Array.from((await screen.findByTestId('steps-bar')).children) as HTMLElement[]
     return items[1]
@@ -687,9 +867,108 @@ describe('the Work item', () => {
   })
 })
 
+describe('the History', () => {
+  const approvedAt = '2026-11-18T09:05:00Z'
+  const approved = { author: 'u1', plan: planOf('Add a supplier field.'), approvedAt }
+  /** The time a number of minutes after 09:00 on the day of the request. */
+  const at = (minutes: number) => new Date(Date.parse('2026-11-18T09:00:00Z') + minutes * 60_000).toISOString()
+  /** A step that starts at a minute and runs a minute, unless `overrides` gives it another end. */
+  const step = (kind: string, minute: number, overrides: Partial<AuthoringRequestStep> = {}): AuthoringRequestStep => ({
+    kind,
+    summary: null,
+    outcome: null,
+    tokens: 0,
+    startedAt: at(minute),
+    finishedAt: at(minute + 1),
+    checks: null,
+    ...overrides,
+  })
+  /** Opens the History from Show the steps and returns its table. */
+  const show = async () => {
+    await userEvent.click(await screen.findByRole('button', { name: 'Show the steps' }))
+    return screen.findByTestId('studio-ai-request-history')
+  }
+  /** The words of each body row, its Step and Result cells, newest first. */
+  const words = (table: HTMLElement) =>
+    within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) =>
+        within(row)
+          .getAllByRole('cell')
+          .slice(0, 2)
+          .map((cell) => cell.textContent),
+      )
+
+  it('folds the History open from Show the steps, closed at first', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps: [step('work', 6)] })).fetch)
+    renderPage()
+
+    const toggle = await screen.findByRole('button', { name: 'Show the steps' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('studio-ai-request-history')).toBeNull()
+
+    await userEvent.click(toggle)
+
+    expect(screen.getByRole('button', { name: 'Hide the steps' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('studio-ai-request-history')).toBeVisible()
+  })
+
+  it('shows the table of its steps with four columns, newest step first', async () => {
+    const steps = [
+      step('plan', 0),
+      step('planChange', 1, { summary: 'Fewer fields' }),
+      step('work', 2, { outcome: null }),
+      step('check', 3, { outcome: 'passed', checks: passedChecks as AuthoringRequestStep['checks'] }),
+      step('review', 4, { outcome: 'passed' }),
+      step('check', 5, { outcome: 'failed', checks: failedCompile as AuthoringRequestStep['checks'] }),
+    ]
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps })).fetch)
+    renderPage()
+
+    const table = await show()
+
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Step', 'Result', 'Started', 'Duration'])
+    expect(words(table)).toEqual([
+      ['Checked the draft', 'It does not compile: 2 problems'],
+      ['Reviewed the draft', 'No changes requested'],
+      ['Checked the draft', 'All scenarios pass'],
+      ['Changed the draft', 'Saved'],
+      ['Asked for another plan: “Fewer fields”', '—'],
+      ['Wrote a plan', 'Plan written'],
+    ])
+  })
+
+  it('shows an em dash in Duration for a step that is still running, and no pager with more than ten steps', async () => {
+    const steps = Array.from({ length: 11 }, (_, index) => step('work', index * 2))
+    steps.push(step('check', 22, { finishedAt: null }))
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'checking', steps })).fetch)
+    renderPage()
+
+    const table = await show()
+
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(12)
+    expect(within(rows[0]).getAllByRole('cell')[3]).toHaveTextContent('—')
+    expect(within(rows[1]).getAllByRole('cell')[3]).not.toHaveTextContent('—')
+    expect(within(table).queryByRole('list')).toBeNull()
+  })
+
+  it('shows Show the steps to a reader who is not the author', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps: [step('work', 6)] })).fetch)
+    renderPage({ userId: 'u9' })
+
+    expect(await screen.findByRole('button', { name: 'Show the steps' })).toBeVisible()
+  })
+})
+
 describe('the Plan item of an approved plan', () => {
   const approvedAt = '2026-11-18T09:05:00Z'
-  const plan = 'Add a supplier field.\n\nShow it on the form.'
+  const plan = planOf('Add a supplier field.', ['Show it on the form.'])
   const asked = (comment: string): AuthoringRequestStep => ({
     kind: 'planChange',
     summary: comment,
@@ -701,7 +980,7 @@ describe('the Plan item of an approved plan', () => {
   })
   const planItem = async () => (Array.from((await screen.findByTestId('steps-bar')).children) as HTMLElement[])[0]
 
-  it('reads "Approved on <time>", folds the plan under its first paragraph and shows the rest with Show the plan', async () => {
+  it('reads "Approved on <time>", folds the plan under its summary and shows its changes with Show the plan', async () => {
     vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'working', plan, approvedAt })).fetch)
     renderPage()
 
@@ -754,10 +1033,10 @@ describe('the Plan item of an approved plan', () => {
     expect(within(item).queryByText(/^Approved on/)).toBeNull()
   })
 
-  it('shows no Show the plan for a plan of one paragraph', async () => {
+  it('shows no Show the plan for a plan with no changes', async () => {
     vi.stubGlobal(
       'fetch',
-      serverOf(request({ author: 'u1', state: 'working', plan: 'Add a field.', approvedAt })).fetch,
+      serverOf(request({ author: 'u1', state: 'working', plan: planOf('Add a field.'), approvedAt })).fetch,
     )
     renderPage()
 
@@ -870,7 +1149,7 @@ describe('accepting a ready request', () => {
     request({
       state: 'ready',
       author: 'u1',
-      plan: 'Add a field.',
+      plan: planOf('Add a field.'),
       steps: [checkStep(passedChecks, 'passed')],
       ...overrides,
     })
@@ -996,7 +1275,7 @@ describe('accepting a ready request', () => {
     expect(await accept()).toBeVisible()
   })
 
-  it('shows a conflict alert with a bullet for each changed resource, and Drop… with no Accept', async () => {
+  it('shows a conflict alert with a bullet for each changed resource, and Make the change again and Drop… with no Accept', async () => {
     const server = serverOf(ready())
     server.accept = ['queued', 'failed']
     server.acceptDiagnostics = [
@@ -1014,7 +1293,11 @@ describe('accepting a ready request', () => {
     ).toBeVisible()
     const items = within(alert).getAllByTestId('studio-ai-request-conflict-item')
     expect(items).toHaveLength(2)
-    expect(items[0].textContent).toBe(`Employee, changed by Linh Nguyen on ${timeOf('2026-11-18T10:15:00Z')}`)
+    expect(items[0].textContent).toBe(`Employee Role, changed by Linh Nguyen on ${timeOf('2026-11-18T10:15:00Z')}`)
+    expect(within(items[0]).getByRole('link', { name: 'Employee' })).toHaveAttribute(
+      'href',
+      studioResourceAddress(application, 'role-1'),
+    )
     expect(within(items[0]).getByText(timeOf('2026-11-18T10:15:00Z'), { selector: 'time' })).toHaveAttribute(
       'datetime',
       '2026-11-18T10:15:00Z',
@@ -1022,13 +1305,33 @@ describe('accepting a ready request', () => {
     expect(items[1].textContent).toBe(
       `packages/tax/rates.json, changed by Minh Tran on ${timeOf('2026-11-18T11:40:00Z')}`,
     )
+    expect(within(items[1]).queryByRole('link')).toBeNull()
 
     const guide = screen.getByTestId('studio-ai-request-guide')
     expect(within(guide).getByText('Resources changed since AI read them')).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Make the change again' })).toBeVisible()
     expect(within(guide).getByRole('button', { name: 'Drop…' })).toBeVisible()
     expect(within(guide).queryByRole('button', { name: 'Accept' })).toBeNull()
     expect(screen.queryByText('Not accepted. Nothing in the application changed.')).toBeNull()
     expect(screen.queryByTestId('studio-request-status')).toBeNull()
+  })
+
+  it('posts the retry when the author clicks "Make the change again", and then reads "AI is working on it"', async () => {
+    const server = serverOf(ready())
+    server.accept = ['queued', 'failed']
+    server.acceptDiagnostics = [conflict('role-1', 'roles/employee.json', 'Linh Nguyen', '2026-11-18T10:15:00Z')]
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ resources: [employee] })
+    await userEvent.click(await accept())
+    await screen.findByTestId('studio-ai-request-conflict', undefined, { timeout: 4000 })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Make the change again' }))
+
+    expect(server.calls.at(-1)).toEqual({ action: 'retry', body: undefined })
+    const guide = screen.getByTestId('studio-ai-request-guide')
+    expect(await within(guide).findByText('AI is working on it')).toBeVisible()
+    expect(screen.queryByTestId('studio-ai-request-conflict')).toBeNull()
+    expect(within(guide).queryByRole('button', { name: 'Make the change again' })).toBeNull()
   })
 
   it('shows "Accepted" and the state Accepted when the accept succeeds', async () => {

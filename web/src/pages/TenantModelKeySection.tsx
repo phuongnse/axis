@@ -1,11 +1,11 @@
 import { Flex, Form, Input, Modal, Typography } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { useEffect, useState, type ReactNode } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { DialogFooter } from '../platform/DialogFooter'
 import { AxisField } from '../platform/AxisField'
 import { maskedKey } from '../platform/maskedKey'
-import { requiredMark } from '../platform/requiredMark'
 import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -200,13 +200,7 @@ function SetKeyDialog({
       }
       onCancel={onCancel}
     >
-      <Form
-        form={form}
-        layout="vertical"
-        requiredMark={requiredMark}
-        scrollToFirstError={{ focus: true }}
-        onFinish={({ key }) => onSave(key)}
-      >
+      <AxisForm form={form} onFinish={({ key }) => onSave(key)}>
         <AxisField
           name="key"
           label={t('shell.users.modelKey.field')}
@@ -215,7 +209,7 @@ function SetKeyDialog({
         >
           <Input.Password autoComplete="off" />
         </AxisField>
-      </Form>
+      </AxisForm>
     </Modal>
   )
 }
