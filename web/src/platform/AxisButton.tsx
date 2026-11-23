@@ -11,7 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
-import { useSelectedItemTint } from './antTheme'
+import { textButtonClass, useSelectedItemTint } from './antTheme'
 import { Chevron } from './Chevron'
 import type { ButtonRole } from './buttonRoles'
 import { fillText } from './fillText'
@@ -82,6 +82,11 @@ function isIconButton(props: AxisButtonProps): props is IconButtonProps {
   return props.nameKey !== undefined
 }
 
+/** The class of a text button, kept beside any class the caller passes. */
+function textClass(className: string | undefined): string {
+  return className ? `${textButtonClass} ${className}` : textButtonClass
+}
+
 type Marks = { 'aria-pressed'?: boolean | 'true' | 'false' | 'mixed'; 'aria-current'?: unknown }
 
 /**
@@ -124,6 +129,7 @@ function IconButton(props: IconButtonProps) {
     doneKey,
     icon,
     style,
+    className,
     disabled,
     onClick,
     onMouseEnter,
@@ -157,6 +163,7 @@ function IconButton(props: IconButtonProps) {
       <Button
         {...chosen.rest}
         type={joined ? 'default' : 'text'}
+        className={joined ? className : textClass(className)}
         disabled={disabled}
         aria-label={nameSuffix ? `${name} ${nameSuffix}` : name}
         icon={<span aria-hidden>{icon}</span>}
@@ -336,7 +343,7 @@ export function TitleRowActions({ children }: { children: ReactNode }) {
  * `finish` is a solid `danger` fill with white text. `selected` draws a subtle button on the selected tint in
  * `primaryText`, and sets the one `aria-pressed`, or `aria-current` for `"page"` and `"step"`, in place of any the caller
  * passes. Inside an `AxisActionRow`, `secondary` and `subtle` are text buttons, and a destructive `secondary` is in
- * `dangerText`. `caret` adds a down caret after the text of any text role. The role is not passed on to the DOM.
+ * `dangerText`. Every text button carries `textButtonClass`. `caret` adds a down caret after the text of any text role. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
@@ -345,7 +352,7 @@ export function AxisButton(props: AxisButtonProps) {
 
   if (isIconButton(props)) return <IconButton {...props} />
 
-  const { role, style, disabled, caret, children, destructive, selected, ...attributes } = props
+  const { role, style, className, disabled, caret, children, destructive, selected, ...attributes } = props
   const chosen = withSelected(selected, attributes, tint, colour.primaryText, disabled)
   const body = {
     ...chosen.rest,
@@ -360,6 +367,7 @@ export function AxisButton(props: AxisButtonProps) {
           {...body}
           type="primary"
           danger
+          className={className}
           disabled={disabled}
           style={
             disabled
@@ -368,7 +376,7 @@ export function AxisButton(props: AxisButtonProps) {
           }
         />
       ) : (
-        <Button {...body} type="primary" disabled={disabled} style={style} />
+        <Button {...body} type="primary" className={className} disabled={disabled} style={style} />
       )
     case 'main':
       // A region's main action keeps its border wherever it sits, even beside a finish button.
@@ -377,19 +385,29 @@ export function AxisButton(props: AxisButtonProps) {
           {...body}
           color={destructive ? 'danger' : 'primary'}
           variant="outlined"
+          className={className}
           disabled={disabled}
           style={{ ...outline(destructive ? colour.dangerText : colour.primaryText), ...style }}
         />
       )
     case 'secondary':
       if (!destructive) {
-        return <Button {...body} type={inRow ? 'text' : 'default'} disabled={disabled} style={style} />
+        return (
+          <Button
+            {...body}
+            type={inRow ? 'text' : 'default'}
+            className={inRow ? textClass(className) : className}
+            disabled={disabled}
+            style={style}
+          />
+        )
       }
       return (
         <Button
           {...body}
           color="danger"
           variant={inRow ? 'text' : 'outlined'}
+          className={inRow ? textClass(className) : className}
           disabled={disabled}
           style={{ ...(inRow ? tinted(colour.dangerText) : outline(colour.dangerText)), ...style }}
         />
@@ -400,11 +418,18 @@ export function AxisButton(props: AxisButtonProps) {
           {...body}
           color="danger"
           variant="text"
+          className={textClass(className)}
           disabled={disabled}
           style={{ ...tinted(colour.dangerText), ...chosen.style, ...style }}
         />
       ) : (
-        <Button {...body} type="text" disabled={disabled} style={{ ...chosen.style, ...style }} />
+        <Button
+          {...body}
+          type="text"
+          className={textClass(className)}
+          disabled={disabled}
+          style={{ ...chosen.style, ...style }}
+        />
       )
   }
 }

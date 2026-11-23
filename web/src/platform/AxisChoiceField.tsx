@@ -1,6 +1,7 @@
-import { Flex, Radio, Typography, type FormItemProps } from 'antd'
-import { useId } from 'react'
+import { Flex, Form, Radio, Typography, type FormItemProps, type RadioGroupProps } from 'antd'
+import { useId, type ReactNode } from 'react'
 import { AxisField, type AxisFieldStatus } from './AxisField'
+import { useErrorBoxStyles } from './antTheme'
 import { StatusTag } from './StatusTag'
 
 /** An option of a choice: its value, its label, its help and an optional mark such as "Built in". */
@@ -46,6 +47,26 @@ function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
   return props.name === undefined
 }
 
+type BoxStyles = ReturnType<ReturnType<typeof useErrorBoxStyles>>
+
+/** The radio group of a choice inside a form item, which draws each unticked radio in `dangerText` while the item shows an error. */
+function FormChoiceGroup({
+  label,
+  radios,
+  ...injected
+}: RadioGroupProps & {
+  label: string
+  radios: (value: unknown, styleOf: (ticked: boolean) => BoxStyles) => ReactNode
+}) {
+  const { status } = Form.Item.useStatus()
+  const boxStyles = useErrorBoxStyles()
+  return (
+    <Radio.Group aria-label={label} {...injected}>
+      {radios(injected.value, (ticked) => boxStyles(status === 'error', ticked))}
+    </Radio.Group>
+  )
+}
+
 /**
  * A choice among a few options of a platform screen, drawn as radios: the field's label, its help, then each option
  * with its label, its optional mark and its own help, see docs/reference/actions-and-controls.md#fields. The option's
@@ -58,12 +79,17 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
   const { label, help, options } = props
   const optionId = useId()
   const groupName = useId()
-  const radios = (
+  const radios = (value: unknown, styleOf: (ticked: boolean) => BoxStyles) => (
     <Flex vertical>
       {options.map((option, index) => {
         const helpId = `${optionId}-${index}-help`
         return (
-          <Radio key={option.value} value={option.value} aria-describedby={option.help === '' ? undefined : helpId}>
+          <Radio
+            key={option.value}
+            value={option.value}
+            styles={styleOf(option.value === value)}
+            aria-describedby={option.help === '' ? undefined : helpId}
+          >
             <Flex gap="small" align="center" wrap>
               <span>{option.label}</span>
               {option.mark && <StatusTag tone="neutral">{option.mark}</StatusTag>}
@@ -88,7 +114,7 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
           value={value}
           onChange={(event) => onChange(event.target.value)}
         >
-          {radios}
+          {radios(value, () => undefined)}
         </Radio.Group>
       </AxisField>
     )
@@ -103,7 +129,7 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
       initialValue={initialValue}
       status={status}
     >
-      <Radio.Group aria-label={label}>{radios}</Radio.Group>
+      <FormChoiceGroup label={label} radios={radios} />
     </AxisField>
   )
 }

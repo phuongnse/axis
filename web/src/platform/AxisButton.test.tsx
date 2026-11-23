@@ -7,7 +7,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AxisActionRow, AxisButton, AxisButtonGroup, AxisSplitButton } from './AxisButton'
-import { antThemeFor } from './antTheme'
+import { antThemeFor, textButtonClass } from './antTheme'
 import { buttonRoles } from './buttonRoles'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
@@ -725,5 +725,69 @@ describe('the split button', () => {
     const menu = await screen.findByRole('menu', { name: 'More actions' })
     expect(within(menu).getByRole('menuitem', { name: 'Delete' })).toHaveClass('ant-dropdown-menu-item-danger')
     expect(within(menu).getByRole('menuitem', { name: 'Rename' })).not.toHaveClass('ant-dropdown-menu-item-danger')
+  })
+})
+
+describe('the class of a text button', () => {
+  it('is on every text button AxisButton draws, and on no solid, outlined or joined one', () => {
+    const { container } = renderIn(
+      'light',
+      <>
+        <AxisButton role="subtle">Subtle</AxisButton>
+        <AxisButton role="subtle" destructive>
+          Subtle destructive
+        </AxisButton>
+        <AxisButton role="subtle" caret>
+          Subtle caret
+        </AxisButton>
+        <AxisButton role="subtle" selected>
+          Subtle selected
+        </AxisButton>
+        <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" />
+        <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.validate" joined />
+        <AxisButton role="finish">Finish</AxisButton>
+        <AxisButton role="finish" destructive>
+          Finish destructive
+        </AxisButton>
+        <AxisButton role="main">Main</AxisButton>
+        <AxisButton role="secondary">Outlined secondary</AxisButton>
+        <AxisButton role="secondary" destructive>
+          Outlined destructive
+        </AxisButton>
+        <AxisActionRow>
+          <AxisButton role="secondary">Row secondary</AxisButton>
+          <AxisButton role="secondary" destructive>
+            Row destructive
+          </AxisButton>
+        </AxisActionRow>
+      </>,
+    )
+
+    const buttons = [...container.querySelectorAll('button')]
+    expect(buttons).toHaveLength(13)
+    const text = buttons.filter((button) => button.classList.contains('ant-btn-variant-text'))
+    expect(text).toHaveLength(7)
+    for (const button of buttons) {
+      expect(button.classList.contains(textButtonClass)).toBe(text.includes(button))
+    }
+  })
+
+  it('keeps a class the caller passes beside it', () => {
+    renderIn(
+      'light',
+      <>
+        <AxisButton role="subtle" className="mine">
+          Subtle
+        </AxisButton>
+        <AxisButton role="finish" className="finish-mine">
+          Finish
+        </AxisButton>
+        <AxisButton role="subtle" icon={<PlusOutlined />} nameKey="test.add" className="icon-mine" />
+      </>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Subtle' })).toHaveClass('mine', textButtonClass)
+    expect(screen.getByRole('button', { name: 'Finish' })).toHaveClass('finish-mine')
+    expect(screen.getByRole('button', { name: 'Add a row' })).toHaveClass('icon-mine', textButtonClass)
   })
 })

@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AxisChoiceField } from './AxisChoiceField'
+import { designTokensFor } from './designTokens'
 import { requiredMark } from './requiredMark'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
@@ -147,5 +148,43 @@ describe('AxisChoiceField', () => {
       // @ts-expect-error Every platform field has help, also when the caller holds the value.
       <AxisChoiceField label="Size" options={options} value="small" onChange={vi.fn()} />,
     ).toBeDefined()
+  })
+
+  it('draws each unticked radio of a field with an error in dangerText, level with the first line', async () => {
+    renderForm(
+      <AxisChoiceField label="Size" help="Pick one." name="size" options={options} requiredMessage="Choose a size." />,
+    )
+    const icons = screen.getAllByRole('radio').map((radio) => radio.closest<HTMLElement>('.ant-radio'))
+    expect(icons.every((icon) => icon?.style.borderColor === '')).toBe(true)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+    for (const icon of icons) {
+      await waitFor(() => expect(icon).toHaveStyle({ borderColor: designTokensFor('light').colour.dangerText }))
+      expect(icon).toHaveStyle({ alignSelf: 'flex-start' })
+    }
+
+    await userEvent.click(screen.getByRole('radio', { name: /Large/ }))
+
+    await waitFor(() => expect(icons.every((icon) => icon?.style.borderColor === '')).toBe(true))
+  })
+
+  it('keeps the own look of the ticked radio in a field the server refused', () => {
+    renderForm(
+      <AxisChoiceField
+        label="Size"
+        help=""
+        name="size"
+        options={options}
+        initialValue="small"
+        status={{ state: 'refused', message: 'Refused.' }}
+      />,
+    )
+
+    const border = (name: RegExp) =>
+      screen.getByRole('radio', { name }).closest<HTMLElement>('.ant-radio')?.style.borderColor
+    expect(border(/Small/)).toBe('')
+    expect(border(/Large/)).not.toBe('')
+    expect(border(/None/)).not.toBe('')
   })
 })
