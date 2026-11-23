@@ -807,10 +807,10 @@ describe('ShellNavigation parent entries', () => {
     },
   ]
   // Without motion a folded submenu leaves the document at once, as jsdom runs no animations.
-  const navigation = (activeKey: string, collapsed = false) => (
+  const navigation = (activeKey: string, collapsed = false, entries: typeof parents = parents) => (
     <ConfigProvider theme={{ token: { motion: false } }}>
       <MemoryRouter>
-        <ShellNavigation entries={parents} activeKey={activeKey} collapsed={collapsed} />
+        <ShellNavigation entries={entries} activeKey={activeKey} collapsed={collapsed} />
       </MemoryRouter>
     </ConfigProvider>
   )
@@ -848,6 +848,16 @@ describe('ShellNavigation parent entries', () => {
     rerender(navigation('requests:all'))
 
     expect(title).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'All requests' })).toBeVisible()
+  })
+
+  it('opens when it is drawn after its marked entry, as the reader arrives after the sidebar', () => {
+    const { rerender } = render(navigation('requests:all', false, [parents[0]]))
+    expect(screen.queryByRole('menuitem', { name: 'AI requests' })).toBeNull()
+
+    rerender(navigation('requests:all'))
+
+    expect(screen.getByRole('menuitem', { name: 'AI requests' })).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('link', { name: 'All requests' })).toBeVisible()
   })
 

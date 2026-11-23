@@ -36,8 +36,9 @@ export type ShellNavigationNode = ShellNavigationEntry | ShellNavigationGroup | 
  * entry shows its label alone, and an open group shows its label above its entries. A collapsed entry shows its icon
  * alone, and Ant Design gives it the label as a tooltip. A collapsed group gives way to a thin rule above its entries.
  * A parent entry opens by itself while one of its entries is marked. A person's open or fold of it holds until another
- * entry is marked, and a collapsed parent opens as Ant Design's popup. The collapsed state is passed on, because a page's
- * entries render through a portal and so do not see the Sider's context. No entry shows a count.
+ * entry is marked or the parents that hold the marked entry change, and a collapsed parent opens as Ant Design's popup.
+ * The collapsed state is passed on, because a page's entries render through a portal and so do not see the Sider's
+ * context. No entry shows a count.
  */
 export function ShellNavigation({
   entries,
@@ -60,14 +61,18 @@ export function ShellNavigation({
       ),
     }
   }
-  // The parents open for the marked entry. The person's own open or fold is kept for the same marked entry only, so a
-  // change of the marked entry starts again from the parents that hold it.
+  // The parents open for the marked entry. The person's own open or fold is kept while the marked entry and the parents
+  // that hold it stay the same. A parent drawn later, such as one that waits for the reader, starts again from them.
   const opened = entries.flatMap((entry) =>
     'children' in entry && entry.children.some((child) => child.key === activeKey) ? [entry.key] : [],
   )
-  const [held, setHeld] = useState<{ activeKey?: string; keys: string[] }>({ activeKey, keys: opened })
-  if (held.activeKey !== activeKey) {
-    setHeld({ activeKey, keys: opened })
+  const [held, setHeld] = useState<{ activeKey?: string; opened: string[]; keys: string[] }>({
+    activeKey,
+    opened,
+    keys: opened,
+  })
+  if (held.activeKey !== activeKey || JSON.stringify(held.opened) !== JSON.stringify(opened)) {
+    setHeld({ activeKey, opened, keys: opened })
   }
   const items = entries.flatMap((entry): NonNullable<MenuProps['items']> => {
     if ('children' in entry) {
@@ -92,7 +97,7 @@ export function ShellNavigation({
       style={{ borderInlineEnd: 'none' }}
       selectedKeys={activeKey ? [activeKey] : []}
       openKeys={collapsed ? undefined : held.keys}
-      onOpenChange={collapsed ? undefined : (keys) => setHeld({ activeKey, keys })}
+      onOpenChange={collapsed ? undefined : (keys) => setHeld({ activeKey, opened, keys })}
       items={items}
     />
   )
