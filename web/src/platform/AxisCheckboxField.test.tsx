@@ -209,6 +209,15 @@ describe('AxisCheckboxField', () => {
     await waitFor(() => expect(icon?.style.borderColor).toBe(''))
   })
 
+  it.each([
+    { kind: 'checkbox', props: {}, role: 'checkbox', root: '.ant-checkbox-wrapper' },
+    { kind: 'switch', props: { kind: 'switch' as const }, role: 'switch', root: '.ant-switch' },
+  ])('keeps the width of a $kind in a form, so a click beside its label does not tick it', ({ props, role, root }) => {
+    renderForm(<AxisCheckboxField label="Active" help="An inactive item is hidden." name="active" {...props} />)
+
+    expect(screen.getByRole(role, { name: 'Active' }).closest(root)).not.toHaveStyle({ width: '100%' })
+  })
+
   it('keeps the own look of a ticked box in a field the server refused', () => {
     renderForm(
       <AxisCheckboxField

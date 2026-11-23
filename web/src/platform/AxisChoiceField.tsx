@@ -2,6 +2,7 @@ import { Flex, Form, Radio, Typography, type FormItemProps, type RadioGroupProps
 import { useId, type ReactNode } from 'react'
 import { AxisField, type AxisFieldStatus } from './AxisField'
 import { useErrorBoxStyles } from './antTheme'
+import { keepsOwnWidth } from './ownWidth'
 import { StatusTag } from './StatusTag'
 
 /** An option of a choice: its value, its label, its help and an optional mark such as "Built in". */
@@ -66,6 +67,7 @@ function FormChoiceGroup({
     </Radio.Group>
   )
 }
+keepsOwnWidth(FormChoiceGroup)
 
 /**
  * A choice among a few options of a platform screen, drawn as radios: the field's label, its help, then each option

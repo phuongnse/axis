@@ -169,6 +169,14 @@ describe('AxisChoiceField', () => {
     await waitFor(() => expect(icons.every((icon) => icon?.style.borderColor === '')).toBe(true))
   })
 
+  it('keeps the width of the radio group in a form, so a click beside an option does not pick it', () => {
+    renderForm(<AxisChoiceField label="Size" help="Pick one." name="size" options={options} />)
+
+    expect(screen.getByRole('radiogroup', { name: 'Size' }).closest('.ant-radio-group')).not.toHaveStyle({
+      width: '100%',
+    })
+  })
+
   it('keeps the own look of the ticked radio in a field the server refused', () => {
     renderForm(
       <AxisChoiceField
