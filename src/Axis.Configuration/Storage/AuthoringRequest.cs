@@ -26,7 +26,11 @@ public sealed class AuthoringRequest
 
     public Guid? DraftId { get; init; }
 
+    /// <summary>The plan as JSON of the plan's shape, see <c>docs/reference/authoring-requests.md#states</c>, or null until AI has proposed one.</summary>
     public string? Plan { get; init; }
+
+    /// <summary>The title AI gave the request with its plan, at most 80 characters, or null until AI has proposed a plan.</summary>
+    public string? Title { get; init; }
 
     public int Round { get; init; }
 

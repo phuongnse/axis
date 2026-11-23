@@ -137,7 +137,7 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnName("finished_at");
 
                     b.Property<string>("Plan")
-                        .HasColumnType("text")
+                        .HasColumnType("jsonb")
                         .HasColumnName("plan");
 
                     b.Property<byte[]>("RefreshToken")
@@ -165,6 +165,10 @@ namespace Axis.Configuration.Storage.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("text");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("text")
+                        .HasColumnName("title");
 
                     b.Property<long>("Tokens")
                         .ValueGeneratedOnAdd()

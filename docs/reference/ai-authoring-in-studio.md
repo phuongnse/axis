@@ -67,7 +67,7 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
 ### The heading
 
 - The heading is the request's name: the first sentence of its words, cut at 80 characters with an ellipsis.
-- **AI's name** _(planned for M35)_. Once AI names the request, the heading shows AI's name in place of the
+- **AI's name**. Once AI names the request, the heading shows AI's name in place of the
   first sentence, as [the request's answer](authoring-requests.md#routes) gives it.
 - The state sits beside the name as a [status tag](shared-widgets.md#which-widget), with its word from
   [the states](#the-states).
@@ -157,7 +157,7 @@ Result, Started and Duration.
   shows an em dash.
 - The words of a step come from its kind and its outcome, and never from AI. Examples are "Wrote a plan",
   "Changed the draft", "Checked the draft", "Fixed the draft", "Reviewed the draft", "Asked for another plan:
-  “<comment>”" and "Asked for changes: “<comment>”".
+  “<comment>”", "Asked for changes: “<comment>”" and "Asked AI to make the change again".
 - The results read "Plan written", "Saved", "All scenarios pass", "No changes requested", "Refused" or
   "Ran out of time". The only free text is the author's own comment in a step.
 - **Writes that follow each other.** Writes that follow each other fold into one group row, as
@@ -187,7 +187,7 @@ bar, never in the heading. Only the request's author sees its actions.
 | AI waits for an outside app _(planned for M35)_ | The app's line, as [below](#an-outside-apps-request) gives it | none                                                                                                         | Drop…                                                               |
 | Ready, a finding must change _(planned for M35)_ | "1 blocking finding", or "<n> blocking findings"         | Ask AI to fix it, which asks for changes with "Fix what the review found must change:" and each blocking finding as the comment | Drop…, Ask for other changes…, Accept anyway…, see [the diff](#the-diff) |
 | Ready, passed | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes…                                        |
-| Ready, an accept met a conflict               | Resources changed since AI read them                     | Make the change again _(planned for M35)_. Until then, none                                                       | Drop…                                                               |
+| Ready, an accept met a conflict               | Resources changed since AI read them                     | Make the change again                                                                                             | Drop…                                                               |
 | Ready, for anyone else | Waiting for its author to accept                         | none                                                                                                              | none                                                                |
 | Accepting | Accepting the draft                                      | none                                                                                                              | none                                                                |
 | Failed, for its author _(planned for M35)_ | AI could not finish                                      | Send again, which sends its words as a new request and opens it                                                   | Drop…                                                               |
@@ -235,11 +235,12 @@ The Plan item shows the plan in each of its states.
 - While AI writes the plan, the mark turns, and the item reads "AI is reading the application and writing a plan. Nothing changes
   until the plan is approved."
 - While the plan waits for its author, nothing sits beside its title, and the plan is open.
+- The open plan shows its summary, then its changes, one bullet each, under **Show the plan** or **Hide the plan**. Its
+  other groups wait for [the plan's groups](#the-plans-groups).
 - **Once the plan is approved.** The item reads "Approved on <time>", and the plan is folded
   under its summary.
 - **The summary.** The summary is under the title in every state once AI has written the
-  plan. **Show the plan** or **Hide the plan** follows it on the same line. Until the plan has its own shape, its
-  summary is its first paragraph, and Show the plan shows only when more text follows that paragraph.
+  plan. **Show the plan** or **Hide the plan** follows it on the same line, and shows only when the plan has changes.
 - **Earlier comments.** The author's comments that asked for another plan come first, oldest
   first, as "Asked for another plan: “…”", in the text colour.
 - **A failure before approval.** A request that failed before its plan was approved stops
@@ -396,12 +397,13 @@ and only when the deployment has a preview host, `studioPreviewHost` in [`GET /a
   in place of "Not accepted". It shows only for the accept that the page follows in this visit, so after a reload the
   request reads as Ready. It has one bullet for each resource: the resource's title, then who changed it and when. A
   bullet with no author shows only the title. The title is the name the resource has in the resource list, or its
-  file while the list loads. The bar then has no Accept, only Drop….
-- **A link to the resource** _(planned for M35)_. Each bullet's title is plain text until the
-  [`ResourceReference`](shared-widgets.md#which-widget) link draws it.
-- **Make the change again** _(planned for M35)_ is the bar's main action after a conflict. It sends the
+  file while the list loads. The bar then has Make the change again and Drop…, and no Accept.
+- **A link to the resource.** Each bullet's title is drawn by the
+  [`ResourceReference`](shared-widgets.md#which-widget) widget: a link to the resource in Studio, with its kind muted
+  after it. A package file, and a resource the list has not loaded yet, is plain muted file text with no link.
+- **Make the change again** is the bar's main action after a conflict. It sends the
   [retry](authoring-requests.md#routes) route. AI makes the change on a new draft from the folder as it is now, and the
-  checks and the review run again. Until it exists, the bar has no main action.
+  checks and the review run again. The page then shows the request as working, and it forgets the accept it followed.
 
 ### A failure
 
@@ -470,7 +472,7 @@ changed what and can undo it.
 - **Publishing.** The publish page lists every file that differs from the live release, under "`<n>` files
   changed since the live release". Each file shows "Changed by" and each person who changed it since the release,
   in the order of their first change. An AI request is "the AI request “`<name>`”", a
-  link to its page. A change the server recorded reads System, as it does in History. An AI request that cannot
+  link to its page, with the request's name as [the heading](#the-heading) gives it. A change the server recorded reads System, as it does in History. An AI request that cannot
   be read names the person who accepted it instead. A file that no revision changed since the release has no
   Changed by line. The list comes from the [live diff](authoring-revisions.md#live-diff). The page is described
   in [publishing](studio.md#publishing).

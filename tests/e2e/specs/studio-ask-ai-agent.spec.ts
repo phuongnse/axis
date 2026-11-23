@@ -7,7 +7,7 @@ import { expect, test } from '../test'
 import { sparePort } from '../activate'
 import { runAdmin } from '../admin-tool'
 import { startAgentHost } from '../agent-host'
-import { askAi, holdAiSpecLock, signIn, startSpecPublisher, type AuthoringAccount } from '../ai-authoring'
+import { askAi, holdAiSpecLock, planAnswer, signIn, startSpecPublisher, type AuthoringAccount } from '../ai-authoring'
 import { csrfHeaders } from '../csrf'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { startDirectoryServer } from '../directory-server'
@@ -93,12 +93,12 @@ test.beforeAll(async () => {
   folder = await mkdtemp(path.join(os.tmpdir(), 'axis-ask-ai-agent-'))
   const tls = issueTenantCertificate(folder)
   trustDir = tls.trustDir
-  // The scripted answers are plans with no questions, shaped as Messages API responses.
+  // The scripted answers are plans with no questions, each a `propose_plan` call.
   answersFile = path.join(folder, 'answers.json')
   await writeFile(
     answersFile,
     JSON.stringify(
-      [plan, secondPlan, newPlan].map((text) => ({ content: [{ type: 'text', text }], stop_reason: 'end_turn', usage })),
+      [plan, secondPlan, newPlan].map((summary) => planAnswer(application, summary, usage)),
     ),
   )
 
@@ -262,7 +262,7 @@ test('a request whose compile check fails in every fix round ends Failed, with w
   await writeFile(
     failingAnswers,
     JSON.stringify([
-      { content: [{ type: 'text', text: failingPlan }], stop_reason: 'end_turn', usage },
+      planAnswer(application, failingPlan, usage),
       {
         content: [
           {
@@ -381,11 +381,7 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
   await writeFile(
     layerAnswers,
     JSON.stringify([
-      {
-        content: [{ type: 'text', text: layerPlan }],
-        stop_reason: 'end_turn',
-        usage,
-      },
+      planAnswer(approvalsApplication, layerPlan, usage),
       // The work reads the employee role before it writes the layer, so the draft records the role's version. The conflict
       // test changes the role after AI reads it, and the accept then meets that change, see there.
       {

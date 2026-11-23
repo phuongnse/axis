@@ -30,7 +30,7 @@ public sealed class AgentReviewingTests(KeycloakFixture keycloak, PostgreSqlFixt
         using var client = await _realm.SignInAsync();
         var id = await SendAsync(client);
         await ReviewingAsync(id);
-        var script = new ScriptedModelAdapter([Plan(Findings, 40, 10)]);
+        var script = new ScriptedModelAdapter([Answer(Findings, 40, 10)]);
         var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
         await using var host = BuildAgent(_realm, script, server, fixing: false);
         await host.StartAsync(CancellationToken);
@@ -69,7 +69,7 @@ public sealed class AgentReviewingTests(KeycloakFixture keycloak, PostgreSqlFixt
         var script = new ScriptedModelAdapter(
         [
             ToolUse("write-1", "write_resource", """{"application":"PurchaseRequests","content":{}}""", 10, 5),
-            Plan("PASSED\nThe draft does the request.", 20, 5),
+            Answer("PASSED\nThe draft does the request.", 20, 5),
         ]);
         var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
         await using var host = BuildAgent(_realm, script, server);
@@ -95,7 +95,7 @@ public sealed class AgentReviewingTests(KeycloakFixture keycloak, PostgreSqlFixt
     // The request is as the checking step leaves it: in reviewing, with a plan, a draft and the results of a finished check step.
     private async Task ReviewingAsync(Guid id)
     {
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'reviewing', plan = 'A plan.', draft_id = '{Guid.NewGuid()}' WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'reviewing', plan = '{PlanJson}', draft_id = '{Guid.NewGuid()}' WHERE id = '{id}' RETURNING 1");
         await ScalarAsync(
             $"INSERT INTO axis.authoring_request_steps (id, request_id, ordinal, kind, outcome, checks, finished_at) VALUES ('{Guid.NewGuid()}', '{id}', 1, 'check', 'passed', '{LatestChecks}'::jsonb, now()) RETURNING 1");
     }

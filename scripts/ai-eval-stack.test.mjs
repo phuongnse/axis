@@ -11,7 +11,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
-import { applicationName, createTenant, startStack } from './lib/ai-eval-stack.mjs'
+import { applicationName, createTenant, planAnswer, startStack } from './lib/ai-eval-stack.mjs'
 
 const timeout = 30 * 60 * 1000
 
@@ -26,7 +26,7 @@ const answers = [
     stop_reason: 'tool_use',
     usage,
   },
-  { content: [{ type: 'text', text: plan }], stop_reason: 'end_turn', usage },
+  planAnswer(applicationName(start, 'eval-smoke'), plan, usage),
 ]
 
 describe('the authoring eval stack', () => {
@@ -98,7 +98,7 @@ describe('the authoring eval stack', () => {
         if (current.state !== 'planning') break
       }
       assert.equal(current.state, 'awaitingApproval', JSON.stringify(current))
-      assert.equal(current.plan, plan)
+      assert.equal(current.plan.summary, plan)
     } catch (error) {
       console.error(stack?.logs())
       throw error

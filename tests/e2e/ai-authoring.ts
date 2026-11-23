@@ -7,6 +7,46 @@ import { liveTotp } from './totp'
 
 // The sign-in, the Ask AI call, the publisher and the lock that the AI authoring specs share, see the Ask AI agent spec in docs/testing.md.
 
+/** Axis's checklist, word for word as a plan must give it, see docs/reference/authoring-requests.md#states. */
+const planChecklist = [
+  'The draft does what the request and the approved plan say, and nothing more.',
+  'A change that a built-in module covers uses it, with a customization layer.',
+  'Each behaviour that the draft adds or changes has a scenario.',
+  'Every text the draft adds has each locale the application offers.',
+]
+
+/**
+ * The answer of a scripted model that ends planning, shaped as a Messages API response: one `propose_plan` call for `application`
+ * with a plan of the plan's shape. Its summary is `summary` and its only change is "Change: <summary>", so a page that shows the
+ * summary and the changes finds each text once.
+ */
+export function planAnswer(
+  application: string,
+  summary: string,
+  usage: { input_tokens: number; output_tokens: number },
+) {
+  return {
+    content: [
+      {
+        type: 'tool_use',
+        id: 'plan-1',
+        name: 'propose_plan',
+        input: {
+          application,
+          title: 'Change the application',
+          plan: {
+            summary,
+            changes: [`Change: ${summary}`],
+            checklist: planChecklist.map((item) => ({ item, how: 'The plan does.' })),
+          },
+        },
+      },
+    ],
+    stop_reason: 'tool_use',
+    usage,
+  }
+}
+
 /** An author's account in a tenant's realm: its name, its password and the Base32 secret of its authenticator. */
 export interface AuthoringAccount {
   username: string

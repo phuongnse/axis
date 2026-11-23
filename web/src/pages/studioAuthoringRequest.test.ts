@@ -8,10 +8,10 @@ import type {
 } from '../platform/studio'
 import {
   planChanges,
-  planSummary,
   requestFeed,
   requestHistory,
   requestResult,
+  requestTitle,
   workLine,
 } from './studioAuthoringRequest'
 
@@ -81,8 +81,18 @@ function requestOf(overrides: Partial<AuthoringRequest>): AuthoringRequest {
     author: 'u1',
     authorName: 'Linh Nguyen',
     text: 'Add a cost centre.',
+    title: null,
     state: 'ready',
-    plan: 'Add a cost centre.',
+    plan: {
+      summary: 'Add a cost centre.',
+      questions: [],
+      changes: [],
+      decisions: [],
+      risks: [],
+      checks: [],
+      checklist: [],
+      details: [],
+    },
     round: 0,
     tokens: 0,
     autoAccept: false,
@@ -93,6 +103,17 @@ function requestOf(overrides: Partial<AuthoringRequest>): AuthoringRequest {
     ...overrides,
   }
 }
+
+describe('requestTitle', () => {
+  it("is the title AI gave the request, or else the first sentence of the request's words", () => {
+    expect(requestTitle(requestOf({ title: 'Add a cost centre', text: 'Please add a cost centre. Thanks.' }))).toBe(
+      'Add a cost centre',
+    )
+    expect(requestTitle(requestOf({ title: null, text: 'Please add a cost centre. Thanks.' }))).toBe(
+      'Please add a cost centre.',
+    )
+  })
+})
 
 describe('requestResult', () => {
   it('shows a passed check with all scenarios passing, and a review that was not run for the author', () => {
@@ -422,26 +443,6 @@ describe('planChanges', () => {
   })
 })
 
-describe('planSummary', () => {
-  it('splits the plan at its first blank line', () => {
-    expect(planSummary('Add a field.\n\nChange the form.\n\nPublish it.')).toEqual({
-      summary: 'Add a field.',
-      rest: 'Change the form.\n\nPublish it.',
-    })
-  })
-
-  it('keeps a line break inside the first paragraph, and reads a blank line with spaces as a blank line', () => {
-    expect(planSummary('Add a field.\nChange the form.\n  \r\nPublish it.')).toEqual({
-      summary: 'Add a field.\nChange the form.',
-      rest: 'Publish it.',
-    })
-  })
-
-  it('has no rest for a plan of one paragraph', () => {
-    expect(planSummary('  Add a field.\n')).toEqual({ summary: 'Add a field.', rest: '' })
-  })
-})
-
 describe('requestHistory', () => {
   it('lists the steps newest first, each keyed by its position from the oldest', () => {
     const steps = [
@@ -587,6 +588,13 @@ describe('requestHistory', () => {
       key: 'shell.studio.aiRequest.history.step.planChange',
       values: { comment: 'Fewer fields' },
     })
+    expect(row.result).toBeNull()
+  })
+
+  it('words a retry step, which has no comment and no result', () => {
+    const [row] = requestHistory(requestOf({ steps: [step({ kind: 'retry', summary: null })] }))
+
+    expect(row.step).toEqual({ key: 'shell.studio.aiRequest.history.step.retry', values: { comment: '' } })
     expect(row.result).toBeNull()
   })
 

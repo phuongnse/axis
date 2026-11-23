@@ -168,7 +168,7 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         using var client = await _realm.SignInAsync();
         var id = await SendAsync(client);
         var stored = Guid.NewGuid();
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'ready', plan = 'A plan.', draft_id = '{stored}', round = 2 WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'ready', plan = '{PlanJson}', draft_id = '{stored}', round = 2 WHERE id = '{id}' RETURNING 1");
         using var requested = await StudioPublishTests.SendAsync(
             client, HttpMethod.Post, $"{Url}/{id}/request-changes", Host, """{ "comment": "Rename the field to Cost centre." }""");
         Assert.Equal(HttpStatusCode.OK, requested.StatusCode);
@@ -264,7 +264,7 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
 
     // The request is approved without the step before it, as the approval leaves it.
     private async Task WorkingAsync(Guid id) =>
-        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = 'A plan.' WHERE id = '{id}' RETURNING 1");
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = '{PlanJson}' WHERE id = '{id}' RETURNING 1");
 
     // The working step's row is finished when it moved the request on in the same transaction, so the checking step may already run.
     private Task WorkFinishedAsync(Guid id) =>
