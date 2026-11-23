@@ -16,15 +16,8 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
-import { authoringRequestStates, requestTitle } from './studioAuthoringRequest'
+import { authoringRequestStates, requestFields, requestTitle } from './studioAuthoringRequest'
 
-/** The columns the view's search, filter and sort can name, see docs/reference/authoring-requests.md#routes. */
-const requestFields = [
-  { name: 'title', type: 'text' },
-  { name: 'state', type: 'enum' },
-  { name: 'author', type: 'text' },
-  { name: 'sentAt', type: 'date' },
-] as const
 // The table has no parameters of its own. A stable empty array keeps useTableView from recomputing on each render.
 const noParameters: readonly string[] = []
 

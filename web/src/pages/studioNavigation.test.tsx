@@ -6,13 +6,14 @@ import { join } from 'node:path'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { ShellNavigation, type ShellNavigationEntry, type ShellNavigationGroup } from '../platform/ShellNavigation'
+import { ShellNavigation, type ShellNavigationEntry, type ShellNavigationNode } from '../platform/ShellNavigation'
 import type { ModuleResourceGroup, ModuleResourceKind, StudioResourceItem } from '../platform/studio'
-import { studioActiveEntry, studioNavigation } from './studioNavigation'
+import { studioActiveEntry, studioNavigation, needsActionFilter } from './studioNavigation'
 
-type Node = ShellNavigationEntry | ShellNavigationGroup
+type Node = ShellNavigationNode
 
 const application = 'purchase-requests'
+const reader = 'Linh Nguyen'
 const t = (key: string) => (platformEnglish as Record<string, string>)[key] ?? key
 
 function resource(id: string, kind: string): StudioResourceItem {
@@ -28,12 +29,20 @@ function navigationFor(folder: StudioResourceItem[], modules: ModuleResourceGrou
 }
 
 function flatten(nodes: readonly Node[]): ShellNavigationEntry[] {
-  return nodes.flatMap((node) => ('entries' in node ? node.entries : [node]))
+  return nodes.flatMap((node) => {
+    if ('children' in node) return [...node.children]
+    return 'entries' in node ? [...node.entries] : [node]
+  })
 }
 
 function groupOf(nodes: readonly Node[], key: string): ShellNavigationEntry[] {
   const group = nodes.find((node) => node.key === key)
   return group && 'entries' in group ? [...group.entries] : []
+}
+
+function childrenOf(nodes: readonly Node[], key: string): ShellNavigationEntry[] {
+  const parent = nodes.find((node) => node.key === key)
+  return parent && 'children' in parent ? [...parent.children] : []
 }
 
 function keysOf(entries: readonly Node[]): string[] {
@@ -91,9 +100,9 @@ describe('studioNavigation', () => {
     expect(sentence).not.toBeNull()
     const documented = sentence![1].split(/, | and /)
 
-    const built = navigationFor(fullFolder)
-      .filter((node): node is ShellNavigationEntry => !('entries' in node))
-      .map((entry) => entry.label)
+    const built = studioNavigation(application, fullFolder, [], t, reader)
+      .filter((node) => !('entries' in node))
+      .map((node) => node.label)
 
     expect(built).toEqual(documented)
   })
@@ -163,6 +172,40 @@ describe('studioNavigation', () => {
     expect(keysOf(groupOf(nav, 'group:other'))).toEqual(['kind:alpha', 'kind:contract', 'kind:layer', 'kind:zeta'])
     expect(groupOf(nav, 'group:other').map((entry) => entry.label)).toEqual(['alpha', 'Contracts', 'Layers', 'zeta'])
     expect(flatten(nav).map((entry) => entry.key)).not.toContain('kind:application')
+  })
+
+  it('lists AI requests right after History for a reader, with All requests and Needs action', () => {
+    const nav = studioNavigation(application, fullFolder, [], t, reader)
+
+    expect(keysOf(nav).slice(0, 5)).toEqual(['overview', 'releases', 'history', 'requests', 'settings'])
+    expect(nav.find((node) => node.key === 'requests')?.label).toBe('AI requests')
+    expect(childrenOf(nav, 'requests').map((entry) => [entry.key, entry.label, entry.icon])).toEqual([
+      ['requests:all', 'All requests', 'list'],
+      ['requests:needsAction', 'Needs action', 'tasks'],
+    ])
+  })
+
+  it('points All requests at the table and Needs action at the table filtered to the reader', () => {
+    const [all, needs] = childrenOf(studioNavigation(application, fullFolder, [], t, reader), 'requests')
+    const allParams = new URL(all.path, 'http://studio.test').searchParams
+    const needsParams = new URL(needs.path, 'http://studio.test').searchParams
+
+    expect(all.path).toBe('/studio?app=purchase-requests&view=requests')
+    expect(needsParams.get('app')).toBe(application)
+    expect(needsParams.get('view')).toBe('requests')
+    expect(needsParams.get('filter')).toBe(JSON.stringify(needsActionFilter(reader)))
+    expect(allParams.has('filter')).toBe(false)
+  })
+
+  it('shows no AI requests entry without a reader, so a person without studioAi sees none', () => {
+    const nav = navigationFor(fullFolder)
+
+    expect(nav.map((node) => node.key)).not.toContain('requests')
+    expect(
+      flatten(nav)
+        .map((entry) => entry.key)
+        .filter((key) => key.startsWith('requests')),
+    ).toEqual([])
   })
 
   it('leaves Settings out when the folder has no manifest', () => {
@@ -269,10 +312,77 @@ describe('studioActiveEntry', () => {
     expect(studioActiveEntry(new URLSearchParams(`app=${application}`), [], [])).toBe('overview')
   })
 
-  it('marks no entry for the AI requests table or a request page, so Overview is not marked for them', () => {
-    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=requests&request=r1`), [], [])).toBe(
-      'requests',
+  it('marks All requests for the AI requests table with no filter, and for a request page, not Overview', () => {
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=requests`), [], [], reader)).toBe(
+      'requests:all',
     )
-    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=requests`), [], [])).toBe('requests')
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=requests&request=r1`), [], [], reader)).toBe(
+      'requests:all',
+    )
+  })
+
+  describe('Needs action', () => {
+    const viewOf = (extra: Record<string, string>, filter?: unknown) =>
+      new URLSearchParams({
+        app: application,
+        view: 'requests',
+        ...extra,
+        ...(filter === undefined ? {} : { filter: JSON.stringify(filter) }),
+      })
+    const active = (params: URLSearchParams, name: string | null = reader) => studioActiveEntry(params, [], [], name)
+
+    it('marks Needs action for exactly its filter, and search, sort and paging do not count', () => {
+      expect(active(viewOf({}, needsActionFilter(reader)))).toBe('requests:needsAction')
+      expect(active(viewOf({ search: 'invoice', page: '2', pageSize: '50' }, needsActionFilter(reader)))).toBe(
+        'requests:needsAction',
+      )
+    })
+
+    it('reads the filter as the table reads it, whatever the order of its keys', () => {
+      const reordered = new URLSearchParams(
+        `app=${application}&view=requests&filter=${encodeURIComponent(
+          JSON.stringify({
+            all: [
+              { op: 'eq', value: reader, field: 'author' },
+              {
+                any: [
+                  { value: 'awaitingApproval', op: 'eq', field: 'state' },
+                  { value: 'ready', field: 'state', op: 'eq' },
+                ],
+              },
+            ],
+          }),
+        )}`,
+      )
+
+      expect(active(reordered)).toBe('requests:needsAction')
+    })
+
+    it('marks All requests for no filter, a changed filter, another reader and an extra condition', () => {
+      expect(active(viewOf({}))).toBe('requests:all')
+      expect(active(viewOf({}, { all: [{ field: 'state', op: 'eq', value: 'ready' }] }))).toBe('requests:all')
+      expect(active(viewOf({}, needsActionFilter('Minh Tran')))).toBe('requests:all')
+      const withTitle = {
+        all: [
+          { field: 'author', op: 'eq', value: reader },
+          {
+            any: [
+              { field: 'state', op: 'eq', value: 'awaitingApproval' },
+              { field: 'state', op: 'eq', value: 'ready' },
+            ],
+          },
+          { field: 'title', op: 'contains', value: 'invoice' },
+        ],
+      }
+      expect(active(viewOf({}, withTitle))).toBe('requests:all')
+    })
+
+    it('marks All requests on a request page, even with the filter in the address', () => {
+      expect(active(viewOf({ request: 'r1' }, needsActionFilter(reader)))).toBe('requests:all')
+    })
+
+    it('marks All requests with no reader, when there is no Needs action entry to mark', () => {
+      expect(active(viewOf({}, needsActionFilter(reader)), null)).toBe('requests:all')
+    })
   })
 })

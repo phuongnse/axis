@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { DatePicker, Drawer, Table, theme } from 'antd'
+import { ConfigProvider, DatePicker, Drawer, Table, theme } from 'antd'
 import viVN from 'antd/locale/vi_VN'
 import dayjs from 'dayjs'
 import { useContext, useEffect, type ReactNode } from 'react'
@@ -803,8 +803,7 @@ describe('ShellNavigation parent entries', () => {
     key: 'requests',
     label: 'Requests',
     icon: 'inbox',
-    parent: true as const,
-    entries: [
+    children: [
       { key: 'all', path: '/r/all', label: 'All' },
       { key: 'mine', path: '/r/mine', label: 'Mine' },
     ],
@@ -831,38 +830,79 @@ describe('ShellNavigation parent entries', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: 'All', hidden: true })).not.toBeVisible())
   })
 
-  it('opens by itself while one of its entries is the current page', () => {
-    render(
+  const parents = [
+    { key: 'history', path: '/studio?view=history', label: 'History' },
+    {
+      key: 'requests',
+      label: 'AI requests',
+      icon: 'inbox',
+      children: [
+        { key: 'requests:all', path: '/studio?view=requests', label: 'All requests' },
+        { key: 'requests:needsAction', path: '/studio?view=requests&filter=x', label: 'Needs action' },
+      ],
+    },
+  ]
+  // Without motion a folded submenu leaves the document at once, as jsdom runs no animations.
+  const navigation = (activeKey: string, collapsed = false, entries: typeof parents = parents) => (
+    <ConfigProvider theme={{ token: { motion: false } }}>
       <MemoryRouter>
-        <ShellNavigation entries={[requests]} activeKey="mine" />
-      </MemoryRouter>,
-    )
+        <ShellNavigation entries={entries} activeKey={activeKey} collapsed={collapsed} />
+      </MemoryRouter>
+    </ConfigProvider>
+  )
 
-    expect(screen.getByRole('menuitem', { name: 'Requests' })).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('link', { name: 'Mine' })).toHaveAttribute('aria-current', 'page')
+  it('opens by itself while one of its entries is marked', () => {
+    render(navigation('requests:needsAction'))
+
+    expect(screen.getByRole('link', { name: 'Needs action' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'All requests' })).toBeVisible()
   })
 
-  it("keeps the person's choice until the current page changes", async () => {
-    const view = (activeKey?: string) => (
-      <MemoryRouter>
-        <ShellNavigation entries={[requests]} activeKey={activeKey} />
-      </MemoryRouter>
-    )
-    const { rerender } = render(view('mine'))
-    const parent = screen.getByRole('menuitem', { name: 'Requests' })
+  it('stays folded after a click on its title, until another entry is marked', async () => {
+    const { rerender } = render(navigation('requests:all'))
 
-    focus(parent)
-    press('Enter', 13)
-    expect(parent).toHaveAttribute('aria-expanded', 'false')
+    const title = screen.getByRole('menuitem', { name: 'AI requests' })
+    await userEvent.click(title)
+    expect(title).toHaveAttribute('aria-expanded', 'false')
 
-    rerender(view('mine'))
-    expect(parent).toHaveAttribute('aria-expanded', 'false')
+    rerender(navigation('requests:all'))
+    expect(title).toHaveAttribute('aria-expanded', 'false')
 
-    rerender(view('all'))
-    expect(parent).toHaveAttribute('aria-expanded', 'true')
+    rerender(navigation('requests:needsAction'))
+    expect(title).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'Needs action' })).toBeVisible()
+  })
 
-    rerender(view(undefined))
-    expect(parent).toHaveAttribute('aria-expanded', 'false')
+  it('opens again after another entry is marked and the parent is marked back', async () => {
+    const { rerender } = render(navigation('requests:all'))
+
+    const title = screen.getByRole('menuitem', { name: 'AI requests' })
+    await userEvent.click(title)
+    expect(title).toHaveAttribute('aria-expanded', 'false')
+
+    rerender(navigation('history'))
+    rerender(navigation('requests:all'))
+
+    expect(title).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'All requests' })).toBeVisible()
+  })
+
+  it('opens when it is drawn after its marked entry, as the reader arrives after the sidebar', () => {
+    const { rerender } = render(navigation('requests:all', false, [parents[0]]))
+    expect(screen.queryByRole('menuitem', { name: 'AI requests' })).toBeNull()
+
+    rerender(navigation('requests:all'))
+
+    expect(screen.getByRole('menuitem', { name: 'AI requests' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'All requests' })).toBeVisible()
+  })
+
+  it('keeps the parent icon when collapsed, and its entries as icons', () => {
+    render(navigation('requests:all', true))
+
+    expect(
+      screen.getByRole('menuitem', { name: 'AI requests' }).querySelector('.anticon[aria-hidden="true"]'),
+    ).not.toBeNull()
   })
 
   it('shows a collapsed parent as its icon, with none of its entries in place', () => {

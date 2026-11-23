@@ -10,6 +10,14 @@ import type {
   StudioScenarioResult,
 } from '../platform/studio'
 
+/** The columns the AI requests table's search, filter and sort can name, see docs/reference/authoring-requests.md#routes. */
+export const requestFields = [
+  { name: 'title', type: 'text' },
+  { name: 'state', type: 'enum' },
+  { name: 'author', type: 'text' },
+  { name: 'sentAt', type: 'date' },
+] as const
+
 /** The word and the tone of each state, from the states in docs/reference/ai-authoring-in-studio.md#the-states. */
 export const authoringRequestStates: Record<AuthoringRequestState, { word: string; tone: StatusTone }> = {
   planning: { word: 'shell.studio.aiRequest.state.planning', tone: 'neutral' },

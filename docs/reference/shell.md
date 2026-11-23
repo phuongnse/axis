@@ -55,9 +55,9 @@ their own controls where they expect them.
   in a new tab, marks no entry.
 - **Parent entries**. A `ShellNavigation` entry that holds entries is a parent entry, drawn as Ant Design's inline
   submenu. It opens and folds in place with a caret, and its entries sit one step indented under it. It opens by itself
-  while one of its entries is the current page, and a person's choice to open or fold it holds until the page changes.
-  A collapsed sidebar shows it as its icon, with its entries in a menu beside it.
-- **Menu groups** _(planned for M42)_. A site's navigation entry with `entries` is a parent entry, as
+  while it holds the marked entry. A person's open or fold of it holds until another entry is marked or the parents
+  that hold the marked entry change. A collapsed sidebar shows it as its icon, with its entries in a menu beside it.
+- **Menu groups** _(planned for M42)_. A site's navigation entry with `entries` is a menu group, as
   [sites and pages](resource-files.md#sites-and-pages) sets out. It stays open while it holds the current page, and it
   shows in the narrow-width menu too. A parent left with no entry by policies is left out, see
   [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).

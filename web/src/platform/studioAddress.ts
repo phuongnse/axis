@@ -1,3 +1,5 @@
+import type { FilterGroup } from './tableFilter'
+
 /**
  * The address of a Studio resource, optionally at a path and with a field's drawer open, see
  * docs/reference/studio.md#route-and-address. Every link to a resource is built here.
@@ -19,6 +21,15 @@ export function studioResourceAddress(
 /** The address of an AI request's page, `&view=requests&request=<id>`, see docs/reference/ai-authoring-in-studio.md. */
 export function studioRequestAddress(application: string, id: string): string {
   return `/studio?${new URLSearchParams({ app: application, view: 'requests', request: id })}`
+}
+
+/** The address of the AI requests table, `&view=requests`, with its filter as `&filter=<json>` when it has one. */
+export function studioRequestsAddress(application: string, filter?: FilterGroup): string {
+  return `/studio?${new URLSearchParams({
+    app: application,
+    view: 'requests',
+    ...(filter ? { filter: JSON.stringify(filter) } : {}),
+  })}`
 }
 
 /** The address of an application in Studio, `/studio?app=<name>`, where `application` is its manifest name. */

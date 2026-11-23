@@ -1074,6 +1074,60 @@ describe('StudioPage', () => {
     expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
   })
 
+  describe('sidebar AI requests entry', () => {
+    const needsAction = JSON.stringify({
+      all: [
+        { field: 'author', op: 'eq', value: 'Linh Nguyen' },
+        {
+          any: [
+            { field: 'state', op: 'eq', value: 'awaitingApproval' },
+            { field: 'state', op: 'eq', value: 'ready' },
+          ],
+        },
+      ],
+    })
+
+    function stubAuthorWhoAsksAi() {
+      const fetchMock = stubServer()
+      const base = fetchMock.getMockImplementation()!
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+        input === '/api/me'
+          ? json({ id: 'author', displayName: 'Linh Nguyen', studio: true, studioAi: true })
+          : base(input, init),
+      )
+    }
+
+    it('lists AI requests right after History for a person who may ask AI', async () => {
+      stubAuthorWhoAsksAi()
+      renderPage()
+
+      const menu = within(sidebar!)
+      await menu.findByRole('menuitem', { name: 'AI requests' })
+      const labels = menu.getAllByRole('menuitem').map((item) => item.textContent)
+      const history = labels.indexOf('History')
+      expect(labels.slice(history, history + 3)).toEqual(['History', 'AI requests', 'Settings'])
+    })
+
+    it('shows no AI requests entry to a person without studioAi', async () => {
+      stubServer()
+      renderPage()
+
+      await within(sidebar!).findByRole('menuitem', { name: 'History' })
+      expect(within(sidebar!).queryByRole('menuitem', { name: 'AI requests' })).not.toBeInTheDocument()
+    })
+
+    it('marks Needs action only while the table shows exactly its filter', async () => {
+      stubAuthorWhoAsksAi()
+      renderPage(`/studio?app=PurchaseRequests&view=requests&filter=${encodeURIComponent(needsAction)}`)
+
+      expect(await within(sidebar!).findByRole('link', { name: 'Needs action' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+      expect(within(sidebar!).getByRole('link', { name: 'All requests' })).not.toHaveAttribute('aria-current')
+    })
+  })
+
   it('shows an authoring request page in place of the content for &view=requests&request=<id>', async () => {
     const fetchMock = stubServer()
     const base = fetchMock.getMockImplementation()!
