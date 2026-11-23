@@ -1,4 +1,5 @@
 import { Flex, Form, Input, Modal, Typography } from 'antd'
+import { AxisForm } from './AxisForm'
 import { useState } from 'react'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
@@ -6,7 +7,6 @@ import { AxisField } from './AxisField'
 import { DialogFooter } from './DialogFooter'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import type { CellHostRequest, CellWriteResult } from './cell'
-import { requiredMark } from './requiredMark'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
@@ -137,14 +137,7 @@ export function HostRequestDialog({
             </Typography.Text>
           </>
         ) : (
-          <Form
-            form={form}
-            layout="vertical"
-            requiredMark={requiredMark}
-            initialValues={{ host: '' }}
-            scrollToFirstError={{ focus: true }}
-            onFinish={({ host }) => void add(host)}
-          >
+          <AxisForm form={form} initialValues={{ host: '' }} onFinish={({ host }) => void add(host)}>
             <AxisField
               name="host"
               label={t(`${texts}.addHostField`)}
@@ -159,7 +152,7 @@ export function HostRequestDialog({
                 }}
               />
             </AxisField>
-          </Form>
+          </AxisForm>
         )}
         {error && <AxisAlert data-testid={`${testId}-error`} kind="error" message={error} />}
       </Flex>

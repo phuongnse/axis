@@ -1,11 +1,11 @@
 import { ConfigProvider, Flex, Form, Input, Modal } from 'antd'
+import { AxisForm } from './AxisForm'
 import { useContext, useState } from 'react'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton, AxisSplitButton } from './AxisButton'
 import { AxisField } from './AxisField'
 import { EmptyState } from './EmptyState'
 import { nameCompare } from './listOrder'
-import { requiredMark } from './requiredMark'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { DialogFooter } from './DialogFooter'
@@ -280,14 +280,7 @@ export function SavedItemsDialog<T>({
           </Flex>
         )}
         {failed && <AxisAlert kind="error" message={t(texts.saveFailed)} />}
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={requiredMark}
-          scrollToFirstError={{ focus: true }}
-          initialValues={{ name: '' }}
-          onFinish={({ name }) => void save(name)}
-        >
+        <AxisForm form={form} initialValues={{ name: '' }} onFinish={({ name }) => void save(name)}>
           <AxisField
             name="name"
             label={t(texts.name)}
@@ -304,7 +297,7 @@ export function SavedItemsDialog<T>({
           >
             <Input maxLength={nameLength} />
           </AxisField>
-        </Form>
+        </AxisForm>
       </Flex>
     </Modal>
   )

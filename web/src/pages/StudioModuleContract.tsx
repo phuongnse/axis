@@ -1,4 +1,5 @@
 import { Flex, Form, Input, Modal, Select, Typography } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { AxisAlert } from '../platform/AxisAlert'
 import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
@@ -10,7 +11,6 @@ import { SectionPart } from '../platform/SectionParts'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import { layerMarks, markOf } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
-import { requiredMark } from '../platform/requiredMark'
 import { StatusTag } from '../platform/StatusTag'
 import {
   fetchStudioModuleResource,
@@ -200,14 +200,7 @@ function Point({ value }: { value: string }) {
       >
         <Flex vertical gap={4}>
           <Typography.Text code>{value}</Typography.Text>
-          <Form
-            form={form}
-            layout="vertical"
-            requiredMark={requiredMark}
-            initialValues={{ reason: '' }}
-            scrollToFirstError={{ focus: true }}
-            onFinish={save}
-          >
+          <AxisForm form={form} initialValues={{ reason: '' }} onFinish={save}>
             <AxisField
               name="reason"
               label={t('shell.studio.contract.relaxReason')}
@@ -220,7 +213,7 @@ function Point({ value }: { value: string }) {
                 showCount
               />
             </AxisField>
-          </Form>
+          </AxisForm>
         </Flex>
       </Modal>
     </Flex>
@@ -348,7 +341,7 @@ function AddStateDialog({
   onClose: () => void
 }) {
   const t = useText()
-  const { size, spacing } = useDesignTokens()
+  const { size } = useDesignTokens()
   const [form] = Form.useForm<{ name: string; initial: boolean; deletable: boolean }>()
 
   function close() {
@@ -380,36 +373,27 @@ function AddStateDialog({
       }
       onCancel={close}
     >
-      <Form
-        form={form}
-        layout="vertical"
-        requiredMark={requiredMark}
-        initialValues={{ name: '', initial: false, deletable: false }}
-        scrollToFirstError={{ focus: true }}
-        onFinish={add}
-      >
-        <Flex vertical gap={spacing.lg}>
-          <AxisField
-            name="name"
-            label={t('shell.studio.contract.name')}
-            help={t('shell.studio.contract.stateName.help')}
-            requiredMessage={t('shell.studio.contract.nameRequired')}
-            rules={[freeNameRule(names, t('shell.studio.contract.stateNameTaken'))]}
-          >
-            <Input aria-label={t('shell.studio.contract.name')} />
-          </AxisField>
-          <AxisCheckboxField
-            name="initial"
-            label={t('shell.studio.contract.initial')}
-            help={t('shell.studio.contract.initial.help')}
-          />
-          <AxisCheckboxField
-            name="deletable"
-            label={t('shell.studio.contract.deletable')}
-            help={t('shell.studio.contract.deletable.help')}
-          />
-        </Flex>
-      </Form>
+      <AxisForm form={form} initialValues={{ name: '', initial: false, deletable: false }} onFinish={add}>
+        <AxisField
+          name="name"
+          label={t('shell.studio.contract.name')}
+          help={t('shell.studio.contract.stateName.help')}
+          requiredMessage={t('shell.studio.contract.nameRequired')}
+          rules={[freeNameRule(names, t('shell.studio.contract.stateNameTaken'))]}
+        >
+          <Input aria-label={t('shell.studio.contract.name')} />
+        </AxisField>
+        <AxisCheckboxField
+          name="initial"
+          label={t('shell.studio.contract.initial')}
+          help={t('shell.studio.contract.initial.help')}
+        />
+        <AxisCheckboxField
+          name="deletable"
+          label={t('shell.studio.contract.deletable')}
+          help={t('shell.studio.contract.deletable.help')}
+        />
+      </AxisForm>
     </Modal>
   )
 }
@@ -437,7 +421,7 @@ function AddTransitionDialog({
   onClose: () => void
 }) {
   const t = useText()
-  const { size, spacing } = useDesignTokens()
+  const { size } = useDesignTokens()
   const [form] = Form.useForm<TransitionValues>()
   const options = states.map((state) => ({ value: state, label: state }))
 
@@ -469,54 +453,49 @@ function AddTransitionDialog({
       }
       onCancel={close}
     >
-      <Form
+      <AxisForm
         form={form}
-        layout="vertical"
-        requiredMark={requiredMark}
         initialValues={{ name: '', from: [], to: undefined, guard: '' }}
-        scrollToFirstError={{ focus: true }}
         onValuesChange={(changed) => 'from' in changed && form.setFields([{ name: 'to', errors: [] }])}
         onFinish={add}
       >
-        <Flex vertical gap={spacing.lg}>
-          <AxisField
-            name="name"
-            label={t('shell.studio.contract.name')}
-            help={t('shell.studio.contract.transitionName.help')}
-            requiredMessage={t('shell.studio.contract.nameRequired')}
-            rules={[freeNameRule(names, t('shell.studio.contract.transitionNameTaken'))]}
-          >
-            <Input aria-label={t('shell.studio.contract.name')} />
-          </AxisField>
-          <AxisField
-            name="from"
-            label={t('shell.studio.contract.from')}
-            help={t('shell.studio.contract.from.help')}
-            requiredMessage={t('shell.studio.contract.fromRequired')}
-          >
-            <Select virtual={false} mode="multiple" aria-label={t('shell.studio.contract.from')} options={options} />
-          </AxisField>
-          <AxisField
-            name="to"
-            label={t('shell.studio.contract.to')}
-            help={t('shell.studio.contract.to.help')}
-            requiredMessage={t('shell.studio.contract.toRequired')}
-            rules={[
-              ({ getFieldValue }) => ({
-                validator: (_, value: string | undefined) =>
-                  value !== undefined && (getFieldValue('from') as string[]).includes(value)
-                    ? Promise.reject(new Error(t('shell.studio.contract.toInFrom')))
-                    : Promise.resolve(),
-              }),
-            ]}
-          >
-            <Select virtual={false} aria-label={t('shell.studio.contract.to')} options={options} />
-          </AxisField>
-          <AxisField name="guard" label={t('shell.studio.contract.guard')} help={t('shell.studio.contract.guard.help')}>
-            <Input aria-label={t('shell.studio.contract.guard')} />
-          </AxisField>
-        </Flex>
-      </Form>
+        <AxisField
+          name="name"
+          label={t('shell.studio.contract.name')}
+          help={t('shell.studio.contract.transitionName.help')}
+          requiredMessage={t('shell.studio.contract.nameRequired')}
+          rules={[freeNameRule(names, t('shell.studio.contract.transitionNameTaken'))]}
+        >
+          <Input aria-label={t('shell.studio.contract.name')} />
+        </AxisField>
+        <AxisField
+          name="from"
+          label={t('shell.studio.contract.from')}
+          help={t('shell.studio.contract.from.help')}
+          requiredMessage={t('shell.studio.contract.fromRequired')}
+        >
+          <Select virtual={false} mode="multiple" aria-label={t('shell.studio.contract.from')} options={options} />
+        </AxisField>
+        <AxisField
+          name="to"
+          label={t('shell.studio.contract.to')}
+          help={t('shell.studio.contract.to.help')}
+          requiredMessage={t('shell.studio.contract.toRequired')}
+          rules={[
+            ({ getFieldValue }) => ({
+              validator: (_, value: string | undefined) =>
+                value !== undefined && (getFieldValue('from') as string[]).includes(value)
+                  ? Promise.reject(new Error(t('shell.studio.contract.toInFrom')))
+                  : Promise.resolve(),
+            }),
+          ]}
+        >
+          <Select virtual={false} aria-label={t('shell.studio.contract.to')} options={options} />
+        </AxisField>
+        <AxisField name="guard" label={t('shell.studio.contract.guard')} help={t('shell.studio.contract.guard.help')}>
+          <Input aria-label={t('shell.studio.contract.guard')} />
+        </AxisField>
+      </AxisForm>
     </Modal>
   )
 }

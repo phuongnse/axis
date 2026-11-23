@@ -1,8 +1,8 @@
-import { Flex, Form, Input, Modal } from 'antd'
+import { Form, Input, Modal } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { useContext, useEffect, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
-import { requiredMark } from '../platform/requiredMark'
 import { StartFromField } from '../platform/StartFromField'
 import {
   createStudioApp,
@@ -45,7 +45,7 @@ export function StudioNewApplication({
   onOpenChange?: (open: boolean) => void
 }) {
   const t = useText()
-  const { size, spacing } = useDesignTokens()
+  const { size } = useDesignTokens()
   const { lost } = useStudioConnection()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [ownOpen, setOwnOpen] = useState(false)
@@ -137,58 +137,49 @@ export function StudioNewApplication({
           setTemplates(undefined)
         }}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={requiredMark}
-          initialValues={{ name: '' }}
-          scrollToFirstError={{ focus: true }}
-          onFinish={create}
-        >
-          <Flex vertical gap={spacing.lg}>
-            <AxisField
-              name="name"
-              label={t('shell.studio.newApplication.name')}
-              help={t('shell.studio.newApplication.name.help')}
-              requiredMessage={t('shell.studio.newApplication.nameRequired')}
-              rules={[
-                {
-                  // An empty name has the required message, so this skips it.
-                  validator: (_, value: string) =>
-                    value.trim() === '' || isApplicationName(value.trim())
-                      ? Promise.resolve()
-                      : Promise.reject(new Error(t('shell.studio.newApplication.invalid'))),
-                },
-              ]}
-            >
-              <Input
-                aria-label={t('shell.studio.newApplication.name')}
-                // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
-                onPressEnter={(event) => {
-                  event.preventDefault()
-                  form.submit()
-                }}
-              />
-            </AxisField>
-            <StartFromField
-              name="template"
-              label={t('shell.studio.newApplication.template')}
-              help={t('shell.studio.newApplication.template.help')}
-              blank={t('shell.studio.newApplication.blank')}
-              failedMessage={t('shell.studio.newApplication.templatesFailed')}
-              choices={
-                Array.isArray(templates)
-                  ? templates.map((item) => ({
-                      id: item.id,
-                      title: localized(item.title, locale),
-                      description: localized(item.description, locale),
-                      mark: item.builtIn ? t('shell.studio.newApplication.builtIn') : undefined,
-                    }))
-                  : templates
-              }
+        <AxisForm form={form} initialValues={{ name: '' }} onFinish={create}>
+          <AxisField
+            name="name"
+            label={t('shell.studio.newApplication.name')}
+            help={t('shell.studio.newApplication.name.help')}
+            requiredMessage={t('shell.studio.newApplication.nameRequired')}
+            rules={[
+              {
+                // An empty name has the required message, so this skips it.
+                validator: (_, value: string) =>
+                  value.trim() === '' || isApplicationName(value.trim())
+                    ? Promise.resolve()
+                    : Promise.reject(new Error(t('shell.studio.newApplication.invalid'))),
+              },
+            ]}
+          >
+            <Input
+              aria-label={t('shell.studio.newApplication.name')}
+              // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
+              onPressEnter={(event) => {
+                event.preventDefault()
+                form.submit()
+              }}
             />
-          </Flex>
-        </Form>
+          </AxisField>
+          <StartFromField
+            name="template"
+            label={t('shell.studio.newApplication.template')}
+            help={t('shell.studio.newApplication.template.help')}
+            blank={t('shell.studio.newApplication.blank')}
+            failedMessage={t('shell.studio.newApplication.templatesFailed')}
+            choices={
+              Array.isArray(templates)
+                ? templates.map((item) => ({
+                    id: item.id,
+                    title: localized(item.title, locale),
+                    description: localized(item.description, locale),
+                    mark: item.builtIn ? t('shell.studio.newApplication.builtIn') : undefined,
+                  }))
+                : templates
+            }
+          />
+        </AxisForm>
       </Modal>
     </>
   )

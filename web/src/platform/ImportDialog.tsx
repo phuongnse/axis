@@ -1,4 +1,5 @@
 import { Flex, Form, Modal, Typography, Upload, type UploadFile } from 'antd'
+import { AxisForm } from './AxisForm'
 import { AxisAlert } from './AxisAlert'
 import type { UploadChangeParam } from 'antd/es/upload'
 import { useEffect, useRef, useState } from 'react'
@@ -13,7 +14,6 @@ import {
   uploadImport,
   type ImportError,
 } from './imports'
-import { requiredMark } from './requiredMark'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -226,14 +226,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
       }
     >
       <Flex vertical gap="middle">
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={requiredMark}
-          scrollToFirstError={{ focus: true }}
-          onFinish={() => void upload()}
-          onFinishFailed={() => chooseRef.current?.focus()}
-        >
+        <AxisForm form={form} onFinish={() => void upload()} onFinishFailed={() => chooseRef.current?.focus()}>
           <AxisField
             name="file"
             label={t('shell.table.importFileField')}
@@ -262,7 +255,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
               </AxisButton>
             </Upload>
           </AxisField>
-        </Form>
+        </AxisForm>
         <div aria-live="polite" data-testid="import-status">
           {status !== null && <Typography.Text>{status}</Typography.Text>}
           {errors.length > 0 && (
