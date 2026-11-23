@@ -124,8 +124,10 @@ choices.
   apart by their heading, with no divider between them.
 - **A menu's minimum width** _(planned for M35)_. Every dropdown menu is at least as wide as the `menu`
   size token, and wider when an item needs the room.
-- **One threshold everywhere**. One or two actions show as buttons on a page's heading, a section's title
-  row, a table's row or a list's item. From three on, or when the row runs out of room, they fold into one "…" menu.
+- **One threshold everywhere**. One or two actions show as buttons in a table's row or a list's item. From three
+  on, or when the row runs out of room, they fold into one "…" menu.
+- **One threshold on a heading** _(planned)_. One or two actions show as buttons on a page's heading or a section's
+  title row. From three on, they fold into one "…" menu, as a row's actions do.
 - **A destructive entry comes last.** In a menu of actions, a destructive entry comes after the others, behind one
   divider.
 - **A menu never holds one entry**. A menu has at least two entries.
