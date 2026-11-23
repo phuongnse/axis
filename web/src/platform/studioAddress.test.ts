@@ -5,6 +5,7 @@ import {
   studioKindAddress,
   studioPackageAddress,
   studioRequestAddress,
+  studioRequestsAddress,
   studioResourceAddress,
   studioViewAddress,
   withStudioField,
@@ -47,6 +48,15 @@ describe('studioResourceAddress', () => {
 describe('studioRequestAddress', () => {
   it('builds the address of an AI request', () => {
     expect(studioRequestAddress('PurchaseRequests', 'r1')).toBe('/studio?app=PurchaseRequests&view=requests&request=r1')
+  })
+})
+
+describe('studioRequestsAddress', () => {
+  it('builds the address of the AI requests table, with its filter as JSON when it has one', () => {
+    expect(studioRequestsAddress('PurchaseRequests')).toBe('/studio?app=PurchaseRequests&view=requests')
+    expect(studioRequestsAddress('PurchaseRequests', { all: [{ field: 'state', op: 'eq', value: 'ready' }] })).toBe(
+      `/studio?app=PurchaseRequests&view=requests&filter=${encodeURIComponent('{"all":[{"field":"state","op":"eq","value":"ready"}]}')}`,
+    )
   })
 })
 

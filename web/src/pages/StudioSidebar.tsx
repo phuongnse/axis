@@ -3,7 +3,7 @@ import { useContext, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { Chevron } from '../platform/Chevron'
 import { useShellSidebar } from '../platform/shellSidebarContext'
-import { ShellNavigation, type ShellNavigationEntry, type ShellNavigationGroup } from '../platform/ShellNavigation'
+import { ShellNavigation, type ShellNavigationNode } from '../platform/ShellNavigation'
 import { SiteMark } from '../platform/SiteMark'
 import { type StudioApplication, studioAppTitle } from '../platform/studio'
 import { useText } from '../platform/texts'
@@ -32,7 +32,7 @@ export function StudioSidebar({
   apps: StudioApplication[]
   application: string
   canCreate: boolean
-  entries: readonly (ShellNavigationEntry | ShellNavigationGroup)[]
+  entries: readonly ShellNavigationNode[]
   activeKey: string
   onPick: (name: string) => void
   onCreated: (name: string) => void

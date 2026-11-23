@@ -2633,6 +2633,8 @@
   "shell.studio.aiRequests.sent": "Gửi lúc",
   "shell.studio.aiRequests.empty": "Chưa có yêu cầu AI nào. Mỗi yêu cầu bạn gửi sẽ hiện ở đây.",
   "shell.studio.aiRequests.loadFailed": "Không tải được các yêu cầu AI.",
+  "shell.studio.aiRequests.all": "Tất cả yêu cầu",
+  "shell.studio.aiRequests.needsAction": "Cần xử lý",
   "shell.studio.aiRequest.sentBy": "{name} gửi lúc {time}",
   "shell.studio.aiRequest.notFound": "Không tìm thấy yêu cầu này.",
   "shell.studio.aiRequest.askAi": "Hỏi AI",

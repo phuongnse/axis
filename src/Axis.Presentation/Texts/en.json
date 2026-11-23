@@ -2633,6 +2633,8 @@
   "shell.studio.aiRequests.sent": "Sent",
   "shell.studio.aiRequests.empty": "No AI request yet. Each request you send appears here.",
   "shell.studio.aiRequests.loadFailed": "The AI requests could not be loaded.",
+  "shell.studio.aiRequests.all": "All requests",
+  "shell.studio.aiRequests.needsAction": "Needs action",
   "shell.studio.aiRequest.sentBy": "Sent by {name} on {time}",
   "shell.studio.aiRequest.notFound": "This request does not exist.",
   "shell.studio.aiRequest.askAi": "Ask AI",
