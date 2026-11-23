@@ -1,14 +1,17 @@
+using System.Text.RegularExpressions;
 using Axis.Presentation.Texts;
 
 namespace Axis.Server.Tests;
 
 /// <summary>
-/// Pins the help rules of docs/reference/ui-writing.md#kinds-of-text on the English texts of Studio's resource forms.
+/// Pins the help rules of docs/reference/ui-writing.md#kinds-of-text on the English texts of Studio's resource forms, and
+/// the Vietnamese rules of docs/reference/ui-writing.md#vietnamese on the Vietnamese ones.
 /// A rule is pinned by the shape of its texts, not by their exact words.
 /// </summary>
 public sealed class StudioHelpTextsTests
 {
     private readonly IReadOnlyDictionary<string, string> _en = new EmbeddedTextResourceProvider().GetTexts("en")!.Texts;
+    private readonly IReadOnlyDictionary<string, string> _vi = new EmbeddedTextResourceProvider().GetTexts("vi")!.Texts;
 
     [Theory]
     [InlineData("shell.studio.field.webhook.timeout.help")]
@@ -139,6 +142,105 @@ public sealed class StudioHelpTextsTests
         Assert.DoesNotContain(_en.Keys, key => key is "shell.studio.matrix.filter" or "shell.studio.matrix.fields" or "shell.studio.matrix.actions");
     }
 
+    [Theory]
+    [InlineData("shell.studio.field.process.steps.assignee.user.help")]
+    [InlineData("shell.studio.field.process.steps.escalations.reassign.user.help")]
+    [InlineData("shell.studio.field.process.steps.escalations.notify.to.user.help")]
+    [InlineData("shell.studio.field.process.steps.escalations.notify.to.kind.user.help")]
+    [InlineData("shell.studio.field.process.steps.to.user.help")]
+    [InlineData("shell.studio.field.process.steps.to.kind.user.help")]
+    public void A_person_a_task_goes_to_is_chosen_by_an_expression(string key) =>
+        Assert.StartsWith("Biểu thức chọn người ", ViText(key), StringComparison.Ordinal);
+
+    [Theory]
+    [InlineData("shell.studio.field.process.steps.assignee.role.help")]
+    [InlineData("shell.studio.field.process.steps.escalations.reassign.role.help")]
+    [InlineData("shell.studio.field.scenario.steps.recipient.role.help")]
+    public void A_roles_people_are_the_people_who_have_it(string key) =>
+        Assert.StartsWith("Những người có vai trò này ", ViText(key), StringComparison.Ordinal);
+
+    [Fact]
+    public void A_code_keeps_its_name_with_its_meaning_in_brackets()
+    {
+        var actions = ViText("shell.studio.field.policy.grants.actions.help");
+        Assert.Contains("read (đọc)", actions, StringComparison.Ordinal);
+        Assert.Contains("update (cập nhật)", actions, StringComparison.Ordinal);
+        Assert.Contains("none (", ViText("shell.studio.field.connector.auth.type.help"), StringComparison.Ordinal);
+        Assert.Contains("object (nhóm trường)", ViText("shell.studio.field.connector.operations.input.type.help"), StringComparison.Ordinal);
+
+        var header = ViText("shell.studio.field.connector.auth.name.help");
+        Assert.Contains("header", header, StringComparison.Ordinal);
+        Assert.DoesNotContain("tiêu đề", header, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("shell.studio.field.identityProvider.claims.displayName.help")]
+    [InlineData("shell.studio.field.identityProvider.claims.email.help")]
+    [InlineData("shell.studio.field.identityProvider.claims.locale.help")]
+    [InlineData("shell.studio.field.identityProvider.roles.claim.help")]
+    public void An_empty_claim_falls_back_to_a_named_claim(string key) =>
+        Assert.Matches(@"Để trống thì dùng claim \S+\.$", ViText(key));
+
+    [Fact]
+    public void Axis_is_the_subject_of_what_it_refuses_or_ignores()
+    {
+        Assert.Contains("Axis từ chối", ViText("shell.studio.field.identityProvider.acr.help"), StringComparison.Ordinal);
+        Assert.Contains("Axis bỏ qua", ViText("shell.studio.field.identityProvider.roles.values.help"), StringComparison.Ordinal);
+        Assert.Contains("Axis từ chối", ViText("shell.studio.section.entity.validations.line"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void No_studio_help_says_bi()
+    {
+        // "bị" as a passive marker only: "thiết bị" (device) and "chuẩn bị" (prepare) are other words.
+        var passive = new Regex(@"(?<!\p{L})(?<!thiết )(?<!chuẩn )bị(?!\p{L})", RegexOptions.IgnoreCase);
+        var helps = _vi.Keys
+            .Where(key => key.StartsWith("shell.studio.", StringComparison.Ordinal)
+                && (key.EndsWith(".help", StringComparison.Ordinal) || key.EndsWith(".line", StringComparison.Ordinal)))
+            .Append("shell.studio.identityProvider.noAcr");
+
+        var offenders = helps.Where(key => passive.IsMatch(ViText(key))).Order().ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    [Theory]
+    [InlineData("shell.studio.field.page.parameters.required.help")]
+    [InlineData("shell.studio.field.page.widgets.collapsed.help")]
+    [InlineData("shell.studio.field.dataSource.parameters.required.help")]
+    [InlineData("shell.studio.field.dataSource.search.help")]
+    [InlineData("shell.studio.field.seed.sync.help")]
+    [InlineData("shell.studio.field.endpoint.input.required.help")]
+    [InlineData("shell.studio.field.form.sections.fields.readOnly.help")]
+    [InlineData("shell.studio.field.entity.fields.required.help")]
+    [InlineData("shell.studio.field.entity.fields.unique.help")]
+    [InlineData("shell.studio.field.entity.fields.userId.help")]
+    [InlineData("shell.studio.field.entity.fields.searchable.help")]
+    [InlineData("shell.studio.field.entity.fields.sensitive.help")]
+    [InlineData("shell.studio.field.entity.fields.exactLookup.help")]
+    [InlineData("shell.studio.field.entity.indexes.unique.help")]
+    public void A_checkbox_says_what_turning_it_on_does_in_Vietnamese(string key) =>
+        Assert.StartsWith("Bật để ", ViText(key), StringComparison.Ordinal);
+
+    [Fact]
+    public void Used_by_relations_are_the_verb_alone()
+    {
+        Assert.Equal("Phát ra", ViText("shell.studio.relation.raisedEvent"));
+        Assert.Equal("Chờ", ViText("shell.studio.relation.awaitedEvent"));
+        Assert.Equal("Gửi đi", ViText("shell.studio.relation.webhookEvent"));
+        Assert.Equal("Gọi thao tác", ViText("shell.studio.relation.packageOperation"));
+        Assert.Equal("Giả lập thao tác", ViText("shell.studio.relation.stubPackage"));
+        Assert.Equal("Kiểm thử", ViText("shell.studio.relation.scenarioProcess"));
+        Assert.Equal("Cấp quyền cho vai trò này", ViText("shell.studio.relation.policyRole"));
+        Assert.Equal("Kiểm thử với vai trò này", ViText("shell.studio.relation.scenarioRole"));
+        Assert.DoesNotContain(
+            _vi.Where(pair => pair.Key.StartsWith("shell.studio.relation.", StringComparison.Ordinal)),
+            pair => pair.Value.Contains("nút", StringComparison.OrdinalIgnoreCase));
+    }
+
     private string Text(string key) =>
         _en.TryGetValue(key, out var text) ? text : throw new Xunit.Sdk.XunitException($"There is no English text for {key}.");
+
+    private string ViText(string key) =>
+        _vi.TryGetValue(key, out var text) ? text : throw new Xunit.Sdk.XunitException($"There is no Vietnamese text for {key}.");
 }
