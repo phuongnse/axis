@@ -1,7 +1,10 @@
 import { Flex, Spin } from 'antd'
+import { useContext } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
-import type { StudioRequest } from '../platform/studio'
+import { fillText } from '../platform/fillText'
+import { type PreviewLink, resourceTitle, type StudioRequest } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { PlatformContext } from './context'
 
 /**
  * The status line of a Studio request. A queued or running request shows the info icon, with a spinner beside its
@@ -10,16 +13,21 @@ import { useText } from '../platform/texts'
  * shows no release number. A test has its own texts too, and shows no release number. An accept, which is an `accept`
  * publish request, says whether the change is in the application, and shows no release number, see
  * docs/reference/ai-authoring-in-studio.md#accepting. A failed one never shows one, even when the request names a
- * release, so a failure never looks like a success.
+ * release, so a failure never looks like a success. A succeeded preview ends with one link for each of `previewLinks`,
+ * named by its site, such as "Open Purchasing", see docs/reference/studio.md#publishing and
+ * docs/reference/ai-authoring-in-studio.md#preview-the-draft.
  */
 export function StudioRequestStatus({
   request,
   releaseNumber,
+  previewLinks = [],
 }: {
   request: StudioRequest
   releaseNumber: number | null
+  previewLinks?: PreviewLink[]
 }) {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const kind = request.kind
   const preview = request.target === 'preview'
   let message
@@ -39,7 +47,17 @@ export function StudioRequestStatus({
         ) : kind === 'test' ? (
           t('shell.studio.request.tested')
         ) : preview ? (
-          t('shell.studio.request.previewed')
+          <>
+            {t('shell.studio.request.previewed')}
+            {previewLinks.map(({ site, url }) => (
+              <span key={url}>
+                {' '}
+                <a data-testid="studio-preview-link" href={url} target="_blank" rel="noreferrer">
+                  {fillText(t('shell.studio.request.openSite'), { site: resourceTitle(site, locale, t) })}
+                </a>
+              </span>
+            ))}
+          </>
         ) : (
           <>
             {t(kind === 'publish' ? 'shell.studio.request.published' : 'shell.studio.request.activated')}

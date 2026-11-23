@@ -1726,6 +1726,19 @@ export async function previewStudioApp(application: string): Promise<StudioReque
 }
 
 /**
+ * Sends a preview request of the author's draft, which publishes the folder with the draft's changes to the preview tenant. It
+ * answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function previewStudioDraft(application: string, draft: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/drafts/${encodeURIComponent(draft)}/preview`
+  const response = await studioFetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/**
  * The address of a site on the preview host. It takes the protocol and the port of the page, because the preview host
  * is served on the same ones as the main host.
  */
@@ -1735,6 +1748,44 @@ export function previewSiteUrl(
   location: Pick<Location, 'protocol' | 'port'> = window.location,
 ): string {
   return `${location.protocol}//${host}${location.port ? `:${location.port}` : ''}/${sitePath}`
+}
+
+/** A site of the application with its address on the preview host. */
+export interface PreviewLink {
+  site: StudioResourceItem
+  url: string
+}
+
+/**
+ * The link to each of `sites` on the preview host, once the preview `ended` has succeeded, else none. A site's path is read from
+ * the working folder, so a site that only a draft adds gets no link and a path renamed since the request was sent gives a
+ * wrong one. A site that fails to load gets no link, and an aborted or unreachable read throws.
+ */
+export async function findPreviewLinks(
+  application: string,
+  previewHost: string | null,
+  sites: StudioResourceItem[],
+  ended: StudioRequest,
+  signal: AbortSignal,
+): Promise<PreviewLink[]> {
+  if (ended.target !== 'preview' || ended.status !== 'succeeded' || previewHost === null) {
+    return []
+  }
+  const links: PreviewLink[] = []
+  for (const site of sites) {
+    try {
+      const { content } = await fetchStudioResource(application, site.id, signal)
+      if (typeof content.path === 'string') {
+        links.push({ site, url: previewSiteUrl(previewHost, content.path) })
+      }
+    } catch (error) {
+      if (signal.aborted || error instanceof ServerUnreachableError) {
+        throw error
+      }
+      console.warn(`Loading the site '${site.id}' for the preview links failed`, error)
+    }
+  }
+  return links
 }
 
 /** Sends an activate request for a release of the history. It answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does. */
@@ -2103,6 +2154,8 @@ export interface AuthoringRequest {
   sentAt: string
   approvedAt: string | null
   finishedAt: string | null
+  /** The id of the request's draft, or `null` when it has none. */
+  draft: string | null
   steps?: AuthoringRequestStep[]
 }
 

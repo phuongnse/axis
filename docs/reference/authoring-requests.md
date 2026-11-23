@@ -100,7 +100,7 @@ an accept, which [accepting](#accepting) describes.
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/request-changes`                     | Moves a request from `ready` back to `working` and keeps the comment as a `changeRequest` step             |
 | `GET /api/studio/apps/{application}/authoring-requests/{id}/diff`                                 | Reads the changes of the request, as the [draft diff](authoring-revisions.md#draft-diff) shows them        |
 | `GET /api/studio/ai` _(planned for M35)_                                                          | Tells the session's author whether their AI is connected, and the address of the MCP server                |
-| `POST /api/studio/apps/{application}/drafts/{draft}/preview` _(planned for M35)_                  | Tries the draft on the preview tenant, see [the draft preview](#routes)                                    |
+| `POST /api/studio/apps/{application}/drafts/{draft}/preview`                                      | Tries the draft on the preview tenant, see [the draft preview](#routes)                                    |
 
 - **Order of checks.** A send checks the session (`401`), the author role (`403`), in a cell the
   tenant's [`authoringRequests` quota](tenant-quotas.md#refusals) (`403`), the application (`404`),
@@ -132,12 +132,12 @@ an accept, which [accepting](#accepting) describes.
 - **Answer.** Accept answers `202` with the queued publish request, in the shape of
   `GET /api/studio/apps/{application}/requests/{id}`, and a `Location` for that route. The other
   routes answer a request, which has its `id`, `application`, `author`, `authorName`, `text`, `title`, `state`, `plan`,
-  `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt` and `finishedAt`. `title` is at most 80 characters and from the plan, and `plan` is
+  `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt`, `finishedAt` and `draft`. `title` is at most 80 characters and from the plan, and `plan` is
   [the plan's shape](#states), an object. Both are null until AI has proposed a plan. The read route adds `steps`,
   each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt`, `finishedAt`, `checks` and `resource`.
   `checks` is the results of a `check` step or the review of a `review` step, and null on any other step.
   `resource` is `{ kind, id, name }` on a `write` step and null on any other step, and the `summary` of a `write`
-  step is the name of its tool.
+  step is the name of its tool. `draft` is the id of the request's draft, or null when it has none.
 - **Paging the list** _(planned for M35)_. The list route takes the record API's `page`, `pageSize`, `sort`, `search`
   and `filter`, as [paging and sorting](record-api.md#paging-and-sorting) defines them. The columns are `title` and
   `author` (the author's name), which are text, `sentAt`, which is a date, and `state`, an enum column whose values are the state names. `state` sorts in the order a request goes through its states. The order is newest
@@ -175,13 +175,17 @@ an accept, which [accepting](#accepting) describes.
   `{ aiConnected, mcp }`. `aiConnected` is true when the tenant's AI authoring setting is on and the person has
   stored a key, or when `Ai:DefaultBinding` needs none, see
   [a person's own key](model-bindings.md#a-persons-own-key). `mcp` is `https://<host>/mcp`.
-- **Draft preview** _(planned for M35)_. The route follows the rules of [preview](authoring-publishing.md#preview) and takes its
-  snapshot from the draft's tip. It answers `404` for a draft that is not the person's, and `409` when the tenant
-  has no preview tenant.
+- **Previewing a draft.** The route follows the rules of [preview](authoring-publishing.md#preview) and takes its
+  snapshot from the draft's tip. It needs the author role only. It checks the session (`401`), the author role (`403`),
+  the application (`404`), the caller's own draft (`404` for a draft that is not the person's, and `503` when the write
+  lock cannot be taken), the preview tenant (`409` "This tenant has no preview tenant." when the tenant has none), the
+  manifest `id` (`409`) and, for a draft with a file under `packages/`, the [package quota](tenant-quotas.md#refusals).
+  It needs no `ready` request. It then stores a `publish` request with the target `preview`, the draft's files as its
+  snapshot and the draft in `draft_id`, and answers `202` with it and a `Location`, as `POST .../preview` does. A refused
+  preview stores nothing. It leaves the working folder and the main tenant as they are, and it is not a storage write.
 - **New answer fields** _(planned for M35)_. A request answers `app` as `{ client, name }` (`studio` with a null name
   for a request sent in Studio), `coAuthors` (the apps that wrote to the draft, in the shape of `app`, in order of first
-  write), `aiConnected` (the AI status rule, for the request's author, so the page can say that no review will run) and
-  `draft` (the draft's id, or null).
+  write) and `aiConnected` (the AI status rule, for the request's author, so the page can say that no review will run).
 - **Approving an outside app's request** _(planned for M35)_. The approve route also gets the agent host's
   [token](#acting-for-the-author), as a send does and with the same refusals, so the agent host can run the checks
   and the review for the author. The agent host runs no plan or change step of such a request.
