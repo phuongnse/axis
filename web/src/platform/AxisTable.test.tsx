@@ -1594,6 +1594,27 @@ describe('AxisTable', () => {
       expect(headerNames()).toEqual(['Name', 'Amount', 'Note'])
       expect(movedLines(container)).toEqual([])
     })
+
+    // The name and note need 416 px and the amount 100 px, so 516 px fits in 530 px. The checkbox column's 32 px
+    // from the theme does not, so the amount moves.
+    it('moves the amount under its row when a bulk action takes the checkbox column', () => {
+      fakeWidth(530)
+      const { container } = renderTable({
+        columns,
+        bulkActions: [{ key: 'archive', labelKey: 'row.archive', onClick: vi.fn() }],
+      })
+
+      expect(headerNames()).not.toContain('Amount')
+      expect(movedLines(container).map((line) => line.textContent)).toEqual(['Amount: 12'])
+    })
+
+    it('keeps every column at 530 px when there is no bulk action', () => {
+      fakeWidth(530)
+      const { container } = renderTable({ columns })
+
+      expect(headerNames()).toEqual(['Name', 'Amount', 'Note'])
+      expect(movedLines(container)).toEqual([])
+    })
   })
 
   describe('title, compact and headless', () => {

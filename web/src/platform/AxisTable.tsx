@@ -1,5 +1,15 @@
 import { DeleteOutlined, EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
-import { ConfigProvider, Dropdown, Flex, Input, Pagination, Table, type TableColumnType, type TableProps } from 'antd'
+import {
+  ConfigProvider,
+  Dropdown,
+  Flex,
+  Input,
+  Pagination,
+  Table,
+  theme as antTheme,
+  type TableColumnType,
+  type TableProps,
+} from 'antd'
 import {
   useContext,
   useEffect,
@@ -203,6 +213,9 @@ export interface AxisTableProps<T> {
 /** Column key of the row actions. A field name starts with a letter, so no field column has it. */
 const actionsKey = '$actions'
 
+/** The class of the sideways-scrolling region, which Ant Design's `classNames.content` puts on its element. */
+const scrollClass = 'axis-table-scroll'
+
 /** A width of 1 % makes an auto-layout column as narrow as its content, which `nowrap` keeps on one line. */
 const fitContent = '1%'
 /** The height of the moved lines of a row, set on the row for the cells that stay. */
@@ -275,9 +288,11 @@ export function AxisTable<T extends object>({
   const tableRef = useRef<HTMLDivElement>(null)
   // Ant Design has no prop for the focus of its scrolling region, so the attribute is set on the element.
   useEffect(() => {
-    tableRef.current?.querySelector('.ant-table-content')?.setAttribute('tabindex', '0')
+    tableRef.current?.querySelector(`.${scrollClass}`)?.setAttribute('tabindex', '0')
   })
   const tokens = useDesignTokens()
+  // Ant Design gives the checkbox column its control height by default, so the room is known before the table draws.
+  const selectionWidth = antTheme.useToken().token.controlHeight
   // The same theme object between draws, so the cells under the table are not drawn again for nothing.
   const theme = useMemo(() => tableTheme(tokens, compact), [tokens, compact])
   const cellPadding = compact ? tokens.spacing.sm : tokens.spacing.lg
@@ -304,6 +319,7 @@ export function AxisTable<T extends object>({
   const share = freeTexts > 0 ? `${100 / freeTexts}%` : undefined
   const lastKey = shown.at(-1)?.key
 
+  const bulk = (bulkActions?.length ?? 0) > 0
   // The table measures its own width after every draw and when it resizes, then moves columns under their row.
   useLayoutEffect(() => {
     const measure = () => {
@@ -316,9 +332,9 @@ export function AxisTable<T extends object>({
         return
       }
       const available = root.clientWidth
-      const others =
-        (root.querySelector<HTMLElement>('th.ant-table-selection-column')?.offsetWidth ?? 0) +
-        (heads.get(actionsKey)?.offsetWidth ?? 0)
+      // The checkbox column is there only with a bulk action, and then it is as wide as the theme gives it.
+      const selection = bulk ? selectionWidth : 0
+      const others = selection + (heads.get(actionsKey)?.offsetWidth ?? 0)
       const drawn = shown.reduce((sum, column) => sum + (heads.get(column.key)?.offsetWidth ?? 0), others)
       const widths = naturalWidths.current
       const sizes = shown.map((column) => {
@@ -335,7 +351,6 @@ export function AxisTable<T extends object>({
       })
       const { moved, scrolls } = makeRoom(available, others, sizes)
       // The moved lines of a row are as wide as the row's content, which starts after the checkbox and its padding.
-      const selection = root.querySelector<HTMLElement>('th.ant-table-selection-column')?.offsetWidth ?? 0
       const next = {
         moved,
         scrolls,
@@ -560,7 +575,6 @@ export function AxisTable<T extends object>({
     })
   }
 
-  const bulk = (bulkActions?.length ?? 0) > 0
   // Only the rows that show count, so the count and the action's rows match what the person sees.
   const selected = bulk ? (pageRows ?? []).filter((item) => selectedKeys.includes(rowKey(item))) : []
   const hasToolbar =
@@ -721,6 +735,7 @@ export function AxisTable<T extends object>({
                       selectedRowKeys: selected.map(rowKey),
                       onChange: (keys) => setSelectedKeys(keys),
                       getCheckboxProps: () => ({ 'aria-label': t('shell.table.selectRow') }),
+                      columnWidth: selectionWidth,
                       fixed: room.scrolls,
                       onCell: () => ({ style: staysRoom }),
                     }
@@ -742,6 +757,7 @@ export function AxisTable<T extends object>({
               showHeader={!headless}
               // The table moves columns under their row first. Only what stays still and does not fit scrolls sideways.
               scroll={{ x: true }}
+              classNames={{ content: scrollClass }}
               // Ant Design otherwise switches to a fixed layout once a column is fixed.
               tableLayout="auto"
               dataSource={tableRows as T[] | undefined}
