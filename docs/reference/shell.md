@@ -72,7 +72,7 @@ their own controls where they expect them.
   what the page edits opens in the panel, and a short task that stands alone is a dialog, as
   [opening things](actions-and-controls.md#opening-things) says. A handle on its edge, a `separator` that takes the
   arrow keys, Home and End, sets its width from `sidePanel` to half the shell, and the browser keeps that width, so
-  every side panel opens at the width last chosen. Its title can carry a `status`, such as a `StatusTag`, and a line under it. Its head
+  every side panel opens at the width last chosen. The handle is there above narrow width only, see [narrow width](frontend.md#narrow-width). Its title can carry a `status`, such as a `StatusTag`, and a line under it. Its head
   stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
   a scrollbar comes. A panel with no close button, such as the process designer's step panel, gives way while a panel
   the person opened is open, and comes back when that one closes. The page keeps the browser's scroll.
@@ -102,7 +102,8 @@ their own controls where they expect them.
   keeps the site title, the account button, the app switcher and a Menu button
   (`shell.navigation.menu`) with `aria-expanded`, which opens and closes the panel. The panel holds the
   navigation and the language and theme menu. Escape or following a link closes it, and Escape returns
-  focus to the button. The breakpoint is in [narrow width](frontend.md#narrow-width).
+  focus to the button. The breakpoint is in [narrow width](frontend.md#narrow-width). The right column stacks under the
+  page, and a side panel takes the window's width.
 - **Window.** The shell fills the browser window: the page has no margin round it, and the document
   behind it is `canvas` in both modes, so no white shows at its edges or when the page scrolls past its
   end. Text that draws no colour of its own takes `text` of the mode, as the controls' text does.

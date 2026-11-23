@@ -250,6 +250,36 @@ describe('Shell at narrow width', () => {
     vi.unstubAllGlobals()
   })
 
+  it('stacks the right column under the content at the width of the window', async () => {
+    renderShell(
+      'en',
+      ['/'],
+      notesNavigation.slice(0, 1),
+      <ShellAside>
+        <p>Side</p>
+      </ShellAside>,
+    )
+
+    const column = (await screen.findByText('Side')).closest('#shell-aside')!
+    expect(column).toHaveStyle({ width: '100%' })
+    expect(column.parentElement).toHaveStyle({ flexDirection: 'column' })
+  })
+
+  it('does not give the page zero width, as a sider layout would', async () => {
+    renderShell(
+      'en',
+      ['/'],
+      notesNavigation.slice(0, 1),
+      <ShellAside>
+        <p>Side</p>
+      </ShellAside>,
+    )
+
+    const row = (await screen.findByText('Side')).closest('#shell-aside')!.parentElement!
+    expect(row).not.toHaveClass('ant-layout-has-sider')
+    expect(row.querySelector('main')).not.toHaveStyle({ width: '0px' })
+  })
+
   it('hides the navigation behind a closed Menu button', () => {
     renderShell('en', ['/'], notesNavigation)
 

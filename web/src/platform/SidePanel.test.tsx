@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { designTokensFor, sizeTokens, spacingTokens } from './designTokens'
+import { stubWindowWidth } from '../test/windowWidth'
+import { breakpointTokens, designTokensFor, sizeTokens, spacingTokens } from './designTokens'
 import { SidePanel } from './SidePanel'
 import { ShellAsideContext } from './shellAsideContext'
 import { TextProvider } from './TextProvider'
@@ -103,6 +104,48 @@ describe('SidePanel line', () => {
       screen.getByRole('heading', { name: 'Problems' }).compareDocumentPosition(line) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
+  })
+})
+
+describe('SidePanel at narrow width', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('takes the width of the window and has no resize handle at 360 px', () => {
+    stubWindowWidth(360)
+    window.innerWidth = 360
+
+    renderPanel({ onClose: vi.fn() })
+
+    expect(screen.getByTestId('panel-test')).toHaveStyle({ width: '100%' })
+    expect(screen.queryByRole('separator')).toBeNull()
+  })
+
+  it('keeps the sidePanel width and its handle at 992 px', () => {
+    stubWindowWidth(breakpointTokens.narrowWidth)
+    window.innerWidth = breakpointTokens.narrowWidth
+
+    renderPanel()
+
+    expect(screen.getByTestId('panel-test')).toHaveStyle({ width: `${sizeTokens.sidePanel}px` })
+    expect(screen.getByRole('separator', { name: 'Resize panel' })).toBeInTheDocument()
+  })
+
+  it('keeps the width stored by the handle, so the panel returns to it when the window widens', () => {
+    localStorage.setItem('axis.sidePanelWidth', '400')
+    stubWindowWidth(360)
+    window.innerWidth = 360
+    const narrow = renderPanel()
+    expect(screen.getByTestId('panel-test')).toHaveStyle({ width: '100%' })
+    narrow.unmount()
+    aside?.remove()
+
+    stubWindowWidth(breakpointTokens.narrowWidth)
+    window.innerWidth = breakpointTokens.narrowWidth
+    renderPanel()
+
+    expect(screen.getByTestId('panel-test')).toHaveStyle({ width: '400px' })
   })
 })
 

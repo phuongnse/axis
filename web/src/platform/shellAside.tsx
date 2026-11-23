@@ -9,6 +9,7 @@ import { ShellAsideContext } from './shellAsideContext'
  * component unmounts. One claim shows at a time: the newest one that is `closable`, which a person opened and can close,
  * or, when none is, the newest. A claim that does not show draws nothing and comes back when the claim that hid it ends.
  * The column is outside the content area's padding, so what it holds, a side panel's included, reads an inset of 0.
+ * At narrow width the column stacks under the content, see docs/reference/shell.md#layout.
  */
 export function ShellAside({ closable = true, children }: { closable?: boolean; children: ReactNode }) {
   const { target, claim, current } = useContext(ShellAsideContext)

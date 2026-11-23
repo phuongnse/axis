@@ -77,7 +77,7 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 _(planned, #5049)_
 
 A field's settings open in a side panel, `SidePanel`, in the shell's right column beside the page, so the table
-stays in sight and clickable, see [one side panel frame](shell.md#layout). The panel is titled by the field's name,
+stays in sight and clickable. At narrow width it stacks under the page instead, see [one side panel frame](shell.md#layout). The panel is titled by the field's name,
 or "Unnamed field" while it has none. From the top it holds the migration warning, then the groups General, the
 type's settings, Value, Validations, and Search and privacy, see [the drawer and its groups](#the-drawer-and-its-groups).
 
