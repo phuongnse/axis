@@ -467,7 +467,11 @@ changed.
 - **At sign-up.** A confirm that succeeds records one acceptance of each document. A confirm that is
   refused records none.
 - **A new version** _(planned for M34)_. When a new version of either document is published, a tenant
-  administrator accepts it in the shell before any other action, and Axis records the acceptance as at sign-up.
+  administrator accepts it in the shell before any other page, see [the shell](shell.md#layout). The control
+  plane sends each tenant's cell the current versions and their addresses through the
+  [provisioning API](tenant-lifecycle.md#provisioning-api). It reads back each acceptance that the cell keeps,
+  and appends it to `control_plane.terms_acceptances` with the same columns as at sign-up. The `account` is
+  the administrator's user id. One acceptance by any administrator covers the tenant for that document version.
 - **Versions.** Each document's version and its address in each language are settings of the control
   plane, and [the documents' route](#the-documents) serves them. A sign-up that sends a version that is no longer
   current is refused. The operator has a lawyer confirm the texts before sign-up opens.

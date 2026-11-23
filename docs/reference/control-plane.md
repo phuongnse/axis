@@ -94,6 +94,10 @@ over a private network with mutual TLS.
   the cell answers `404`. The [subscription clock](subscriptions.md#one-clock) uses them.
 - **Quotas.** The client also sends `PUT /api/cell/tenants/{id}/quotas` with a `set` of quota values and
   no `Idempotency-Key`, and accepts only `200`. The [quota write](plans.md#from-a-plan-to-the-quotas) uses it.
+- **The subscription and the terms** _(planned for M34)_. The client also sends each tenant's plan, state and next
+  date, and the current versions and addresses of the terms and the data processing agreement. It reads back each
+  acceptance that a cell keeps, see [what a tenant administrator sees](subscriptions.md#what-a-tenant-administrator-sees)
+  and [terms acceptance](sign-up.md#terms-acceptance).
 
 ## Its own work
 

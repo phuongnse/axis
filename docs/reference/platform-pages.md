@@ -235,6 +235,7 @@ are `shell.users.usage.*`.
   use on a line of its own when the server counts it. A quota whose use the server does not count shows its limit only, with no bar.
 - **Days.** A table lists the tenant's rows of the last 30 days, newest first: the database and file sizes, users,
   applications, emails sent, connector calls and work items run. A count the server does not keep shows the em dash. The cell console's Tenant view shows the same table.
+- **The plan and the subscription** _(planned for M34)_. The section also shows the plan, the state, the next date and a link to the operator's billing page, see [what a tenant administrator sees](subscriptions.md#what-a-tenant-administrator-sees).
 
 The "Hosts" section is a component of its own, below "Usage". It loads `GET /api/tenant/hosts` and renders nothing unless
 the route answers `200`. That keeps it hidden outside a cell, in a preview tenant and from a user who is not an

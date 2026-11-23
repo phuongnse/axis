@@ -345,7 +345,7 @@ platform tools they may open.
 | `billingUrl`        | `https://account.<Cell:TenantDomain>/tenants/<tenant id>` for a user who holds the administrator role in a tenant of a cell. Otherwise null, also in a preview tenant |
 | `tenantExports`     | True for a user who holds the administrator role in a tenant of a cell that is not a preview tenant, the tenants whose [export routes](tenant-lifecycle.md#exports-by-a-tenant-administrator) answer. Otherwise false |
 
-- **The operator's billing page** _(planned for M34)_. `billingUrl` is the operator's billing page, from a setting of the cell, for the same users.
+- **The operator's billing page** _(planned for M34)_. `billingUrl` is the operator's billing page, from the cell setting [`Cell:BillingPageUrl`](host-settings.md#cell-settings), for the same users. Without that setting it is null.
 - **The tenant's setting** _(planned for M35)_. `studioAi` is also false while the tenant's [AI authoring](user-administration.md#ai-authoring) setting is off.
 
 Record writes, process starts and the task API read the current user the same way, and their audit
