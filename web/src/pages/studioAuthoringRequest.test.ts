@@ -6,7 +6,7 @@ import type {
   StudioDiagnostic,
   StudioScenarioResult,
 } from '../platform/studio'
-import { requestResult } from './studioAuthoringRequest'
+import { planChanges, planSummary, requestFeed, requestResult, workLine } from './studioAuthoringRequest'
 
 const error: StudioDiagnostic = {
   code: 'AXIS-E101',
@@ -251,5 +251,185 @@ describe('requestResult', () => {
     const result = requestResult(requestOf({ steps: undefined }), true)
 
     expect(result.checks).toBeNull()
+  })
+})
+
+describe('requestFeed', () => {
+  const approvedAt = '2026-11-18T09:05:00Z'
+  const withChecks = [check(checksWith())]
+
+  it.each([
+    ['writing the plan', { state: 'planning', plan: null }, [['plan', 'now']]],
+    ['a plan that waits', { state: 'awaitingApproval' }, [['plan', 'waiting']]],
+    [
+      'a plan that is approved and a draft that is changed',
+      { state: 'working', approvedAt },
+      [
+        ['plan', 'done'],
+        ['work', 'now'],
+      ],
+    ],
+    [
+      'a fix',
+      { state: 'fixing', approvedAt },
+      [
+        ['plan', 'done'],
+        ['work', 'now'],
+      ],
+    ],
+    [
+      'a draft that is checked',
+      { state: 'checking', approvedAt },
+      [
+        ['plan', 'done'],
+        ['work', 'now'],
+      ],
+    ],
+    [
+      'a draft that is reviewed',
+      { state: 'reviewing', approvedAt },
+      [
+        ['plan', 'done'],
+        ['work', 'now'],
+      ],
+    ],
+    [
+      'a ready request',
+      { state: 'ready', approvedAt, steps: withChecks },
+      [
+        ['plan', 'done'],
+        ['work', 'done'],
+        ['result', 'waiting'],
+      ],
+    ],
+    [
+      'a ready request with no checks',
+      { state: 'ready', approvedAt },
+      [
+        ['plan', 'done'],
+        ['work', 'done'],
+      ],
+    ],
+    [
+      'an accepted request',
+      { state: 'accepted', approvedAt },
+      [
+        ['plan', 'done'],
+        ['work', 'done'],
+        ['result', 'done'],
+      ],
+    ],
+    [
+      'a request that failed after its checks',
+      { state: 'failed', approvedAt, steps: withChecks },
+      [
+        ['plan', 'done'],
+        ['work', 'stopped'],
+        ['result', 'idle'],
+      ],
+    ],
+    ['a request that failed before its plan was approved', { state: 'failed', plan: null }, [['plan', 'stopped']]],
+    [
+      'a request dropped before approval',
+      { state: 'dropped' },
+      [
+        ['plan', 'idle'],
+        ['dropped', 'idle'],
+      ],
+    ],
+    [
+      'a request dropped after approval',
+      { state: 'dropped', approvedAt },
+      [
+        ['plan', 'done'],
+        ['work', 'idle'],
+        ['dropped', 'idle'],
+      ],
+    ],
+    ['a request dropped while AI wrote the plan', { state: 'dropped', plan: null }, [['dropped', 'idle']]],
+  ] as const)('lists the items of %s with their marks', (_, overrides, expected) => {
+    const feed = requestFeed(requestOf(overrides as Partial<AuthoringRequest>))
+
+    expect(feed.map((entry) => [entry.key, entry.mark])).toEqual(expected)
+  })
+})
+
+describe('workLine', () => {
+  it.each(['working', 'fixing', 'checking', 'reviewing'] as const)(
+    'names what runs now while the request is %s',
+    (state) => {
+      expect(workLine(requestOf({ state, steps: [step({ kind: 'work' })] }))).toEqual({
+        key: `shell.studio.aiRequest.work.${state}`,
+      })
+    },
+  )
+
+  it('counts the steps of the work from the first start to the last finish, and leaves out the other steps', () => {
+    const line = workLine(
+      requestOf({
+        steps: [
+          step({ kind: 'plan', startedAt: '2026-11-18T08:00:00Z', finishedAt: '2026-11-18T08:03:00Z' }),
+          step({ kind: 'work', startedAt: '2026-11-18T09:00:00Z', finishedAt: '2026-11-18T09:01:00Z' }),
+          step({ kind: 'check', startedAt: '2026-11-18T09:01:00Z', finishedAt: '2026-11-18T09:02:00Z' }),
+          step({ kind: 'review', startedAt: '2026-11-18T09:02:00Z', finishedAt: '2026-11-18T09:03:30Z' }),
+          step({ kind: 'accept', startedAt: '2026-11-18T10:00:00Z', finishedAt: '2026-11-18T10:00:05Z' }),
+        ],
+      }),
+    )
+
+    expect(line).toEqual({ count: 3, ms: 210_000 })
+  })
+
+  it('reads a step that has not finished as lasting up to the last step that did', () => {
+    const line = workLine(
+      requestOf({
+        state: 'failed',
+        steps: [
+          step({ kind: 'work', finishedAt: null }),
+          step({ kind: 'fix', startedAt: '2026-11-18T09:02:00Z', finishedAt: '2026-11-18T09:03:00Z' }),
+        ],
+      }),
+    )
+
+    expect(line).toEqual({ count: 2, ms: 180_000 })
+  })
+
+  it('has no line for a request with no step of the work', () => {
+    expect(workLine(requestOf({ steps: [step({ kind: 'plan' })] }))).toBeNull()
+    expect(workLine(requestOf({ steps: undefined }))).toBeNull()
+  })
+})
+
+describe('planChanges', () => {
+  it('gives the comment of each planChange step in order, and no other summary', () => {
+    const steps = [
+      step({ kind: 'planChange', summary: 'Add the cost centre.' }),
+      step({ kind: 'plan', summary: 'A plan.' }),
+      step({ kind: 'planChange', summary: 'Also add it to the form.' }),
+      step({ kind: 'planChange', summary: null }),
+    ]
+
+    expect(planChanges(requestOf({ steps }))).toEqual(['Add the cost centre.', 'Also add it to the form.'])
+    expect(planChanges(requestOf({ steps: undefined }))).toEqual([])
+  })
+})
+
+describe('planSummary', () => {
+  it('splits the plan at its first blank line', () => {
+    expect(planSummary('Add a field.\n\nChange the form.\n\nPublish it.')).toEqual({
+      summary: 'Add a field.',
+      rest: 'Change the form.\n\nPublish it.',
+    })
+  })
+
+  it('keeps a line break inside the first paragraph, and reads a blank line with spaces as a blank line', () => {
+    expect(planSummary('Add a field.\nChange the form.\n  \r\nPublish it.')).toEqual({
+      summary: 'Add a field.\nChange the form.',
+      rest: 'Publish it.',
+    })
+  })
+
+  it('has no rest for a plan of one paragraph', () => {
+    expect(planSummary('  Add a field.\n')).toEqual({ summary: 'Add a field.', rest: '' })
   })
 })
