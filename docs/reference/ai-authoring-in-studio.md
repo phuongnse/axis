@@ -181,7 +181,7 @@ bar, never in the heading. Only the request's author sees its actions.
 | --------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | AI writes the plan                            | AI is writing the plan                                   | none                                                                                                              | Drop…                                                               |
 | The plan waits, for its author                | Plan ready for your approval                             | Approve plan                                                                                                      | Drop…, Change the plan…                                             |
-| The plan waits with questions, for its author _(planned for M35)_ | "1 question to answer", or "<n> questions to answer"     | Answer…, which opens the reply as "Your answers"                                                                  | Drop…                                                               |
+| The plan waits with questions, for its author | "1 question to answer", or "<n> questions to answer"     | Answer…, which opens the reply as "Your answers"                                                                  | Drop…                                                               |
 | The plan waits, for anyone else               | Waiting for its author's approval                        | none                                                                                                              | none                                                                |
 | AI works, checks or reviews                   | AI is working on it                                      | none                                                                                                              | Drop…                                                               |
 | AI waits for an outside app _(planned for M35)_ | The app's line, as [below](#an-outside-apps-request) gives it | none                                                                                                         | Drop…                                                               |
@@ -201,7 +201,7 @@ to 2,000 characters, and its dialog has Cancel. A failure shows inside the dialo
 
 - **Change the plan…** is a secondary action for a plan that waits with no questions. Its `medium` dialog,
   "Change the plan", asks "What should the plan do differently?", and its button is **Ask for a new plan**.
-- **Answer…** _(planned for M35)_ is the main action while the plan has questions. Its `medium` dialog, "Answer the plan's
+- **Answer…** is the main action while the plan has questions. Its `medium` dialog, "Answer the plan's
   questions", asks for "Your answers". Its help says "AI writes the plan again with your answers, and you
   approve it." Its button is **Ask for a new plan**, and it sends the answers as a change of plan.
 - **Ask for other changes…** is a secondary action for a ready draft with no conflict. Its `medium` dialog,
@@ -235,8 +235,8 @@ The Plan item shows the plan in each of its states.
 - While AI writes the plan, the mark turns, and the item reads "AI is reading the application and writing a plan. Nothing changes
   until the plan is approved."
 - While the plan waits for its author, nothing sits beside its title, and the plan is open.
-- The open plan shows its summary, then its changes, one bullet each, under **Show the plan** or **Hide the plan**. Its
-  other groups wait for [the plan's groups](#the-plans-groups).
+- The open plan shows its summary, then, under **Show the plan** or **Hide the plan**, its groups as
+  [the plan's groups](#the-plans-groups) gives them.
 - **Once the plan is approved.** The item reads "Approved on <time>", and the plan is folded
   under its summary.
 - **The summary.** The summary is under the title in every state once AI has written the
@@ -256,8 +256,6 @@ Only the author of the request approves its plan.
 
 ### The plan's groups
 
-_(planned for M35)_
-
 A plan with questions waits for its author's answers. While it has questions, the page offers **Answer…**
 and no **Approve plan**.
 
@@ -272,7 +270,7 @@ when it has something to show.
 4. **Risks and limits** are what the change does to the data and the people already there, and where it stops.
 5. **Acceptance criteria** say how the result will be checked.
 6. **Checklist** gives each item of Axis's checklist, then how the plan meets it.
-7. **Implementation notes** sit behind **Show the implementation notes**, with the edits grouped by resource.
+7. **Implementation notes** sit behind **Show the implementation notes**, one bullet each.
 
 A question is one that AI leaves to its author. A decision is a choice that AI made, which its author may undo.
 
