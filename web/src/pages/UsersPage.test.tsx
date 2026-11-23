@@ -137,12 +137,16 @@ function posts(fetchMock: ReturnType<typeof stubServer>) {
 }
 
 /** Opens the invite form, fills it and asks to invite, which opens the confirmation. */
-async function fillInvitation() {
-  renderPage()
-  await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
-  const form = await confirmation('Invite a person')
+async function fillInvitation(vietnamese = false) {
+  renderPage('/users', vietnamese)
+  const words: Record<string, string> = vietnamese ? platformVietnamese : platformEnglish
+  await userEvent.click(await screen.findByRole('button', { name: words['shell.users.invite'] }))
+  const form = await confirmation(words['shell.users.invite.title'])
   await userEvent.type(within(form).getByLabelText(/^Email\*?$/), 'new@axis.local')
-  await userEvent.type(within(form).getByLabelText(/^Display name\*?$/), 'New Person')
+  await userEvent.type(
+    within(form).getByLabelText(new RegExp(`^${words['shell.users.invite.displayName']}\\*?$`)),
+    'New Person',
+  )
   return form
 }
 
@@ -159,10 +163,16 @@ function LocationProbe() {
   return <output data-testid="location">{useLocation().search}</output>
 }
 
-function renderPage(initialEntry = '/users') {
+function renderPage(initialEntry = '/users', vietnamese = false) {
+  const current: Platform = vietnamese
+    ? { ...platform, current: { locale: 'vi', texts: platformVietnamese } }
+    : platform
   render(
-    <PlatformContext.Provider value={platform}>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+    <PlatformContext.Provider value={current}>
+      <TextProvider
+        catalogs={[{ texts: vietnamese ? platformVietnamese : platformEnglish, fallbackTexts: platformEnglish }]}
+        development={false}
+      >
         <MemoryRouter initialEntries={[initialEntry]}>
           <UsersPage />
           <LocationProbe />
@@ -514,7 +524,7 @@ describe('UsersPage', () => {
     const dialog = await confirmation('Invite this person?')
     expect(within(dialog).getByTestId('users-invite-confirm')).toHaveTextContent('Email: new@axis.local')
     expect(dialog).toHaveTextContent('Name: New Person')
-    expect(dialog).toHaveTextContent('Roles: approver (Purchasing), operator (Platform)')
+    expect(dialog).toHaveTextContent('Roles: approver (Purchasing) and operator (Platform)')
     expect(posts(fetchMock)).toHaveLength(0)
     await userEvent.click(within(dialog).getByRole('button', { name: 'Invite' }))
 
@@ -527,6 +537,26 @@ describe('UsersPage', () => {
       roles: [{ applicationId, role: 'approver' }, { role: 'operator' }],
     })
     await vi.waitFor(() => expect(requested(fetchMock).filter(isList)).toHaveLength(2))
+  })
+
+  it('joins the chosen roles with the Vietnamese "và" in the invite confirmation', async () => {
+    stubInvitations()
+    const form = await fillInvitation(true)
+    const words: Record<string, string> = platformVietnamese
+    await userEvent.click(
+      within(await within(form).findByRole('region', { name: 'Purchasing' })).getByRole('checkbox', {
+        name: 'approver',
+      }),
+    )
+    await userEvent.click(
+      within(within(form).getByRole('region', { name: words['shell.users.roles.platform'] })).getByRole('checkbox', {
+        name: 'operator',
+      }),
+    )
+    await userEvent.click(within(form).getByRole('button', { name: words['shell.users.invite.send'] }))
+
+    const dialog = await confirmation(words['shell.users.invite.confirm'])
+    expect(dialog).toHaveTextContent(`approver (Purchasing) và operator (${words['shell.users.roles.platform']})`)
   })
 
   it('invites without roles when the roles cannot be loaded', async () => {

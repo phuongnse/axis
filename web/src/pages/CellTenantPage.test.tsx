@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import {
   cellTenantStatusTones,
   type CellJob,
@@ -208,12 +209,18 @@ function Address() {
   return <output data-testid="address">{useLocation().search}</output>
 }
 
-function renderPage(path: string, onRefused = vi.fn()) {
+function renderPage(path: string, onRefused = vi.fn(), vietnamese = false) {
+  const current: Platform = vietnamese
+    ? { ...platform, current: { locale: 'vi', texts: platformVietnamese } }
+    : platform
   render(
     <MemoryRouter initialEntries={[path]}>
       <ThemeModeProvider>
-        <PlatformContext.Provider value={platform}>
-          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <PlatformContext.Provider value={current}>
+          <TextProvider
+            catalogs={[{ texts: vietnamese ? platformVietnamese : platformEnglish, fallbackTexts: platformEnglish }]}
+            development={false}
+          >
             <Routes>
               <Route element={<Outlet context={{ onRefused }} />}>
                 <Route path="tenants/:id" element={<CellTenantPage />} />
@@ -249,7 +256,7 @@ describe('CellTenantPage', () => {
     const details = await screen.findByTestId('cell-tenant')
     expect(details).not.toHaveTextContent('Status')
     expect(details).toHaveTextContent('crm')
-    expect(details).toHaveTextContent('acme.example.com, portal.acme.test')
+    expect(details).toHaveTextContent('acme.example.com and portal.acme.test')
 
     const quotaRows = within(await screen.findByTestId('cell-tenant-quotas'))
       .getAllByRole('row')
@@ -266,6 +273,13 @@ describe('CellTenantPage', () => {
     // The tenant's own jobs name the tenant of the page, so it is not a link back to it.
     expect(within(jobRows[1]).queryByRole('link')).toBeNull()
     expect(fetchMock).toHaveBeenCalledWith('/api/cell/jobs?tenant=acme&pageSize=50', expect.anything())
+  })
+
+  it('joins the hosts in the list words of the Vietnamese locale', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme', vi.fn(), true)
+
+    expect(await screen.findByTestId('cell-tenant')).toHaveTextContent('acme.example.com và portal.acme.test')
   })
 
   it('lists each requested host as pending with its expiry, verified or expired', async () => {

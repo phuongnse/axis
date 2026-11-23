@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import type { CellJob, CellTenant } from '../platform/cell'
 import { chooseOption, formItem, openDropdown, optionTexts } from '../test/antd'
 import { clickInDialog, dialog, pick } from '../test/tableFilter'
@@ -85,12 +86,18 @@ function Address() {
   return <output data-testid="address">{useLocation().search}</output>
 }
 
-function renderPage(onRefused = vi.fn(), address = '/') {
+function renderPage(onRefused = vi.fn(), address = '/', vietnamese = false) {
+  const current: Platform = vietnamese
+    ? { ...platform, current: { locale: 'vi', texts: platformVietnamese } }
+    : platform
   render(
     <MemoryRouter initialEntries={[address]}>
       <ThemeModeProvider>
-        <PlatformContext.Provider value={platform}>
-          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <PlatformContext.Provider value={current}>
+          <TextProvider
+            catalogs={[{ texts: vietnamese ? platformVietnamese : platformEnglish, fallbackTexts: platformEnglish }]}
+            development={false}
+          >
             <Routes>
               <Route element={<Outlet context={{ onRefused }} />}>
                 <Route index element={<CellTenantsPage />} />
@@ -209,6 +216,14 @@ function allOptionTexts() {
 describe('CellTenantsPage', () => {
   afterEach(() => vi.unstubAllGlobals())
 
+  it('joins the hosts of a tenant in the list words of the Vietnamese locale', async () => {
+    stubTenants(200, [acme])
+    renderPage(vi.fn(), '/', true)
+
+    await loadedTable()
+    expect(dataRows()[0]).toHaveTextContent('acme.example.com và portal.acme.test')
+  })
+
   it('lists one row per tenant, with dashes for the failed work not yet counted', async () => {
     stubTenants(200, [acme, beta, gamma])
     renderPage()
@@ -221,7 +236,7 @@ describe('CellTenantsPage', () => {
     expect(within(rows[1]).getByText('Suspended').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
     expect(within(rows[2]).getByText('Read only').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
     expect(rows[0]).toHaveTextContent('crm')
-    expect(rows[0]).toHaveTextContent('acme.example.com, portal.acme.test')
+    expect(rows[0]).toHaveTextContent('acme.example.com and portal.acme.test')
     expect(
       within(rows[0])
         .getAllByRole('cell')

@@ -425,8 +425,9 @@ A new record has no history.
 - **Values** _(planned for M41)_. An entry that changed fields shows each field's label with its old and new
   value, as [values in history](record-audit.md#values-in-history) holds them. A field the person may not
   read shows only its label, so the person sees that it changed and not what it was.
-- **Summary lines**. In the summary the field labels are joined by commas, and the
-  task outcome and the step each take a line of their own, never joined by a separator, see
+- **Summary lines**. In the summary the field labels are joined in the locale's list format, such as "Title,
+  Amount, and Notes", and the task outcome and the step each take a line of their own, never joined by a
+  separator, see
   [text](actions-and-controls.md#text).
 - **Open process.** An entry whose `inspectPath` is not `null` links to the instance page of the first
   page of the site whose widget is a `processInspector` that names the entry's process. The link reads

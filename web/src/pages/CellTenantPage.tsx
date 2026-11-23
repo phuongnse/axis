@@ -435,7 +435,12 @@ export function CellTenantPage() {
                 {
                   key: 'hosts',
                   term: t('shell.cell.tenant.hosts'),
-                  value: tenant.hosts.length > 0 ? tenant.hosts.join(', ') : <EmptyDash />,
+                  value:
+                    tenant.hosts.length > 0 ? (
+                      new Intl.ListFormat(locale, { type: 'conjunction' }).format(tenant.hosts)
+                    ) : (
+                      <EmptyDash />
+                    ),
                 },
               ]}
             />

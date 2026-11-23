@@ -98,7 +98,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
           ) : (
             <Flex vertical>
               {items.map((item) => {
-                const summary = historySummary(item, fields, t)
+                const summary = historySummary(item, fields, t, locale)
                 const target = typeof item.inspectPath === 'string' ? inspectTarget(item.inspectPath) : null
                 const inspectorPage = target === null ? undefined : inspectors?.get(target.process)
                 return (

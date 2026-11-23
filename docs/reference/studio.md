@@ -399,7 +399,8 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   it has no label, and a path as the labels of its fields, such as "Name of Supplier". An enum value reads as
   its value label, `true` and `false` as yes and no, and `null` as no value. Numbers and dates read in the
   author's language. A text value reads between single quotes, such as 'PR-'. A comparison reads in words: "is
-  at least", "has no value", and "is one of" with the list joined by "or". A comparison of dates reads as before
+  at least", "has no value", and "is one of" with the values joined by the locale's "or", such as "Draft, Sent,
+  or Done". A comparison of dates reads as before
   or after. A yes-or-no field on its own reads as being yes, and after `not` as being no. Arithmetic keeps ×,
   ÷ and −, so `amount * 1.1` reads "Amount × 1.1". With an error the line is hidden, and the error shows. The
   reading comes from the [expression check](authoring.md#expression-check), and its words are texts in every
