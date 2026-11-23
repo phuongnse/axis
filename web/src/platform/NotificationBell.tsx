@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Announcement } from './Announcement'
 import { EmptyState } from './EmptyState'
+import { fillText } from './fillText'
 import { formatValue } from './formatValue'
 import {
   fetchNotifications,
@@ -82,7 +83,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
 
   const unread = data.unreadCount
   const label = t('shell.notifications.label')
-  const named = unread > 0 ? `${label}, ${unread} ${t('shell.notifications.unread')}` : label
+  const named = unread > 0 ? fillText(t('shell.notifications.named'), { count: unread }) : label
 
   function openPanel() {
     setMarkFailed(false)

@@ -64,18 +64,18 @@ function Location() {
   return <div data-testid="location">{location.pathname + location.search}</div>
 }
 
-function renderBell() {
+function renderBell(texts: Record<string, string> = platformEnglish, locale = 'en') {
   return render(
     <MemoryRouter initialEntries={['/e2e/notes']}>
       <ConfigProvider theme={{ token: { motion: false } }}>
         <ThemeModeProvider>
-          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <TextProvider catalogs={[{ texts, fallbackTexts: platformEnglish }]} development={false}>
             <Routes>
               <Route
                 path="*"
                 element={
                   <>
-                    <NotificationBell path={path} sitePath="e2e" locale="en" />
+                    <NotificationBell path={path} sitePath="e2e" locale={locale} />
                     <Location />
                   </>
                 }
@@ -101,6 +101,13 @@ describe('NotificationBell', () => {
     expect(bell).toHaveTextContent('2')
     expect(within(bell).queryByRole('img')).toBeNull()
     expect(screen.getByRole('status')).toHaveTextContent('Notifications, 2 unread')
+  })
+
+  it('names the bell in Vietnamese with the unread count', async () => {
+    stubServer(() => json(page([withPage], 2)))
+    renderBell(platformVietnamese, 'vi')
+
+    expect(await screen.findByRole('button', { name: 'Thông báo, 2 chưa đọc' })).toBeInTheDocument()
   })
 
   it('names the bell without a count when nothing is unread', async () => {

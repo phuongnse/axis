@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { historySummary } from './historySummary'
 import type { HistoryItem } from './records'
 import type { FieldMetadata, FieldType } from './site'
@@ -28,9 +30,9 @@ function field(name: string, type: FieldType, labelKey: string | null): FieldMet
 const fields = [field('title', 'text', 'request.title'), field('comment', 'text', 'request.comment')]
 
 const texts: Record<string, string> = {
-  'shell.history.fields': 'Changed',
-  'shell.history.outcome': 'Outcome',
-  'shell.history.step': 'Step',
+  'shell.history.fields': 'Changed: {fields}',
+  'shell.history.outcome': 'Outcome: {outcome}',
+  'shell.history.step': 'Step: {step}',
   'request.title': 'Title',
   'request.comment': 'Comment',
 }
@@ -65,5 +67,37 @@ describe('historySummary', () => {
 
   it('has no lines when the details name no field, outcome or step', () => {
     expect(historySummary(item('record.created', { version: 1 }), fields, t)).toEqual([])
+  })
+})
+
+describe.each([
+  {
+    locale: 'English',
+    catalog: platformEnglish,
+    labels: { 'request.title': 'Title', 'request.comment': 'Comment' },
+    changed: 'Changed: Title, amount, gone',
+    outcome: 'Outcome: reject',
+    step: 'Step: decide',
+  },
+  {
+    locale: 'Vietnamese',
+    catalog: platformVietnamese,
+    labels: { 'request.title': 'Tiêu đề', 'request.comment': 'Ghi chú' },
+    changed: 'Đã thay đổi: Tiêu đề, amount, gone',
+    outcome: 'Kết quả: reject',
+    step: 'Bước: decide',
+  },
+])('historySummary in $locale', ({ catalog, labels, changed, outcome, step }) => {
+  const all: Record<string, string> = { ...catalog, ...labels }
+  const translate = (key: string) => all[key] ?? key
+
+  it('fills each line from one text of the catalog', () => {
+    expect(
+      historySummary(
+        item('task.completed', { fields: ['title', 'amount', 'gone'], outcome: 'reject', step: 'decide' }),
+        [...fields, field('amount', 'decimal', null)],
+        translate,
+      ),
+    ).toEqual([changed, outcome, step])
   })
 })
