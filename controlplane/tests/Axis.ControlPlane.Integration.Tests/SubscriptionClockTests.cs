@@ -59,6 +59,7 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
         {
             TenantDomain = "vn.example.com",
             PublicUrl = "https://account.vn.example.com",
+            BillingPageUrl = "https://billing.example.com/tenants/{tenantId}",
             MailFrom = "no-reply@vn.example.com",
         };
         controlPlane.Cells.Add(new CellOptions { Id = "vn-1", InternalUrl = "https://vn-1.test", TokenUrl = "https://vn-1.test/token", ClientId = "axis-controlplane" });
@@ -287,7 +288,7 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
     }
 
     [Fact]
-    public async Task An_email_names_the_date_of_the_next_step_in_utc_in_the_language_of_its_reader_and_links_only_to_the_billing_portal()
+    public async Task An_email_names_the_date_of_the_next_step_in_utc_in_the_language_of_its_reader_and_links_only_to_the_billing_page()
     {
         var people = SeedPeople();
         await SeedAsync("acme", "trialing", _start.AddDays(30), people.Owner);
@@ -301,7 +302,7 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
         var english = Assert.Single(messages, message => HasRecipient(message, people.Owner));
         Assert.Contains("31 January 2026, 00:00 UTC", english.Text, StringComparison.Ordinal);
         Assert.Contains("https://acme.vn.example.com", english.Text, StringComparison.Ordinal);
-        Assert.Contains("https://account.vn.example.com/tenants/acme", english.Text, StringComparison.Ordinal);
+        Assert.Contains("https://billing.example.com/tenants/acme", english.Text, StringComparison.Ordinal);
         var vietnamese = Assert.Single(messages, message => HasRecipient(message, people.Vi));
         Assert.Contains("00:00 UTC ngày 31/01/2026", vietnamese.Text, StringComparison.Ordinal);
         Assert.Contains("Chào Binh,", vietnamese.Text, StringComparison.Ordinal);

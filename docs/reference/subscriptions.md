@@ -199,4 +199,7 @@ one.
   written in the same transaction as the `sendEmail` jobs, so a rerun, a retry or two runs that
   overlap send nothing twice. A deletion that is cancelled sends no second read-only or deletion
   email.
+- **The billing page.** The trial, warning, read-only and deletion emails link the operator's billing page from
+  `ControlPlane:BillingPageUrl`, see [control plane settings](control-plane.md#settings). Without that setting they
+  have no billing line.
 - **Never a secret.** An email holds no password, token or payment detail.

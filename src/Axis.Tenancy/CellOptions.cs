@@ -64,6 +64,12 @@ public sealed class CellOptions
     /// </summary>
     public string ConsoleClientId { get; set; } = DefaultConsoleClientId;
 
+    /// <summary>
+    /// The operator's billing page, an absolute https URL that may hold <c>{tenantId}</c>, see <see cref="BillingPage"/>. Optional:
+    /// without it <c>GET /api/me</c> answers no billing address.
+    /// </summary>
+    public string? BillingPageUrl { get; set; }
+
     /// <summary>The file of the cell's backup key, which wraps each tenant's backup key.</summary>
     public string? BackupKeyFile { get; set; }
 
@@ -75,7 +81,7 @@ public sealed class CellOptions
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// A value cannot be read, or a host in a cell lacks <c>Tenancy:Source=directory</c>, <c>Cell:Region</c> or
-    /// <c>Cell:TenantDomain</c>, or <c>Cell:Id</c> is not the region, a hyphen and a number.
+    /// <c>Cell:TenantDomain</c>, or <c>Cell:Id</c> is not the region, a hyphen and a number, or <c>Cell:BillingPageUrl</c> is not an absolute https URL.
     /// </exception>
     public static CellOptions Load(IConfiguration configuration)
     {

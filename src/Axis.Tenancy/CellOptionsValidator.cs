@@ -49,6 +49,11 @@ public static partial class CellOptionsValidator
             problems.Add($"Cell:Id '{id}' must be the region and a number, such as 'vn-1'{region}.");
         }
 
+        if (!string.IsNullOrWhiteSpace(options.BillingPageUrl) && !BillingPage.IsValid(options.BillingPageUrl))
+        {
+            problems.Add("Cell:BillingPageUrl must be an absolute https URL.");
+        }
+
         foreach (var network in options.ConsoleAllowedNetworks)
         {
             if (!IPNetwork.TryParse(network, out _))

@@ -4,8 +4,10 @@ Chào {{name}},
 
 Bản dùng thử của không gian làm việc tại {{tenantAddress}} kết thúc sau 7 ngày, lúc {{nextStepAt}}. Sau đó không gian làm việc chuyển sang chế độ chỉ xem.
 
+{{#billingPageUrl}}
 Để tránh việc này, hãy thanh toán trên trang thanh toán trước thời điểm đó:
 
-{{billingPortalUrl}}
+{{billingPageUrl}}
+{{/billingPageUrl}}
 
 Đội ngũ Axis

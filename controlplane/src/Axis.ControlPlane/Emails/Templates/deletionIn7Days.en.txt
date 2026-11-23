@@ -4,9 +4,11 @@ Hello {{name}},
 
 The workspace at {{tenantAddress}} is read-only, and on {{nextStepAt}}, in 7 days, its deletion starts. The workspace and all its data are then lost. This cannot be undone.
 
-To stop it, pay in the billing portal:
+{{#billingPageUrl}}
+To stop it, pay on the billing page:
 
-{{billingPortalUrl}}
+{{billingPageUrl}}
+{{/billingPageUrl}}
 
 Export the data first: an administrator can do it from the application until then.
 

@@ -6,8 +6,12 @@ The trial has started. Sign in at:
 
 {{tenantAddress}}
 
-The trial ends on {{nextStepAt}}. After that the workspace is read-only: it can be read, but nothing can change. To keep it working, pay in the billing portal before then:
+The trial ends on {{nextStepAt}}. After that the workspace is read-only: it can be read, but nothing can change.
 
-{{billingPortalUrl}}
+{{#billingPageUrl}}
+To keep it working, pay on the billing page before then:
+
+{{billingPageUrl}}
+{{/billingPageUrl}}
 
 The Axis team

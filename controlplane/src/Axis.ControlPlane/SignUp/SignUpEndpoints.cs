@@ -9,6 +9,7 @@ using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.Subscriptions;
 using Axis.Server.Http;
+using Axis.Tenancy;
 using MimeKit;
 using Npgsql;
 
@@ -379,7 +380,7 @@ internal static class SignUpEndpoints
     }
 
     // Queues the trial-used email to the address of the form: the sign-in address while the region directory holds the tenant of the
-    // earlier sign-up, else the billing portal link. See docs/reference/sign-up.md#the-emails.
+    // earlier sign-up, else the operator's billing page, which the email leaves out when it is not set. See docs/reference/sign-up.md#the-emails.
     private static async Task QueueTrialUsedAsync(
         IServiceProvider services,
         NpgsqlConnection connection,
@@ -399,7 +400,7 @@ internal static class SignUpEndpoints
 
         var (template, values) = running
             ? ("signUpTrialUsedSignIn", new Dictionary<string, string> { ["name"] = fullName, ["tenantAddress"] = SignUpAddress.Of(options, tenantId) })
-            : ("signUpTrialUsedBillingPortal", new Dictionary<string, string> { ["name"] = fullName, ["billingPortalUrl"] = SignUpAddress.BillingPortalOf(options, tenantId) });
+            : ("signUpTrialUsedBillingPage", new Dictionary<string, string> { ["name"] = fullName, ["billingPageUrl"] = BillingPage.Of(options.BillingPageUrl, tenantId) ?? string.Empty });
         await EmailJobs.EnqueueAsync(connection, transaction, templates, template, language, email, values, cancellationToken);
     }
 
