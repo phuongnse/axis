@@ -1,7 +1,7 @@
-import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
+import { SendOutlined } from '@ant-design/icons'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
-import { AxisTable, type AxisColumn } from './AxisTable'
+import { AxisTable, type AxisColumn, type AxisRowAction } from './AxisTable'
 import { formatValue } from './formatValue'
 import {
   deadLetterCommands,
@@ -168,11 +168,10 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
               actions: (item) =>
                 deadLetterCommands
                   .filter((command) => item.commands.includes(command))
-                  .map((command) => ({
+                  .map((command): AxisRowAction => ({
                     key: command,
                     labelKey: `shell.inspector.commands.${command}`,
-                    icon: command === 'redeliver' ? <SendOutlined /> : <DeleteOutlined />,
-                    destructive: command === 'discard',
+                    ...(command === 'redeliver' ? { icon: <SendOutlined /> } : { meaning: 'remove' as const }),
                     onClick: () => setOpen({ command, item }),
                     attributes: { 'data-testid': `inspector-dead-letter-${command}-${item.id}` },
                   })),
