@@ -104,3 +104,7 @@ A person accepts the tenant's terms in a step of the identity provider, once and
   and off when it has none, so the page never shows without a link. When the tenant's terms version changes, the
   sync asks it again of every user of the realm, and then stores the version in the realm attribute
   `axis.termsVersion`. When the tenant has no terms the sync clears that attribute, so terms set later ask everyone.
+- **The operator's terms** _(planned for M34)_. In Axis SaaS, the operator's terms of service and data processing
+  agreement are different from the tenant's terms. A person accepts them at sign-up. A tenant administrator accepts
+  a new version in the shell, not in this identity provider step. See [the shell](shell.md#layout) and
+  [terms acceptance](sign-up.md#terms-acceptance).

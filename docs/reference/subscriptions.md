@@ -16,6 +16,9 @@ commerce.
 - **The cell knows no commerce.** The control plane changes a tenant through the
   [provisioning API](tenant-lifecycle.md#provisioning-api): its quotas, its read-only state, a resume
   and a deletion. A cell never counts days for billing.
+- **The cell's copy of the subscription** _(planned for M34)_. The cell keeps the plan, the state and the next
+  date that the control plane sends it, only to show them. It counts no day with them, see
+  [what a tenant administrator sees](#what-a-tenant-administrator-sees).
 - **Runs as jobs.** A job checks each subscription's next date every hour, so a restart or an outage
   delays a step and never skips one. Every change of state writes an audit record.
 - **The `control_plane.subscriptions` table.** `id`, `tenant_id`, `sign_up_id`, `state` (`trialing`,
@@ -145,6 +148,28 @@ and `POST /api/cell/tenants/{id}/read-only` set and `resume` clears.
   every page: why the workspace is read-only, and, for an administrator in a cell, a link to the
   billing page at `billingUrl`, see [the current user](security.md#roles-and-the-current-user).
 - **Quotas.** Unchanged. Nothing grows, so none is reached.
+
+## What a tenant administrator sees
+
+_(planned for M34)_
+
+A tenant administrator sees the tenant's plan and subscription in the tenant's administration. They see what
+the tenant has and when its next step comes, without asking the operator.
+
+- **Where.** The Usage section of the users page, see
+  [export data and usage](platform-pages.md#export-data-and-usage).
+- **What.** The plan's name in the person's language. Each quota with its use, as
+  [the usage route](tenant-quotas.md#usage) answers. The state, and the next date. The next date is the
+  trial's end, the day after the paid-through date, or the next step of the clock.
+- **From the control plane.** A cell never calls the control plane. The control plane sends the plan, the
+  state and the next date through the [provisioning API](tenant-lifecycle.md#provisioning-api). It sends them
+  with each move of the clock, each [plan call](billing-api.md#setting-the-plan-and-add-ons) and the nightly
+  [quota sync](plans.md#from-a-plan-to-the-quotas).
+- **The billing page.** A link to the operator's billing page, the `billingUrl` of `GET /api/me`. The link
+  comes from the cell setting `Cell:BillingPageUrl`, see [cell settings](host-settings.md#cell-settings).
+  Without that setting, no billing link shows.
+- **No subscription.** A tenant with no subscription in the control plane shows no plan, state, next date or
+  link.
 
 ## Emails
 

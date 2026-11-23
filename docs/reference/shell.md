@@ -25,6 +25,12 @@ their own controls where they expect them.
   sidebar, on every page of every site. It says that the workspace is read-only and why. An
   administrator in a cell also gets a link to the billing page, the `billingUrl` of
   `GET /api/me`, see [the current user](security.md#roles-and-the-current-user). The cell console's host has no tenant, so it shows no banner.
+- **The operator's new terms** _(planned for M34)_. While a new version of the operator's terms or data processing
+  agreement waits for acceptance, a tenant administrator in a cell sees an acceptance page in place of every other
+  page, with Continue and sign out. It uses the shared terms box, `AcceptTermsField`, see
+  [the terms box](legal.md#accepting-the-terms). One administrator's acceptance covers the tenant for that version,
+  and no other administrator is asked. Other people work as before. The record is as at sign-up, see
+  [terms acceptance](sign-up.md#terms-acceptance).
 - **Mark and title.** The mark is the first letter of the site's title on a `primary` tile with
   `radius-base` corners, and the mark and the title are one link to the site's first navigation page.
   The platform site's title and mark name Axis, because the tenant has no name yet, as the
