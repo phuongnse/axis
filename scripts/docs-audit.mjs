@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readList } from './check-issue-links.mjs'
-import { docWordCounts } from './lib/docs/helpers.mjs'
+import { docWordCounts, plannedMilestoneMarkers, roadmapStatuses } from './lib/docs/helpers.mjs'
 import { splitIssueWords, splitTargetWords } from './lib/docs/sizes.mjs'
 
 // The docs audit of D145, in four commands that the docs-audit workflow runs:
@@ -13,7 +13,8 @@ import { splitIssueWords, splitTargetWords } from './lib/docs/sizes.mjs'
 //                                                  four at a time, with read-only tools, and prints the findings
 //   node scripts/docs-audit.mjs file <findings> <run id>
 //                                                  opens a NexKit issue for each group of findings that no open
-//                                                  issue covers: code and test fixes first, then a split issue for
+//                                                  issue covers: a milestone whose GitHub close and roadmap row
+//                                                  disagree first, then code and test fixes, then a split issue for
 //                                                  each doc past the size mark, at most ten, the rest printed
 //   node scripts/docs-audit.mjs homes <links>     asks Claude Code once, with read-only tools, for the new home of
 //                                                  each broken link that scripts/check-issue-links.mjs listed
@@ -156,12 +157,34 @@ const codeKinds = ['unbuilt', 'untested-list']
 // Every issue the audit opens has its home label, as docs/delivery.md#how-issues-run says.
 const homeLabel = 'docs-audit'
 
+const milestonePattern = /^M\d+\b/
+
 /**
- * Groups the findings into issues: code and test fixes first, then docs pages, then a split issue for each doc
- * past splitIssueWords. Leaves out what an open issue or an earlier issue of this run covers, keeps at most ten,
- * and returns the findings past the cap as leftOut. docWords lists { page, words } for each doc.
+ * Returns each GitHub milestone whose close disagrees with its roadmap row: closed while the row does not read Done,
+ * or with no open issue while a planned marker names it. A title that does not start with M<n> is skipped.
+ * markers lists the planned markers as plannedMilestoneMarkers gives them, and keeps only those of a milestone with
+ * no open issue.
  */
-export function issuesFrom(findings, openBodies, runId, docWords = []) {
+export function milestoneFindings(statuses, githubMilestones, markers) {
+  const findings = []
+  for (const { title, state, open_issues } of githubMilestones) {
+    const milestone = milestonePattern.exec(title)?.[0]
+    if (!milestone) continue
+    const status = statuses.get(milestone)
+    const closed = state === 'closed' && status !== 'Done'
+    const named = open_issues === 0 ? markers.filter((m) => m.milestone === milestone).map(({ file, line }) => ({ file, line })) : []
+    if (closed || named.length) findings.push({ milestone, status, closed, markers: named })
+  }
+  return findings
+}
+
+/**
+ * Groups the findings into issues: milestone issues first, then code and test fixes, then docs pages, then a split
+ * issue for each doc past splitIssueWords. Leaves out what an open issue or an earlier issue of this run covers,
+ * keeps at most ten, and returns the findings past the cap as leftOut. docWords lists { page, words } for each doc,
+ * and milestones lists what milestoneFindings returns.
+ */
+export function issuesFrom(findings, openBodies, runId, docWords = [], milestones = []) {
   const built = new Set()
   const covered = (group, key) =>
     built.has(`${group} ${key}`) || openBodies.some((b) => b.includes(marker(group, key)))
@@ -170,6 +193,44 @@ export function issuesFrom(findings, openBodies, runId, docWords = []) {
     if (covered(group, key)) return
     built.add(`${group} ${key}`)
     candidates.push({ found, issue: { ...issue, labels: [...issue.labels, homeLabel] } })
+  }
+  for (const m of milestones) {
+    const count = m.markers.length
+    const markerCount = `${count} planned ${count === 1 ? 'marker names' : 'markers name'} it`
+    const statement = [
+      m.closed && (m.status ? `closed on GitHub while its roadmap row says ${m.status}` : 'closed on GitHub with no roadmap row'),
+      count && `no open issue while ${markerCount}`,
+    ]
+      .filter(Boolean)
+      .join(', and ')
+    const sentences = [
+      m.closed &&
+        (m.status
+          ? `The milestone is closed on GitHub, but its roadmap row says ${m.status}.`
+          : 'The milestone is closed on GitHub, but the roadmap has no row for it.'),
+      count &&
+        `No issue of the milestone is open on GitHub, yet ${markerCount}: ${m.markers.map((x) => link(x.file, x.line)).join(', ')}.`,
+    ]
+      .filter(Boolean)
+      .join(' ')
+    add('milestone', m.milestone, [{ page: 'docs/roadmap.md', line: 1, kind: 'milestone', statement: `${m.milestone} ${statement}` }], {
+      title: `The roadmap and the docs of ${m.milestone} match its close on GitHub`,
+      labels: ['documentation'],
+      body: body(
+        [
+          sentences,
+          `The roadmap row and the close of a milestone must agree, as [the life of a milestone](${repository}/blob/main/docs/delivery.md#the-life-of-a-milestone) says.`,
+          'Concepts: none. This changes how the docs are kept.',
+        ].join('\n\n'),
+        'milestone',
+        m.milestone,
+        runId,
+        [
+          `The roadmap row of ${m.milestone} reads Done, and each \`_(planned for ${m.milestone})_\` marker is removed where built or moved as docs/writing-docs.md#planned-work says.`,
+          '`node scripts/check-docs.mjs` and `node scripts/check-links.mjs` pass.',
+        ],
+      ),
+    })
   }
   for (const f of codeKinds.flatMap((kind) => findings.filter((x) => x.kind === kind))) {
     const group = f.kind === 'unbuilt' ? 'code' : 'test'
@@ -382,11 +443,20 @@ export function readFindings(file) {
   }
 }
 
+/** Returns each milestone of the repository on GitHub, open and closed, with its title, state and open issue count. */
+function githubMilestones(gh) {
+  return run(gh, ['api', '--paginate', 'repos/{owner}/{repo}/milestones?state=all&per_page=100', '--jq', '.[] | {title, state, open_issues}'])
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+}
+
 function file(findingsFile, runId) {
   const findings = readFindings(findingsFile)
   const gh = process.env.GH ?? 'gh'
   const open = JSON.parse(run(gh, ['issue', 'list', '--state', 'open', '--limit', '1000', '--json', 'body']))
-  const { issues, leftOut } = issuesFrom(findings, open.map((i) => i.body ?? ''), runId, docWordCounts(root))
+  const milestones = milestoneFindings(roadmapStatuses(root), githubMilestones(gh), plannedMilestoneMarkers(root))
+  const { issues, leftOut } = issuesFrom(findings, open.map((i) => i.body ?? ''), runId, docWordCounts(root), milestones)
   for (const issue of issues) {
     const args = ['issue', 'create', '--title', issue.title, '--body', issue.body]
     for (const label of issue.labels) args.push('--label', label)

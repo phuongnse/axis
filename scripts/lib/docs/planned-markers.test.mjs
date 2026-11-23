@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { beforeEach, describe, test } from 'node:test'
+import { plannedMilestoneMarkers, roadmapStatuses } from './helpers.mjs'
 import { checkPlannedMarkers } from './planned-markers.mjs'
 import { useTempRoot } from './testing.mjs'
 
@@ -106,6 +107,29 @@ describe('planned markers', () => {
     assert.deepEqual(messages(), [
       'docs/reference/guide.md:5: planned for M1, which the roadmap calls Done: remove the marker, or move it to the milestone that builds the rest',
       'docs/reference/guide.md:7: planned for M1, which the roadmap calls Done: remove the marker, or move it to the milestone that builds the rest',
+    ])
+  })
+})
+
+describe('roadmap statuses and planned milestone markers', () => {
+  test('gives the trimmed status of each milestone row of the roadmap, keyed by the milestone', () => {
+    write(
+      'docs/roadmap.md',
+      ['| Milestone | Name | Status | Delivers |', '| --- | --- | --- | --- |', '| **M1** | Walking skeleton | Done | Entities. |', '| **M2** | Data and rules |  In progress  | Rules. |', ''].join('\n'),
+    )
+
+    assert.deepEqual([...roadmapStatuses(fixture.root())], [
+      ['M1', 'Done'],
+      ['M2', 'In progress'],
+    ])
+  })
+
+  test('lists each milestone that a marker names, with the marker file from the root and its line', () => {
+    write('docs/reference/guide.md', '# Guide\n\n_(planned for M2 and M1)_\n\nText _(planned)_ here.\n')
+
+    assert.deepEqual(plannedMilestoneMarkers(fixture.root()), [
+      { file: 'docs/reference/guide.md', line: 3, milestone: 'M2' },
+      { file: 'docs/reference/guide.md', line: 3, milestone: 'M1' },
     ])
   })
 })
