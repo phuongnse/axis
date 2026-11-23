@@ -94,6 +94,12 @@ internal sealed class CellTestServer : IAsyncDisposable
     /// <summary>When set, the administrators route answers this status and no list.</summary>
     public int? AdministratorsStatus { get; set; }
 
+    /// <summary>The items that the usage days route answers as one page, as the cell's JSON objects. Null answers <c>404</c>.</summary>
+    public IReadOnlyList<object>? UsageDayItems { get; set; }
+
+    /// <summary>The query string of the last usage days read.</summary>
+    public string? UsageDayQuery { get; private set; }
+
     /// <summary>Makes the next <paramref name="count"/> calls to the cell, the token requests excepted, answer <c>401</c>.</summary>
     public void RefuseNext(int count) => Volatile.Write(ref _refusals, count);
 
@@ -226,6 +232,19 @@ internal sealed class CellTestServer : IAsyncDisposable
 
             return Administrators is { } administrators
                 ? Results.Json(new { items = administrators.Select(administrator => new { email = administrator.Email, displayName = administrator.DisplayName, language = administrator.Language }) })
+                : Results.StatusCode(StatusCodes.Status404NotFound);
+        });
+
+        app.MapGet("/api/cell/tenants/{id}/usage-days", (HttpContext context) =>
+        {
+            if (Refuse())
+            {
+                return Results.StatusCode(StatusCodes.Status401Unauthorized);
+            }
+
+            UsageDayQuery = context.Request.QueryString.Value;
+            return UsageDayItems is { } items
+                ? Results.Json(new { items, page = 1, pageSize = 1, totalCount = items.Count })
                 : Results.StatusCode(StatusCodes.Status404NotFound);
         });
 

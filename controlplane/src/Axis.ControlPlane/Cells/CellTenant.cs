@@ -29,3 +29,13 @@ internal sealed record CellTenantUsage(CellQuotaUse Storage, CellQuotaUse Users,
 
 /// <summary>One tenant as <c>GET /api/cell/tenants/{id}</c> reads it, of which the client reads the <c>status</c> and the <c>usage</c>. The usage is null when the body holds none.</summary>
 internal sealed record CellTenantRead(string Status, CellTenantUsage? Usage);
+
+/// <summary>
+/// One day of a tenant's usage as <c>GET /api/cell/tenants/{id}/usage-days</c> reads it, see <c>docs/reference/tenant-quotas.md#usage</c>. The
+/// users and the applications are null when the cell's row holds none.
+/// </summary>
+internal sealed record CellUsageDay(
+    DateOnly Day, long DatabaseBytes, long FileBytes, int? Users, int? Applications, int EmailsSent, long ConnectorCalls, long WorkItemsRun);
+
+/// <summary>The body of one page of <c>GET /api/cell/tenants/{id}/usage-days</c>, of which the client reads the items.</summary>
+internal sealed record CellUsageDayList(IReadOnlyList<CellUsageDay?>? Items);

@@ -335,6 +335,34 @@ public sealed class CellClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_usage_day_read_filters_to_the_day_and_returns_the_row_or_null_for_a_404_and_for_no_item_and_throws_for_a_row_of_another_day()
+    {
+        var cell = Build().Get("vn-1");
+        var token = TestContext.Current.CancellationToken;
+        var day = new DateOnly(2026, 11, 22);
+        _server.UsageDayItems =
+        [
+            new { day = "2026-11-22", databaseBytes = 11L, fileBytes = 22L, users = (int?)3, applications = (int?)null, emailsSent = 5, connectorCalls = 66L, workItemsRun = 77L },
+        ];
+
+        var usage = await cell.GetUsageDayAsync("acme", day, token);
+
+        Assert.Equal(new CellUsageDay(day, 11, 22, 3, null, 5, 66, 77), usage);
+        var filter = Uri.EscapeDataString("""{"all":[{"field":"day","op":"eq","value":"2026-11-22"}]}""");
+        Assert.Equal($"?filter={filter}&pageSize=1", _server.UsageDayQuery);
+
+        _server.UsageDayItems = [];
+        Assert.Null(await cell.GetUsageDayAsync("acme", day, token));
+
+        _server.UsageDayItems = null;
+        Assert.Null(await cell.GetUsageDayAsync("acme", day, token));
+
+        _server.UsageDayItems = [new { day = "2026-11-21", databaseBytes = 1L, fileBytes = 1L, users = 1, applications = 1, emailsSent = 1, connectorCalls = 1L, workItemsRun = 1L }];
+        var exception = await Assert.ThrowsAsync<CellCallException>(() => cell.GetUsageDayAsync("acme", day, token));
+        Assert.Contains("vn-1", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task An_administrators_read_answered_with_an_error_throws_with_the_status_and_no_body()
     {
         _server.AdministratorsStatus = 500;

@@ -16,7 +16,7 @@ namespace Axis.ControlPlane.Cells;
 /// response body, a token, the client secret or a request body, and none of them is logged. A <c>409</c> titled
 /// <see cref="FullTitle"/> sets <see cref="CellCallException.CellFull"/>, and any other <c>409</c> is an ordinary failure.
 /// <see cref="ListTenantsAsync"/> reads the cell's whole tenant list, page by page, <see cref="GetTenantAsync"/> one tenant's status and usage, <see cref="GetTenantStatusAsync"/> only its status and
-/// <see cref="ListAdministratorsAsync"/> its administrators, with the same token and the same failures. <see cref="PutQuotasAsync"/> sets a
+/// <see cref="ListAdministratorsAsync"/> its administrators and <see cref="GetUsageDayAsync"/> one day of its usage, with the same token and the same failures. <see cref="PutQuotasAsync"/> sets a
 /// tenant's quotas with a <c>PUT</c> that carries no idempotency key: it sets every key it names, so a repeat gives the same rows.
 /// </summary>
 internal sealed class CellClient : IDisposable
@@ -174,6 +174,25 @@ internal sealed class CellClient : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         return CallAsync(
             HttpMethod.Get, $"/api/cell/tenants/{Uri.EscapeDataString(tenantId)}/administrators", null, null, ReadAdministratorsAsync, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads one day of a tenant's usage, <c>GET /api/cell/tenants/{id}/usage-days</c> filtered to <paramref name="day"/>, see
+    /// <c>docs/reference/billing-api.md#daily-usage</c>. A cell that does not know the tenant answers <c>404</c>, and one that has no row for the day
+    /// answers no item, and the result is null in both cases.
+    /// </summary>
+    public Task<CellUsageDay?> GetUsageDayAsync(string tenantId, DateOnly day, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        var text = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var filter = Uri.EscapeDataString("{\"all\":[{\"field\":\"day\",\"op\":\"eq\",\"value\":\"" + text + "\"}]}");
+        return CallAsync(
+            HttpMethod.Get,
+            $"/api/cell/tenants/{Uri.EscapeDataString(tenantId)}/usage-days?filter={filter}&pageSize=1",
+            null,
+            null,
+            (response, call, token) => ReadUsageDayAsync(response, call, day, token),
+            cancellationToken);
     }
 
     /// <summary>
@@ -365,6 +384,40 @@ internal sealed class CellClient : IDisposable
         }
 
         throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not an administrator list.", status);
+    }
+
+    private async Task<CellUsageDay?> ReadUsageDayAsync(HttpResponseMessage response, string call, DateOnly day, CancellationToken cancellationToken)
+    {
+        var status = (int)response.StatusCode;
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            throw new CellCallException($"The call {call} to the cell '{CellId}' answered with the status {status.ToString(CultureInfo.InvariantCulture)}.", status);
+        }
+
+        try
+        {
+            var list = await response.Content.ReadFromJsonAsync<CellUsageDayList>(JsonSerializerOptions.Web, cancellationToken);
+            if (list?.Items is { Count: 0 })
+            {
+                return null;
+            }
+
+            if (list?.Items is [{ } item, ..] && item.Day == day)
+            {
+                return item;
+            }
+        }
+        catch (JsonException)
+        {
+            // The body is not a usage page, which the fixed text below says without quoting it.
+        }
+
+        throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not the usage day asked for.", status);
     }
 
     private async Task<CellTenantRead?> ReadTenantAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)

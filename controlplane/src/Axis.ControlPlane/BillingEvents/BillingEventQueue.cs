@@ -15,6 +15,8 @@ internal static class BillingEventQueue
 
     public const string TenantCreated = "tenant.created";
 
+    public const string UsageDaily = "usage.daily";
+
     /// <summary>
     /// Queues an event in <paramref name="transaction"/>, so the event exists exactly when the change that caused it does. It writes nothing when
     /// <c>ControlPlane:BillingEvents:Url</c> is not set. The payload fixes the event's id, type, timestamp and <paramref name="data"/>, so every

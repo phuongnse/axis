@@ -570,6 +570,28 @@ namespace Axis.ControlPlane.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.UsageDayEventRow", b =>
+                {
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.Property<DateTimeOffset>("QueuedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("queued_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("SubscriptionId", "Day")
+                        .HasName("pk_usage_day_events");
+
+                    b.ToTable("usage_day_events", "control_plane");
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.Subscriptions.QuotaOverrideRow", b =>
                 {
                     b.HasOne("Axis.ControlPlane.Subscriptions.SubscriptionRow", null)
@@ -608,6 +630,16 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscriptions_sign_up_id");
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.UsageDayEventRow", b =>
+                {
+                    b.HasOne("Axis.ControlPlane.Subscriptions.SubscriptionRow", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_usage_day_events_subscription_id");
                 });
 #pragma warning restore 612, 618
         }
