@@ -1190,7 +1190,7 @@
   "shell.studio.code.unfolded": "Unfolded lines",
   "shell.studio.code.to": "to",
   "shell.studio.code.completions": "Suggestions",
-  "shell.studio.code.unchangedLines": "$ unchanged lines",
+  "shell.studio.code.unchangedLines": "Show $ unchanged lines",
   "shell.studio.code.language.csharp": "C#",
   "shell.studio.code.language.typescript": "TypeScript",
   "shell.studio.code.language.javascript": "JavaScript",

@@ -79,6 +79,9 @@ function LineDiff({
           language={json ? 'json' : fileLanguage(path)}
           onDiffCounts={onCounts}
           readOnly
+          // As tall as its text, so a wheel over the diff scrolls the page, see
+          // docs/reference/actions-and-controls.md#scroll-areas.
+          grow
         />
       </Suspense>
     </div>

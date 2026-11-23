@@ -195,8 +195,8 @@ export default function CodeEditor({
           indentOnInput(),
           // The words of the text only: the language packages' own suggestions and snippets bring CodeMirror's English.
           autocompletion({ override: [completeAnyWord] }),
-          highlightActiveLine(),
-          highlightActiveLineGutter(),
+          // Proposed: a diff marks no current line, which would read as one of its changes or its folded row, see #4623.
+          initial.original === undefined ? [highlightActiveLine(), highlightActiveLineGutter()] : [],
           compartments.language.of(languageExtension(initial.language)),
           compartments.readOnly.of(readOnlyExtension(initial.readOnly)),
           compartments.phrases.of(initial.phrases),
@@ -446,6 +446,7 @@ const editorTheme = sharedTheme((tokens, mode, selectedTint: string, height: Edi
       '.cm-collapsedLines': {
         color: colour.primaryText,
         background: colour.canvas,
+        '&:hover': { textDecoration: 'underline' },
         padding: `0 ${spacing.sm}px 0 calc(${spacing.sm}px + 2ch)`,
         '&:before, &:after': { content: 'none' },
       },
