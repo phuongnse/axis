@@ -54,7 +54,7 @@ const staleArchiveMs = 26 * 60 * 60 * 1000
  * filters, sorts and pages the list. The table has Search, which looks in the id and the hosts, Filter on every column,
  * Columns, a sort on every column but Hosts, and a pager with a page size, all kept in the address, see
  * `docs/reference/cell-console.md#views` and `docs/reference/actions-and-controls.md#tables`. Create tenant opens the
- * dialog that creates a tenant, and the list loads again when the create job ends.
+ * dialog that creates a tenant, and the list loads again when the create job ends or Refresh is pressed.
  */
 export function CellTenantsPage() {
   const t = useText()
@@ -64,7 +64,7 @@ export function CellTenantsPage() {
   const query = recordQuery(view)
   const [tenants, setTenants] = useState<CellTenantPage | 'failed'>()
   const [creating, setCreating] = useState(false)
-  // Counts the create jobs that ended, so the list loads again.
+  // Counts the create jobs that ended and Refresh, so the list loads again.
   const [reload, setReload] = useState(0)
 
   useEffect(() => {
@@ -243,6 +243,7 @@ export function CellTenantsPage() {
         }}
         emptyText={t('shell.cell.tenants.empty')}
         toolbar={{
+          onRefresh: () => setReload((count) => count + 1),
           main: (
             <AxisButton role="main" data-testid="cell-tenants-create" onClick={() => setCreating(true)}>
               {t('shell.cell.create.button')}

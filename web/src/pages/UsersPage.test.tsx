@@ -430,6 +430,26 @@ describe('UsersPage', () => {
     expect(screen.getByTestId('users-forbidden')).toBeVisible()
   })
 
+  it('loads the people again when Refresh is pressed in their table', async () => {
+    const fetchMock = stubServer(() => json(users))
+    renderPage()
+    await screen.findByText('Ann Invited')
+    const people = within(screen.getByRole('tabpanel', { name: 'People' }))
+
+    await userEvent.click(people.getByRole('button', { name: 'Refresh' }))
+
+    await vi.waitFor(() => expect(requested(fetchMock).filter(isList)).toEqual(['/api/users', '/api/users']))
+  })
+
+  it('draws no people table and no Refresh when the list is refused', async () => {
+    stubServer(() => new Response(null, { status: 403 }))
+    renderPage()
+
+    expect(await screen.findByTestId('users-forbidden')).toBeVisible()
+    expect(screen.queryByRole('table')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Refresh' })).toBeNull()
+  })
+
   it('shows the not-found page on a 404', async () => {
     stubServer(() => new Response(null, { status: 404 }))
     renderPage()

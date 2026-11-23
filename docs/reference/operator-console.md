@@ -200,11 +200,12 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   with its state as a tag and Process as its line, as a site's instance page is, see [page header](shell.md#page-header).
   It offers the commands that the
   detail lists. The view is paged on the server. Its table has the toolbar of
-  [tables](actions-and-controls.md#tables) with Filter, and a pager. Each column filters, and the
-  Application and Process columns filter by name, so the view has no Application picker. The
-  Process filter offers the processes of the active releases. The address keeps the view as
-  `failedWork.filter`, `failedWork.page` and `failedWork.pageSize`, because the page has other
-  tables.
+  [tables](actions-and-controls.md#tables), with Search, Filter, Columns and Refresh, a sort on
+  Failed, and a pager with a page size. Search looks in the step or call and the error. Each column
+  filters, and the Application and Process columns filter by name, so the view has no Application
+  picker. The Process filter offers the processes of the active releases. The address keeps the view
+  as `failedWork.search`, `failedWork.filter`, `failedWork.sort`, `failedWork.page`,
+  `failedWork.pageSize` and `failedWork.columns`, because the page has other tables.
 - **Instance view**. The console shows the instance as the [instance page](process-inspector-widget.md#instance-page)
   does, with the process's name in place of its title.
 - **Paths, variables and cancels.** _(planned for M38)_ The instance detail that a failed-work entry opens

@@ -390,6 +390,35 @@ describe('ConsolePage', () => {
     expect(within(view).getByTestId('console-failed-work-open-i-2')).toHaveAttribute('href', '/console/instances/i-2')
   })
 
+  it('gives the failed work its search, columns and refresh, and Refresh loads it again', async () => {
+    const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+    renderPage()
+    const view = await screen.findByTestId('console-failed-work')
+    expect(await within(view).findByText('Timed out.')).toBeVisible()
+    expect(within(view).getByRole('searchbox', { name: 'Search' })).toBeVisible()
+    expect(within(view).getByRole('button', { name: 'Columns' })).toBeVisible()
+
+    await userEvent.click(within(view).getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() =>
+      expect(failedWorkRequests(fetchMock)).toEqual(['/api/console/failed-work', '/api/console/failed-work']),
+    )
+  })
+
+  it('sends the failed work search on Enter and keeps it in the address', async () => {
+    const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+    renderPage()
+    const view = await screen.findByTestId('console-failed-work')
+    expect(await within(view).findByText('Timed out.')).toBeVisible()
+
+    await userEvent.type(within(view).getByRole('searchbox', { name: 'Search' }), 'timeout{Enter}')
+
+    await waitFor(() =>
+      expect(new URLSearchParams(failedWorkRequests(fetchMock).at(-1)!.split('?')[1]).get('search')).toBe('timeout'),
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent('failedWork.search=timeout')
+  })
+
   it('requests the next page of failed work', async () => {
     const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
     renderPage()

@@ -99,7 +99,7 @@ tenant button of the Tenants view and the actions of the Tenant view.
   step with its state, or one line when no step has run yet, and the error of a failed job or step. A failed job other than a `purge` job has a Run
   again button, with a confirmation that names the job and the tenant, see [actions](#actions).
 - **Tenants.** One row per tenant, with AxisTable's Search, which looks in the id and the hosts, its Filter on every
-  column, its Columns, a sort on the header of every column but Hosts, a pager with a page size, and a Create tenant
+  column, its Columns, Refresh, a sort on the header of every column but Hosts, a pager with a page size, and a Create tenant
   button that opens the dialog of [creating a tenant](#actions). The server searches, filters, sorts and pages the
   list, 20 tenants to a page by default, see [the tenant list](tenant-lifecycle.md#routes). The search, the filter,
   the columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).

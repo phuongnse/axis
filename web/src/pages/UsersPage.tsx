@@ -80,7 +80,7 @@ const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
  * to the person's page, which shows their roles, followed by (you) on the administrator's own row. The Invite button opens the form that invites a person. A row's commands
  * are entries of its "…" row-actions menu. An invited account has Resend invitation. A row that is not disabled has Disable,
  * a disabled row has Enable, and an account has Reset authenticator. Each of these asks for a confirmation, then reloads
- * the list, because a resend gives the person a new id. The page has two tabs. People holds the list and, below it, the
+ * the list, because a resend gives the person a new id. Refresh, in the People table's toolbar, loads the list again. The page has two tabs. People holds the list and, below it, the
  * Export data and Usage sections for an administrator in a cell tenant and the Model key section where the installation
  * allows tenant keys. Connected apps holds the outside MCP clients switch and the apps with consent, and shows only when
  * `GET /api/tenant/outside-clients` answers `200`. See docs/reference/platform-pages.md#connected-apps.
@@ -100,7 +100,7 @@ export function UsersPage() {
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<'invite' | Command>()
   const [problem, setProblem] = useState<string>()
-  // Counts the commands, so each one loads the list again.
+  // Counts the commands and Refresh, so each one loads the list again.
   const [reloads, setReloads] = useState(0)
   const [outsideClients, setOutsideClients] = useState<TenantOutsideClients | null>(null)
 
@@ -271,6 +271,7 @@ export function UsersPage() {
                       columns: true,
                     }}
                     toolbar={{
+                      onRefresh: () => setReloads((count) => count + 1),
                       main: (
                         <AxisButton
                           role="main"

@@ -9,7 +9,7 @@ import {
   type ConsoleFailedWorkPage,
 } from '../platform/console'
 import { SectionPart } from '../platform/SectionParts'
-import { recordPageSize, recordQuery } from '../platform/tableQuery'
+import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
 
@@ -33,24 +33,27 @@ const failedWorkFields = [
 const noParameters: readonly string[] = []
 
 /**
- * The Failed work view of the operator console: the failed instances and the calls with an unknown outcome, newest first,
- * paged on the server. The table has Filter on each column and a pager, both kept in the address under the `failedWork.`
- * prefix, because the page has other tables, see docs/reference/operator-console.md#views and
+ * The Failed work view of the operator console: the failed instances and the calls with an unknown outcome, newest first
+ * until the view sorts them, paged on the server. The table has Search, which looks in the step or call and the error,
+ * Filter on each column, Columns, Refresh, a sort on Failed and a pager with a page size, all kept in the address under the
+ * `failedWork.` prefix, because the page has other tables, see docs/reference/operator-console.md#views and
  * docs/reference/actions-and-controls.md#tables. The Application and Process columns filter by name, so the view has no
  * picker above the table. A failure, a 403 included, shows an error in this part only.
  */
 export function ConsoleFailedWork({ applications, locale }: ConsoleFailedWorkProps) {
   const t = useText()
-  const { view, setView } = useTableView(
+  const { view, setView, saved } = useTableView(
     failedWorkFields,
     recordPageSize,
     noParameters,
-    false,
     true,
-    false,
+    true,
+    true,
     'failedWork.',
+    'console.failedWork',
   )
   const query = recordQuery(view)
+  const [reload, setReload] = useState(0)
   const [failedWork, setFailedWork] = useState<ConsoleFailedWorkPage | 'failed'>()
 
   useEffect(() => {
@@ -65,7 +68,7 @@ export function ConsoleFailedWork({ applications, locale }: ConsoleFailedWorkPro
         setFailedWork('failed')
       })
     return () => controller.abort()
-  }, [query])
+  }, [query, reload])
 
   const page = typeof failedWork === 'object' ? failedWork : undefined
   const processes = page?.processes
@@ -113,6 +116,7 @@ export function ConsoleFailedWork({ applications, locale }: ConsoleFailedWorkPro
         kind: 'fixed',
         title: t('shell.console.failedWork.failedAt'),
         filter: { kind: 'date' },
+        sorter: true,
         render: (_value, row) => new Date(row.failedAt).toLocaleString(locale),
       },
       {
@@ -134,7 +138,16 @@ export function ConsoleFailedWork({ applications, locale }: ConsoleFailedWorkPro
         dataSource={page?.items ?? []}
         loading={failedWork === undefined}
         emptyText={t('shell.console.failedWork.empty')}
-        view={{ query: view, onChange: setView, total: page?.totalCount ?? 0 }}
+        view={{
+          query: view,
+          onChange: setView,
+          saved,
+          pageSizes: tablePageSizes(),
+          total: page?.totalCount ?? 0,
+          search: true,
+          columns: true,
+        }}
+        toolbar={{ onRefresh: () => setReload((count) => count + 1) }}
         failure={
           failedWork === 'failed' ? (
             <AxisAlert
