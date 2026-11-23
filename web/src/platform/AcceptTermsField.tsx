@@ -1,5 +1,6 @@
-import { Checkbox, Form, Typography, type FormItemProps } from 'antd'
+import { Form, Typography, type FormItemProps } from 'antd'
 import type { ReactNode } from 'react'
+import { FormItemCheckbox } from './AxisCheckboxField'
 import { FilledText } from './FilledText'
 import { setOwn } from './ownProperty'
 import { useDesignTokens } from './themeMode'
@@ -52,9 +53,9 @@ export function AcceptTermsField({
         },
       ]}
     >
-      <Checkbox>
+      <FormItemCheckbox>
         <FilledText text={text} parts={parts} />
-      </Checkbox>
+      </FormItemCheckbox>
     </Form.Item>
   )
 }

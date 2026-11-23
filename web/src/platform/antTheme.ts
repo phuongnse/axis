@@ -212,6 +212,9 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
 /** The class `AxisField` puts on its wrapper, which `fieldRules` sizes the input the field holds by. */
 export const fieldClass = 'axis-field'
 
+/** The class `AxisButton` puts on every text button it draws, which `fieldRules` gives its light fill on keyboard focus. */
+export const textButtonClass = 'axis-text-button'
+
 /** The inputs that fill their field. A checkbox, a switch and an upload keep their own width. */
 const fieldInputs = [
   '.ant-select',
@@ -228,22 +231,17 @@ const fieldInputs = [
 const fieldParents = [`.${fieldClass}`, `.${fieldClass} .ant-form-item-control-input-content`]
 
 /**
- * The CSS every Axis form and message shares, rendered once beside each provider's ConfigProvider. Ant Design has no
- * token for an unticked box's error border, so a rule carries it. The border takes the mode's text colour: a page with
- * two modes would give it one colour. An input of an `AxisField` fills the field's
- * width, and a select joined with its action fills it together with the action, see docs/reference/shell.md#layout. A
- * subtle button, which Ant Design draws as a text button, takes the light fill on keyboard focus that it takes on hover,
- * see docs/reference/actions-and-controls.md#buttons.
+ * The CSS every Axis form and message shares, rendered once beside each provider's ConfigProvider. An input of an `AxisField` fills the field's width, and a select joined with its action fills it together with the
+ * action, see docs/reference/shell.md#layout. A text button that `AxisButton` draws, such as a subtle button, takes the
+ * light fill on keyboard focus that it takes on hover, see docs/reference/actions-and-controls.md#buttons.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
-  const { colour } = designTokensFor(mode, page)
   const hoverFill = theme.getDesignToken(antThemeFor(mode, page)).colorBgTextHover
   const fieldWidth = fieldParents.flatMap((parent) => fieldInputs.map((input) => `${parent} > ${input}`)).join(', ')
   return [
     // An input fills its field, and a select joined with its action fills it too, see docs/reference/shell.md#layout.
     `${fieldWidth} { width: 100%; }`,
-    `.ant-btn-variant-text:not(:disabled):focus-visible { background: ${hoverFill}; }`,
-    `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,
+    `.${textButtonClass}:not(:disabled):focus-visible { background: ${hoverFill}; }`,
   ].join('\n')
 }
 
@@ -291,6 +289,16 @@ export function useAlertIconStyles(): Record<'info' | 'success' | 'warning' | 'e
     warning: { ...box, color: token.colorWarningText },
     error: { ...box, color: token.colorErrorText },
   }
+}
+
+/**
+ * The border of an unticked checkbox or radio in a field with an error, see docs/reference/actions-and-controls.md#fields:
+ * the `styles` of a box, which take `dangerText` from the theme in use. A ticked box, or one in a field without an error,
+ * keeps its own look.
+ */
+export function useErrorBoxStyles(): (error: boolean, ticked: boolean) => { icon: CSSProperties } | undefined {
+  const { token } = theme.useToken()
+  return (error, ticked) => (error && !ticked ? { icon: { borderColor: token.colorErrorText } } : undefined)
 }
 
 /**
