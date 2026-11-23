@@ -159,6 +159,31 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
     }
 
     [Fact]
+    public async Task A_request_that_the_author_sent_back_to_work_uses_its_draft_and_the_first_model_message_holds_the_comment()
+    {
+        using var client = await _realm.SignInAsync();
+        var id = await SendAsync(client);
+        var stored = Guid.NewGuid();
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'ready', plan = 'A plan.', draft_id = '{stored}', round = 2 WHERE id = '{id}' RETURNING 1");
+        using var requested = await StudioPublishTests.SendAsync(
+            client, HttpMethod.Post, $"{Url}/{id}/request-changes", Host, """{ "comment": "Rename the field to Cost centre." }""");
+        Assert.Equal(HttpStatusCode.OK, requested.StatusCode);
+        var script = new ScriptedModelAdapter([new ModelAnswer([new ModelText("Done.")], ModelStopReason.EndTurn, new ModelTokens(1, 1))]);
+        var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
+        await using var host = BuildAgent(_realm, script, server);
+        await host.StartAsync(CancellationToken);
+        await WorkFinishedAsync(id);
+        await host.StopAsync(CancellationToken);
+
+        var first = Assert.IsType<ModelText>(Assert.Single(script.Calls[0].Messages[0].Content)).Text;
+        Assert.Contains("Rename the field to Cost centre.", first, StringComparison.Ordinal);
+        Assert.Contains("A plan.", first, StringComparison.Ordinal);
+        Assert.DoesNotContain("create_draft", server.ToolCalls);
+        Assert.Contains(stored.ToString("D"), script.Calls[0].System, StringComparison.Ordinal);
+        Assert.Equal(stored.ToString("D"), await ScalarAsync($"SELECT draft_id FROM axis.authoring_requests WHERE id = '{id}'"));
+    }
+
+    [Fact]
     public async Task A_model_that_never_ends_its_turn_within_50_model_calls_stops_the_request_failed_with_the_outcome_unfinished()
     {
         using var client = await _realm.SignInAsync();

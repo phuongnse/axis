@@ -14,7 +14,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The token and time budgets of an authoring request, see <c>docs/reference/authoring-requests.md#budgets</c>. A request that would pass
-/// <c>Ai:RequestTokenBudget</c> makes no further model call, and one past <c>Ai:RequestTimeout</c> from its approval, or still running at it, is cancelled.
+/// <c>Ai:RequestTokenBudget</c> makes no further model call, and one past <c>Ai:RequestTimeout</c> from its approval or its newest change request, or still running at it, is cancelled.
 /// Either stops as <c>failed</c> with the outcome <c>overBudget</c> or <c>timedOut</c>, and keeps its draft. The model is the scripted adapter.
 /// </summary>
 public sealed class AgentRequestBudgetTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
@@ -67,6 +67,23 @@ public sealed class AgentRequestBudgetTests(KeycloakFixture keycloak, PostgreSql
         Assert.Empty(server.ToolCalls);
         Assert.Equal("1:work:timedOut:0:true", await StepsAsync(id));
         Assert.Equal("true", await ScalarAsync($"SELECT (refresh_token IS NULL)::text FROM axis.authoring_requests WHERE id = '{id}'"));
+    }
+
+    [Fact]
+    public async Task A_request_approved_longer_ago_than_the_time_limit_that_has_a_newer_change_request_runs_its_step_and_does_not_stop_as_timedOut()
+    {
+        using var client = await _realm.SignInAsync();
+        var id = await SendAsync(client);
+        await ApprovedAsync(id, "now() - interval '31 minutes'");
+        await ScalarAsync(
+            $"INSERT INTO axis.authoring_request_steps (id, request_id, ordinal, kind, input_summary, finished_at) VALUES (gen_random_uuid(), '{id}', 1, 'changeRequest', 'Change it.', now()) RETURNING 1");
+        var step = new TestStep("working", "work", "checking");
+        await using var host = BuildAgent(new ScriptedModelAdapter([]), new RecordingHandler(_realm.Factory.Server.CreateHandler()), new() { ["Ai:RequestTimeout"] = "00:30:00" }, step);
+        await host.StartAsync(CancellationToken);
+        await WaitUntilAsync(async () => await StateAsync(id) == "checking", "The host did not run the working step.");
+        await host.StopAsync(CancellationToken);
+
+        Assert.Equal("1:changeRequest:-:0:true,2:work:done:0:true", await StepsAsync(id));
     }
 
     [Fact]

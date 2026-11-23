@@ -239,6 +239,67 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_authors_request_for_changes_keeps_the_comment_and_the_draft_and_sends_a_ready_request_back_to_work_with_round_0()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("authoring_requests_changes", CancellationToken);
+        await using var factory = NewFactory(folder.Path, connectionString);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var employee = factory.CreateClient().SignedInAs("employee");
+        var id = await SendRequestAsync(author);
+        var draft = Guid.NewGuid();
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            $"UPDATE axis.authoring_requests SET state = 'ready', draft_id = '{draft}', round = 3, claimed_by = 'host', claimed_until = now() + interval '1 hour' WHERE id = '{id}'",
+            CancellationToken);
+        const string Comment = """{ "comment": "Also add it to the form." }""";
+
+        // Another author is refused, and a body that is not a comment of 1 to 2000 characters is a 400.
+        using var other = await StudioPublishTests.SendAsync(employee, HttpMethod.Post, $"{Url}/{id}/request-changes", Host, Comment);
+        Assert.Equal(HttpStatusCode.Forbidden, other.StatusCode);
+        foreach (var body in new[] { """{ "comment": "" }""", $$"""{ "comment": "{{new string('x', 2001)}}" }""" })
+        {
+            using var invalid = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/request-changes", Host, body);
+            Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        }
+
+        // A request that is not ready is a 409.
+        await SetStateAsync(connectionString, id, "awaitingApproval");
+        using var notReady = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/request-changes", Host, Comment);
+        Assert.Equal(HttpStatusCode.Conflict, notReady.StatusCode);
+        await SetStateAsync(connectionString, id, "ready");
+
+        // A draft with an accept queued is a 409 too, so an accept cannot commit a draft that AI is changing.
+        using var accepted = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        using var pending = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/request-changes", Host, Comment);
+        Assert.Equal(HttpStatusCode.Conflict, pending.StatusCode);
+        Assert.Equal(
+            "The draft already has an accept that has not finished.",
+            (await StudioPublishTests.ReadAsync(pending)).RootElement.GetProperty("title").GetString());
+        Assert.Equal("ready|3", await StringAsync(connectionString, $"SELECT state || '|' || round FROM axis.authoring_requests WHERE id = '{id}'"));
+        Assert.Equal(0L, await ScalarAsync(connectionString, "SELECT count(*) FROM axis.authoring_request_steps"));
+        await PostgreSqlServer.AdminScalarAsync(connectionString, "DELETE FROM axis.publish_requests", CancellationToken);
+
+        using var changed = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/request-changes", Host, Comment);
+
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        using var changedBody = await StudioPublishTests.ReadAsync(changed);
+        Assert.Equal("working", changedBody.RootElement.GetProperty("state").GetString());
+        Assert.Equal(0, changedBody.RootElement.GetProperty("round").GetInt32());
+        Assert.Equal(
+            $"working|0|{draft}|true",
+            await StringAsync(
+                connectionString,
+                $"SELECT state || '|' || round || '|' || draft_id || '|' || (claimed_by IS NULL AND claimed_until IS NULL) FROM axis.authoring_requests WHERE id = '{id}'"));
+        using var read = await StudioPublishTests.GetJsonAsync(author, $"{Url}/{id}", Host);
+        var steps = read.RootElement.GetProperty("steps");
+        Assert.Equal(1, steps.GetArrayLength());
+        Assert.Equal("changeRequest", steps[0].GetProperty("kind").GetString());
+        Assert.Equal("Also add it to the form.", steps[0].GetProperty("summary").GetString());
+    }
+
+    [Fact]
     public async Task Sending_approving_and_dropping_each_write_one_audit_record_with_the_author_the_application_and_the_request()
     {
         using var folder = StudioPublishTests.NewFolder();
