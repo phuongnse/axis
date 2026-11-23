@@ -19,7 +19,8 @@ Axis writes six logs: three streams of log entries for the operator, and three k
 | Step history and call attempt rows | Every step run and every connector, package or lookup call attempt, with the `trace_id` of the run, see [tables](process-tables.md#tables) | Rows in the tenant database                                         | The tenant database                                                                                    | Users who may inspect the instance, and the operator | As long as the instance's rows                      |
 
 - **Keycloak.** The events of the identity provider that Axis ships belong to it. Its sign-in and
-  admin events are the operator's, see [Axis's identity provider](identity-provider.md).
+  admin events are the operator's, see [Axis's identity provider](identity-provider.md). Axis does not turn on a
+  realm's stored events, so a realm stores no consent event, see [audit](mcp-server.md#audit).
 - **Access.** Console and OTLP logs are the operator's to protect. Axis writes no log file, so no
   file permission is needed. The database rejects changes to the audit tables, see the
   [ASVS](asvs-data-and-operations.md#v16-security-logging-and-error-handling) row for protected logs.
