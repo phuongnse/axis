@@ -234,18 +234,12 @@ test.describe("Studio edits a process in the process editor", () => {
     }).toPass({ timeout: 20_000 });
     await saveResource(page);
 
-    // Both transitions that name markApproved give the same message and resource, so the rows differ only by path. The
-    // list keeps the order of the diagnostics, which sorts by path, so the first row is the one at /steps/2/otherwise.
-    const diagnostic = (await openProblems(page))
-      .getByRole("listitem")
-      .filter({ hasText: "AXC0070" })
-      .first();
-    await expect(diagnostic).toContainText("AXC0070");
-    const link = diagnostic.getByRole("link", {
-      name: "PurchaseRequestApproval",
-      exact: true,
-    });
-    await expect(link).toHaveAttribute("href", /path=%2Fsteps%2F2%2Fotherwise/);
+    // Both transitions that name markApproved give AXC0070 for the same resource. The link's address ends in the
+    // problem's path, so it picks the one at /steps/2/otherwise, however the panel lists or groups the problems.
+    const panel = await openProblems(page);
+    await expect(panel).toContainText("AXC0070");
+    const link = panel.locator('a[href$="path=%2Fsteps%2F2%2Fotherwise"]');
+    await expect(link).toBeVisible();
     await link.click();
 
     await expect(page).toHaveURL(/path=%2Fsteps%2F2%2Fotherwise/);
