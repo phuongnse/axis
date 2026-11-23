@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Data.Storage;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Mvc.Testing;
 using static Axis.Integration.Tests.TaskApiFixture;
@@ -763,6 +764,187 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
         Assert.Equal(0L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads"));
     }
 
+    [Fact]
+    public async Task A_notice_for_one_person_is_listed_read_and_cleared_by_that_person_alone()
+    {
+        await ClearAsync();
+        var request = await InsertRequestAsync("awaitingApproval");
+        await InsertAuthoringNoticeAsync(AuthoringRequestNotice.PlanReady, request, "otto");
+        await using var factory = AdministratorFactory();
+        using var otto = factory.CreateClient().SignedInAs("otto");
+        using var maria = factory.CreateClient().SignedInAs("maria");
+        using var rita = factory.CreateClient().SignedInAs("rita");
+
+        // Otto is not an administrator and still lists the notice, once.
+        using var list = await GetJsonAsync(otto, TenantNotices);
+        var id = Assert.Single(Ids(list));
+        Assert.Equal(1, list.RootElement.GetProperty("totalCount").GetInt32());
+        Assert.Equal(1, list.RootElement.GetProperty("unreadCount").GetInt32());
+
+        // An administrator and another user list nothing, and read, clear, read-all and clear-all change nothing for them.
+        foreach (var other in new[] { maria, rita })
+        {
+            using var none = await GetJsonAsync(other, TenantNotices);
+            Assert.Empty(none.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal(0, none.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(0, none.RootElement.GetProperty("unreadCount").GetInt32());
+
+            foreach (var action in new[] { "read", "clear" })
+            {
+                using var denied = await PostAsync(other, $"{TenantNotices}/{id:D}/{action}");
+                using var problem = await RecordApiFixture.ReadProblemAsync(denied, HttpStatusCode.NotFound);
+                Assert.Equal("No notification exists with this id.", problem.RootElement.GetProperty("title").GetString());
+            }
+
+            foreach (var action in new[] { "read-all", "clear-all" })
+            {
+                using var all = await PostAsync(other, $"{TenantNotices}/{action}");
+                Assert.Equal(HttpStatusCode.NoContent, all.StatusCode);
+            }
+        }
+
+        Assert.Equal(0L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads"));
+
+        using (var read = await PostAsync(otto, $"{TenantNotices}/{id:D}/read"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, read.StatusCode);
+        }
+
+        using (var cleared = await PostAsync(otto, $"{TenantNotices}/{id:D}/clear"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, cleared.StatusCode);
+        }
+
+        using var after = await GetJsonAsync(otto, TenantNotices);
+        Assert.Empty(after.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(1L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads WHERE user_id = 'otto' AND cleared_at IS NOT NULL"));
+    }
+
+    [Fact]
+    public async Task An_administrator_lists_the_notice_sent_to_them_and_another_administrator_does_not()
+    {
+        await ClearAsync();
+        var request = await InsertRequestAsync("awaitingApproval");
+        await InsertAuthoringNoticeAsync(AuthoringRequestNotice.PlanReady, request, "fiona");
+        await using var factory = AdministratorFactory();
+        using var fiona = factory.CreateClient().SignedInAs("fiona");
+        using var maria = factory.CreateClient().SignedInAs("maria");
+
+        using var own = await GetJsonAsync(fiona, TenantNotices);
+        Assert.Single(Ids(own));
+
+        using var other = await GetJsonAsync(maria, TenantNotices);
+        Assert.Empty(other.RootElement.GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task An_AI_request_notice_opens_its_request_in_Studio_with_its_texts_and_values()
+    {
+        await ClearAsync();
+        var request = await InsertRequestAsync("awaitingApproval");
+        await InsertAuthoringNoticeAsync(AuthoringRequestNotice.PlanReady, request, "otto", "Orders \"North\"");
+        await using var factory = AdministratorFactory();
+        using var otto = factory.CreateClient().SignedInAs("otto");
+
+        using var list = await GetJsonAsync(otto, TenantNotices);
+
+        var item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal("authoringRequest", item.GetProperty("source").GetString());
+        Assert.Equal("action", item.GetProperty("kind").GetString());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("releaseId").ValueKind);
+        Assert.Equal("Plan ready to approve", item.GetProperty("subject").GetString());
+        Assert.Equal("Read the plan for your request in Orders \"North\" and approve it or ask for another.", item.GetProperty("body").GetString());
+        var open = item.GetProperty("open");
+        Assert.Equal("studio", open.GetProperty("page").GetString());
+        var parameters = open.GetProperty("parameters");
+        Assert.Equal("Orders \"North\"", parameters.GetProperty("app").GetString());
+        Assert.Equal("requests", parameters.GetProperty("view").GetString());
+        Assert.Equal(request.ToString("D"), parameters.GetProperty("request").GetString());
+    }
+
+    [Fact]
+    public async Task A_plan_ready_notice_is_done_once_its_request_leaves_awaiting_approval()
+    {
+        await ClearAsync();
+        var request = await InsertRequestAsync("awaitingApproval");
+        var id = await InsertAuthoringNoticeAsync(AuthoringRequestNotice.PlanReady, request, "otto");
+        await using var factory = AdministratorFactory();
+        using var otto = factory.CreateClient().SignedInAs("otto");
+
+        using (var waiting = await GetJsonAsync(otto, $"{TenantNotices}?needsAction=true"))
+        {
+            Assert.Equal([id], Ids(waiting));
+            Assert.False(waiting.RootElement.GetProperty("items")[0].GetProperty("done").GetBoolean());
+        }
+
+        using (var all = await PostAsync(otto, $"{TenantNotices}/clear-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, all.StatusCode);
+        }
+
+        using (var kept = await GetJsonAsync(otto, TenantNotices))
+        {
+            Assert.Equal([id], Ids(kept));
+        }
+
+        await fixture.ExecuteAsync(TenantA, "UPDATE axis.authoring_requests SET state = 'working'");
+
+        using (var done = await GetJsonAsync(otto, TenantNotices))
+        {
+            Assert.True(done.RootElement.GetProperty("items")[0].GetProperty("done").GetBoolean());
+        }
+
+        using (var needsAction = await GetJsonAsync(otto, $"{TenantNotices}?needsAction=true"))
+        {
+            Assert.Empty(needsAction.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal(0, needsAction.RootElement.GetProperty("totalCount").GetInt32());
+        }
+
+        using (var all = await PostAsync(otto, $"{TenantNotices}/clear-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, all.StatusCode);
+        }
+
+        using var cleared = await GetJsonAsync(otto, TenantNotices);
+        Assert.Empty(cleared.RootElement.GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_draft_ready_notice_waits_on_ready_and_a_newer_notice_of_the_request_makes_it_done()
+    {
+        await ClearAsync();
+        var request = await InsertRequestAsync("ready");
+        var older = await InsertAuthoringNoticeAsync(AuthoringRequestNotice.DraftReady, request, "otto");
+        await using var factory = AdministratorFactory();
+        using var otto = factory.CreateClient().SignedInAs("otto");
+
+        using (var waiting = await GetJsonAsync(otto, $"{TenantNotices}?needsAction=true"))
+        {
+            Assert.Equal([older], Ids(waiting));
+        }
+
+        // The request goes back to ready after a change, and a newer draft ready notice is stored. Only the newer one waits.
+        var newer = await InsertAuthoringNoticeAsync(AuthoringRequestNotice.DraftReady, request, "otto");
+        using (var list = await GetJsonAsync(otto, $"{TenantNotices}?needsAction=true"))
+        {
+            Assert.Equal([newer], Ids(list));
+        }
+
+        // A notice of another request or of another person does not make it done.
+        var other = await InsertRequestAsync("ready");
+        await InsertAuthoringNoticeAsync(AuthoringRequestNotice.DraftReady, other, "otto");
+        await InsertAuthoringNoticeAsync(AuthoringRequestNotice.Accepted, request, "fiona");
+        using (var list = await GetJsonAsync(otto, $"{TenantNotices}?needsAction=true"))
+        {
+            Assert.Equal(2, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Contains(newer, Ids(list));
+        }
+
+        await fixture.ExecuteAsync(TenantA, "UPDATE axis.authoring_requests SET state = 'accepted'");
+        using var done = await GetJsonAsync(otto, $"{TenantNotices}?needsAction=true");
+        Assert.Empty(done.RootElement.GetProperty("items").EnumerateArray());
+    }
+
     private WebApplicationFactory<Program> AdministratorFactory() =>
         fixture.Factory.WithWebHostBuilder(builder => builder.UseSetting("Users:AdministratorRole", "finance"));
 
@@ -784,7 +966,34 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
     }
 
     private async Task ClearAsync() =>
-        await fixture.ExecuteAsync(TenantA, "DELETE FROM axis.notification_reads; DELETE FROM axis.notifications; DELETE FROM axis.notification_preferences;");
+        await fixture.ExecuteAsync(
+            TenantA,
+            "DELETE FROM axis.notification_reads; DELETE FROM axis.notifications; DELETE FROM axis.notification_preferences; DELETE FROM axis.authoring_request_steps; DELETE FROM axis.authoring_requests;");
+
+    private async Task<Guid> InsertRequestAsync(string state)
+    {
+        var id = Guid.NewGuid();
+        await fixture.ExecuteAsync(
+            TenantA,
+            "INSERT INTO axis.authoring_requests (id, application_id, author, text, state) VALUES (@id, @application, 'otto', 'Add a field.', @state)",
+            ("id", id),
+            ("application", Guid.NewGuid()),
+            ("state", state));
+        return id;
+    }
+
+    // The notice that the shared insert stores, in its own transaction as a move of the request would.
+    private async Task<Guid> InsertAuthoringNoticeAsync(AuthoringRequestNotice notice, Guid request, string author, string application = "Orders")
+    {
+        await using var connection = await fixture.OpenConnectionAsync(TenantA);
+        await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
+        await AuthoringRequestNotices.InsertAsync(transaction, notice, request, author, application, CancellationToken);
+        await transaction.CommitAsync(CancellationToken);
+        return (Guid)(await fixture.ScalarAsync(
+            TenantA,
+            "SELECT id FROM axis.notifications WHERE recipient = @author ORDER BY created_at DESC, id DESC LIMIT 1",
+            ("author", author)))!;
+    }
 
     // The stored preferences of a person, as PUT /api/me/notification-preferences stores them.
     private async Task SavePreferencesAsync(string userId, string sources) =>

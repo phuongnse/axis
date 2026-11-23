@@ -6,11 +6,11 @@ using NpgsqlTypes;
 namespace Axis.Processes.Instances;
 
 /// <summary>
-/// Reads the in-app notifications of an application, and the tenant notices for administrators, over a connection to a
+/// Reads the in-app notifications of an application, and the tenant notices, over a connection to a
 /// tenant database, and marks them read or clears them. A user sees the notifications addressed to their id, and those addressed to a role they hold. The caller gives the
 /// roles the active release declares, so a role it no longer declares shows nothing. A notification addressed to a user
 /// both ways is one notification. A tenant notice has no application. The user sees the ones addressed to a platform role
-/// kind the caller says the user holds. A user does not see the sources they turned off in the application, and tenant
+/// kind the caller says the user holds, and the ones addressed to their own id. A user does not see the sources they turned off in the application, and tenant
 /// notices ignore the preferences, see <c>docs/reference/notifications.md#notification-preferences</c>. Read and clear state are kept per user, and a cleared notification leaves only the list of the user who cleared it,
 /// see <c>docs/reference/notifications.md#in-app-notifications</c>. Ids and role names match exactly, including letter case.
 /// </summary>
@@ -24,20 +24,48 @@ public static class NotificationQueries
           AND n.source <> ALL ({NotificationPreferences.ApplicationOffSourcesSql})
         """;
 
-    // A tenant notice has no application and goes to a platform role kind that the caller says the user holds.
+    // A tenant notice has no application. It goes to a platform role kind that the caller says the user holds, or to one person by user id.
     private const string TenantVisibleWhere =
         $"""
         n.application_id IS NULL
-          AND n.recipient_kind = '{TenantNotices.PlatformRoleRecipient}' AND n.recipient = ANY(@roles)
+          AND ((n.recipient_kind = '{TenantNotices.PlatformRoleRecipient}' AND n.recipient = ANY(@roles))
+            OR (n.recipient_kind = '{AuthoringRequestNotices.PlatformUserRecipient}' AND n.recipient = @user))
+        """;
+
+    private const string AwaitingApprovalState = "awaitingApproval";
+
+    private const string ReadyState = "ready";
+
+    // Whether nothing is left to do for the notification n. Only an action notification is not done. An AI request's action
+    // notification is done once its request leaves the state it waits on, or once a newer notice of the same request goes to the same
+    // recipient, because a request can come back to that state after a change. The rule changes the answer only for AI request notices.
+    private const string DoneSql =
+        $"""
+        CASE
+            WHEN n.kind <> '{NotificationKinds.Action}' THEN true
+            WHEN n.source <> '{AuthoringRequestNotices.Source}' THEN false
+            ELSE (
+                NOT EXISTS (
+                    SELECT 1 FROM axis.authoring_requests ar
+                    WHERE ar.id = (n."values"->>'request')::uuid
+                      AND ar.state = CASE WHEN n.subject_key = '{AuthoringRequestNotices.PlanReadySubjectKey}' THEN '{AwaitingApprovalState}' ELSE '{ReadyState}' END)
+                OR EXISTS (
+                    SELECT 1 FROM axis.notifications m
+                    WHERE m.source = '{AuthoringRequestNotices.Source}'
+                      AND m.recipient_kind = n.recipient_kind AND m.recipient = n.recipient
+                      AND m."values"->>'request' = n."values"->>'request'
+                      AND (m.created_at, m.id) > (n.created_at, n.id))
+            )
+        END
         """;
 
     // One row for each notification, though a user and a role recipient of the same notification are two stored rows.
     private const string VisibleCteStart =
-        """
+        $"""
         WITH visible AS (
             SELECT DISTINCT ON (n.id)
                 n.id, n.release_id, n.subject_key, n.body_key, n."values"::text AS "values", n.value_types::text AS value_types, n.open_page,
-                n.open_parameters::text AS open_parameters, n.created_at, n.source, n.kind,
+                n.open_parameters::text AS open_parameters, n.created_at, n.source, n.kind, {DoneSql} AS done,
                 EXISTS (SELECT 1 FROM axis.notification_reads r WHERE r.notification_id = n.id AND r.user_id = @user) AS is_read
             FROM axis.notifications n
             WHERE
@@ -53,8 +81,8 @@ public static class NotificationQueries
 
     private const string VisibleCte = $"{VisibleCteStart} {VisibleWhere}{VisibleCteEnd}";
 
-    // The list filters: only the unread ones, and only the action ones, which are not done while they are listed.
-    private const string ListFilter = $"(NOT @unread OR NOT is_read) AND (NOT @needsAction OR kind = '{NotificationKinds.Action}')";
+    // The list filters: only the unread ones, and only the ones not done, which are the action ones whose request or task is still waiting.
+    private const string ListFilter = "(NOT @unread OR NOT is_read) AND (NOT @needsAction OR NOT done)";
 
     /// <summary>Counts the notifications a user sees that the list filters match, and the unread ones among those the user sees.</summary>
     internal const string CountsSql =
@@ -71,7 +99,7 @@ public static class NotificationQueries
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> notifications of the application that
     /// <paramref name="userId"/> sees, newest first and then by id, and counts them. With <paramref name="unreadOnly"/>
     /// the page and <see cref="NotificationPage.TotalCount"/> have only the unread ones, and with <paramref name="needsActionOnly"/>
-    /// only the <c>action</c> ones, which are not done while they are listed.
+    /// only the <c>action</c> ones that are not done.
     /// <see cref="NotificationPage.UnreadCount"/> counts every unread one. A page past the last one has no items.
     /// </summary>
     public static Task<NotificationPage> ListAsync(
@@ -374,7 +402,7 @@ public static class NotificationQueries
             $"""
             {_cte}
             SELECT id, release_id, subject_key, body_key, "values", value_types, open_page, open_parameters, created_at, is_read,
-                source, kind, kind <> '{NotificationKinds.Action}' AS done
+                source, kind, done
             FROM visible
             WHERE {ListFilter}
             ORDER BY created_at DESC, id DESC
@@ -419,7 +447,7 @@ public static class NotificationQueries
             $"""
             INSERT INTO axis.notification_reads (notification_id, user_id, cleared_at)
             SELECT DISTINCT n.id, @user, now() FROM axis.notifications n
-            WHERE {visibleWhere} AND n.kind <> '{NotificationKinds.Action}'
+            WHERE {visibleWhere} AND {DoneSql}
             ON CONFLICT (notification_id, user_id) DO UPDATE
             SET cleared_at = COALESCE(axis.notification_reads.cleared_at, excluded.cleared_at)
             """;
@@ -443,9 +471,9 @@ public sealed record NotificationPage(IReadOnlyList<NotificationItem> Items, lon
 /// <param name="OpenParameters">The raw page parameters, a JSON object, or null when there is no page.</param>
 /// <param name="CreatedAt">When the notification was stored.</param>
 /// <param name="Read">Whether the user has read it.</param>
-/// <param name="Source">The source of the notification, <c>process</c> or <c>quota</c>.</param>
+/// <param name="Source">The source of the notification, <c>process</c>, <c>quota</c> or <c>authoringRequest</c>.</param>
 /// <param name="Kind">The kind of the notification, one of <see cref="NotificationKinds"/>.</param>
-/// <param name="Done">Whether nothing is left to do for it. Only an <c>action</c> notification is not done, and a listed one is not done, because a cleared one is no longer listed, see <c>docs/reference/notifications.md#in-app-notifications</c>.</param>
+/// <param name="Done">Whether nothing is left to do for it. Only an <c>action</c> notification is not done. An AI request's <c>action</c> notification is done once its request leaves the state it waits on, or a newer notice of the request exists. Any other listed <c>action</c> notification is not done, because a cleared one is no longer listed, see <c>docs/reference/notifications.md#in-app-notifications</c>.</param>
 public sealed record NotificationItem(
     Guid Id,
     Guid? ReleaseId,
