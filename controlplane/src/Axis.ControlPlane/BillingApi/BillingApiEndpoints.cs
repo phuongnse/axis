@@ -7,6 +7,7 @@ using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.Subscriptions;
+using Axis.Tenancy;
 using Npgsql;
 
 namespace Axis.ControlPlane.BillingApi;
@@ -15,7 +16,8 @@ namespace Axis.ControlPlane.BillingApi;
 /// The routes of the billing API under <c>/api/billing/v1/</c>, see <c>docs/reference/billing-api.md</c>. The group needs the billing client's token and its
 /// scope, see <see cref="BillingApiClient"/>. Without complete <c>ControlPlane:Billing</c> settings every route answers <c>401</c> with
 /// <c>WWW-Authenticate: Bearer</c>. This part holds the call that sets the paid-through date, the call that sets the plan and the add-ons, the call that ends
-/// a subscription and the call that reads a tenant with the usage its cell reports.
+/// a subscription and the call that reads a tenant with the usage its cell reports. The plan call reads the same usage and refuses a plan that lowers a quota
+/// below the tenant's use.
 /// </summary>
 internal static partial class BillingApiEndpoints
 {
@@ -98,6 +100,9 @@ internal static partial class BillingApiEndpoints
         HttpContext httpContext,
         NpgsqlDataSource controlPlane,
         PlanCatalogue catalogue,
+        CellClients cells,
+        ILoggerFactory loggers,
+        TimeProvider clock,
         CancellationToken cancellationToken) =>
         HandleAsync(
             PlanKind,
@@ -140,6 +145,23 @@ internal static partial class BillingApiEndpoints
                 if (move.State is "deleting" or "deleted")
                 {
                     return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "The subscription is being deleted or is deleted.");
+                }
+
+                // A plan that lowers a quota below the tenant's use is refused, see docs/reference/billing-api.md#setting-the-plan-and-add-ons. The cell holds the
+                // use, so a cell that cannot be read refuses the call too.
+                var logger = loggers.CreateLogger(typeof(BillingApiEndpoints).FullName!);
+                if (await ReadUsageAsync(httpContext, cells, logger, tenantId, move.SubscriptionId, cancellationToken) is not { } usage)
+                {
+                    return CellUnreadable();
+                }
+
+                var limits = await SubscriptionQuotas.ComputeAsync(move.Transaction.Connection!, move.Transaction, move.SubscriptionId, plan, addOns, clock.GetUtcNow(), cancellationToken);
+                if (OverQuotas(usage, limits) is { Length: > 0 } over)
+                {
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: "The tenant's use is over the plan's quotas.",
+                        extensions: new Dictionary<string, object?> { ["quotas"] = over });
                 }
 
                 return await SubscriptionPlanChange.SetAsync(move.Transaction, move.SubscriptionId, plan, addOns, AuditActorKind.Billing, move.Client, cancellationToken)
@@ -205,26 +227,12 @@ internal static partial class BillingApiEndpoints
         if (subscription.State != Deleted)
         {
             var logger = loggers.CreateLogger(typeof(BillingApiEndpoints).FullName!);
-            var directory = httpContext.RequestServices.GetKeyedService<NpgsqlDataSource>("directory");
-            var cell = directory is null ? null : TenantCells.Client(cells, await TenantCells.FindCellIdAsync(directory, tenantId, cancellationToken));
-            if (cell is not null)
+            if (await ReadUsageAsync(httpContext, cells, logger, tenantId, subscriptionId, cancellationToken) is not { } read)
             {
-                try
-                {
-                    usage = (await cell.GetTenantAsync(tenantId, cancellationToken))?.Usage;
-                }
-                catch (Exception exception) when (exception is CellCallException or TimeoutException)
-                {
-                    LogReadFailed(logger, exception, subscriptionId, cell.CellId);
-                    return CellUnreadable();
-                }
-            }
-
-            if (usage is null)
-            {
-                LogNoUsage(logger, subscriptionId);
                 return CellUnreadable();
             }
+
+            usage = read;
         }
 
         return Results.Text(
@@ -240,6 +248,56 @@ internal static partial class BillingApiEndpoints
                     usage),
                 JsonSerializerOptions.Web),
             "application/json");
+    }
+
+    // The usage that the tenant's cell reports, or null when the cell gives none: the tenant has no row in the directory, the cell is not one of the region's,
+    // the cell does not know the tenant or sends no usage, or the call fails.
+    private static async Task<CellTenantUsage?> ReadUsageAsync(
+        HttpContext httpContext,
+        CellClients cells,
+        ILogger logger,
+        string tenantId,
+        Guid subscriptionId,
+        CancellationToken cancellationToken)
+    {
+        CellTenantUsage? usage = null;
+        var directory = httpContext.RequestServices.GetKeyedService<NpgsqlDataSource>("directory");
+        var cell = directory is null ? null : TenantCells.Client(cells, await TenantCells.FindCellIdAsync(directory, tenantId, cancellationToken));
+        if (cell is not null)
+        {
+            try
+            {
+                usage = (await cell.GetTenantAsync(tenantId, cancellationToken))?.Usage;
+            }
+            catch (Exception exception) when (exception is CellCallException or TimeoutException)
+            {
+                LogReadFailed(logger, exception, subscriptionId, cell.CellId);
+                return null;
+            }
+        }
+
+        if (usage is null)
+        {
+            LogNoUsage(logger, subscriptionId);
+        }
+
+        return usage;
+    }
+
+    // Each of storage, users and applications whose new limit is below the tenant's use and below the limit the cell holds now. A tenant that is over a quota the
+    // plan raises or keeps is not refused, as the plan would only help it. emailsPerDay is a daily count that resets, so it says nothing of the plan's fit.
+    private static OverQuota[] OverQuotas(CellTenantUsage usage, Dictionary<string, long> limits)
+    {
+        var over = new List<OverQuota>();
+        foreach (var (quota, use) in new[] { (QuotaKeys.Storage, usage.Storage), (QuotaKeys.Users, usage.Users), (QuotaKeys.Applications, usage.Applications) })
+        {
+            if (limits.TryGetValue(quota, out var limit) && use.Used is { } used && used > limit && limit < (use.Limit ?? long.MaxValue))
+            {
+                over.Add(new OverQuota(quota, limit, used, used - limit));
+            }
+        }
+
+        return [.. over];
     }
 
     private static IResult CellUnreadable() =>
@@ -509,6 +567,9 @@ internal static partial class BillingApiEndpoints
 
     // What a call's own move gets: the transaction that holds the subscription's row locked, and what the call read of it.
     private sealed record BillingMove<TBody>(NpgsqlTransaction Transaction, Guid SubscriptionId, string State, string? PlanCode, TBody Body, string Client);
+
+    // One quota of the 409 body that a refused plan names, see docs/reference/billing-api.md#setting-the-plan-and-add-ons.
+    private sealed record OverQuota(string Quota, long Limit, long Used, long Over);
 
     private sealed record BillingPlan(string Code, int Version);
 
