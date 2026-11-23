@@ -43,6 +43,36 @@ export function docWordCounts(root) {
     .map((file) => ({ file, page: relativePath(root, file), words: countWords(lines(file).join('\n')) }))
 }
 
+const roadmapRowPattern = /^\| \*\*(M\d+)\*\* \| [^|]+\| ([^|]+?) \|/
+const plannedPattern = /planned for (M\d+(?:(?:, | and )M\d+)*)/g
+
+/** Returns the status of each milestone row of docs/roadmap.md, trimmed, in a Map keyed by the milestone's name in its row. */
+export function roadmapStatuses(root) {
+  const statuses = new Map()
+  const roadmap = path.join(root, 'docs', 'roadmap.md')
+  if (!existsSync(roadmap)) return statuses
+  for (const line of lines(roadmap)) {
+    const row = roadmapRowPattern.exec(line)
+    if (row) statuses.set(row[1], row[2].trim())
+  }
+  return statuses
+}
+
+/** Returns { file, line, milestone } for each milestone that a planned marker under docs/ names, with file from root. */
+export function plannedMilestoneMarkers(root) {
+  const found = []
+  for (const file of markdownFiles(path.join(root, 'docs')).sort()) {
+    lines(file).forEach((line, i) => {
+      for (const match of line.matchAll(plannedPattern)) {
+        for (const milestone of match[1].match(/M\d+/g)) {
+          found.push({ file: relativePath(root, file), line: i + 1, milestone })
+        }
+      }
+    })
+  }
+  return found
+}
+
 /** Yields { index, raw } for each row of every table in text, an array of lines, whose header line, trimmed, equals header. Separator rows are skipped. */
 export function* tableRows(text, header) {
   for (let headerIndex = 0; headerIndex < text.length; headerIndex++) {

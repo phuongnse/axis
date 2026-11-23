@@ -24,8 +24,9 @@ it opens issues and edits only the broken links of open issues.
    run on the fallback Claude subscription, so the audit does not use up the one NexKit runs on.
 3. `file <findings> <run id>`, in a job that runs no model, groups the findings, leaves out those that an
    open issue or an earlier issue of the run covers, opens at most ten issues, labels each `docs-audit`
-   beside its other labels, and marks each with the run that found it. It opens the `unbuilt` issues
-   first, then the `untested-list` issues, then one docs issue per page, and last one split issue for each
+   beside its other labels, and marks each with the run that found it. It opens the milestone issues
+   first, as [milestones](milestones.md) says, then the `unbuilt` issues, then the `untested-list` issues,
+   then one docs issue per page, and last one split issue for each
    doc past the size mark of [how the docs stay correct](../../../docs/writing-docs.md#how-the-docs-stay-correct).
    It prints each finding the cap leaves out, and the next run of that finding's page reports it again.
 
@@ -73,6 +74,8 @@ The file step writes them, so this is what to expect, not what to do:
   a `wrong` finding, as [how the docs stay correct](../../../docs/writing-docs.md#how-the-docs-stay-correct) says.
 - One `bug` issue per `unbuilt` finding, and one test issue per `untested-list` finding, labelled
   `documentation`.
+- One milestone issue per milestone whose GitHub close and roadmap row disagree, labelled `documentation`, as
+  [milestones](milestones.md) says. Its hidden `docs-audit milestone` marker holds the milestone, so an open one stops a second.
 - One split issue per doc past the size mark, labelled `documentation`. It gives the doc's word count and asks
   to split the page by topic. Its hidden `docs-audit split` marker holds the page, so an open one stops a second.
 - Each issue carries the `docs-audit` label, which is its home, as [how issues run](../../../docs/delivery.md#how-issues-run)

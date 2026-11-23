@@ -38,7 +38,7 @@ Three actors take part in the work, the owner, the local agent session and NexKi
 - **The docs audit** is a workflow that opens NexKit issues. It is the `docs-audit.yml` workflow, which follows the
   [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a quarter of the docs,
   the skills and AGENTS.md against the code every few merges and opens a NexKit issue for each group
-  of findings that no open issue covers, code and test fixes first and at most ten a run, as
+  of findings that no open issue covers, milestone issues first, then code and test fixes, and at most ten a run, as
   [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees and the
   skill says. It also opens an issue to split each doc past the split mark, as
   [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct) says. It points each broken link of an open issue at its new home, once a job that runs
@@ -359,7 +359,7 @@ A milestone goes from a readiness check to its close in five steps.
    what the milestone made stale. It carries the `docs-sweep` label, so it runs once every
    other issue of the milestone is closed, the journey included. It leaves what other milestones are still building to their own sweeps. It checks at
    least:
-   - the roadmap status of this milestone and the next one;
+   - the roadmap row of this milestone, which the sweep sets to Done, so `scripts/check-docs.mjs` refuses any marker left for it, and the next milestone's row;
    - the **From** column of [concepts.md](domain/concepts.md) for every concept listed for this
      milestone, moved to a later milestone when the concept was not delivered;
    - every `_(planned for Mx)_` marker for this milestone in any doc, removed when the work was built,
@@ -372,7 +372,7 @@ A milestone goes from a readiness check to its close in five steps.
    - the rows of [docs/README.md](README.md), which still say what each file holds;
    - every skill under `.claude/skills/`: its links still resolve and its statements still hold.
 5. **Close.** When the last issue of the milestone closes, NexKit mentions the owner once. The owner
-   closes the milestone on GitHub once the docs sweep is merged. Nothing waits for the close.
+   closes the milestone on GitHub only once its roadmap row reads Done, which the merged sweep sets. Nothing waits for the close.
 
 ## Design changes
 
@@ -425,8 +425,10 @@ change, a design review and a sync are in the
   deleted, so the links to the prototype never break. A tag starts no CI run. The branch is then
   deleted, locally and on GitHub.
 - **A prototype starts from `main` and changes only the SPA.** It never starts from another review's
-  tag: a screen that an earlier review's issues have not built yet waits for them. It changes no
-  server code. What a screen needs from an API is a fixture in the prototype and a contract in the
+  tag. Before the branch is made, the session lists each `_(planned…)_` marker in the docs of the subject's
+  pages and widgets, and each earlier `design-review/*` tag of the same widgets. A review waits for the build
+  of an earlier agreed design of what it touches, not only for a screen that an earlier review's issues have
+  not built. It changes no server code. What a screen needs from an API is a fixture in the prototype and a contract in the
   review's rule comments on the design issue, and NexKit builds it. At the start of every session and
   before each step, the session merges `origin/main` into the branch and never rebases it. So the
   previews differ from `main` only by what the review changes. `main` stays the standard for behaviour
@@ -478,10 +480,12 @@ change, a design review and a sync are in the
 - **An agreed step is audited for one mechanism.** When the owner agrees a step, an agent audits the step's
   diff for one concern done by two mechanisms. The session merges what it finds before the next step. The
   audit of the whole prototype, when the review ends, still comes last.
-- **A review ends when the design issue's `on-hold` label comes off.** Before that, the session tags the
-  prototype and comments the tag on each issue that waits for the design issue. A screen that is already
-  built has no such issue, so the session first writes one build issue *blocked by* the design issue.
-  Then it removes the label.
+- **A review ends when the design issue's `on-hold` label comes off.** Before that, the session maps each
+  rule comment to the issue that builds it, in a table in the state comment. A rule with no issue gets one,
+  *blocked by* the design issue. An issue written before a later step either takes that step's rules into
+  its body or gets a new issue beside it. The session also tags the prototype and comments the tag on each
+  issue that waits for the design issue. A screen that is already built has no such issue, so the session
+  first writes one build issue *blocked by* the design issue. Then it removes the label.
 - **NexKit writes the docs change once the label is removed.** It plans the design issue like any
   issue and writes each rule where it lives, marked as planned, as
   [writing the docs](writing-docs.md#planned-work) says. The rules

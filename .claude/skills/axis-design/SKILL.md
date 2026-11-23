@@ -23,7 +23,7 @@ For a change the owner asks for in words, follow [requested-change.md](requested
 ## A design review
 
 Use this when the owner reviews the design in words, one change after
-another. The rules are under "Several changes are a design review" in Design changes.
+another.
 
 ### Start
 
@@ -32,8 +32,9 @@ another. The rules are under "Several changes are a design review" in Design cha
    [how issues run](../../../docs/delivery.md#how-issues-run) says. Its title names
    one subject. Its body states the scope and build notes, and says NexKit writes the docs change
    from the rule comments. Set the body with
-   `gh issue edit <n> --body-file <file>`. If an earlier review's issues have not
-   built what it touches, say so and stop.
+   `gh issue edit <n> --body-file <file>`. Before the branch is made, list the
+   `_(planned…)_` markers and earlier `design-review/*` tags of the subject's pages and widgets; an unbuilt
+   earlier agreed design stops the review.
 2. Check the issue's scope against the one-subject rule in
    [Design changes](../../../docs/delivery.md#design-changes). If it holds more than one subject,
    propose the split to the owner. When the owner agrees, open each other subject with
