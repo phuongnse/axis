@@ -15,6 +15,8 @@ internal static class BillingEventQueue
 
     public const string TenantCreated = "tenant.created";
 
+    public const string UsageDaily = "usage.daily";
+
     public const string SubscriptionStateChanged = "subscription.stateChanged";
 
     /// <summary>
