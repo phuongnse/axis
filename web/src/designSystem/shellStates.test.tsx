@@ -179,6 +179,9 @@ describe('the design-system shell states', () => {
 
     const failed = await screen.findByTestId('account-ai-connect-failed', {}, { timeout: 15000 })
     expect(failed).toHaveTextContent('Your provider refused this key.')
+    // A message about the whole dialog comes before its fields.
+    const provider = screen.getByRole('combobox', { name: 'Provider' })
+    expect(failed.compareDocumentPosition(provider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('dialog', { name: 'Connect your AI' })).toBeVisible()
   }, 30000)
 
@@ -189,7 +192,10 @@ describe('the design-system shell states', () => {
 
     expect(await screen.findByTestId('account-ai-state', {}, { timeout: 15000 })).toHaveTextContent('Refused')
     expect(screen.getByText('••••x7Qa')).toBeVisible()
-    expect(screen.getByTestId('account-ai-state-notice')).toHaveTextContent('Change your AI to go on.')
+    const notice = screen.getByTestId('account-ai-state-notice')
+    expect(notice).toHaveTextContent('Change your AI to go on.')
+    // What to do comes before the facts.
+    expect(notice.compareDocumentPosition(screen.getByText('••••x7Qa')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Change your AI…' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Remove your AI…' })).toBeVisible()
   }, 30000)

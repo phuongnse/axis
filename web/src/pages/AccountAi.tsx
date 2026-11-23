@@ -160,7 +160,7 @@ export function AccountAi() {
   )
 }
 
-/** Proposed (#3926): the connected AI's facts, what to do when its key does not work, and its two actions. */
+/** Proposed (#3926): what to do when the key does not work, first, then the connected AI's facts and its two actions. */
 function Connected({
   connection,
   providers,
@@ -179,6 +179,16 @@ function Connected({
   const provider = providers.find((candidate) => candidate.id === connection.provider)
   return (
     <>
+      {notice && (
+        <AxisAlert
+          data-testid="account-ai-state-notice"
+          kind={notice}
+          message={t(`shell.account.ai.state.${connection.state}.notice`)}
+        />
+      )}
+      {removeFailed && (
+        <AxisAlert data-testid="account-ai-remove-failed" kind="error" message={t('shell.account.ai.removeFailed')} />
+      )}
       <TermList
         terms={[
           { key: 'provider', term: t('shell.account.ai.provider'), value: provider?.name ?? connection.provider },
@@ -194,16 +204,6 @@ function Connected({
           },
         ]}
       />
-      {notice && (
-        <AxisAlert
-          data-testid="account-ai-state-notice"
-          kind={notice}
-          message={t(`shell.account.ai.state.${connection.state}.notice`)}
-        />
-      )}
-      {removeFailed && (
-        <AxisAlert data-testid="account-ai-remove-failed" kind="error" message={t('shell.account.ai.removeFailed')} />
-      )}
       <Flex gap="small">
         <AxisButton role="secondary" data-testid="account-ai-change" onClick={onChange}>
           {t('shell.account.ai.change')}
@@ -225,8 +225,8 @@ interface ConnectValues {
  * Proposed (#3926): the dialog that connects an AI, or changes the connected one. The provider comes first, then how the
  * person signs in to it, which is an API key for every provider today. The author chooses the model for each request in
  * Studio, so the dialog asks for none. It renders only while open, so closing it clears the key. Connect sends the key,
- * which the agent host tests with the provider before the server keeps it. A failed connect says why, as the provider
- * answered the test, and keeps the dialog open.
+ * which the agent host tests with the provider before the server keeps it. A failed connect says why above the fields,
+ * as the provider answered the test, and keeps the dialog open.
  */
 function ConnectDialog({
   title,
@@ -288,6 +288,13 @@ function ConnectDialog({
         initialValues={{ provider: provider ?? providers[0]?.id }}
         onFinish={(values) => void connect(values)}
       >
+        {failure && (
+          <AxisAlert
+            data-testid="account-ai-connect-failed"
+            kind="error"
+            message={t(`shell.account.ai.connectFailed.${failure}`)}
+          />
+        )}
         <AxisField
           name="provider"
           label={t('shell.account.ai.provider')}
@@ -304,13 +311,6 @@ function ConnectDialog({
         >
           <Input.Password autoComplete="off" />
         </AxisField>
-        {failure && (
-          <AxisAlert
-            data-testid="account-ai-connect-failed"
-            kind="error"
-            message={t(`shell.account.ai.connectFailed.${failure}`)}
-          />
-        )}
       </AxisForm>
     </Modal>
   )
