@@ -77,6 +77,7 @@ function checkStep(checks: unknown, outcome: 'passed' | 'failed'): AuthoringRequ
     startedAt: sentAt,
     finishedAt: sentAt,
     checks: checks as AuthoringRequestStep['checks'],
+    resource: null,
   }
 }
 
@@ -932,6 +933,7 @@ describe('the History', () => {
     startedAt: at(minute),
     finishedAt: at(minute + 1),
     checks: null,
+    resource: null,
     ...overrides,
   })
   /** Opens the History from Show the steps and returns its table. */
@@ -1009,6 +1011,78 @@ describe('the History', () => {
     expect(within(table).queryByRole('list')).toBeNull()
   })
 
+  /** A saved write at a minute, of the tool given, with its resource. */
+  const write = (
+    minute: number,
+    resource: { kind: string; id: string; name: string },
+    summary = 'write_resource',
+    overrides: Partial<AuthoringRequestStep> = {},
+  ) => step('write', minute, { summary, outcome: 'saved', resource, ...overrides })
+  const form = { kind: 'form', id: 'form-1', name: 'RequestForm' }
+  const entity = { kind: 'entity', id: 'entity-1', name: 'Supplier' }
+  const role = { kind: 'role', id: 'role-1', name: 'approver' }
+
+  it('folds a run of writes into one row, "Wrote 3 resources", that opens to each write', async () => {
+    const steps = [
+      step('work', 2),
+      write(3, form),
+      write(4, entity, 'write_layer'),
+      write(5, role),
+      step('check', 6, { outcome: 'passed', checks: passedChecks as AuthoringRequestStep['checks'] }),
+    ]
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps })).fetch)
+    renderPage({
+      resources: [
+        { id: 'form-1', kind: 'form', name: 'RequestForm', file: 'forms/request.json', version: 'v1', usedBy: 0 },
+      ],
+    })
+
+    const table = await show()
+
+    expect(words(table)).toEqual([
+      ['Checked the draft', 'All scenarios pass'],
+      ['Wrote 3 resources', 'Saved'],
+      ['Changed the draft', 'Saved'],
+    ])
+    await userEvent.click(within(table).getByRole('button', { name: 'Show the rows in it' }))
+    expect(words(table).slice(2, 5)).toEqual([
+      ['Wrote approver Role', 'Saved'],
+      ['Wrote Supplier Entity', 'Saved'],
+      ['Wrote RequestForm Form', 'Saved'],
+    ])
+    // The resource the application holds is a link, and one that only the draft holds is plain text.
+    expect(within(table).getByRole('link', { name: 'RequestForm' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('form-1'),
+    )
+    expect(within(table).getByText('Supplier').closest('a')).toBeNull()
+    expect(within(table).queryByRole('list')).toBeNull()
+  })
+
+  it('reads "Changed 2 resources" when a delete is among the writes, "Results differ" when the results differ, and keeps one write a plain row', async () => {
+    const steps = [
+      write(1, form),
+      write(2, entity, 'delete_resource', { outcome: 'refused' }),
+      step('check', 3),
+      write(4, role),
+    ]
+    vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps })).fetch)
+    renderPage()
+
+    const table = await show()
+
+    expect(words(table)).toEqual([
+      ['Wrote approver Role', 'Saved'],
+      ['Checked the draft', '—'],
+      ['Changed 2 resources', 'Results differ'],
+    ])
+    await userEvent.click(within(table).getByRole('button', { name: 'Show the rows in it' }))
+    expect(words(table).slice(3, 5)).toEqual([
+      ['Deleted Supplier Entity', 'Refused'],
+      ['Wrote RequestForm Form', 'Saved'],
+    ])
+  })
+
   it('shows Show the steps to a reader who is not the author', async () => {
     vi.stubGlobal('fetch', serverOf(request({ ...approved, state: 'ready', steps: [step('work', 6)] })).fetch)
     renderPage({ userId: 'u9' })
@@ -1028,6 +1102,7 @@ describe('the Plan item of an approved plan', () => {
     startedAt: sentAt,
     finishedAt: sentAt,
     checks: null,
+    resource: null,
   })
   const planItem = async () => (Array.from((await screen.findByTestId('steps-bar')).children) as HTMLElement[])[0]
 

@@ -91,6 +91,38 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_read_request_answers_the_resource_on_a_write_step_and_null_on_every_other_step()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("authoring_requests_write_step", CancellationToken);
+        await using var factory = NewCellFactory(folder.Path, connectionString);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var accepted = await StudioPublishTests.SendAsync(author, HttpMethod.Post, Url, Host, Text);
+        using var sent = await StudioPublishTests.ReadAsync(accepted);
+        var id = sent.RootElement.GetProperty("id").GetString()!;
+        var resource = Guid.NewGuid();
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            $$"""
+            INSERT INTO axis.authoring_request_steps (id, request_id, ordinal, kind, outcome, input_summary, resource)
+            VALUES ('{{Guid.NewGuid()}}', '{{id}}', 1, 'work', 'done', NULL, NULL),
+                   ('{{Guid.NewGuid()}}', '{{id}}', 2, 'write', 'saved', 'write_resource', '{"kind":"form","id":"{{resource}}","name":"RequestForm"}')
+            """,
+            CancellationToken);
+
+        using var read = await StudioPublishTests.GetJsonAsync(author, $"{Url}/{id}", Host);
+
+        var steps = read.RootElement.GetProperty("steps");
+        Assert.Equal(["work", "write"], steps.EnumerateArray().Select(step => step.GetProperty("kind").GetString()));
+        Assert.Equal(JsonValueKind.Null, steps[0].GetProperty("resource").ValueKind);
+        var written = steps[1].GetProperty("resource");
+        Assert.Equal("form", written.GetProperty("kind").GetString());
+        Assert.Equal(resource.ToString("D"), written.GetProperty("id").GetString());
+        Assert.Equal("RequestForm", written.GetProperty("name").GetString());
+        Assert.Equal("write_resource", steps[1].GetProperty("summary").GetString());
+    }
+
+    [Fact]
     public async Task A_tenant_at_its_quota_gets_the_quota_403_and_no_row_or_audit_record_is_written()
     {
         using var folder = StudioPublishTests.NewFolder();

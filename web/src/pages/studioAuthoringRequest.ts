@@ -6,6 +6,7 @@ import type {
   AuthoringRequestReviewChecks,
   AuthoringRequestState,
   AuthoringRequestStep,
+  AuthoringRequestStepResource,
   StudioScenarioResult,
 } from '../platform/studio'
 
@@ -290,17 +291,22 @@ export function planChanges(request: AuthoringRequest): string[] {
 }
 
 /**
- * A row of a request's History, one step, see docs/reference/ai-authoring-in-studio.md#the-history. `step` and `result` are
- * the text keys with the values that fill them, and each is null where the step has no words of its own.
+ * A row of a request's History, one step or a group of writes, see docs/reference/ai-authoring-in-studio.md#the-history. `step`
+ * and `result` are the text keys with the values that fill them, and each is null where the step has no words of its own. A
+ * write row holds its `resource`, and a group row holds its writes, newest first, in `rows`.
  */
 export interface HistoryRow {
   key: string
   startedAt: string
   /** How long the step took in milliseconds, or null while it runs. */
   ms: number | null
-  step: { key: string; values: Record<string, string> } | null
+  step: { key: string; values: Record<string, string | number> } | null
   /** Null while the step runs, and for a step whose outcome has no words. */
   result: { key: string; values: Record<string, number> } | null
+  /** The resource of a write, and null on any other row. */
+  resource: AuthoringRequestStepResource | null
+  /** The writes of a group row, newest first, and null on any other row. */
+  rows: HistoryRow[] | null
 }
 
 /** The words of each step by its kind, see docs/reference/ai-authoring-in-studio.md#the-history. */
@@ -314,7 +320,20 @@ const historyStepKeys: Record<string, string> = {
   changeRequest: 'shell.studio.aiRequest.history.step.changeRequest',
   retry: 'shell.studio.aiRequest.history.step.retry',
   accept: 'shell.studio.aiRequest.history.step.accept',
+  write: 'shell.studio.aiRequest.history.step.write',
 }
+
+/** The words of a `write` step made by the tool `delete_resource`, which remove a resource and do not write it. */
+const historyDeleteKey = 'shell.studio.aiRequest.history.step.delete'
+
+/** The words of a group of writes, with a delete among them or not. */
+const historyGroupKeys = {
+  wrote: 'shell.studio.aiRequest.history.step.wroteGroup',
+  changed: 'shell.studio.aiRequest.history.step.changedGroup',
+}
+
+/** The result of a group whose writes ended differently. */
+const historyDifferKey = 'shell.studio.aiRequest.history.result.differ'
 
 /**
  * The result of a step, keyed by its kind and outcome, as `kind:outcome`, or by its outcome alone. A step with no outcome
@@ -323,6 +342,7 @@ const historyStepKeys: Record<string, string> = {
 const historyResultKeys: Record<string, string> = {
   'plan:null': 'shell.studio.aiRequest.history.result.planWritten',
   'work:null': 'shell.studio.aiRequest.history.result.saved',
+  'write:saved': 'shell.studio.aiRequest.history.result.saved',
   'fix:null': 'shell.studio.aiRequest.history.result.saved',
   'review:passed': 'shell.studio.aiRequest.review.passed',
   'review:findings': 'shell.studio.aiRequest.review.findings',
@@ -342,9 +362,10 @@ const historyResultKeys: Record<string, string> = {
   interrupted: 'shell.studio.aiRequest.history.result.unfinished',
 }
 
-/** The words of a step: its kind's words, with the author's comment for a step that carries one. */
+/** The words of a step: its kind's words, with the author's comment for a step that carries one. A delete reads as a delete. */
 function historyStepOf(step: AuthoringRequestStep): HistoryRow['step'] {
-  const key = historyStepKeys[step.kind]
+  const key =
+    step.kind === 'write' && step.summary === 'delete_resource' ? historyDeleteKey : historyStepKeys[step.kind]
   return key === undefined ? null : { key, values: { comment: step.summary ?? '' } }
 }
 
@@ -362,17 +383,63 @@ function historyResultOf(step: AuthoringRequestStep): HistoryRow['result'] {
 }
 
 /**
+ * One group row of a run of writes, see docs/reference/ai-authoring-in-studio.md#the-history. Its result is the one its writes
+ * share, or Results differ, and null while one runs. Its duration runs from the first write's start to the last write's end.
+ */
+function writeGroup(key: string, writes: HistoryRow[]): HistoryRow {
+  const results = writes.map((write) => write.result?.key)
+  const shared = results.every((result) => result === results[0])
+    ? writes[0].result
+    : { key: historyDifferKey, values: {} }
+  const running = writes.some((write) => write.ms === null)
+  const first = Date.parse(writes[0].startedAt)
+  const last = Math.max(...writes.map((write) => Date.parse(write.startedAt) + (write.ms ?? 0)))
+  const deletes = writes.some((write) => write.step?.key === historyDeleteKey)
+  return {
+    key,
+    startedAt: writes[0].startedAt,
+    ms: running ? null : Math.max(0, last - first),
+    step: { key: deletes ? historyGroupKeys.changed : historyGroupKeys.wrote, values: { count: writes.length } },
+    result: running ? null : shared,
+    resource: null,
+    rows: writes.toReversed(),
+  }
+}
+
+/** The row of one step. */
+function historyRow(step: AuthoringRequestStep, key: string): HistoryRow {
+  return {
+    key,
+    startedAt: step.startedAt,
+    ms: step.finishedAt === null ? null : Math.max(0, Date.parse(step.finishedAt) - Date.parse(step.startedAt)),
+    step: historyStepOf(step),
+    result: historyResultOf(step),
+    resource: step.resource,
+    rows: null,
+  }
+}
+
+/**
  * The rows of a request's History, newest first, see docs/reference/ai-authoring-in-studio.md#the-history. A step has no id,
- * so each row is keyed by the step's position, oldest first, which stays the same because steps are only ever added.
+ * so each row is keyed by the step's position, oldest first, which stays the same because steps are only ever added. Two or
+ * more writes in a row fold into one group row that holds them, and a single write stays a row of its own.
  */
 export function requestHistory(request: AuthoringRequest): HistoryRow[] {
-  return (request.steps ?? [])
-    .map((step, index) => ({
-      key: String(index),
-      startedAt: step.startedAt,
-      ms: step.finishedAt === null ? null : Math.max(0, Date.parse(step.finishedAt) - Date.parse(step.startedAt)),
-      step: historyStepOf(step),
-      result: historyResultOf(step),
-    }))
-    .reverse()
+  const steps = request.steps ?? []
+  const rows: HistoryRow[] = []
+  for (let start = 0, end = 0; start < steps.length; start = end) {
+    end = start + 1
+    while (steps[start].kind === 'write' && end < steps.length && steps[end].kind === 'write') {
+      end++
+    }
+    rows.push(
+      end - start === 1
+        ? historyRow(steps[start], String(start))
+        : writeGroup(
+            `w${start}`,
+            steps.slice(start, end).map((step, offset) => historyRow(step, `w${start}-${start + offset}`)),
+          ),
+    )
+  }
+  return rows.reverse()
 }

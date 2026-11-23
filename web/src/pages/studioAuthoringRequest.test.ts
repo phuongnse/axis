@@ -60,6 +60,7 @@ function step(overrides: Partial<AuthoringRequestStep>): AuthoringRequestStep {
     startedAt: '2026-11-18T09:00:00Z',
     finishedAt: '2026-11-18T09:01:00Z',
     checks: null,
+    resource: null,
     ...overrides,
   }
 }
@@ -484,6 +485,80 @@ describe('requestHistory', () => {
     expect(plan.result).toEqual({ key: 'shell.studio.aiRequest.history.result.planWritten', values: {} })
   })
 
+  describe('the writes', () => {
+    /** A saved write at a minute past 09:00 that runs a minute, of the tool given. */
+    const write = (minute: number, summary = 'write_resource', overrides: Partial<AuthoringRequestStep> = {}) =>
+      step({
+        kind: 'write',
+        summary,
+        outcome: 'saved',
+        startedAt: `2026-11-18T09:0${minute}:00Z`,
+        finishedAt: `2026-11-18T09:0${minute + 1}:00Z`,
+        resource: { kind: 'form', id: `r${minute}`, name: `Form${minute}` },
+        ...overrides,
+      })
+
+    it('folds a run of writes into one group row that holds them newest first, and keeps the other steps beside it', () => {
+      const steps = [step({ kind: 'work' }), write(1), write(3), write(5), step({ kind: 'check' })]
+
+      const rows = requestHistory(requestOf({ steps }))
+
+      expect(rows.map((row) => row.key)).toEqual(['4', 'w1', '0'])
+      const group = rows[1]
+      expect(group.step).toEqual({ key: 'shell.studio.aiRequest.history.step.wroteGroup', values: { count: 3 } })
+      expect(group.result).toEqual({ key: 'shell.studio.aiRequest.history.result.saved', values: {} })
+      expect(group.startedAt).toBe('2026-11-18T09:01:00Z')
+      expect(group.ms).toBe(300_000)
+      expect(group.resource).toBeNull()
+      expect(group.rows?.map((row) => [row.key, row.resource?.name, row.rows])).toEqual([
+        ['w1-3', 'Form5', null],
+        ['w1-2', 'Form3', null],
+        ['w1-1', 'Form1', null],
+      ])
+      expect(group.rows?.[0].step).toEqual({
+        key: 'shell.studio.aiRequest.history.step.write',
+        values: { comment: 'write_resource' },
+      })
+    })
+
+    it('leaves a single write a plain row with its resource, and reads a delete as a delete', () => {
+      const rows = requestHistory(
+        requestOf({ steps: [step({ kind: 'work' }), write(1, 'delete_resource'), step({ kind: 'check' })] }),
+      )
+
+      expect(rows[1].rows).toBeNull()
+      expect(rows[1].resource).toEqual({ kind: 'form', id: 'r1', name: 'Form1' })
+      expect(rows[1].step?.key).toBe('shell.studio.aiRequest.history.step.delete')
+    })
+
+    it('reads a group with a delete among its writes as changed, and starts a new group after another step', () => {
+      const steps = [write(1), write(2, 'delete_resource'), step({ kind: 'check' }), write(4), write(5)]
+
+      const rows = requestHistory(requestOf({ steps }))
+
+      expect(rows.map((row) => [row.key, row.step?.key])).toEqual([
+        ['w3', 'shell.studio.aiRequest.history.step.wroteGroup'],
+        ['2', 'shell.studio.aiRequest.history.step.check'],
+        ['w0', 'shell.studio.aiRequest.history.step.changedGroup'],
+      ])
+    })
+
+    it('reads the result the writes share, Results differ when they differ, and nothing while one runs', () => {
+      const [shared] = requestHistory(requestOf({ steps: [write(1), write(2, 'write_layer', { outcome: 'refused' })] }))
+      const [same] = requestHistory(
+        requestOf({
+          steps: [write(1, 'write_resource', { outcome: 'refused' }), write(2, 'write_layer', { outcome: 'refused' })],
+        }),
+      )
+      const [running] = requestHistory(requestOf({ steps: [write(1), write(2, 'write_layer', { finishedAt: null })] }))
+
+      expect(shared.result).toEqual({ key: 'shell.studio.aiRequest.history.result.differ', values: {} })
+      expect(same.result).toEqual({ key: 'shell.studio.aiRequest.history.result.refused', values: {} })
+      expect(running.result).toBeNull()
+      expect(running.ms).toBeNull()
+    })
+  })
+
   it('reads the reason a step stopped by its outcome, and an interrupted step as unfinished', () => {
     const [interrupted, timed] = requestHistory(
       requestOf({
@@ -524,7 +599,7 @@ describe('requestHistory', () => {
   })
 
   it('gives a step of a kind with no words no step text, so its row shows the dash', () => {
-    const [row] = requestHistory(requestOf({ steps: [step({ kind: 'write' })] }))
+    const [row] = requestHistory(requestOf({ steps: [step({ kind: 'accepted' })] }))
 
     expect(row.step).toBeNull()
   })

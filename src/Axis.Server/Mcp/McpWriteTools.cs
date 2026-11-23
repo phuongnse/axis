@@ -20,7 +20,9 @@ namespace Axis.Server.Mcp;
 /// changes no draft. It stores a <c>test</c> request of the draft's files, or reads one back, and records no audit record, as a
 /// <c>test</c> records none, see <c>docs/reference/authoring-publishing.md#test</c>. <c>accept_draft</c> changes no draft either. It stores an
 /// <c>accept</c> publish request of the draft, only under the rules of <c>docs/reference/authoring-requests.md#accepting</c>, and
-/// appends one <c>mcp.toolCalled</c> audit record only when it queues an accept.
+/// appends one <c>mcp.toolCalled</c> audit record only when it queues an accept. Each <c>write_resource</c>, <c>delete_resource</c> and
+/// <c>write_layer</c> call also stores a finished <c>write</c> step on the person's authoring request that holds the draft, see
+/// <c>docs/reference/authoring-requests.md#states</c>.
 /// </summary>
 internal static class McpWriteTools
 {
@@ -28,6 +30,21 @@ internal static class McpWriteTools
 
     /// <summary>The answer to <c>create_draft</c>: the draft's id and the commit of the working folder's history it starts from.</summary>
     internal sealed record CreatedDraft(string Id, string Start);
+
+    /// <summary>The resource a <c>write</c> step holds: a part the call did not name is null.</summary>
+    internal sealed record StepResource(string? Kind, string? Id, string? Name);
+
+    // What a write call found out about its resource so far, for the step the call stores, whether the call is saved or refused.
+    private sealed class Touched
+    {
+        public string? Kind { get; set; }
+
+        public string? Id { get; set; }
+
+        public string? Name { get; set; }
+
+        public StepResource Resource => new(Kind, Id, Name);
+    }
 
     /// <summary>Makes a draft of the person at the tip of the application's history.</summary>
     public static async Task<(object? Output, string? Error)> CreateDraftAsync(McpToolContext context, string application, CancellationToken ct)
@@ -67,6 +84,16 @@ internal static class McpWriteTools
     public static async Task<(object? Output, string? Error)> WriteResourceAsync(
         McpToolContext context, string application, string draft, string contentJson, CancellationToken ct)
     {
+        var startedAt = DateTimeOffset.UtcNow;
+        var touched = new Touched();
+        var (output, error) = await WriteResourceCoreAsync(context, application, draft, contentJson, touched, ct);
+        await StepAsync(context, "write_resource", draft, startedAt, error is null, touched.Resource);
+        return (output, error);
+    }
+
+    private static async Task<(object? Output, string? Error)> WriteResourceCoreAsync(
+        McpToolContext context, string application, string draft, string contentJson, Touched touched, CancellationToken ct)
+    {
         var (folder, refusal) = StudioEndpoints.FindFolder(context.Options, application);
         if (folder is null)
         {
@@ -80,6 +107,9 @@ internal static class McpWriteTools
         }
 
         var content = JsonNode.Parse(contentJson)!.AsObject();
+        touched.Id = Text(content["id"]);
+        touched.Kind = Text(content["kind"]);
+        touched.Name = Text(content["name"]);
         var listed = await drafts.ListAsync(draft, ct);
         if (listed.Refusal is not null)
         {
@@ -87,11 +117,14 @@ internal static class McpWriteTools
         }
 
         // A resource the draft lacks is a create: its id, kind and name get the create route's own checks.
-        var exists = content["id"] is JsonValue idValue
+        var current = content["id"] is JsonValue idValue
             && idValue.TryGetValue<string>(out var id)
             && StudioEndpoints.ParseResourceId(id) is { } resource
-            && listed.Value!.Any(file => file.Id == resource);
-        if (!exists && StudioFileNames.NewFile(content, out _, out var problem) is null)
+                ? listed.Value!.FirstOrDefault(file => file.Id == resource)
+                : null;
+        touched.Kind = current?.Kind ?? touched.Kind;
+        touched.Name = current?.Name ?? touched.Name;
+        if (current is null && StudioFileNames.NewFile(content, out _, out var problem) is null)
         {
             return (null, problem);
         }
@@ -114,6 +147,9 @@ internal static class McpWriteTools
         }
 
         var written = outcome.Value!;
+        touched.Id = written.Id.ToString("D");
+        touched.Kind = written.Kind;
+        touched.Name = written.Name;
         await AuditAsync(context, folder, "write_resource", draft, written.Id);
 
         var (diagnostics, diagnosticsError) = await DiagnosticsAsync(context, folder, draft, ct);
@@ -128,6 +164,16 @@ internal static class McpWriteTools
     /// <summary>Removes one resource from the draft, as the delete route does, and answers the draft's diagnostics.</summary>
     public static async Task<(object? Output, string? Error)> DeleteResourceAsync(
         McpToolContext context, string application, string draft, string id, CancellationToken ct)
+    {
+        var startedAt = DateTimeOffset.UtcNow;
+        var touched = new Touched { Id = id };
+        var (output, error) = await DeleteResourceCoreAsync(context, application, draft, id, touched, ct);
+        await StepAsync(context, "delete_resource", draft, startedAt, error is null, touched.Resource);
+        return (output, error);
+    }
+
+    private static async Task<(object? Output, string? Error)> DeleteResourceCoreAsync(
+        McpToolContext context, string application, string draft, string id, Touched touched, CancellationToken ct)
     {
         var (folder, refusal) = StudioEndpoints.FindFolder(context.Options, application);
         if (folder is null)
@@ -144,6 +190,15 @@ internal static class McpWriteTools
         if (StudioEndpoints.ParseResourceId(id) is not { } resource)
         {
             return (null, StudioEndpoints.NoResource);
+        }
+
+        // The kind and the name are read before the delete removes the file. A resource the draft lacks has neither.
+        var listed = await drafts.ListAsync(draft, ct);
+        if (listed.Value?.FirstOrDefault(file => file.Id == resource) is { } current)
+        {
+            touched.Id = resource.ToString("D");
+            touched.Kind = current.Kind;
+            touched.Name = current.Name;
         }
 
         // The draft is known, so a refusal as NotFound is the resource.
@@ -177,6 +232,16 @@ internal static class McpWriteTools
     public static async Task<(object? Output, string? Error)> WriteLayerAsync(
         McpToolContext context, string application, string draft, string module, string id, string contentJson, CancellationToken ct)
     {
+        var startedAt = DateTimeOffset.UtcNow;
+        var touched = new Touched { Id = id };
+        var (output, error) = await WriteLayerCoreAsync(context, application, draft, module, id, contentJson, touched, ct);
+        await StepAsync(context, "write_layer", draft, startedAt, error is null, touched.Resource);
+        return (output, error);
+    }
+
+    private static async Task<(object? Output, string? Error)> WriteLayerCoreAsync(
+        McpToolContext context, string application, string draft, string module, string id, string contentJson, Touched touched, CancellationToken ct)
+    {
         var (folder, refusal) = StudioEndpoints.FindFolder(context.Options, application);
         if (folder is null)
         {
@@ -199,6 +264,9 @@ internal static class McpWriteTools
             return (null, McpReadTools.Title(notFound));
         }
 
+        touched.Id = found.Id.ToString("D");
+        touched.Kind = found.Kind;
+        touched.Name = found.Name;
         using var edited = JsonDocument.Parse(contentJson);
         var (changes, layerRefusal) = StudioEndpoints.LayerChanges(found, module, edited.RootElement);
         if (layerRefusal is not null)
@@ -548,6 +616,62 @@ internal static class McpWriteTools
         return files is null
             ? (null, error)
             : (StudioDiagnostics.CompileFiles(McpReadTools.Contents(files), context.Packages, context.Modules, context.ApplicationPackages), null);
+    }
+
+    private static string? Text(JsonNode? node) => node is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+
+    // Stores the finished write step of a write call on the person's authoring request that holds the draft, only while that request
+    // is working or fixing, in its own transaction like the audit record. The row lock keeps the ordinals of overlapping calls apart.
+    internal static async Task StepAsync(McpToolContext context, string tool, string draft, DateTimeOffset startedAt, bool saved, StepResource resource)
+    {
+        if (!Guid.TryParseExact(draft, "D", out var draftId))
+        {
+            return;
+        }
+
+        var ct = CancellationToken.None;
+        var connection = await context.Database.GetConnectionAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+        Guid? requestId;
+        await using (var find = new NpgsqlCommand(
+            """
+            SELECT id FROM axis.authoring_requests
+            WHERE draft_id = @draft AND author = @author AND state IN ('working', 'fixing')
+            ORDER BY sent_at DESC, id DESC LIMIT 1 FOR UPDATE
+            """,
+            connection,
+            transaction))
+        {
+            find.Parameters.AddWithValue("draft", draftId);
+            find.Parameters.AddWithValue("author", context.Caller.Id);
+            requestId = await find.ExecuteScalarAsync(ct) as Guid?;
+        }
+
+        if (requestId is null)
+        {
+            await transaction.RollbackAsync(ct);
+            return;
+        }
+
+        await using (var insert = new NpgsqlCommand(
+            """
+            INSERT INTO axis.authoring_request_steps (id, request_id, ordinal, kind, input_summary, outcome, resource, started_at, finished_at)
+            SELECT @step, @id, coalesce(max(ordinal), 0) + 1, 'write', @tool, @outcome, @resource::jsonb, @started, now()
+            FROM axis.authoring_request_steps WHERE request_id = @id
+            """,
+            connection,
+            transaction))
+        {
+            insert.Parameters.AddWithValue("step", Guid.CreateVersion7());
+            insert.Parameters.AddWithValue("id", requestId.Value);
+            insert.Parameters.AddWithValue("tool", tool);
+            insert.Parameters.AddWithValue("outcome", saved ? "saved" : "refused");
+            insert.Parameters.AddWithValue("resource", JsonSerializer.Serialize(resource, JsonSerializerOptions.Web));
+            insert.Parameters.AddWithValue("started", startedAt);
+            await insert.ExecuteNonQueryAsync(ct);
+        }
+
+        await transaction.CommitAsync(ct);
     }
 
     // Appends the one audit record of a successful write call, in its own transaction right after the draft's commit. It takes
