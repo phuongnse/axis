@@ -297,12 +297,11 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                         </Flex>
                         {componentDisabled ? null : (
                           <RowActions
-                            fold
                             actions={[
                               {
                                 key: 'remove',
                                 labelKey: 'shell.studio.identityProvider.remove',
-                                destructive: true,
+                                meaning: 'remove',
                                 onClick: () =>
                                   writeRoleValues(
                                     Object.entries(roleValues)
@@ -337,12 +336,11 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                   </Flex>
                   {componentDisabled ? null : (
                     <RowActions
-                      fold
                       actions={[
                         {
                           key: 'remove',
                           labelKey: 'shell.studio.identityProvider.remove',
-                          destructive: true,
+                          meaning: 'remove',
                           onClick: () =>
                             onChange(
                               '/acr',

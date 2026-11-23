@@ -10,7 +10,7 @@ import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { emptyDescription, optionTexts, shownMenu } from '../test/antd'
+import { emptyDescription, optionTexts } from '../test/antd'
 import { IdentityProviderEditor } from './IdentityProviderEditor'
 
 const names = {
@@ -67,11 +67,9 @@ function renderEditor(
   return onChange
 }
 
-/** Deletes a row or an item through the "…" menu of its scope. */
+/** Deletes a row or an item with the trash button of its scope. */
 async function deleteFrom(scope: HTMLElement) {
-  await userEvent.click(within(scope).getByRole('button', { name: 'Actions' }))
-  await shownMenu('Actions')
-  await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
+  await userEvent.click(within(scope).getByRole('button', { name: 'Delete' }))
 }
 
 /** The label and the help of an identity provider field's text, in English. */
@@ -348,11 +346,14 @@ describe('IdentityProviderEditor', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add assurance level' }))
     expect(onChange).toHaveBeenLastCalledWith('/acr', ['urn:level2', ''])
 
-    await deleteFrom(screen.getByTestId('studio-field-/acr/0'))
+    const level = screen.getByTestId('studio-field-/acr/0')
+    expect(within(level).getByRole('button', { name: 'Delete' }).querySelector('.anticon-delete')).not.toBeNull()
+    expect(within(level).queryByRole('button', { name: 'Actions' })).toBeNull()
+    await deleteFrom(level)
     expect(onChange).toHaveBeenLastCalledWith('/acr', undefined)
   })
 
-  it('shows no Add and no "…" menu on a claim value or an assurance level while read-only', () => {
+  it('shows no Add, no Delete and no "…" menu on a claim value or an assurance level while read-only', () => {
     renderEditor(
       { ...oidc, roles: { claim: 'groups', values: { managers: 'department-manager' } } },
       vi.fn(),
@@ -363,6 +364,7 @@ describe('IdentityProviderEditor', () => {
     expect(screen.getByTestId('studio-role-row-0')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Add claim value' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add assurance level' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
     expect(screen.queryAllByRole('button', { name: 'Actions' })).toHaveLength(0)
   })
 

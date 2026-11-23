@@ -402,18 +402,19 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim
   value and a role picked from the application's roles, one field to a line. Add claim value sits on the
-  title row, and each row's Delete is in its "…" menu. With no rows, a claim value gives the role of the
-  same name, and the editor says so.
+  title row, and each row's Delete is the trash icon, named by its tooltip. With no rows, a claim value gives
+  the role of the same name, and the editor says so.
 - **Assurance.** `acr` is a list of text rows. Add assurance level sits on the Assurance heading, and each
-  row's Delete is in its "…" menu. With none the key is removed. A read-only tab, such as while the JSON
-  has an error, shows no Add and no menu, as the Lists bullet of the [process editor](#process-editor) says.
+  row's Delete is the trash icon, named by its tooltip. With none the key is removed. A read-only tab, such as
+  while the JSON has an error, shows no Add and no Delete, as the Lists bullet of the
+  [process editor](#process-editor) says.
 - **Unknown keys.** A key the editor does not show is saved unchanged.
 
 ### A site's sign-in
 
 On a `site`, `signIn` is a list of the application's identity providers, picked by name, with add and
-remove. Add provider sits on the heading, and each row's Remove is in its "…" menu. A read-only tab shows
-neither. An empty list removes `signIn`, so the site allows every provider, and the form says so.
+remove. Add provider sits on the heading, and each row's Remove is the trash icon, named by its tooltip. A
+read-only tab shows neither. An empty list removes `signIn`, so the site allows every provider, and the form says so.
 
 ## Scenario editor
 
@@ -429,8 +430,9 @@ stays as the second view of the same draft. Scenarios themselves are in [test sc
   are in its "…" menu on the card's title row. Move up is off on the first step and Move down on the last.
   A read-only tab shows no menu.
 - **Rows.** A key and value list, such as an expected notification's values or a stub's output, has Add on
-  its title row, and each row's Delete is in its "…" menu. Users and stubs keep their Delete in a menu too.
-  A read-only tab shows neither, as the Lists bullet of the [process editor](#process-editor) says.
+  its title row, and each row's Delete is the trash icon, named by its tooltip. Users and stubs show their
+  Delete the same way. A read-only tab shows neither Add nor Delete, as the Lists bullet of the
+  [process editor](#process-editor) says.
 - **Pickers.** Entities, processes, roles and connectors are picked by name. A `record` is picked from
   the aliases that earlier `createRecord` steps save, and a `step` and its `outcome` come from the
   processes that the record started.
