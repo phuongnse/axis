@@ -1,4 +1,5 @@
 import { theme, type ConfigProviderProps, type ThemeConfig } from 'antd'
+import type { CSSProperties } from 'react'
 import { colourTokens, designTokensFor, type ColourName, type DesignTokens, type PageTokenValues } from './designTokens'
 import type { StatusTone } from './statusTones'
 import type { ThemeMode } from './themeMode'
@@ -224,12 +225,11 @@ const fieldParents = [`.${fieldClass}`, `.${fieldClass} .ant-form-item-control-i
 
 /**
  * The CSS every Axis form and message shares, rendered once beside each provider's ConfigProvider. Ant Design has no
- * token for the gap under a message, for an unticked box's error border or for a message's icon, which it draws in the
- * seed colour, so these rules carry them. The border and the icon take the mode's text colour: a page with two modes
- * would give them one colour. An input of an `AxisField` fills the field's width, and a select joined with its action
- * fills it together with the action, see docs/reference/shell.md#layout. A subtle button, which Ant Design draws as a
- * text button, takes the light fill on keyboard focus that it takes on hover, see
- * docs/reference/actions-and-controls.md#buttons.
+ * token for the gap under a message or for an unticked box's error border, so these rules carry them. The border takes
+ * the mode's text colour: a page with two modes would give it one colour. An input of an `AxisField` fills the field's
+ * width, and a select joined with its action fills it together with the action, see docs/reference/shell.md#layout. A
+ * subtle button, which Ant Design draws as a text button, takes the light fill on keyboard focus that it takes on hover,
+ * see docs/reference/actions-and-controls.md#buttons.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
   const { colour, type } = designTokensFor(mode, page)
@@ -243,12 +243,6 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
     '.ant-form-item-margin-offset { display: none; }',
     `.ant-btn-variant-text:not(:disabled):focus-visible { background: ${hoverFill}; }`,
     `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,
-    // The icon of a message takes its kind's text colour, which passes contrast. Naming the alert twice outranks the
-    // seed colour that Ant Design draws the icon in.
-    `.ant-alert.ant-alert-info .ant-alert-icon { color: ${colour.infoText}; }`,
-    `.ant-alert.ant-alert-success .ant-alert-icon { color: ${colour.successText}; }`,
-    `.ant-alert.ant-alert-warning .ant-alert-icon { color: ${colour.warningText}; }`,
-    `.ant-alert.ant-alert-error .ant-alert-icon { color: ${colour.dangerText}; }`,
   ].join('\n')
 }
 
@@ -280,6 +274,21 @@ export function useStatusTints(): Record<StatusTone, StatusTint> {
     success: { text: token.colorSuccessText, fill: token.colorSuccessBg, border: token.colorSuccessBorder },
     danger: { text: token.colorErrorText, fill: token.colorErrorBg, border: token.colorErrorBorder },
     muted: { text: token.colorTextSecondary, fill: 'transparent', border: token.colorFill },
+  }
+}
+
+/**
+ * The icon of each kind of message in the theme in use, see docs/reference/shared-widgets.md#which-widget: a box one line
+ * high, centred on that line, in the kind's text colour. The first line of a message that wraps holds it.
+ */
+export function useAlertIconStyles(): Record<'info' | 'success' | 'warning' | 'error', CSSProperties> {
+  const { token } = theme.useToken()
+  const box = { height: token.fontSize * token.lineHeight, display: 'flex', alignItems: 'center' } as const
+  return {
+    info: { ...box, color: token.colorInfoText },
+    success: { ...box, color: token.colorSuccessText },
+    warning: { ...box, color: token.colorWarningText },
+    error: { ...box, color: token.colorErrorText },
   }
 }
 
