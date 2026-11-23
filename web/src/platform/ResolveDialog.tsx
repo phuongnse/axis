@@ -1,4 +1,5 @@
 import { Flex, Form, Input, Modal, Radio, Select } from 'antd'
+import { AxisForm } from './AxisForm'
 import { AxisAlert } from './AxisAlert'
 import { AxisField } from './AxisField'
 import { AxisFieldGroup } from './AxisFieldGroup'
@@ -7,7 +8,6 @@ import { resolveCall, type CallOutput, type InstanceCall } from './inspection'
 import { placeProblemErrors } from './problemErrors'
 import type { RecordProblem } from './records'
 import { buildResolveBody } from './recordBody'
-import { requiredMark } from './requiredMark'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { DialogFooter } from './DialogFooter'
@@ -101,71 +101,63 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
       destroyOnHidden
     >
       <Flex vertical gap="middle">
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={requiredMark}
-          scrollToFirstError={{ focus: true }}
-          onFinish={(values) => void send(values)}
-        >
-          <Flex vertical gap={spacing.lg}>
-            <AxisField
-              name="reason"
-              label={t('shell.inspector.commands.reason')}
-              help={t('shell.inspector.commands.reason.help')}
-              requiredMessage={t('shell.inspector.commands.reasonRequired')}
-              rules={[{ max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') }]}
+        <AxisForm form={form} onFinish={(values) => void send(values)}>
+          <AxisField
+            name="reason"
+            label={t('shell.inspector.commands.reason')}
+            help={t('shell.inspector.commands.reason.help')}
+            requiredMessage={t('shell.inspector.commands.reasonRequired')}
+            rules={[{ max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') }]}
+          >
+            <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
+          </AxisField>
+          <AxisField
+            name="outcome"
+            label={t('shell.inspector.commands.outcome')}
+            help={t('shell.inspector.commands.outcome.help')}
+            requiredMessage={t('shell.inspector.commands.outcomeRequired')}
+          >
+            <Radio.Group
+              role="radiogroup"
+              aria-label={t('shell.inspector.commands.outcome')}
+              options={[
+                { value: 'succeeded', label: t('shell.inspector.commands.outcomeSucceeded') },
+                { value: 'failed', label: t('shell.inspector.commands.outcomeFailed') },
+              ]}
+            />
+          </AxisField>
+          {outcome === 'succeeded' && outputs.length > 0 && (
+            <AxisFieldGroup
+              title={t('shell.inspector.commands.outputs')}
+              help={t('shell.inspector.commands.outputs.help')}
             >
-              <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
-            </AxisField>
-            <AxisField
-              name="outcome"
-              label={t('shell.inspector.commands.outcome')}
-              help={t('shell.inspector.commands.outcome.help')}
-              requiredMessage={t('shell.inspector.commands.outcomeRequired')}
-            >
-              <Radio.Group
-                role="radiogroup"
-                aria-label={t('shell.inspector.commands.outcome')}
-                options={[
-                  { value: 'succeeded', label: t('shell.inspector.commands.outcomeSucceeded') },
-                  { value: 'failed', label: t('shell.inspector.commands.outcomeFailed') },
-                ]}
-              />
-            </AxisField>
-            {outcome === 'succeeded' && outputs.length > 0 && (
-              <AxisFieldGroup
-                title={t('shell.inspector.commands.outputs')}
-                help={t('shell.inspector.commands.outputs.help')}
-              >
-                <Flex vertical gap={spacing.lg}>
-                  {outputs.map((output) => (
-                    <AxisField
-                      key={output.name}
-                      name={['output', output.name]}
-                      label={`${output.name} (${output.type})`}
-                      help={t('shell.inspector.commands.output.help')}
-                      requiredMessage={output.required ? t('shell.inspector.commands.outputRequired') : undefined}
-                    >
-                      {output.type === 'boolean' ? (
-                        <Select
-                          allowClear
-                          virtual={false}
-                          options={[
-                            { value: true, label: 'true' },
-                            { value: false, label: 'false' },
-                          ]}
-                        />
-                      ) : (
-                        <Input />
-                      )}
-                    </AxisField>
-                  ))}
-                </Flex>
-              </AxisFieldGroup>
-            )}
-          </Flex>
-        </Form>
+              <Flex vertical gap={spacing.lg}>
+                {outputs.map((output) => (
+                  <AxisField
+                    key={output.name}
+                    name={['output', output.name]}
+                    label={`${output.name} (${output.type})`}
+                    help={t('shell.inspector.commands.output.help')}
+                    requiredMessage={output.required ? t('shell.inspector.commands.outputRequired') : undefined}
+                  >
+                    {output.type === 'boolean' ? (
+                      <Select
+                        allowClear
+                        virtual={false}
+                        options={[
+                          { value: true, label: 'true' },
+                          { value: false, label: 'false' },
+                        ]}
+                      />
+                    ) : (
+                      <Input />
+                    )}
+                  </AxisField>
+                ))}
+              </Flex>
+            </AxisFieldGroup>
+          )}
+        </AxisForm>
         {error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />}
       </Flex>
     </Modal>

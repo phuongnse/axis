@@ -1,4 +1,5 @@
 import { Flex, Form, Input, Typography } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { useId, useRef } from 'react'
@@ -15,7 +16,7 @@ import type { AddAuthenticatorContext } from './signInContext'
  */
 export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorContext }) {
   const { texts, error, loginAction, qrCode, manualKey, secret, mode, deviceNameRequired, appInitiated } = context
-  const { colour, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const formId = useId()
   const [form] = Form.useForm<{ code?: string; userLabel?: string }>()
   const submitRef = useRef<HTMLInputElement>(null)
@@ -30,41 +31,35 @@ export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorCon
           {manualKey}
         </Typography.Text>
       </Flex>
-      <Form
+      <AxisForm
         form={form}
         name={formId}
         method="post"
         action={loginAction}
-        layout="vertical"
-        requiredMark={false}
-        scrollToFirstError={{ focus: true }}
+        unmarked
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <Flex vertical gap={spacing.lg}>
-          <CodeField
-            form={form}
-            postAs="totp"
-            label={texts.code}
-            requiredMessage={texts.codeRequired}
-            invalid={Boolean(error)}
-          />
-          <input ref={submitRef} type="hidden" name="totpSecret" value={secret} />
-          {mode && <input type="hidden" name="mode" value={mode} />}
-          <Form.Item
-            name="userLabel"
-            label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{texts.deviceName}</span>}
-            rules={[
-              { required: deviceNameRequired, whitespace: deviceNameRequired, message: texts.deviceNameRequired },
-            ]}
-          >
-            <Input name="userLabel" autoComplete="off" />
-          </Form.Item>
-          <AxisButton role="finish" htmlType="submit" block>
-            {texts.submit}
-          </AxisButton>
-        </Flex>
-      </Form>
+        <CodeField
+          form={form}
+          postAs="totp"
+          label={texts.code}
+          requiredMessage={texts.codeRequired}
+          invalid={Boolean(error)}
+        />
+        <input ref={submitRef} type="hidden" name="totpSecret" value={secret} />
+        {mode && <input type="hidden" name="mode" value={mode} />}
+        <Form.Item
+          name="userLabel"
+          label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{texts.deviceName}</span>}
+          rules={[{ required: deviceNameRequired, whitespace: deviceNameRequired, message: texts.deviceNameRequired }]}
+        >
+          <Input name="userLabel" autoComplete="off" />
+        </Form.Item>
+        <AxisButton role="finish" htmlType="submit" block>
+          {texts.submit}
+        </AxisButton>
+      </AxisForm>
       {appInitiated && (
         <form method="post" action={loginAction}>
           <input type="hidden" name="cancel-aia" value="true" />

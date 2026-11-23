@@ -1,7 +1,7 @@
-import { ConfigProvider, Form } from 'antd'
+import { ConfigProvider } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { useEffect, useMemo, useRef } from 'react'
 import { antLocaleFor } from '../platform/antLocale'
-import { requiredMark } from '../platform/requiredMark'
 import type { RecordItem } from '../platform/records'
 import { sectionsOf, useRecordForm } from '../platform/useRecordForm'
 import { entityWithField, locale, savedRecord, type PreviewFieldType } from './fixtures'
@@ -42,9 +42,7 @@ export function FieldPreview({
   }, [problem, record.version, showProblem, version])
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
-      <Form layout="vertical" requiredMark={requiredMark} scrollToFirstError={{ focus: true }}>
-        {form.fields}
-      </Form>
+      <AxisForm>{form.fields}</AxisForm>
     </ConfigProvider>
   )
 }

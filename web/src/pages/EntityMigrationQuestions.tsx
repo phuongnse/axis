@@ -1,10 +1,10 @@
 import { Flex, Form, Input, Modal, Typography } from 'antd'
+import { AxisForm } from '../platform/AxisForm'
 import { useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { DialogFooter } from '../platform/DialogFooter'
 import { asked, type FieldAnswer, type FieldQuestion } from '../platform/entityMigrations'
-import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 
@@ -145,12 +145,9 @@ function ExpressionQuestion({
           <Typography.Text strong data-testid="studio-migration-field">
             {question.field}
           </Typography.Text>
-          <Form
+          <AxisForm
             form={form}
-            layout="vertical"
-            requiredMark={requiredMark}
             initialValues={{ value: '' }}
-            scrollToFirstError={{ focus: true }}
             onFinish={({ value }) => onAnswer({ value: value.trim() })}
           >
             <AxisField
@@ -161,7 +158,7 @@ function ExpressionQuestion({
             >
               <Input autoFocus aria-label={label} />
             </AxisField>
-          </Form>
+          </AxisForm>
         </Flex>
       </div>
     </Modal>
