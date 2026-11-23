@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> schema of the control plane database. It holds the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>sign_up_emails</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the <c>billing_requests</c> and the append-only <c>terms_acceptances</c>.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>sign_up_emails</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>usage_day_events</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the <c>billing_requests</c> and the append-only <c>terms_acceptances</c>.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -34,6 +34,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<SubscriptionRow> Subscriptions => Set<SubscriptionRow>();
 
     public DbSet<SubscriptionEmailRow> SubscriptionEmails => Set<SubscriptionEmailRow>();
+
+    public DbSet<UsageDayEventRow> UsageDayEvents => Set<UsageDayEventRow>();
 
     public DbSet<SubscriptionAddOnRow> SubscriptionAddOns => Set<SubscriptionAddOnRow>();
 
@@ -171,6 +173,16 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             email.Property(e => e.Kind).HasColumnName("kind");
             email.Property(e => e.QueuedAt).HasColumnName("queued_at").HasDefaultValueSql("now()");
             email.HasOne<SubscriptionRow>().WithMany().HasForeignKey(e => e.SubscriptionId).HasConstraintName("fk_subscription_emails_subscription_id").OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<UsageDayEventRow>(usageDay =>
+        {
+            usageDay.ToTable("usage_day_events");
+            usageDay.HasKey(e => new { e.SubscriptionId, e.Day }).HasName("pk_usage_day_events");
+            usageDay.Property(e => e.SubscriptionId).HasColumnName("subscription_id");
+            usageDay.Property(e => e.Day).HasColumnName("day").HasColumnType("date");
+            usageDay.Property(e => e.QueuedAt).HasColumnName("queued_at").HasDefaultValueSql("now()");
+            usageDay.HasOne<SubscriptionRow>().WithMany().HasForeignKey(e => e.SubscriptionId).HasConstraintName("fk_usage_day_events_subscription_id").OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<SubscriptionAddOnRow>(addOn =>

@@ -20,7 +20,6 @@ import { StatusTag } from '../platform/StatusTag'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
-import { visuallyHidden } from '../platform/visuallyHidden'
 import { AccountNotifications } from './AccountNotifications'
 import { usePlatform } from './context'
 
@@ -181,27 +180,20 @@ export function AccountPage() {
                                   authenticator.createdAt ? dayjs(authenticator.createdAt).format('YYYY-MM-DD') : null,
                               },
                             },
-                            {
-                              key: 'remove',
-                              kind: 'fixed',
-                              title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
-                              render: (_value, authenticator) => (
-                                <AxisButton
-                                  role="secondary"
-                                  destructive
-                                  size="small"
-                                  disabled={authenticators.authenticators.length <= 1}
-                                  onClick={() =>
-                                    assignLocation(
-                                      accountActionUrl('/account', `delete_credential:${authenticator.id}`),
-                                    )
-                                  }
-                                >
-                                  {t('shell.account.authenticators.remove')}
-                                </AxisButton>
-                              ),
-                            },
                           ]}
+                          rowActions={{
+                            configured: 1,
+                            actions: (authenticator) => [
+                              {
+                                key: 'remove',
+                                labelKey: 'shell.account.authenticators.remove',
+                                meaning: 'remove',
+                                disabled: authenticators.authenticators.length <= 1,
+                                onClick: () =>
+                                  assignLocation(accountActionUrl('/account', `delete_credential:${authenticator.id}`)),
+                              },
+                            ],
+                          }}
                         />
                       </Flex>
                     </SectionPart>
@@ -258,7 +250,14 @@ export function AccountPage() {
                                 key: 'signedInAt',
                                 kind: 'fixed',
                                 title: t('shell.account.sessions.signedInAt'),
-                                render: (_value, session) => time(session.signedInAt),
+                                render: (_value, session) => (
+                                  <Flex gap="small" align="center">
+                                    {time(session.signedInAt)}
+                                    {session.current && (
+                                      <StatusTag tone="neutral">{t('shell.account.sessions.current')}</StatusTag>
+                                    )}
+                                  </Flex>
+                                ),
                                 filter: {
                                   kind: 'date',
                                   value: (session) => dayjs(session.signedInAt).format('YYYY-MM-DD'),
@@ -274,26 +273,22 @@ export function AccountPage() {
                                   value: (session) => dayjs(session.lastRequestAt).format('YYYY-MM-DD'),
                                 },
                               },
-                              {
-                                key: 'end',
-                                kind: 'fixed',
-                                title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
-                                render: (_value, session) =>
-                                  session.current ? (
-                                    <StatusTag tone="neutral">{t('shell.account.sessions.current')}</StatusTag>
-                                  ) : (
-                                    <AxisButton
-                                      role="secondary"
-                                      destructive
-                                      size="small"
-                                      disabled={!endAllowed}
-                                      onClick={() => end(() => endSession(session.id))}
-                                    >
-                                      {t('shell.account.sessions.end')}
-                                    </AxisButton>
-                                  ),
-                              },
                             ]}
+                            rowActions={{
+                              configured: 1,
+                              actions: (session) =>
+                                session.current
+                                  ? null
+                                  : [
+                                      {
+                                        key: 'end',
+                                        labelKey: 'shell.account.sessions.end',
+                                        destructive: true,
+                                        disabled: !endAllowed,
+                                        onClick: () => end(() => endSession(session.id)),
+                                      },
+                                    ],
+                            }}
                           />
                         </Flex>
                       )}

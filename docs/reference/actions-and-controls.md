@@ -453,7 +453,7 @@ be kept right.
   set up for three or more actions folds each row that has two or more. A row with one action shows it as a
   button, even at narrow width. A known Remove or Delete is the trash icon in `dangerText`, named by a tooltip.
   See [menus](#menus).
-- **A known action is its icon wherever its row is** _(planned, #5087)_. A row's Remove or Delete that is a button is the
+- **A known action is its icon wherever its row is**. A row's Remove or Delete that is a button is the
   trash icon in `dangerText`, named by a tooltip, in a list's row as in a table's.
 - **A column of row controls has no header text** _(planned, #5087)_. The column of a row's "…" or icon buttons, and the
   column of drag handles, show no header words, as their icons say what they are. Each header still has a name for

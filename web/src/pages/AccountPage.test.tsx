@@ -7,6 +7,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { OwnAuthenticators } from '../platform/ownAuthenticators'
 import type { OwnNotificationPreferences } from '../platform/ownNotificationPreferences'
 import type { OwnSessions } from '../platform/ownSessions'
+import { designTokensFor } from '../platform/designTokens'
 import { assignLocation } from '../platform/navigation'
 import { chooseOption } from '../test/antd'
 import { expectTitleAloneInBand } from '../test/pageBand'
@@ -164,6 +165,19 @@ describe('AccountPage', () => {
 
     expect(within(current).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sign in again' })).not.toBeInTheDocument()
+    expect(within(current).getByText('This session').closest('td')).toBe(within(current).getAllByRole('cell')[0])
+  })
+
+  it('draws End on another session as the only button in its row, in the destructive tone, in the last cell', async () => {
+    stubServer(() => json(sessions(true)))
+    renderPage()
+
+    const end = await screen.findByRole('button', { name: 'End' })
+    const row = end.closest('tr')!
+
+    expect(within(row).getAllByRole('button')).toEqual([end])
+    expect(end.closest('td')).toBe(within(row).getAllByRole('cell').at(-1))
+    expect(end).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
   })
 
   it('ends one session with the CSRF header, then loads the list again', async () => {
@@ -254,7 +268,9 @@ describe('AccountPage', () => {
     )
     renderPage()
 
-    expect(await screen.findByRole('button', { name: 'Remove' })).toBeDisabled()
+    const remove = await screen.findByRole('button', { name: 'Remove' })
+    expect(remove).toBeDisabled()
+    expect(remove.querySelector('.anticon-delete')).not.toBeNull()
   })
 
   it('enables Remove when the person has two authenticators', async () => {
@@ -267,7 +283,10 @@ describe('AccountPage', () => {
 
     const buttons = await screen.findAllByRole('button', { name: 'Remove' })
     expect(buttons).toHaveLength(2)
-    buttons.forEach((button) => expect(button).toBeEnabled())
+    buttons.forEach((button) => {
+      expect(button).toBeEnabled()
+      expect(button.querySelector('.anticon-delete')).not.toBeNull()
+    })
   })
 
   it('sends Change password, Add and Remove to the identity provider through the sign-in route', async () => {

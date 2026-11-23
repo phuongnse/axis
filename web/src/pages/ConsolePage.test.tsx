@@ -511,6 +511,8 @@ describe('ConsolePage', () => {
     expect(within(webhook).getByText('Open')).toBeVisible()
     expect(within(webhook).getByText('Open').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
     expect(within(view).getByTestId('console-dead-letter-redeliver-d2')).toBeVisible()
+    expect(within(view).getByTestId('console-dead-letter-redeliver-d2').querySelector('.anticon-send')).not.toBeNull()
+    expect(within(view).getByTestId('console-dead-letter-discard-d2').querySelector('.anticon-delete')).not.toBeNull()
     const discarded = within(view).getByText('trigger.fanOut').closest('tr')!
     expect(within(discarded).getByText('Discarded')).toBeVisible()
     expect(within(discarded).getByText('Discarded').closest('[data-tone]')).toHaveAttribute('data-tone', 'muted')

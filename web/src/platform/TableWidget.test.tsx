@@ -1233,7 +1233,9 @@ describe('TableWidget', () => {
       renderWidget('', { ...noteWidget, rowActions: [remove] })
 
       const row = await screen.findByRole('row', { name: /Buy paper/ })
-      expect(within(row).getByRole('button', { name: 'Delete note' })).toBeInTheDocument()
+      const button = within(row).getByRole('button', { name: 'Delete note' })
+      expect(button).toBeInTheDocument()
+      expect(button.querySelector('.anticon-delete')).not.toBeNull()
       expect(within(row).queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
       expect(within(row).queryByRole('link')).not.toBeInTheDocument()
     })

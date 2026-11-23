@@ -129,6 +129,7 @@ describe('the add and remove buttons of a child collection', () => {
     renderIn('dark', <Harness initial={oneRow} />)
 
     const remove = screen.getByRole('button', { name: 'Delete row' })
+    expect(remove.querySelector('.anticon-delete')).not.toBeNull()
     expect(remove).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
     await userEvent.click(screen.getByRole('textbox', { name: 'Quantity 1' }))
     await userEvent.tab()

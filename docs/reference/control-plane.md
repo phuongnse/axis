@@ -29,7 +29,7 @@ through a cell's API.
   [plan and add-ons](billing-api.md#setting-the-plan-and-add-ons), [ends a subscription](billing-api.md#ending-a-subscription)
   and [reads a tenant's state and usage](billing-api.md#reading-a-tenant) through the [billing API](billing-api.md), with a
   client and a scope of its own.
-- **Billing events** _(planned for M34)_. The control plane sends the operator's billing system signed
+- **Billing events**. The control plane sends the operator's billing system signed
   [events](billing-api.md#events) as jobs on its queue.
 
 ## Two parts
@@ -131,7 +131,8 @@ every business change.
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
     (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry and the counts of sign-up emails older than 24 hours), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
     (`advanceSubscriptions`) every hour. When the directory and a cell are set, it also queues the
-    [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
+    [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When the directory, a cell and `ControlPlane:BillingEvents:Url` are set, it also queues the
+    [daily usage events](billing-api.md#daily-usage) (`queueDailyUsage`) every hour. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
     [disposable mailbox domains](sign-up.md#bots-and-abuse) (`refreshDisposableDomains`) every 7 days. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks

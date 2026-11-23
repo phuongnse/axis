@@ -16,9 +16,10 @@ internal sealed record PutCall(string Path, IReadOnlyDictionary<string, long> Se
 
 /// <summary>
 /// Stands in for the cell <c>vn-1</c>: a token endpoint, the job route, <c>POST /api/cell/tenants/{id}/resume</c>, <c>POST /api/cell/tenants/{id}/read-only</c>,
-/// <c>PUT /api/cell/tenants/{id}/quotas</c> and <c>GET /api/cell/tenants/{id}</c>. It records each call that changes a tenant with its <c>Idempotency-Key</c>, and a read
+/// <c>PUT /api/cell/tenants/{id}/quotas</c>, <c>GET /api/cell/tenants/{id}</c> and <c>GET /api/cell/tenants/{id}/usage-days</c>. It records each call that changes a tenant with its <c>Idempotency-Key</c>, and a read
 /// in <see cref="Reads"/> only. While <see cref="FailResumes"/> is set a resume answers <c>500</c> and is still recorded. A tenant read answers <see cref="Usage"/>, or
-/// <c>500</c> while <see cref="FailReads"/> is set.
+/// <c>500</c> while <see cref="FailReads"/> is set. A usage days read records its path and query in <see cref="UsageDayReads"/> and answers one page that holds
+/// <see cref="UsageDay"/>, or no item while it is null, or <c>500</c> while <see cref="FailReads"/> is set.
 /// </summary>
 internal sealed class CellStub : HttpMessageHandler
 {
@@ -26,6 +27,7 @@ internal sealed class CellStub : HttpMessageHandler
     private readonly ConcurrentQueue<ChangeCall> _readOnlys = new();
     private readonly ConcurrentQueue<PutCall> _puts = new();
     private readonly ConcurrentQueue<string> _reads = new();
+    private readonly ConcurrentQueue<string> _usageDayReads = new();
     private readonly ConcurrentQueue<string> _calls = new();
 
     public bool FailResumes { get; set; }
@@ -41,12 +43,18 @@ internal sealed class CellStub : HttpMessageHandler
         emailsPerDay = new { limit = 0L, used = 0L },
     };
 
+    /// <summary>The one day row that a usage days read answers with, as the cell's JSON object, or null for a cell that has no row.</summary>
+    public object? UsageDay { get; set; }
+
     public IReadOnlyList<ChangeCall> Resumes => [.. _resumes];
 
     public IReadOnlyList<ChangeCall> ReadOnlys => [.. _readOnlys];
 
     /// <summary>The path of each tenant read, in the order it came. A read is not in <see cref="Calls"/>.</summary>
     public IReadOnlyList<string> Reads => [.. _reads];
+
+    /// <summary>The path and query of each usage days read, in the order it came. A read is not in <see cref="Calls"/>.</summary>
+    public IReadOnlyList<string> UsageDayReads => [.. _usageDayReads];
 
     public IReadOnlyList<PutCall> Puts => [.. _puts];
 
@@ -80,6 +88,18 @@ internal sealed class CellStub : HttpMessageHandler
             _calls.Enqueue($"POST {path}");
             _readOnlys.Enqueue(new ChangeCall(path, request.Headers.TryGetValues("Idempotency-Key", out var keys) ? keys.Single() : null));
             return Json(new { id = Guid.NewGuid(), kind = "read-only", tenantId = "any", state = "queued", createdAt = DateTimeOffset.UnixEpoch }, HttpStatusCode.Accepted);
+        }
+
+        if (request.Method == HttpMethod.Get && path.StartsWith("/api/cell/tenants/", StringComparison.Ordinal) && path.EndsWith("/usage-days", StringComparison.Ordinal))
+        {
+            _usageDayReads.Enqueue(request.RequestUri.PathAndQuery);
+            if (FailReads)
+            {
+                return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+            }
+
+            object[] items = UsageDay is null ? [] : [UsageDay];
+            return Json(new { items, page = 1, pageSize = 1, totalCount = items.Length });
         }
 
         if (request.Method == HttpMethod.Get && path.StartsWith("/api/cell/tenants/", StringComparison.Ordinal) && path.Count(character => character == '/') == 4)
