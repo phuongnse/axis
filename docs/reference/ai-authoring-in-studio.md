@@ -81,8 +81,8 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
   Nothing else on the page names an AI.
 - The page checks the request every second until it waits for its author or ends.
 - An unknown request shows "This request does not exist."
-- **The button to the request panel** _(planned for M35)_. The unknown request's line also has an Ask AI button,
-  which opens [the request panel](#the-request-panel).
+- **The button to the request panel**. The unknown request's line also has an Ask AI button, for a reader who may
+  use AI, which opens [the request panel](#the-request-panel).
 - A failed action shows "That did not work. Try again." in an
   [alert](shared-widgets.md#which-widget) above the plan. A failed reply shows it inside its dialog instead, see
   [replies](#replies).
@@ -190,7 +190,7 @@ bar, never in the heading. Only the request's author sees its actions.
 | Ready, an accept met a conflict               | Resources changed since AI read them                     | Make the change again                                                                                             | Drop…                                                               |
 | Ready, for anyone else | Waiting for its author to accept                         | none                                                                                                              | none                                                                |
 | Accepting | Accepting the draft                                      | none                                                                                                              | none                                                                |
-| Failed, for its author _(planned for M35)_ | AI could not finish                                      | Send again, which sends its words as a new request and opens it                                                   | Drop…                                                               |
+| Failed                                        | AI could not finish                                      | Send again, which sends its words and its auto-accept choice as a new request, and opens it                       | Drop…                                                               |
 | Accepted                                      | Accepted. Live once published                            | none                                                                                                              | none                                                                |
 | Dropped                                       | Dropped. Nothing changed                                 | none                                                                                                              | none                                                                |
 
@@ -210,8 +210,8 @@ to 2,000 characters, and its dialog has Cancel. A failure shows inside the dialo
 - **Drop…** is a secondary action that opens a `small` dialog, "Drop this request?". It says that AI stops
   working on the request and that its draft is deleted. It has Cancel and no field, and its button is **Drop**, in the
   destructive tone. A failed drop shows in [the page's alert](#the-heading).
-- **Send again** _(planned for M35)_ is the main action of a failed request. It sends the request's words as a new request and
-  opens that request's page.
+- **Send again** is the main action of a failed request. It sends the request's words and its auto-accept choice as a new
+  request, and opens that request's page.
 
 ### An outside app's request
 
