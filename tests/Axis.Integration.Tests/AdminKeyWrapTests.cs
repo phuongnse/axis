@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using Axis.Admin;
@@ -60,7 +61,7 @@ public sealed class AdminKeyWrapTests : IDisposable
     {
         const string keyId = "arn:aws:kms:eu-west-1:111122223333:key/0a1b2c3d-4e5f-6789-abcd-ef0123456789";
         using var listener = new HttpListener();
-        var port = Random.Shared.Next(20000, 60000);
+        var port = FreePort();
         listener.Prefixes.Add($"http://127.0.0.1:{port}/");
         listener.Start();
         var served = Task.Run(async () =>
@@ -106,7 +107,7 @@ public sealed class AdminKeyWrapTests : IDisposable
             }
         }
 
-        await served;
+        await served.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
         Assert.Equal(1, exit);
         Assert.Equal("", output.ToString());
         Assert.Equal("The key does not wrap at the key of KeyService:KeyId (AccessDeniedException)." + Environment.NewLine, error.ToString());
@@ -177,6 +178,13 @@ public sealed class AdminKeyWrapTests : IDisposable
         Assert.Equal(2, exit);
         Assert.Equal("", output.ToString());
         Assert.Equal("The key is required on standard input." + Environment.NewLine, error.ToString());
+    }
+
+    private static int FreePort()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
     private IConfiguration Configure(bool file)
