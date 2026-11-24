@@ -106,7 +106,7 @@ internal static partial class McpServer
 
     private static readonly ToolDefinition[] _definitions =
     [
-        new(ListApplicationsTool, "Lists the applications you may author.", []),
+        new(ListApplicationsTool, "Lists the applications you may author.", [], Paged: true),
         new(
             ReadReferenceTool,
             "Answers the JSON Schema of a resource kind and the text of the reference pages that describe it, from the installed version of Axis. "
@@ -117,7 +117,8 @@ internal static partial class McpServer
             ListResourcesTool,
             "Lists the resources of an application: each one's id, kind, name, file, version, titles and how many references use it. "
             + "Reads the working folder, or your draft when you name one.",
-            [_applicationInput, _draftInput]),
+            [_applicationInput, _draftInput],
+            Paged: true),
         new(
             ReadResourceTool,
             "Reads one resource of an application by its id: its content and version. Reads the working folder, or your draft when you name one.",
@@ -132,7 +133,8 @@ internal static partial class McpServer
         new(
             ReadNamesTool,
             "Lists every name the application defines, module names included. Reads the working folder, or your draft when you name one.",
-            [_applicationInput, _draftInput]),
+            [_applicationInput, _draftInput],
+            Paged: true),
         new(
             CreateDraftTool,
             "Creates a draft of the application for you, at the tip of its working folder's history. Answers the draft's id and the commit it starts from. "
@@ -156,12 +158,14 @@ internal static partial class McpServer
         new(
             CheckExpressionTool,
             "Checks an expression at a path of one resource of your draft, in the draft's context, and answers its type, diagnostics and reading. Writes nothing.",
-            [_applicationInput, _writeDraftInput, _idInput, _pathInput, _expressionInput]),
+            [_applicationInput, _writeDraftInput, _idInput, _pathInput, _expressionInput],
+            Paged: true),
         new(
             ValidateDraftTool,
             "Answers the compile diagnostics of your draft, the module contract checks included, as the diagnostics route answers them for the working folder. "
             + "Writes nothing.",
-            [_applicationInput, _writeDraftInput]),
+            [_applicationInput, _writeDraftInput],
+            Paged: true),
         new(
             DiffDraftTool,
             "Answers one page of at most 1 MiB of the changes of your draft since the commit it started from, resource by resource. "
@@ -182,7 +186,8 @@ internal static partial class McpServer
             ListPackageFilesTool,
             "Lists the files of the application's packages, the files under packages/: each one's package, path and version. "
             + "Reads the working folder, or your draft when you name one.",
-            [_applicationInput, _draftInput]),
+            [_applicationInput, _draftInput],
+            Paged: true),
         new(
             ReadPackageFileTool,
             "Reads one package file of the application: its text and version. Reads the working folder, or your draft when you name one.",
@@ -409,7 +414,7 @@ internal static partial class McpServer
         if (definition.Read(call["arguments"]) is not { } arguments)
         {
             LogToolCall(logger, tool, clientId, "tool error");
-            return ToolError(id, definition.Inputs.Count == 0 ? "The tool takes no input." : InputMismatch);
+            return ToolError(id, InputMismatch);
         }
 
         var (output, error) = await RunAsync(tool, arguments, context, ct);
