@@ -143,10 +143,92 @@ public sealed class AiSettingsTests : IDisposable
             ["Ai:DefaultBinding"] = "main",
             ["Ai:HostKeyFile"] = file,
         }));
-        using var key = AgentHostKey.Load(settings.HostKeyFile!);
+        using var key = AgentHostKey.Load(settings.HostKeyFile!, null);
 
         Assert.Equal(JwkThumbprint.Of(parameters).KeyId, key.KeyId);
         Assert.Equal([0x04, .. parameters.Q.X!, .. parameters.Q.Y!], key.PublicKey);
+    }
+
+    [Fact]
+    public void With_a_key_service_the_host_key_file_holds_the_wrapped_key_and_a_value_sealed_to_the_public_key_opens()
+    {
+        var keyFileBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var keyService = KeyServiceOf(keyFileBase64);
+        using var pair = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        var file = Path.Combine(_folder, "host-key.pem");
+        File.WriteAllText(file, keyService.Wrap(KeyService.AgentHostKey, pair.ExportPkcs8PrivateKeyPem()) + "\n");
+
+        using var key = AgentHostKey.Load(file, keyService);
+
+        Assert.DoesNotContain("-----BEGIN", File.ReadAllText(file), StringComparison.Ordinal);
+        byte[] info = "axis test info"u8.ToArray();
+        byte[] aad = "axis test aad"u8.ToArray();
+        var sealedValue = Hpke.Seal(pair.ExportParameters(false), info, aad, "sk-person-1234"u8);
+        Assert.Equal("sk-person-1234"u8.ToArray(), key.Open(info, aad, sealedValue));
+        Assert.Equal(JwkThumbprint.Of(pair.ExportParameters(false)).KeyId, key.KeyId);
+    }
+
+    [Theory]
+    [InlineData("installation-key")]
+    [InlineData("another-key-file")]
+    [InlineData("plain-pem")]
+    public void With_a_key_service_a_host_key_that_does_not_unwrap_is_refused_with_the_setting_and_no_path_or_pem(string case_)
+    {
+        var keyFileBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var keyService = KeyServiceOf(keyFileBase64);
+        using var pair = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        var pem = pair.ExportPkcs8PrivateKeyPem();
+        var value = case_ switch
+        {
+            "installation-key" => keyService.Wrap(KeyService.InstallationKey, pem),
+            "another-key-file" => KeyServiceOf(Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)), "other-key-file").Wrap(KeyService.AgentHostKey, pem),
+            _ => pem,
+        };
+        var file = Path.Combine(_folder, "host-key.pem");
+        File.WriteAllText(file, value);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => AgentHostKey.Load(file, keyService));
+
+        Assert.Equal("The setting Ai:HostKeyFile does not unwrap with the key of KeyService:KeyFile.", exception.Message);
+        var text = exception.ToString();
+        foreach (var hidden in new[] { "-----BEGIN", file, _folder, "host-key.pem", keyFileBase64, value })
+        {
+            Assert.DoesNotContain(hidden, text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void With_a_key_service_set_in_the_settings_AddAxisAgent_unwraps_the_host_key_file()
+    {
+        var keyFileBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var keyService = KeyServiceOf(keyFileBase64);
+        using var pair = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        var file = Path.Combine(_folder, "host-key.pem");
+        File.WriteAllText(file, keyService.Wrap(KeyService.AgentHostKey, pair.ExportPkcs8PrivateKeyPem()));
+        var values = new Dictionary<string, string?>
+        {
+            ["Ai:Bindings:main:Kind"] = "anthropic",
+            ["Ai:Bindings:main:Model"] = ModelId,
+            ["Ai:DefaultBinding"] = "main",
+            ["Ai:HostKeyFile"] = file,
+            ["KeyService:Kind"] = "file",
+            ["KeyService:KeyFile"] = Path.Combine(_folder, "key-service-key"),
+        };
+
+        // The host key loads before the tenants, so a wrapped key that unwraps gets as far as the missing tenants.
+        var unwrapped = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddAxisAgent(Configure(values), new TestEnvironment()));
+        Assert.Contains("No tenants are configured", unwrapped.Message, StringComparison.Ordinal);
+        values["Ai:HostKeyFile"] = Path.Combine(_folder, "plain-host-key.pem");
+        File.WriteAllText(values["Ai:HostKeyFile"]!, pair.ExportPkcs8PrivateKeyPem());
+        var plain = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddAxisAgent(Configure(values), new TestEnvironment()));
+        Assert.Equal("The setting Ai:HostKeyFile does not unwrap with the key of KeyService:KeyFile.", plain.Message);
+    }
+
+    private IKeyService KeyServiceOf(string keyFileBase64, string name = "key-service-key")
+    {
+        var path = Path.Combine(_folder, name);
+        File.WriteAllText(path, keyFileBase64 + "\n");
+        return KeyService.Load(Configure(new Dictionary<string, string?> { ["KeyService:Kind"] = "file", ["KeyService:KeyFile"] = path }))!;
     }
 
     [Fact]

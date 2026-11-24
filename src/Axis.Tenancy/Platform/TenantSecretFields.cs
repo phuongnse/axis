@@ -38,6 +38,16 @@ public static class TenantSecretFields
     /// </summary>
     public const string BackupKey = "backup_key";
 
+    /// <summary>
+    /// The field of a key that the key service wraps, bound with an empty tenant id. The purpose is <c>installation-key</c> or
+    /// <c>agent-host-key</c>, so a key wrapped for one purpose does not unwrap for the other.
+    /// </summary>
+    public static string WrappedKey(string purpose)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(purpose);
+        return "wrapped_key:" + purpose;
+    }
+
     /// <summary>The field of a data protection key. It is bound with an empty tenant id.</summary>
     public static string DataProtectionKey(Guid id) => "data_protection_key:" + id.ToString("D");
 

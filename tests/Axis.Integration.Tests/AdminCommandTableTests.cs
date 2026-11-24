@@ -44,6 +44,7 @@ public sealed class AdminCommandTableTests
                 ["cell restore-check"] = AuditMark.OnePerTenant,
                 ["tenant list"] = AuditMark.None,
                 ["tenant binding list"] = AuditMark.None,
+                ["platform key wrap"] = AuditMark.None,
                 ["version"] = AuditMark.None,
                 ["publisher"] = AuditMark.None,
             }.OrderBy(pair => pair.Key, StringComparer.Ordinal),
