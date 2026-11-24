@@ -1,7 +1,8 @@
 // Writes the files that scripts/load.sh needs to start the reference stack from deploy/compose/compose.yaml:
-// a certificate authority made for the run, the certificates, the secret files, the SQL that creates the database
+// a certificate authority made for the run, the certificates, the secret files (the installation key is wrapped with `platform key wrap`
+// in the admin image, see scripts/lib/key-service.mjs), the SQL that creates the database
 // roles, collector.json and override.json. Run it as `node scripts/lib/load-stack.mjs <folder>` with a folder that does
-// not exist yet. It mirrors the setup of scripts/onprem.test.mjs.
+// not exist yet, and the admin image, such as axis-admin:0.0.0-load. It mirrors the setup of scripts/onprem.test.mjs.
 //
 // The override file is JSON, which is valid YAML. It adds PostgreSQL over TLS, trusts the authority in every host,
 // adds the OpenTelemetry Collector with its own certificate from the authority, points the worker's metrics at the
@@ -14,6 +15,7 @@ import { randomBytes } from 'node:crypto'
 import { chmodSync, copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { wrapKey, writeKeyFile } from './key-service.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './postgres-tls.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -32,7 +34,17 @@ export const stubUrl = `https://${stubHost}:8443`
 
 const password = () => randomBytes(18).toString('hex')
 
-export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results = join(root, 'artifacts/load-results') } = {}) => {
+// writeLoadStack: `adminImage` runs `platform key wrap`. A test that has no image sets `wrapInstallationKey`, a function of the key and
+// the key file that returns the text to write in Platform__SecretKey.
+export const writeLoadStack = (
+  target,
+  {
+    proxyAddress = '172.31.250.10',
+    results = join(root, 'artifacts/load-results'),
+    adminImage,
+    wrapInstallationKey = (key, keyFile) => wrapKey({ image: adminImage, keyFile, key }),
+  } = {},
+) => {
   const folder = resolve(target)
   mkdirSync(folder, { recursive: true })
   chmodSync(folder, 0o755)
@@ -112,7 +124,9 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results
   writeFile(join(secrets, 'ConnectionStrings__PlatformSchema'), connection('axis_platform_schema', passwords.schema))
   writeFile(join(secrets, 'ConnectionStrings__Platform'), connection('axis_platform', passwords.platform))
   writeFile(join(secrets, 'Admin__ConnectionString'), `Host=postgres;Port=5432;Database=postgres;Username=axis_admin;Password=${passwords.admin}${trusted}`)
-  writeFile(join(secrets, 'Platform__SecretKey'), randomBytes(32).toString('base64'))
+  // A production host needs a key service, so the key file comes with a wrapped installation key.
+  writeKeyFile(join(secrets, 'KeyService__KeyFile'))
+  writeFile(join(secrets, 'Platform__SecretKey'), wrapInstallationKey(randomBytes(32).toString('base64'), join(secrets, 'KeyService__KeyFile')))
   writeFile(join(secrets, 'IdentityProvider__AdminClientSecret'), password())
   writeFile(join(secrets, 'KC_DB_URL'), 'jdbc:postgresql://postgres:5432/axis_identity?sslmode=verify-full&sslrootcert=/db-ca/root.crt')
   writeFile(join(secrets, 'KC_DB_USERNAME'), 'axis_identity')
@@ -207,10 +221,10 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const target = process.argv[2]
-  if (!target) {
-    console.error('Usage: node scripts/lib/load-stack.mjs <folder>')
+  const [target, adminImage] = process.argv.slice(2)
+  if (!target || !adminImage) {
+    console.error('Usage: node scripts/lib/load-stack.mjs <folder> <admin image>')
     process.exit(2)
   }
-  writeLoadStack(target, { proxyAddress: process.env.AXIS_PROXY_ADDRESS || undefined })
+  writeLoadStack(target, { proxyAddress: process.env.AXIS_PROXY_ADDRESS || undefined, adminImage })
 }

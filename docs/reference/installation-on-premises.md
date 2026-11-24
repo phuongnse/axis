@@ -15,16 +15,19 @@ the TLS proxy, the C#, the Python and the Node.js package host and the admin hos
 under the `replicas` profile, see [TLS proxy and a second replica](#tls-proxy-and-a-second-replica), and the application package host under the `application-packages` profile.
 The file holds no password, client secret or key.
 
+Every service that reads `Platform__SecretKey` also mounts the key file `KeyService__KeyFile` and sets `KeyService__Kind=file`, because a host outside Development and Testing does not start without a key service, and it refuses a plain key. `Platform__SecretKey` holds a wrapped key, see [the secret files](#the-secret-files).
+
 - **The server, the worker and the agent host** run the production images with a read-only root file system. The
   identity provider cannot, because Keycloak rebuilds itself at start and writes into its image.
 - **The admin host** runs only when asked, through `docker compose run --rm admin`.
 - **The publisher** runs the `axis-admin` image with the command `publisher`. It gets the
-  `ConnectionStrings__PlatformSchema` and `Platform__SecretKey` files and not
+  `ConnectionStrings__PlatformSchema`, `Platform__SecretKey` and `KeyService__KeyFile` files and not
   `Admin__ConnectionString`, and it publishes no port. Its `stop_grace_period` is six minutes, longer
   than the five-minute lease, so a stop lets the running request finish. It sits on the default network and on the internal network `runners`,
   and sets `Extensions__Runners__Application` to `application-package-host:5310`, so a publish can build the packages of an application, see [an application's packages](package-runners.md#an-applications-packages).
-- **The agent host** runs the `axis-agent` image. It mounts the `ConnectionStrings__Platform` and
-  `Platform__SecretKey` files and no folder, and it publishes only its health port on `127.0.0.1`.
+- **The agent host** runs the `axis-agent` image. It mounts the `ConnectionStrings__Platform`, `Platform__SecretKey` and
+  `KeyService__KeyFile` files and no folder, and it publishes only its health port on `127.0.0.1`. The example gives it no
+  `Ai:DefaultBinding`, so AI authoring is off. To turn it on, see [the installation key](#the-secret-files) for the host key file.
 - **The package hosts** are `package-host-dotnet`, `package-host-python` and `package-host-node`. They run the `axis-package-host-dotnet`, `axis-package-host-python` and `axis-package-host-node`
   images with the command `host`, and run the C#, the `python` and the `node` package operations of the worker, see [package runners](package-runners.md#package-runners).
   Each has a read-only root file system apart from a `/tmp` tmpfs, no environment, secret or published port, and `/extensions` read-only and
@@ -161,6 +164,7 @@ Compose reads one file per secret from `AXIS_SECRETS_DIR`, which defaults to `./
 | `ConnectionStrings__Platform` | server, worker, agent, publisher |
 | `ConnectionStrings__PlatformSchema` | server, admin, publisher |
 | `Platform__SecretKey` | server, worker, agent, admin, publisher |
+| `KeyService__KeyFile` | server, worker, agent, admin, publisher |
 | `Admin__ConnectionString` | admin |
 | `IdentityProvider__AdminClientSecret` | admin, identity |
 | `IdentityProvider__DatabaseConnectionString` | admin |
@@ -172,7 +176,26 @@ Compose reads one file per secret from `AXIS_SECRETS_DIR`, which defaults to `./
 - **Writing them.** Write each file with `printf '%s'`, so it has no trailing newline. Make the folder
   and the files readable by UID 1654, the user the images run as, and the files that the identity
   provider reads readable by UID 1000, the user of the Keycloak image.
-- **The installation key.** Generate it once with `openssl rand -base64 32`.
+- **The installation key and the key file.** `KeyService__KeyFile` holds the key of the key service, 32 random bytes in
+  base64. `Platform__SecretKey` holds the installation key wrapped with it. Compose mounts the key file at
+  `/run/key-service/key`, outside `/run/secrets`, and sets `KeyService__KeyFile=/run/key-service/key`, because every host
+  reads a file in `/run/secrets` as a setting and would take the key's text for the path. Make the key file once, keep
+  a copy outside the installation, and wrap a new installation key with `platform key wrap` from the admin image. The
+  plain key goes through standard input and is never written to a file:
+
+  ```bash
+  openssl rand -base64 32 | tr -d '\n' > secrets/KeyService__KeyFile
+  openssl rand -base64 32 | docker run --rm -i --read-only \
+    -e KeyService__Kind=file -e KeyService__KeyFile=/run/key-service/key \
+    -v "$PWD/secrets/KeyService__KeyFile:/run/key-service/key:ro" \
+    "${AXIS_IMAGE_PREFIX:-}axis-admin:$AXIS_VERSION" platform key wrap --purpose installation-key \
+    | tr -d '\n' > secrets/Platform__SecretKey
+  ```
+
+  A host that reads a key that is not wrapped, or that was wrapped with another key file, stops at start and names
+  `Platform__SecretKey`. For AI authoring, make the agent host's key as an EC P-256 private key in PEM form, wrap it with
+  `--purpose agent-host-key`, and mount the output in your own override file as the file that `Ai__HostKeyFile` names.
+  Make it readable by UID 1654 like the other files. See [the key policy](keys-and-data-protection.md#key-policy).
 - **The connection strings.** Each sets `SSL Mode=VerifyFull`, and `Root Certificate` when your
   PostgreSQL certificate comes from a private authority, because the hosts refuse anything weaker, see
   [TLS](installation.md#tls). They name the database server as the hosts reach it, which is a name in the PostgreSQL

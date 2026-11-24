@@ -1,8 +1,11 @@
 # Production Compose example: the server, the worker, the agent host and the publisher run from the production images,
 # Axis's identity provider (Keycloak with the Axis theme) runs beside them, and the admin tool runs only on demand.
 # PostgreSQL 18 runs elsewhere and holds the identity provider's own database. Tenants come from the tenant
-# directory. Every secret is a file under secrets:, mounted in /run/secrets. This file holds no
-# password, client secret or key. See docs/reference/installation-on-premises.md#on-premises for the steps.
+# directory. Every secret is a file under secrets:, mounted in /run/secrets, except the key file of the key service,
+# which sits at /run/key-service/key because the hosts read /run/secrets as settings. Every service that reads
+# Platform__SecretKey gets the key file, and Platform__SecretKey holds a wrapped key, because a host outside
+# Development and Testing does not start without a key service. This file holds no password, client secret or key.
+# See docs/reference/installation-on-premises.md#on-premises for the steps.
 # compose.scenarios.yaml is an optional second file that turns on test scenarios.
 #
 # AXIS_VERSION          Required. The tag of the seven images.
@@ -70,6 +73,9 @@ x-host: &host
     Tenancy__Source: directory
     Extensions__Path: /extensions
     Modules__Path: /modules
+    # The key service of the hosts that read Platform__SecretKey: the key file, which `platform key wrap` wrapped the key with.
+    KeyService__Kind: file
+    KeyService__KeyFile: /run/key-service/key
 
 # The package hosts, the containers that run the package operations of the worker. Each sets its own image and
 # limits. The rules are the same for all, so they cannot drift apart. Port 5310 has no authentication, so a host
@@ -124,6 +130,8 @@ x-server: &server
     - ConnectionStrings__Platform
     - ConnectionStrings__PlatformSchema
     - Platform__SecretKey
+    - source: KeyService__KeyFile
+      target: /run/key-service/key
 
 services:
   server:
@@ -224,6 +232,8 @@ services:
     secrets:
       - ConnectionStrings__Platform
       - Platform__SecretKey
+      - source: KeyService__KeyFile
+        target: /run/key-service/key
 
   # The C# package host, the container that runs the C# package operations of the worker. See x-package-host.
   package-host-dotnet:
@@ -259,9 +269,11 @@ services:
     cpus: ${AXIS_APPLICATION_PACKAGE_HOST_CPUS:-1}
     mem_limit: ${AXIS_APPLICATION_PACKAGE_HOST_MEMORY:-1g}
 
-  # The agent host. It gets the platform connection and the installation key, which it reads only when AI authoring is on. It reads
+  # The agent host. It gets the platform connection, the installation key and its key file, which it reads only when AI authoring is on. It reads
   # a tenant's own model key from the platform database only with Ai__AllowTenantKeys on.
-  # It gets no extension or module folder, and never the schema connection string.
+  # It gets no extension or module folder, and never the schema connection string. It gets no host key file: an operator who turns AI
+  # authoring on wraps the PEM with `platform key wrap --purpose agent-host-key` and mounts it in their own override, see
+  # docs/reference/installation-on-premises.md#on-premises.
   agent:
     image: ${AXIS_IMAGE_PREFIX:-}axis-agent:${AXIS_VERSION:?Set AXIS_VERSION}
     restart: unless-stopped
@@ -270,6 +282,8 @@ services:
       - /tmp
     environment:
       Tenancy__Source: directory
+      KeyService__Kind: file
+      KeyService__KeyFile: /run/key-service/key
       # All interfaces inside the container. The published port stays on 127.0.0.1.
       Health__Urls: http://0.0.0.0:5209
       # No value: this passes through from the shell, and both servers take the same value.
@@ -279,6 +293,8 @@ services:
     secrets:
       - ConnectionStrings__Platform
       - Platform__SecretKey
+      - source: KeyService__KeyFile
+        target: /run/key-service/key
 
   # Runs the publish requests that Studio stores. It publishes no port. It builds the packages of an application on
   # the application package host, and its egress proxy for a run from Studio listens on the internal network `runners`.
@@ -309,6 +325,8 @@ services:
       - ConnectionStrings__Platform
       - ConnectionStrings__PlatformSchema
       - Platform__SecretKey
+      - source: KeyService__KeyFile
+        target: /run/key-service/key
 
   # Runs only through `docker compose run --rm admin <command>`, so `docker compose up` does not start it.
   admin:
@@ -335,6 +353,8 @@ services:
       - IdentityProvider__AdminClientSecret
       - IdentityProvider__DatabaseConnectionString
       - Platform__SecretKey
+      - source: KeyService__KeyFile
+        target: /run/key-service/key
 
 # A fixed subnet gives the proxy a fixed address. Docker hands out the other addresses from the ip_range only,
 # so a short-lived container cannot take the proxy's address.
@@ -348,7 +368,8 @@ networks:
   runners:
     internal: true
 
-# One file per setting, named like the setting. Compose mounts each at /run/secrets/<name>.
+# One file per setting, named like the setting. Compose mounts each at /run/secrets/<name>, except KeyService__KeyFile, which holds the
+# key of the key service, not a setting, and is mounted at /run/key-service/key.
 secrets:
   Admin__ConnectionString:
     file: ${AXIS_SECRETS_DIR:-./secrets}/Admin__ConnectionString
@@ -366,5 +387,7 @@ secrets:
     file: ${AXIS_SECRETS_DIR:-./secrets}/KC_DB_URL
   KC_DB_USERNAME:
     file: ${AXIS_SECRETS_DIR:-./secrets}/KC_DB_USERNAME
+  KeyService__KeyFile:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/KeyService__KeyFile
   Platform__SecretKey:
     file: ${AXIS_SECRETS_DIR:-./secrets}/Platform__SecretKey

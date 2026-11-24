@@ -1,6 +1,7 @@
 using System.Text;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Axis.Tenancy.Keys;
 
@@ -87,6 +88,27 @@ public static class KeyService
 
         var key = KeyFile.Read(path, out var problem, KeyFileSetting) ?? throw new InvalidOperationException(problem);
         return new FileKeyService(TenantSecretCipher.FromKey(key));
+    }
+
+    /// <summary>
+    /// Returns the key service like <see cref="Load(IConfiguration)"/>, and refuses a blank <c>KeyService:Kind</c> outside Development and
+    /// Testing. Every host that reads the installation key or the agent host's private key loads through this overload. See
+    /// <c>docs/reference/keys-and-data-protection.md#key-policy</c>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// <c>KeyService:Kind</c> is blank outside Development and Testing, or <see cref="Load(IConfiguration)"/> throws.
+    /// </exception>
+    public static IKeyService? Load(IConfiguration configuration, IHostEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+
+        var keyService = Load(configuration);
+        if (keyService is null && !environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
+        {
+            throw new InvalidOperationException($"The setting {KindSetting} is required outside Development and Testing.");
+        }
+
+        return keyService;
     }
 }
 

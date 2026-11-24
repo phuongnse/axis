@@ -2135,7 +2135,7 @@ internal static partial class AdminCommands
         TenantSecretCipher cipher;
         try
         {
-            cipher = TenantSecretCipher.Load(configuration);
+            cipher = TenantSecretCipher.Load(configuration, new AdminEnvironment(configuration[DotnetEnvironmentSetting] ?? Environments.Production));
         }
         catch (InvalidOperationException exception)
         {

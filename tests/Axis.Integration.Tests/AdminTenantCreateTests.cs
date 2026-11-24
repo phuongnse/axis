@@ -341,14 +341,12 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
         await using var scenario = await NewScenarioAsync();
         var id = scenario.NewTenantId();
 
-        var result = await scenario.RunAsync(
-            AdminScenario.CreateArgs(id, "shop.example.test"),
-            extra: new Dictionary<string, string?>
-            {
-                ["DOTNET_ENVIRONMENT"] = "Production",
-                ["Admin:ConnectionString"] = new NpgsqlConnectionStringBuilder(scenario.AdminConnection) { SslMode = SslMode.VerifyFull }.ConnectionString,
-                ["ConnectionStrings:PlatformSchema"] = new NpgsqlConnectionStringBuilder(scenario.Platform) { SslMode = SslMode.VerifyFull }.ConnectionString,
-            });
+        // A production command refuses a plain key, so the key is wrapped by a file key service.
+        var extra = TestKeyService.WrappedKeySettings(AdminScenario.TestSecretKey);
+        extra["DOTNET_ENVIRONMENT"] = "Production";
+        extra["Admin:ConnectionString"] = new NpgsqlConnectionStringBuilder(scenario.AdminConnection) { SslMode = SslMode.VerifyFull }.ConnectionString;
+        extra["ConnectionStrings:PlatformSchema"] = new NpgsqlConnectionStringBuilder(scenario.Platform) { SslMode = SslMode.VerifyFull }.ConnectionString;
+        var result = await scenario.RunAsync(AdminScenario.CreateArgs(id, "shop.example.test"), extra: extra);
 
         Assert.Equal(2, result.Exit);
         Assert.Contains("IdentityProvider:Url", Assert.Single(result.Error), StringComparison.Ordinal);

@@ -117,6 +117,7 @@ function runLoad(args = [], extraEnv = {}, setup = () => {}) {
     for (const file of [
       'scripts/load.sh',
       'scripts/lib/load-stack.mjs',
+      'scripts/lib/key-service.mjs',
       'scripts/lib/load-realm.mjs',
       'scripts/lib/load-objectives.mjs',
       'samples/keycloak/axis-realm.json',
@@ -209,6 +210,10 @@ describe('scripts/load.sh starts the reference stack and runs the objectives sce
       assert.ok(run.calls.some((call) => call.startsWith(`docker build --target ${target} `)), target)
     }
 
+    // The installation key is wrapped in the admin image, after the images are built and before the stack starts.
+    const wrap = indexOf(run, ' axis-admin:0.0.0-load platform key wrap --purpose installation-key')
+    assert.ok(wrap > indexOf(run, 'docker build --target axis-admin '))
+    assert.ok(wrap < indexOf(run, ' up -d postgres'))
     const first = indexOf(run, ' up -d server worker')
     const second = indexOf(run, '--profile replicas up -d server-2')
     assert.ok(indexOf(run, ' up -d postgres') < indexOf(run, ' up -d identity proxy'))
@@ -360,7 +365,7 @@ describe('scripts/load.sh collects the metrics of the worker', () => {
       const dir = mkdtempSync(join(tmpdir(), 'axis-load-stack-'))
       try {
         const folder = join(dir, 'run')
-        writeLoadStack(folder, { results: join(dir, 'artifacts/load-results') })
+        writeLoadStack(folder, { results: join(dir, 'artifacts/load-results'), wrapInstallationKey: () => 'wrapped-key' })
         check({
           folder,
           dir,
@@ -383,6 +388,30 @@ describe('scripts/load.sh collects the metrics of the worker', () => {
         assert.ok(worker.volumes.includes(`${join(folder, 'ca')}:/run/test-ca:ro`), worker.volumes.join('\n'))
         assert.ok(worker.depends_on.includes('collector'))
       })
+    })
+
+    test('the installation key is written wrapped, next to the key file of the key service', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'axis-load-stack-'))
+      try {
+        const folder = join(dir, 'run')
+        const wrapped = []
+        writeLoadStack(folder, {
+          results: join(dir, 'artifacts/load-results'),
+          wrapInstallationKey: (key, keyFile) => {
+            wrapped.push({ key, keyFile })
+            return 'wrapped-key-marker'
+          },
+        })
+
+        const keyFile = join(folder, 'secrets/KeyService__KeyFile')
+        assert.equal(Buffer.from(readFileSync(keyFile, 'utf8'), 'base64').length, 32)
+        assert.equal(readFileSync(join(folder, 'secrets/Platform__SecretKey'), 'utf8'), 'wrapped-key-marker')
+        assert.deepEqual(wrapped.map((call) => call.keyFile), [keyFile])
+        assert.equal(Buffer.from(wrapped[0].key, 'base64').length, 32)
+        assert.notEqual(readFileSync(join(folder, 'secrets/Platform__SecretKey'), 'utf8'), wrapped[0].key)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
     })
 
     test('the collector certificate is signed by the authority and names the collector', () => {

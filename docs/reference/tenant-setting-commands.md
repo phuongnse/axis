@@ -460,7 +460,7 @@ keys. It can be rotated without signing anyone out.
 
 ### Wrapped keys
 
-With a key service set, a host holds the installation key as a wrapped value. The key service is a key file of 32 random
+Outside Development and Testing every host that reads the installation key needs a key service, and holds the key as a wrapped value. The key service is a key file of 32 random
 bytes in base64, `KeyService:KeyFile`, with `KeyService:Kind` set to `file`, or an AWS KMS key, `KeyService:KeyId`, with
 `KeyService:Kind` set to `aws-kms`, see [host settings](host-settings.md#tenancy-settings). `platform key wrap` makes the wrapped
 value from the plain key.

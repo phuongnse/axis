@@ -1,7 +1,9 @@
 // Smoke test for the production images axis-server, axis-worker, axis-agent, axis-admin, axis-controlplane and
 // axis-package-host-dotnet, -node and -python, which scripts/smoke.sh builds: checks what they hold, and runs the hosts
 // read-only with their settings in /run/secrets files. The test PostgreSQL serves TLS with a certificate from an authority
-// made for the run, and the connection strings set SSL Mode=VerifyFull, which the production hosts require. Each package
+// made for the run, and the connection strings set SSL Mode=VerifyFull, which the production hosts require. The hosts that read the
+// installation key also need a key service, so the test writes a key file and wraps the key with `platform key wrap` in axis-admin, see
+// docs/reference/keys-and-data-protection.md#key-policy. Each package
 // host image builds the test package of its language from a read-only source, see
 // docs/reference/extension-packages.md#building-a-package. Requires Docker and openssl. Run from scripts/smoke.sh.
 import assert from 'node:assert/strict'
@@ -24,6 +26,7 @@ import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { listedImage } from './lib/docker-images.mjs'
 import { buildPackage, copyReadable, downloadTrivyDatabase, removeAsImageUser, writable } from './lib/package-build.mjs'
+import { keyServicePath, wrapKey, writeKeyFile } from './lib/key-service.mjs'
 import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
@@ -38,6 +41,9 @@ const secretKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
 let version
 let folder
 let trustDir
+// The key file of the key service and the installation key wrapped by it. The hosts refuse a plain key outside Development and Testing.
+let keyFile
+let wrappedKey
 const containers = []
 
 const image = (target) => `${target}:${version}`
@@ -66,6 +72,15 @@ before(
   async () => {
     version = smokeImages(targets)
     folder = mkdtempSync(join(tmpdir(), 'axis-images-'))
+
+    // The key file sits in a folder of its own, outside the /run/secrets folders, which hosts read as settings.
+    const keyServiceDir = join(folder, 'key-service')
+    mkdirSync(keyServiceDir)
+    chmodSync(keyServiceDir, 0o755)
+    keyFile = join(keyServiceDir, 'key')
+    writeKeyFile(keyFile)
+    wrappedKey = wrapKey({ image: image('axis-admin'), keyFile, key: secretKey })
+    assert.notEqual(wrappedKey, secretKey, 'the installation key is not wrapped')
 
     const certificates = issuePostgresCertificate({
       folder,
@@ -186,6 +201,9 @@ test('no image holds samples, development settings or source control metadata', 
   }
 })
 
+// The settings that give a host the key service, which a host outside Development and Testing needs for a key.
+const keyService = () => ['-v', `${keyFile}:${keyServicePath}:ro`, '-e', 'KeyService__Kind=file', '-e', `KeyService__KeyFile=${keyServicePath}`]
+
 // startReadOnly: starts a host read-only with its settings in a /run/secrets folder and returns its health URL.
 const startReadOnly = (target, secrets, port, extra) => {
   const id = run([
@@ -235,17 +253,17 @@ test('the server starts read-only with its settings in /run/secrets', { timeout 
   const secrets = writeSecrets('server', {
     ConnectionStrings__Platform: connection('axis_runtime'),
     ConnectionStrings__PlatformSchema: connection('axis_schema'),
-    Platform__SecretKey: secretKey,
+    Platform__SecretKey: wrappedKey,
   })
-  await waitLive(startReadOnly('axis-server', secrets, 8080, []))
+  await waitLive(startReadOnly('axis-server', secrets, 8080, keyService()))
 })
 
 test('the worker starts read-only with its settings in /run/secrets', { timeout }, async () => {
   const secrets = writeSecrets('worker', {
     ConnectionStrings__Platform: connection('axis_runtime'),
-    Platform__SecretKey: secretKey,
+    Platform__SecretKey: wrappedKey,
   })
-  await waitLive(startReadOnly('axis-worker', secrets, 5208, ['-e', 'Health__Urls=http://0.0.0.0:5208']))
+  await waitLive(startReadOnly('axis-worker', secrets, 5208, [...keyService(), '-e', 'Health__Urls=http://0.0.0.0:5208']))
 })
 
 test('the agent host starts read-only and answers /health/live', { timeout }, async () => {
@@ -255,11 +273,12 @@ test('the agent host starts read-only and answers /health/live', { timeout }, as
 test('the agent host starts read-only with AI authoring on and its settings in /run/secrets', { timeout }, async () => {
   const secrets = writeSecrets('agent-ai', {
     ConnectionStrings__Platform: connection('axis_runtime'),
-    Platform__SecretKey: secretKey,
+    Platform__SecretKey: wrappedKey,
   })
   // It is live while the first read of the tenant directory retries.
   await waitLive(
     startReadOnly('axis-agent', secrets, 5209, [
+      ...keyService(),
       '-e',
       'Ai__Bindings__main__Kind=anthropic',
       '-e',

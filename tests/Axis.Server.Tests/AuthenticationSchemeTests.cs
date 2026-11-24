@@ -28,6 +28,7 @@ public sealed class AuthenticationSchemeTests
         {
             builder.UseEnvironment("Production");
             builder.UseTestPlatform();
+            builder.UseTestKeyService(TestPlatform.SecretKey);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);

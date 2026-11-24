@@ -413,7 +413,8 @@ A tenant archive is not a backup of the installation. The operator also keeps th
 - **The installation key.** `Platform:SecretKey` decrypts every stored secret. Without it, no
   database password, OIDC client secret or `secret` binding value can be read, and every one must be
   set again by hand. Keep it apart from the backups, so a stolen backup does not hold its own key.
-  See [platform database](storage.md#platform-database).
+  The hosts hold it wrapped, so also keep a copy of the key file of the key service, or keep the AWS KMS key, outside the installation:
+  without them the wrapped key cannot be read. See [platform database](storage.md#platform-database).
 - **The backup key.** The file that `--backup-key-file` names decrypts every archive made with it.
   Keep it outside the installation and apart from the archives, so a stolen archive is useless. Keep
   it apart from the installation key too, because the tool cannot tell whether the two are the same.

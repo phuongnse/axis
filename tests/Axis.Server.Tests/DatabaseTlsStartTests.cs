@@ -49,6 +49,7 @@ public sealed class DatabaseTlsStartTests
         {
             builder.UseEnvironment(environment);
             builder.UseTestPlatform();
+            builder.UseTestKeyService(TestPlatform.SecretKey);
             builder.UseSetting(setting, value);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", TestPlatform.UnreachableDatabase);
