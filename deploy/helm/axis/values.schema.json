@@ -110,6 +110,14 @@
         "resources": { "type": "object" }
       }
     },
+    "keyService": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["", "aws-kms"] },
+        "keyId": { "type": "string" }
+      }
+    },
     "tenancy": {
       "type": "object",
       "properties": {
