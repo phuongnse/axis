@@ -1,9 +1,10 @@
-import { Avatar, Dropdown, type MenuProps } from 'antd'
+import { Avatar, Dropdown } from 'antd'
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { useLocation } from 'react-router'
 import { AxisButton } from './AxisButton'
 import { startSignIn } from './api'
 import { fetchCurrentUser, signOutSession, type CurrentUser } from './currentUser'
+import { menuOf } from './menuActions'
 import { assignLocation } from './navigation'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -59,13 +60,23 @@ export function UserMenu() {
   const signOut = () => {
     signOutSession().then(assignLocation, (error: unknown) => console.warn('Signing out failed', error))
   }
-  const items: MenuProps['items'] = [
-    { key: 'account', label: <Link to="/account">{t('shell.account.title')}</Link> },
-    { key: 'signOut', label: t('shell.account.signOut'), onClick: signOut },
-  ]
+  // Your account is the menu's one choice, marked while the account page is open. Sign out is an action
+  // after a divider.
+  const menu = menuOf(
+    [
+      {
+        key: 'account',
+        labelKey: 'shell.account.title',
+        href: '/account',
+        selected: pathname === '/account' || pathname.startsWith('/account/'),
+      },
+      { key: 'signOut', labelKey: 'shell.account.signOut', onClick: signOut },
+    ],
+    t,
+  )
 
   return (
-    <Dropdown trigger={['click']} menu={{ items, 'aria-label': t('shell.account.label') }}>
+    <Dropdown trigger={['click']} menu={{ ...menu, 'aria-label': t('shell.account.label') }}>
       <AxisButton
         role="subtle"
         caret

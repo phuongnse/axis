@@ -1,7 +1,8 @@
 import { SendOutlined } from '@ant-design/icons'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
-import { AxisTable, type AxisColumn, type AxisRowAction } from '../platform/AxisTable'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import type { AxisAction } from '../platform/menuActions'
 import {
   consoleDeadLettersPath,
   fetchConsoleDeadLetters,
@@ -197,7 +198,7 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
           actions: (item) =>
             deadLetterCommands
               .filter((command) => item.commands.includes(command))
-              .map((command): AxisRowAction => ({
+              .map((command): AxisAction => ({
                 key: command,
                 labelKey: `shell.inspector.commands.${command}`,
                 ...(command === 'redeliver' ? { icon: <SendOutlined /> } : { meaning: 'remove' as const }),

@@ -1,7 +1,8 @@
 import { ConfigProvider, Divider, Menu } from 'antd'
 import type { ReactNode } from 'react'
 import { useChoiceActionsTheme } from './antTheme'
-import { menuOf, type MenuAction } from './menuActions'
+import { menuOf, type AxisAction } from './menuActions'
+import { useText } from './texts'
 
 /**
  * A select's own actions at the end of its list, such as Manage saved inputs…, see
@@ -16,9 +17,10 @@ export function ChoiceActions({
   close,
 }: {
   list: ReactNode
-  actions: readonly MenuAction[]
+  actions: readonly AxisAction[]
   close: () => void
 }) {
+  const t = useText()
   const choiceTheme = useChoiceActionsTheme()
   return (
     <>
@@ -27,17 +29,18 @@ export function ChoiceActions({
         <Divider />
         <Menu
           mode="vertical"
-          selectable={false}
-          style={{ border: 'none', background: 'transparent' }}
-          items={menuOf(
+          {...menuOf(
             actions.map((action) => ({
               ...action,
               onClick: () => {
                 close()
-                action.onClick()
+                action.onClick?.()
               },
             })),
+            t,
           )}
+          selectable={false}
+          style={{ border: 'none', background: 'transparent' }}
         />
       </ConfigProvider>
     </>

@@ -2,7 +2,8 @@ import { Flex, Modal, Result, Tabs, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { useEffect, useMemo, useState } from 'react'
-import { AxisTable, type AxisColumn, type AxisRowAction } from '../platform/AxisTable'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import type { AxisAction } from '../platform/menuActions'
 import { PageLayout } from '../platform/PageLayout'
 import { PersonName } from '../platform/PersonName'
 import { SectionParts } from '../platform/SectionParts'
@@ -220,7 +221,7 @@ export function UsersPage() {
   }, [locale, t])
 
   // Brokered users get no Resend and no Reset: those routes answer 409 for them.
-  function rowActions(row: UserListItem): AxisRowAction[] {
+  function rowActions(row: UserListItem): AxisAction[] {
     const commands: Command[] = []
     if (row.status === 'invited' && row.provider === null) {
       commands.push('resend')

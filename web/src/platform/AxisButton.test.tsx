@@ -21,6 +21,7 @@ const texts = {
   'test.validate': 'Validate',
   'test.preview': 'Preview',
   'test.runTests': 'Run tests',
+  'test.discard': 'Discard',
   'shell.actionRow.more': 'More actions',
   'test.decision': 'Decision',
 }
@@ -593,6 +594,24 @@ describe('an action row that folds', () => {
       'Run tests',
       'Publish…',
     ])
+  })
+
+  it('draws a destructive fold action in dangerText as a button, and as a danger entry of the menu after a divider', async () => {
+    const discard = { key: 'discard', labelKey: 'test.discard', destructive: true, disabled: false, onClick: () => {} }
+    fakeWidths(300, 400)
+    renderFolding([...actions().slice(0, 1), discard])
+
+    await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    const menu = await screen.findByRole('menu', { name: 'More actions' })
+    expect(within(menu).getByRole('menuitem', { name: 'Discard' })).toHaveClass('ant-dropdown-menu-item-danger')
+    expect(within(menu).getByRole('separator')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+
+    box = 1000
+    resize()
+    expect(screen.getByRole('button', { name: 'Discard' })).toHaveStyle({
+      color: designTokensFor('light').colour.dangerText,
+    })
   })
 
   it('folds when the row shrinks after it drew', () => {

@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
-import { RowActions, type AxisRowAction } from '../platform/AxisTable'
+import { RowActions } from '../platform/AxisTable'
+import type { AxisAction } from '../platform/menuActions'
 import { EmptyState } from '../platform/EmptyState'
 import { unusedStepName } from '../platform/formLayout'
 import { SectionPart } from '../platform/SectionParts'
@@ -93,7 +94,7 @@ export function FormSteps({
     onChange('/steps', [...list, step])
   }
 
-  function actionsOf(index: number): AxisRowAction[] {
+  function actionsOf(index: number): AxisAction[] {
     return [
       {
         key: 'moveUp',

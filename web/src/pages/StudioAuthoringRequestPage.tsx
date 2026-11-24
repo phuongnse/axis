@@ -3,7 +3,8 @@ import { type ReactNode, useContext, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisButton, type AxisFoldAction } from '../platform/AxisButton'
+import { AxisButton } from '../platform/AxisButton'
+import type { AxisAction } from '../platform/menuActions'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { DialogFooter } from '../platform/DialogFooter'
 import { FilledText } from '../platform/FilledText'
@@ -331,7 +332,7 @@ export function StudioAuthoringRequestPage({
       setActing(false)
     }
   }
-  const fold: AxisFoldAction[] = []
+  const fold: AxisAction[] = []
   if (isAuthor && request.state === 'awaitingApproval' && !asking) {
     fold.push({
       key: 'changePlan',

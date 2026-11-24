@@ -8,15 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chooseOption, optionTexts, tabTo } from '../test/antd'
 import { withAntdStyles } from '../test/antdStyles'
 import { dialog, filterTexts } from '../test/tableFilter'
-import {
-  AxisTable,
-  RowActions,
-  type AxisColumn,
-  type AxisRowAction,
-  type AxisTableProps,
-  type AxisTableToolbar,
-} from './AxisTable'
+import { AxisTable, RowActions, type AxisColumn, type AxisTableProps, type AxisTableToolbar } from './AxisTable'
 import { designTokensFor } from './designTokens'
+import type { AxisAction } from './menuActions'
 import { TextProvider } from './TextProvider'
 import type { TableQuery } from './tableQuery'
 import { narrowWidthQuery } from './useNarrowWidth'
@@ -101,19 +95,19 @@ function renderTable(props: Partial<AxisTableProps<Row>> = {}) {
   )
 }
 
-const deleteAction: AxisRowAction = {
+const deleteAction: AxisAction = {
   key: 'delete',
   labelKey: 'row.delete',
   icon: <DeleteOutlined />,
   destructive: true,
   onClick: vi.fn(),
 }
-const openAction: AxisRowAction = { key: 'open', labelKey: 'row.open', onClick: vi.fn() }
-const closeAction: AxisRowAction = { key: 'close', labelKey: 'row.close', onClick: vi.fn() }
-const removeAction: AxisRowAction = { key: 'remove', labelKey: 'row.delete', meaning: 'remove', onClick: vi.fn() }
+const openAction: AxisAction = { key: 'open', labelKey: 'row.open', onClick: vi.fn() }
+const closeAction: AxisAction = { key: 'close', labelKey: 'row.close', onClick: vi.fn() }
+const removeAction: AxisAction = { key: 'remove', labelKey: 'row.delete', meaning: 'remove', onClick: vi.fn() }
 
 /** Draws one list row's actions outside a table, as a list that is not a table does. */
-function renderRowActions(actions: AxisRowAction[], fold?: boolean) {
+function renderRowActions(actions: AxisAction[], fold?: boolean) {
   return render(
     <TextProvider catalogs={catalogs} development={false}>
       <RowActions actions={actions} fold={fold} />
@@ -457,7 +451,7 @@ describe('AxisTable', () => {
   })
 
   describe('row actions', () => {
-    const actionsFor = (...actions: AxisRowAction[]) => ({
+    const actionsFor = (...actions: AxisAction[]) => ({
       configured: actions.length,
       actions: (row: Row) => (row.id === '2' ? null : actions),
     })
@@ -472,7 +466,7 @@ describe('AxisTable', () => {
     })
 
     it('draws a text action as a subtle button, and a destructive one in dangerText with no border', () => {
-      const revokeAction: AxisRowAction = { key: 'revoke', labelKey: 'row.revoke', destructive: true, onClick: vi.fn() }
+      const revokeAction: AxisAction = { key: 'revoke', labelKey: 'row.revoke', destructive: true, onClick: vi.fn() }
       renderTable({ rowActions: actionsFor(openAction, revokeAction) })
 
       const row = screen.getByRole('row', { name: /Buy paper/ })

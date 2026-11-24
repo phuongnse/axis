@@ -17,7 +17,7 @@ import type { ButtonRole } from './buttonRoles'
 import { fillText } from './fillText'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
-import { menuOf, type MenuAction } from './menuActions'
+import { actionText, menuOf, type AxisAction } from './menuActions'
 import { focusFollowsTab } from './tabFocus'
 
 type Base = Omit<ButtonProps, 'type' | 'color' | 'variant' | 'danger' | 'role' | 'icon'> & {
@@ -190,18 +190,6 @@ function IconButton(props: IconButtonProps) {
   )
 }
 
-/**
- * An action of an `AxisActionRow` that folds, see docs/reference/actions-and-controls.md#buttons. It is a secondary
- * button, or a menu entry once the row folds. `labelKey` is the text key of its text, `attributes` go to its button.
- */
-export interface AxisFoldAction {
-  key: string
-  labelKey: string
-  disabled?: boolean
-  onClick: () => void
-  attributes?: object
-}
-
 /** Justifies the row like `justify`, but starts the row at its start edge when the content is wider, so it can be measured. */
 function safeJustify(justify: FlexProps['justify']): CSSProperties['justifyContent'] {
   return justify === 'flex-end' || justify === 'end' || justify === 'center' ? `safe ${justify}` : undefined
@@ -226,7 +214,7 @@ export function AxisActionRow({
   outlined,
 }: {
   children?: ReactNode
-  fold?: AxisFoldAction[]
+  fold?: AxisAction[]
   end?: ReactNode
   justify?: FlexProps['justify']
   align?: FlexProps['align']
@@ -292,7 +280,7 @@ export function AxisActionRow({
               trigger={['click']}
               autoFocus
               menu={{
-                items: menuOf(fold.map((action) => ({ ...action, label: t(action.labelKey) }))),
+                ...menuOf(fold, t),
                 'aria-label': t('shell.actionRow.more'),
               }}
             >
@@ -303,11 +291,12 @@ export function AxisActionRow({
               <AxisButton
                 key={action.key}
                 role="secondary"
+                destructive={action.destructive}
                 disabled={action.disabled}
                 onClick={action.onClick}
                 {...action.attributes}
               >
-                {t(action.labelKey)}
+                {actionText(action, t)}
               </AxisButton>
             ))
           ))}
@@ -491,8 +480,8 @@ export function AxisSplitButton({
   menu,
   nameSuffix,
 }: {
-  action: MenuAction
-  menu: readonly MenuAction[]
+  action: AxisAction
+  menu: readonly AxisAction[]
   nameSuffix?: string
 }) {
   const t = useText()
@@ -500,14 +489,15 @@ export function AxisSplitButton({
     <Space.Compact>
       <AxisButton
         role="secondary"
-        aria-label={nameSuffix ? `${action.label} ${nameSuffix}` : undefined}
+        aria-label={nameSuffix ? `${actionText(action, t)} ${nameSuffix}` : undefined}
+        destructive={action.destructive}
         disabled={action.disabled}
         onClick={action.onClick}
         {...action.attributes}
       >
-        {action.label}
+        {actionText(action, t)}
       </AxisButton>
-      <Dropdown trigger={['click']} autoFocus menu={{ items: menuOf(menu), 'aria-label': t('shell.actionRow.more') }}>
+      <Dropdown trigger={['click']} autoFocus menu={{ ...menuOf(menu, t), 'aria-label': t('shell.actionRow.more') }}>
         <AxisButton role="subtle" joined nameKey="shell.actionRow.more" nameSuffix={nameSuffix} icon={<Chevron />} />
       </Dropdown>
     </Space.Compact>

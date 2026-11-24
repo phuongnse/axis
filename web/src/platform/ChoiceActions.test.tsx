@@ -4,7 +4,10 @@ import { Select } from 'antd'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ChoiceActions } from './ChoiceActions'
+import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
+
+const texts = { 'test.manageInputs': 'Manage saved inputs…' }
 
 function ChoiceSelect({ onChange, onAction }: { onChange: () => void; onAction: () => void }) {
   const [open, setOpen] = useState(true)
@@ -23,7 +26,7 @@ function ChoiceSelect({ onChange, onAction }: { onChange: () => void; onAction: 
       popupRender={(list) => (
         <ChoiceActions
           list={list}
-          actions={[{ key: 'manage', label: 'Manage saved inputs…', onClick: onAction }]}
+          actions={[{ key: 'manage', labelKey: 'test.manageInputs', onClick: onAction }]}
           close={() => setOpen(false)}
         />
       )}
@@ -35,9 +38,11 @@ function renderSelect() {
   const onChange = vi.fn()
   const onAction = vi.fn()
   render(
-    <ThemeModeProvider>
-      <ChoiceSelect onChange={onChange} onAction={onAction} />
-    </ThemeModeProvider>,
+    <TextProvider catalogs={[{ texts, fallbackTexts: texts }]} development={false}>
+      <ThemeModeProvider>
+        <ChoiceSelect onChange={onChange} onAction={onAction} />
+      </ThemeModeProvider>
+    </TextProvider>,
   )
   return { onChange, onAction }
 }

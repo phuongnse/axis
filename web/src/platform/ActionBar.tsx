@@ -1,6 +1,7 @@
 import { Flex } from 'antd'
 import type { ReactNode } from 'react'
-import { AxisActionRow, type AxisFoldAction } from './AxisButton'
+import { AxisActionRow } from './AxisButton'
+import type { AxisAction } from './menuActions'
 import { useDesignTokens } from './themeMode'
 
 /**
@@ -20,7 +21,7 @@ export function ActionBar({
   'data-testid': testId,
 }: {
   start?: ReactNode
-  fold?: AxisFoldAction[]
+  fold?: AxisAction[]
   end?: ReactNode
   pane?: boolean
   'data-testid'?: string
