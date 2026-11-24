@@ -1,7 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Tests;
 using Axis.Server.Studio;
@@ -171,6 +170,39 @@ public sealed class McpReadToolTests(KeycloakFixture keycloak, PostgreSqlFixture
     }
 
     [Fact]
+    public async Task Lists_over_one_mebibyte_are_read_page_by_page()
+    {
+        // The application's title and description are two texts of 1.2 MB, which the application list and the resource list both answer.
+        var big = string.Concat(Enumerable.Repeat("A \"big\" <text> with Tiếng Việt, é and 😀. ", 30_000));
+        var textsPath = Path.Combine(Folder, "texts", "en.json");
+        var texts = JsonNode.Parse(await File.ReadAllTextAsync(textsPath, CancellationToken))!;
+        var entries = texts["texts"]!.AsObject();
+        entries["application.title"] = big;
+        entries["application.description"] = big;
+        for (var number = 1; number <= 30_000; number++)
+        {
+            entries[$"bulk.key{number:D5}"] = "v";
+        }
+
+        await File.WriteAllTextAsync(textsPath, texts.ToJsonString(), CancellationToken);
+
+        var applications = await ReadPagesAsync("list_applications", "{}");
+        Assert.Equal(big, applications["items"]![0]!["descriptions"]!["en"]!.GetValue<string>());
+
+        var resources = await ReadPagesAsync("list_resources", Arguments());
+        Assert.Equal(
+            StudioFolder.List(Folder).Select(file => file.Id.ToString("D")),
+            resources["items"]!.AsArray().Select(item => item!["id"]!.GetValue<string>()));
+        Assert.Equal(big, resources["items"]!.AsArray().Single(item => item!["kind"]!.GetValue<string>() == "application")!["titles"]!["en"]!.GetValue<string>());
+        await AssertForeignCursorAsync("list_resources", Arguments());
+
+        var names = await ReadPagesAsync("read_names", Arguments());
+        var keys = names["texts"]!.AsArray().Select(text => text!["key"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal);
+        Assert.All(Enumerable.Range(1, 30_000), number => Assert.Contains($"bulk.key{number:D5}", keys));
+        await AssertForeignCursorAsync("read_names", Arguments());
+    }
+
+    [Fact]
     public async Task A_cursor_on_an_output_that_gave_none_is_refused()
     {
         var process = StudioFolder.List(Folder).Single(file => file.Kind == "process" && file.Name == "PurchaseRequestApproval");
@@ -179,7 +211,9 @@ public sealed class McpReadToolTests(KeycloakFixture keycloak, PostgreSqlFixture
             McpForeignCursor,
             (await CallAsync("read_resource", Arguments(("id", process.Id.ToString("D")), ("cursor", "garbage")))).Error);
         Assert.Equal(McpForeignCursor, (await CallAsync("read_reference", """{"topic":"policy","cursor":"garbage"}""")).Error);
-        Assert.Equal(InputMismatch, (await CallAsync("list_resources", Arguments(("cursor", "garbage")))).Error);
+        Assert.Equal(McpForeignCursor, (await CallAsync("list_resources", Arguments(("cursor", "garbage")))).Error);
+        Assert.Equal(InputMismatch, (await CallAsync("create_draft", Arguments(("cursor", "garbage")))).Error);
+        Assert.Equal(InputMismatch, (await CallAsync("list_applications", """{"application":"PurchaseRequests"}""")).Error);
     }
 
     [Fact]
@@ -318,36 +352,18 @@ public sealed class McpReadToolTests(KeycloakFixture keycloak, PostgreSqlFixture
             : new ToolAnswer(false, result["structuredContent"], null);
     }
 
-    // The pages of a tool call joined: each is at most one page of 1 MiB and there is more than one, the parts joined are the output's JSON text.
-    private async Task<JsonNode> ReadPagesAsync(string tool, string arguments)
-    {
-        var parts = new List<string>();
-        string? cursor = null;
-        do
+    // The pages of a tool call joined, see McpTestCalls.ReadPagesAsync.
+    private Task<JsonNode> ReadPagesAsync(string tool, string arguments) =>
+        McpTestCalls.ReadPagesAsync(async cursor =>
         {
-            var call = await CallAsync(tool, cursor is null ? arguments : WithCursor(arguments, cursor));
+            var call = await CallAsync(tool, cursor is null ? arguments : McpTestCalls.WithCursor(arguments, cursor));
             Assert.False(call.IsError, call.Error);
-            Assert.True(Encoding.UTF8.GetByteCount(call.Output!.ToJsonString()) <= StudioDiffPages.PageBytes);
-            parts.Add(call.Output["part"]!.GetValue<string>());
-            cursor = call.Output["cursor"]?.GetValue<string>();
-            Assert.True(parts.Count <= 10, "The pages do not end.");
-        }
-        while (cursor is not null);
-
-        Assert.True(parts.Count > 1);
-        return JsonNode.Parse(string.Concat(parts))!;
-    }
+            return call.Output!;
+        });
 
     private async Task AssertForeignCursorAsync(string tool, string arguments)
     {
-        Assert.Equal(McpForeignCursor, (await CallAsync(tool, WithCursor(arguments, "garbage"))).Error);
-    }
-
-    private static string WithCursor(string arguments, string cursor)
-    {
-        var withCursor = JsonNode.Parse(arguments)!.AsObject();
-        withCursor["cursor"] = cursor;
-        return withCursor.ToJsonString();
+        Assert.Equal(McpForeignCursor, (await CallAsync(tool, McpTestCalls.WithCursor(arguments, "garbage"))).Error);
     }
 
     private sealed record ToolAnswer(bool IsError, JsonNode? Output, string? Error);

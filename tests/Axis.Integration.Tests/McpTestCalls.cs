@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Server.Tests;
+using Axis.Studio;
 
 namespace Axis.Integration.Tests;
 
@@ -50,6 +51,37 @@ internal static class McpTestCalls
         }
 
         return new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 3, ["method"] = "tools/call", ["params"] = parameters }.ToJsonString();
+    }
+
+    /// <summary>The arguments of <paramref name="arguments"/> with the <c>cursor</c> of a page added, as a paged tool call reads its next page.</summary>
+    public static string WithCursor(string arguments, string cursor)
+    {
+        var withCursor = JsonNode.Parse(arguments)!.AsObject();
+        withCursor["cursor"] = cursor;
+        return withCursor.ToJsonString();
+    }
+
+    /// <summary>
+    /// The parts of a paged tool output read to the end and joined, parsed as the output's JSON text. <paramref name="readPage"/>
+    /// answers the page that a cursor names, or the first page for null. Each page is at most <see cref="StudioDiffPages.PageBytes"/>,
+    /// and the output has more than one page and at most ten.
+    /// </summary>
+    public static async Task<JsonNode> ReadPagesAsync(Func<string?, Task<JsonNode>> readPage)
+    {
+        var parts = new List<string>();
+        string? cursor = null;
+        do
+        {
+            var page = await readPage(cursor);
+            Assert.True(Encoding.UTF8.GetByteCount(page.ToJsonString()) <= StudioDiffPages.PageBytes);
+            parts.Add(page["part"]!.GetValue<string>());
+            cursor = page["cursor"]?.GetValue<string>();
+            Assert.True(parts.Count <= 10, "The pages do not end.");
+        }
+        while (cursor is not null);
+
+        Assert.True(parts.Count > 1);
+        return JsonNode.Parse(string.Concat(parts))!;
     }
 
     /// <summary>Posts <paramref name="body"/> to <c>/mcp</c> on <paramref name="host"/>, with the headers that are not null.</summary>

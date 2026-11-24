@@ -29,6 +29,7 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
     private const string NoDraft = "The application has no draft with this id.";
     private const string NoRequest = "The application has no publish request with this id.";
     private const string NoResource = "The application has no resource with this id.";
+    private const string McpForeignCursor = "The cursor is not one this output gave.";
     private const string KindChange = "A patch may not change id or kind.";
     private const string Module = "department-budgets";
     private const string ProcessId = "94f1cc25-6a68-435f-9383-36fc43aae860";
@@ -361,6 +362,35 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
     }
 
     [Fact]
+    public async Task A_validate_draft_over_one_mebibyte_is_read_page_by_page()
+    {
+        var draft = (await CallAsync("create_draft", Arguments())).Output!["id"]!.GetValue<string>();
+
+        // A policy names roles that do not exist, and each one is a diagnostic of the policy, so the output passes 1 MiB.
+        var policy = Guid.NewGuid().ToString("D");
+        var roles = new JsonArray(Enumerable.Range(1, 7_000).Select(number => (JsonNode)$"missing-role-{number:D5}").ToArray());
+        var content = new JsonObject
+        {
+            ["id"] = policy,
+            ["kind"] = "policy",
+            ["name"] = "MissingRoles",
+            ["formatVersion"] = 1,
+            ["roles"] = roles,
+            ["grants"] = new JsonArray(new JsonObject { ["name"] = "purchaseRequestRead", ["entity"] = "PurchaseRequest", ["actions"] = new JsonArray("read") }),
+        };
+        Assert.Null((await Drafts(_user!).WriteAsync(draft, content, CancellationToken)).Refusal);
+
+        var validated = await ReadPagesAsync("validate_draft", Arguments(("draft", draft)));
+
+        var diagnostics = validated["diagnostics"]!.AsArray()
+            .Where(diagnostic => diagnostic!["resourceId"]?.GetValue<string>() == policy)
+            .ToList();
+        Assert.Equal(7_000, diagnostics.Count);
+        Assert.All(diagnostics, diagnostic => Assert.Equal("AXC0090", diagnostic!["code"]!.GetValue<string>()));
+        await AssertForeignCursorAsync("validate_draft", Arguments(("draft", draft)));
+    }
+
+    [Fact]
     public async Task A_diff_over_one_mebibyte_comes_in_pages_that_the_cursor_reads_and_writes_nothing()
     {
         var before = FolderState();
@@ -577,6 +607,21 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
             new("application", Application),
             .. more.Select(pair => new KeyValuePair<string, JsonNode?>(pair.Name, pair.Value)),
         ]).ToJsonString();
+
+    // The pages of a tool call joined, see McpTestCalls.ReadPagesAsync.
+    private Task<JsonNode> ReadPagesAsync(string tool, string arguments) =>
+        McpTestCalls.ReadPagesAsync(async cursor =>
+        {
+            var page = await CallAsync(tool, cursor is null ? arguments : McpTestCalls.WithCursor(arguments, cursor));
+            Assert.False(page.IsError, page.Error);
+            return page.Output!;
+        });
+
+    // A cursor that the output did not give is refused, as the tool's own error.
+    private async Task AssertForeignCursorAsync(string tool, string arguments)
+    {
+        Assert.Equal(McpForeignCursor, (await CallAsync(tool, McpTestCalls.WithCursor(arguments, "garbage"))).Error);
+    }
 
     // The content argument is a JSON object, not a string, so it is added to the arguments as the object.
     private static (string Name, string Value) Content(string json) => ("content", json);

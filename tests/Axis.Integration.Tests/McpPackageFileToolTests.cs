@@ -194,31 +194,41 @@ public sealed class McpPackageFileToolTests(KeycloakFixture keycloak, PostgreSql
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, text, CancellationToken);
         var arguments = Arguments(null, "x", "big.txt");
+        var first = await CallAsync("read_package_file", arguments);
+        Assert.False(first.IsError, first.Error);
+        var firstCursor = first.Output!["cursor"]!.GetValue<string>();
 
-        var parts = new List<string>();
-        string? cursor = null;
-        string? firstCursor = null;
-        do
-        {
-            var page = await CallAsync("read_package_file", cursor is null ? arguments : WithCursor(arguments, cursor));
-            Assert.False(page.IsError, page.Error);
-            Assert.True(Encoding.UTF8.GetByteCount(page.Output!.ToJsonString()) <= StudioDiffPages.PageBytes);
-            parts.Add(page.Output["part"]!.GetValue<string>());
-            cursor = page.Output["cursor"]?.GetValue<string>();
-            firstCursor ??= cursor;
-            Assert.True(parts.Count <= 10, "The pages do not end.");
-        }
-        while (cursor is not null);
-
-        Assert.True(parts.Count > 1);
-        var whole = JsonNode.Parse(string.Concat(parts))!;
+        var whole = await ReadPagesAsync("read_package_file", arguments);
         Assert.Equal(text, whole["content"]!.GetValue<string>());
         Assert.Equal(Hash(text), whole["version"]!.GetValue<string>());
 
         // A cursor of the file as it was is refused once the file has changed, and so is one that no page gave.
         await File.WriteAllTextAsync(path, text + "print('changed')\n", CancellationToken);
-        Assert.Equal(ForeignCursor, (await CallAsync("read_package_file", WithCursor(arguments, firstCursor!))).Error);
-        Assert.Equal(ForeignCursor, (await CallAsync("read_package_file", WithCursor(arguments, "garbage"))).Error);
+        Assert.Equal(ForeignCursor, (await CallAsync("read_package_file", McpTestCalls.WithCursor(arguments, firstCursor))).Error);
+        Assert.Equal(ForeignCursor, (await CallAsync("read_package_file", McpTestCalls.WithCursor(arguments, "garbage"))).Error);
+    }
+
+    [Fact]
+    public async Task A_package_file_list_over_one_mebibyte_is_read_page_by_page()
+    {
+        await StartAsync(developerRole: "publisher", switchOn: true);
+        var folder = Path.Combine(Folder, "packages", "x");
+        Directory.CreateDirectory(folder);
+        var contents = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var number = 1; number <= 6_000; number++)
+        {
+            var name = $"f-{number:D5}-{new string('p', 120)}.txt";
+            contents[name] = $"print({number})\n";
+            await File.WriteAllTextAsync(Path.Combine(folder, name), contents[name], CancellationToken);
+        }
+
+        var listed = await ReadPagesAsync("list_package_files", Arguments(null));
+
+        var items = listed["items"]!.AsArray();
+        Assert.Equal(contents.Keys.Order(StringComparer.Ordinal), items.Select(item => item!["path"]!.GetValue<string>()));
+        Assert.All(items, item => Assert.Equal("x", item!["package"]!.GetValue<string>()));
+        Assert.All(items, item => Assert.Equal(Hash(contents[item!["path"]!.GetValue<string>()]), item!["version"]!.GetValue<string>()));
+        await AssertForeignCursorAsync("list_package_files", Arguments(null));
     }
 
     [Fact]
@@ -229,7 +239,7 @@ public sealed class McpPackageFileToolTests(KeycloakFixture keycloak, PostgreSql
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, "small\n", CancellationToken);
 
-        Assert.Equal(ForeignCursor, (await CallAsync("read_package_file", WithCursor(Arguments(null, "x", "small.txt"), "garbage"))).Error);
+        Assert.Equal(ForeignCursor, (await CallAsync("read_package_file", McpTestCalls.WithCursor(Arguments(null, "x", "small.txt"), "garbage"))).Error);
         Assert.Equal("small\n", (await CallAsync("read_package_file", Arguments(null, "x", "small.txt"))).Output!["content"]!.GetValue<string>());
     }
 
@@ -344,11 +354,18 @@ public sealed class McpPackageFileToolTests(KeycloakFixture keycloak, PostgreSql
             ["content"] = content,
         }.Where(pair => pair.Value is not null).Select(pair => new KeyValuePair<string, JsonNode?>(pair.Key, pair.Value))).ToJsonString();
 
-    private static string WithCursor(string arguments, string cursor)
+    // The pages of a tool call joined, see McpTestCalls.ReadPagesAsync.
+    private Task<JsonNode> ReadPagesAsync(string tool, string arguments) =>
+        McpTestCalls.ReadPagesAsync(async cursor =>
+        {
+            var page = await CallAsync(tool, cursor is null ? arguments : McpTestCalls.WithCursor(arguments, cursor));
+            Assert.False(page.IsError, page.Error);
+            return page.Output!;
+        });
+
+    private async Task AssertForeignCursorAsync(string tool, string arguments)
     {
-        var withCursor = JsonNode.Parse(arguments)!.AsObject();
-        withCursor["cursor"] = cursor;
-        return withCursor.ToJsonString();
+        Assert.Equal(ForeignCursor, (await CallAsync(tool, McpTestCalls.WithCursor(arguments, "garbage"))).Error);
     }
 
     private static string Hash(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));

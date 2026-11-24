@@ -47,6 +47,12 @@ public sealed class McpToolInputTests
     [InlineData("read_resource")]
     [InlineData("read_module_resource")]
     [InlineData("read_package_file")]
+    [InlineData("list_applications")]
+    [InlineData("list_resources")]
+    [InlineData("read_names")]
+    [InlineData("check_expression")]
+    [InlineData("validate_draft")]
+    [InlineData("list_package_files")]
     public void A_paged_tool_lists_an_optional_cursor_and_says_how_to_read_the_pages(string name)
     {
         var tool = Assert.Single(ListedTools(), entry => entry["name"]!.GetValue<string>() == name);
@@ -57,13 +63,21 @@ public sealed class McpToolInputTests
         Assert.Contains("cursor", tool["description"]!.GetValue<string>(), StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void A_tool_that_is_not_paged_lists_no_cursor_unless_it_has_its_own()
+    [Theory]
+    [InlineData("create_draft")]
+    [InlineData("write_resource")]
+    [InlineData("delete_resource")]
+    [InlineData("write_layer")]
+    [InlineData("write_package_file")]
+    [InlineData("delete_package_file")]
+    [InlineData("run_scenarios")]
+    [InlineData("test_package")]
+    [InlineData("accept_draft")]
+    public void A_write_or_run_tool_lists_no_cursor(string name)
     {
-        var tools = ListedTools().ToDictionary(entry => entry["name"]!.GetValue<string>());
+        var tool = Assert.Single(ListedTools(), entry => entry["name"]!.GetValue<string>() == name);
 
-        Assert.Null(tools["write_resource"]["inputSchema"]!["properties"]!["cursor"]);
-        Assert.Null(tools["list_resources"]["inputSchema"]!["properties"]!["cursor"]);
+        Assert.Null(tool["inputSchema"]!["properties"]!["cursor"]);
     }
 
     [Fact]
