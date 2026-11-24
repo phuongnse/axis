@@ -139,8 +139,6 @@ them there.
 
 ## Diffs
 
-_(planned for M37, #3991)_
-
 A change to a package's files shows as text, line by line, because a package file is code and not a
 resource's JSON.
 
@@ -148,10 +146,11 @@ resource's JSON.
   Added, Changed or Removed, with its text before and after, line by line, see
   [revisions](ai-authoring-in-studio.md#revisions), [the diff](ai-authoring-in-studio.md#the-diff) and
   [publishing](studio.md#publishing).
-- **The same rules.** The summary, the markers and the order follow those of a resource's diff. The file is
-  a block like a resource's, with its kind Package file.
+- **The same rules.** The markers and the order follow those of a resource's diff, and the file's kind reads
+  Package file.
+- **The block** _(planned for M35, #5153)_. The file is a block like a resource's, and its line diff fills it.
 - **The line diff.** A package file's diff is the one line diff that
-  [a file's diff](ai-authoring-in-studio.md#revisions) describes, coloured by the file's language, in the file's block.
+  [a file's diff](ai-authoring-in-studio.md#revisions) describes, coloured by the file's language.
 - **The API.** No route is new. The [revision diff](authoring-revisions.md#diff), the
   [draft diff](authoring-revisions.md#draft-diff) through [the request diff](authoring-requests.md#routes) and the
   [live diff](authoring-revisions.md#live-diff) give each file's text in `before` and `after`. A package file is

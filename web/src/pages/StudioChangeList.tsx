@@ -57,7 +57,11 @@ export function StudioChangeList({
             <Link to={studioResourceAddress(application, row.resourceId)}>{row.name}</Link>
           )}
           <Typography.Text style={{ color: colour.textMuted }}>
-            {row.kind === null ? '—' : kindSingular(row.kind, t)}
+            {row.kind !== null
+              ? kindSingular(row.kind, t)
+              : row.packageFile
+                ? t('shell.studio.changes.packageFile')
+                : '—'}
           </Typography.Text>
           <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
         </div>

@@ -185,9 +185,10 @@ const site: StudioResourceItem = {
 
 /**
  * A server that answers by URL and method: a read answers the request as `server.current` holds it, and each action
- * answers with the request in the state it moves to, or with a 500 when `refuse` names it. `calls` lists the actions.
+ * answers with the request in the state it moves to, or with a 500 when `refuse` names it. `calls` lists the actions. The
+ * diff answers `changed`, which is `diff` unless a test gives its own.
  */
-function serverOf(current: AuthoringRequest, refuse: string[] = []) {
+function serverOf(current: AuthoringRequest, refuse: string[] = [], changed: AuthoringRequestDiff = diff) {
   const server = {
     current,
     /** The statuses that reads of the accept's publish request answer in turn, the last one for every read after. */
@@ -202,7 +203,7 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
       if (init?.method !== 'POST') {
         // The changes of the request answer the diff, in one page.
         if (String(input).endsWith('/diff')) {
-          return new Response(JSON.stringify(diff), { headers: { 'Content-Type': 'application/json' } })
+          return new Response(JSON.stringify(changed), { headers: { 'Content-Type': 'application/json' } })
         }
         // The accept's publish request. Once it reads succeeded, the request reads accepted, as the publisher moves it.
         if (String(input).endsWith('/requests/p1')) {
@@ -1341,6 +1342,38 @@ describe('StudioAuthoringRequestPage Result item', () => {
 
     await userEvent.click(within(layer).getByRole('button', { name: 'Show the diff of PurchaseRequest' }))
     expect(within(layer).getByTestId('json-diff-after')).toHaveTextContent('"supplier"')
+  })
+
+  it('shows a changed package file folded, and its Show the diff draws its line diff', async () => {
+    const packageFile = {
+      file: 'packages/approval-rules/adapter.py',
+      change: 'changed' as const,
+      id: null,
+      kind: null,
+      name: null,
+      before: 'def limit():\n    return 1000\n',
+      after: 'def limit():\n    return 5000\n',
+      target: null,
+    }
+    const server = serverOf(request({ state: 'ready', author: 'u1', steps: [checkStep(passedChecks, 'passed')] }), [], {
+      ...diff,
+      resources: [...diff.resources, packageFile],
+    })
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ userId: 'u1' })
+
+    const files = await screen.findAllByTestId('studio-changes-file')
+    const section = files.find((file) => file.dataset.file === packageFile.file)!
+    expect(within(section).getByText('Package file')).toBeVisible()
+    expect(within(section).queryByRole('textbox')).not.toBeInTheDocument()
+
+    await userEvent.click(
+      within(section).getByRole('button', { name: 'Show the diff of packages/approval-rules/adapter.py' }),
+    )
+    expect(await within(section).findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })).toBeVisible()
+    await waitFor(() => expect(section.querySelector('.cm-deletedLine')).toHaveTextContent('return 1000'))
+    expect(section.querySelector('.cm-changedLine')).toHaveTextContent('return 5000')
+    expect(within(section).queryByTestId('json-diff-after')).not.toBeInTheDocument()
   })
 
   it("links each scenario's name to its Studio address in the checks, and leaves a skipped scenario's name as text", async () => {

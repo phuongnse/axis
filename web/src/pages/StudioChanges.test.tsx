@@ -1,5 +1,5 @@
 import { ConfigProvider } from 'antd'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
@@ -34,6 +34,7 @@ const texts = {
   'shell.studio.changes.changedBy': 'Changed by {authors}',
   'shell.studio.changes.you': 'you',
   'shell.studio.changes.aiRequest': 'the AI request “{name}”',
+  'shell.studio.changes.packageFile': 'Package file',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -63,6 +64,37 @@ const files: StudioRevisionChange[] = [
     kind: null,
     name: 'Old',
     before: '{"gone":true}',
+    after: null,
+  },
+]
+
+/** A package's files: a changed adapter, an added file and a removed file, each as a text before and after. */
+const packageFiles: StudioRevisionChange[] = [
+  {
+    file: 'packages/approval-rules/adapter.py',
+    change: 'changed',
+    id: null,
+    kind: null,
+    name: null,
+    before: 'def limit():\n    return 1000\n',
+    after: 'def limit():\n    return 5000\n',
+  },
+  {
+    file: 'packages/approval-rules/new.py',
+    change: 'added',
+    id: null,
+    kind: null,
+    name: null,
+    before: null,
+    after: 'def fresh():\n    return 1\n',
+  },
+  {
+    file: 'packages/approval-rules/old.py',
+    change: 'removed',
+    id: null,
+    kind: null,
+    name: null,
+    before: 'def gone():\n    return 0\n',
     after: null,
   },
 ]
@@ -266,5 +298,63 @@ describe('StudioChanges folded', () => {
     await userEvent.click(within(section).getByRole('button', { name: 'Show the diff of PurchaseRequest' }))
     expect(within(section).getByTestId('json-diff-after')).toHaveTextContent('"supplier"')
     expect(within(section).getByTestId('json-diff-after')).not.toHaveTextContent('"target"')
+  })
+})
+
+describe('StudioChanges package files', () => {
+  it('draws each package file as the line diff, named by its path and kind, and no JSON', async () => {
+    renderChanges(packageFiles)
+
+    const changed = fileSection('packages/approval-rules/adapter.py')
+    const editor = await within(changed).findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })
+    expect(editor).toBeVisible()
+    expect(within(changed).getByText('Package file')).toBeVisible()
+    expect(within(changed).getByText('Changed')).toBeVisible()
+    await waitFor(() => expect(changed.querySelector('.cm-deletedLine')).toHaveTextContent('return 1000'))
+    expect(changed.querySelector('.cm-changedLine')).toHaveTextContent('return 5000')
+    expect(within(changed).queryByTestId('json-diff-before')).toBeNull()
+
+    const added = fileSection('packages/approval-rules/new.py')
+    expect(await within(added).findByRole('textbox', { name: 'packages/approval-rules/new.py' })).toBeVisible()
+    expect(within(added).getByText('Added')).toBeVisible()
+    expect(added.querySelectorAll('.cm-changedLine')).toHaveLength(2)
+    expect(added.querySelector('.cm-changedLine')).toHaveTextContent('def fresh():')
+    expect(added.querySelector('.cm-removedFile')).toBeNull()
+    expect(within(added).queryByTestId('json-diff-before')).toBeNull()
+
+    const removed = fileSection('packages/approval-rules/old.py')
+    expect(await within(removed).findByRole('textbox', { name: 'packages/approval-rules/old.py' })).toBeVisible()
+    expect(within(removed).getByText('Removed')).toBeVisible()
+    expect(removed.querySelector('.cm-removedFile')).not.toBeNull()
+    expect(removed.querySelector('.cm-changedLine')).toHaveTextContent('def gone():')
+    expect(within(removed).queryByTestId('json-diff-before')).toBeNull()
+  })
+
+  it('keeps a resource on its JSON, and puts the package files after the resources, sorted by path', async () => {
+    renderChanges([packageFiles[2], packageFiles[0], files[1], packageFiles[1]])
+
+    expect(screen.getAllByTestId('studio-changes-file').map((section) => section.dataset.file)).toEqual([
+      'roles/buyer.json',
+      'packages/approval-rules/adapter.py',
+      'packages/approval-rules/new.py',
+      'packages/approval-rules/old.py',
+    ])
+    expect(within(fileSection('roles/buyer.json')).getByTestId('json-diff-before')).toHaveTextContent(
+      '"label": "first"',
+    )
+    await within(fileSection('packages/approval-rules/old.py')).findByRole('textbox', {
+      name: 'packages/approval-rules/old.py',
+    })
+  })
+
+  it('shows a package file behind Show the diff when folded, as it shows a resource', async () => {
+    renderChanges([packageFiles[0]], { folded: true })
+
+    const section = fileSection('packages/approval-rules/adapter.py')
+    expect(within(section).queryByRole('textbox')).not.toBeInTheDocument()
+    await userEvent.click(
+      within(section).getByRole('button', { name: 'Show the diff of packages/approval-rules/adapter.py' }),
+    )
+    expect(await within(section).findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })).toBeVisible()
   })
 })

@@ -457,21 +457,21 @@ changed what and can undo it.
 - **Focus** _(planned for M35, #5153)_. The diff draws no focus ring of its own. Its block draws one `focusRing`
   ring round the whole file while the diff has focus, from a click or the keyboard alike, as an editable region's
   focus shows.
-- **A file's diff** _(planned for M37, #3991)_. A file shows as one column in Studio's one code editor,
+- **A file's diff**. A package file shows as one column in Studio's one code editor,
   `CodeEditor`, read-only and coloured by the file's language. It is as tall as its text and scrolls only
   sideways, so a wheel over it scrolls the page, as [scroll areas](actions-and-controls.md#scroll-areas) says. It
   marks no current line.
-- **Removed and added lines** _(planned for M37, #3991)_. A removed line sits on the `danger` tint, after a "−" in
+- **Removed and added lines**. A removed line sits on the `danger` tint, after a "−" in
   `dangerText`, with its code in the text colour, because a language's colours fall below 4.5:1 on that tint in
   light mode. An added line sits on the `success` tint, after a "+" in `successText`, with its code in its
   language's colours. A run's changed field uses the same tints and marks.
-- **Changed words** _(planned for M37, #3991)_. In a line whose words changed in part, the changed words are
+- **Changed words**. In a line whose words changed in part, the changed words are
   underlined with a thin line in `successText` or `dangerText`. A line added or removed whole has no underline, and
   nor does a line whose only change is its spaces, such as the indent of a bracket that the diff kept.
-- **Line numbers** _(planned for M37, #3991)_. A changed file numbers its lines in two columns, one for the text
+- **Line numbers**. A changed file numbers its lines in two columns, one for the text
   before and one for the text after. An unchanged line has both numbers, a removed line the first and an added
   line the second. A file added or removed whole has one column of numbers. The last line break of a file makes no row.
-- **Unchanged lines fold** _(planned for M37, #3991)_. A run of 4 or more unchanged lines folds to one row, "Show
+- **Unchanged lines fold**. A run of 4 or more unchanged lines folds to one row, "Show
   `<n>` unchanged lines", or "Xem `<n>` dòng không đổi" in Vietnamese. The row is in `primaryText` on `canvas` and
   underlines on hover. The fold keeps 3 lines on each side of a change, and a click or the keyboard opens it.
 - **A resource's JSON** _(planned for M35, #5153)_. A resource's JSON, indented, shows in the same line diff as a
