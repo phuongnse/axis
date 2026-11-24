@@ -1,6 +1,7 @@
 import { CheckOutlined, ClockCircleOutlined, CloseOutlined, LoadingOutlined, MinusOutlined } from '@ant-design/icons'
 import { Tooltip, Typography } from 'antd'
 import type { ComponentType, CSSProperties, ReactElement, ReactNode } from 'react'
+import { FocusRingStyle } from './FocusRingStyle'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
@@ -187,9 +188,7 @@ export function StepsBar({
       }
   return (
     <>
-      {onPick && (
-        <style>{`[data-step-pick]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: 2px; }`}</style>
-      )}
+      {onPick && <FocusRingStyle selector="[data-step-pick]:focus-visible" />}
       <ol
         data-testid="steps-bar"
         style={{

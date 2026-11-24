@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type RefObject } from 'react'
+import { FocusRingStyle } from './FocusRingStyle'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
@@ -90,7 +91,7 @@ export function ResizeHandle({
 
   return (
     <>
-      <style>{`[data-resize-handle]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: -2px; }`}</style>
+      <FocusRingStyle selector="[data-resize-handle]:focus-visible" inset />
       <div
         role="separator"
         aria-orientation={orientation}
