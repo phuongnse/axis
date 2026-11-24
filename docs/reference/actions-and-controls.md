@@ -466,7 +466,6 @@ be kept right.
   button, even at narrow width. A known Remove or Delete is the trash icon in `dangerText`, named by a tooltip.
   An action that opens another site, such as Open in Studio, is a text button with a real address, so Ctrl+click
   opens it in a new tab. See [menus](#menus).
-  See [menus](#menus).
 - **A known action is its icon wherever its row is**. A row's Remove or Delete that is a button is the
   trash icon in `dangerText`, named by a tooltip, in a list's row as in a table's.
 - **A column of row controls has no header text** _(planned, #5087)_. The column of a row's "…" or icon buttons, and the
@@ -578,9 +577,10 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   another site, such as Studio, opens only from a button named for it, such as Open in Studio. So a call's connector
   and operation are plain text.
 - **Studio's and the platform's references**. A user or a tenant that a Studio or platform page names is a link to
-  its page where the reader may open it, and plain text otherwise. An application or a release is not a link in a
-  value: a reader who may use Studio opens it from an Open in Studio button, and anyone else sees plain text. A Studio
-  reference picker whose chosen resource exists has an Open button joined to it, which opens that resource in Studio.
+  its page where the reader may open it, and plain text otherwise. On a page outside Studio, such as the console
+  or the user page, an application or a release is not a link in a value: a reader who may use Studio opens it from
+  an Open in Studio button, and anyone else sees plain text. A Studio reference picker whose chosen resource exists
+  has an Open button joined to it, which opens that resource in Studio.
 
 ## Dialogs
 
