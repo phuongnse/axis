@@ -126,6 +126,14 @@ describe('SaveBar', () => {
     expect(screen.getByTestId('site-save')).toHaveTextContent('Save')
   })
 
+  it('draws Discard in the destructive tone', () => {
+    renderBar()
+
+    expect(within(screen.getByTestId('studio-save-bar')).getByRole('button', { name: 'Discard' })).toHaveStyle({
+      color: designTokensFor('light').colour.dangerText,
+    })
+  })
+
   it('turns Undo, Redo and Discard off while a save runs', () => {
     renderBar({ redoable: true, busy: true })
 
