@@ -1,12 +1,13 @@
 import { foldedRanges } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ConfigProvider, theme } from 'antd'
 import { createRef, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { antThemeFor } from '../platform/antTheme'
+import { changeLook } from '../platform/changeTint'
 import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
@@ -390,6 +391,294 @@ describe('CodeEditor', () => {
       const defaultTint = theme.getDesignToken(base).controlItemBgActive
       expect(asStyled(pageTint)).not.toBe(asStyled(defaultTint))
       expect(selectedMatchBackground()).toBe(asStyled(pageTint))
+    })
+  })
+
+  describe('with original', () => {
+    withAntdStyles()
+
+    const { colour } = designTokensFor('light')
+    const removed = changeLook('removed', colour)
+    const added = changeLook('added', colour)
+
+    /** A colour or a tint as the style sheet reads it back: jsdom writes each hex colour as rgb. */
+    const asRule = (value: string) => value.replace(/#[0-9a-f]{6}/gi, asStyled)
+
+    /** The value of a property in the last style rule whose selector ends in `ending`, which reads pseudo-elements too. */
+    function ruleEndingIn(ending: string, property: string, without = /^$/) {
+      const rules = Array.from(document.styleSheets).flatMap((sheet) => Array.from(sheet.cssRules))
+      return rules
+        .filter((rule): rule is CSSStyleRule => 'selectorText' in rule)
+        .filter((rule) =>
+          rule.selectorText.split(',').some((selector) => selector.trim().endsWith(ending) && !without.test(selector)),
+        )
+        .map((rule) => rule.style.getPropertyValue(property))
+        .filter(Boolean)
+        .at(-1)
+    }
+
+    const diff = (original: string, value: string, extra: Partial<CodeEditorProps> = {}, options?: RenderOptions) =>
+      renderEditor({ original, value, language: 'plain', ...extra }, { initialMode: 'light', ...options })
+
+    const changedLines = () => Array.from(document.querySelectorAll<HTMLElement>('.cm-changedLine'))
+    const deletedLines = () => Array.from(document.querySelectorAll<HTMLElement>('.cm-deletedLine'))
+    /** Waits for the marks that the editor puts on the removed lines and folded rows once they are drawn. */
+    const drawn = () =>
+      waitFor(() => expect(document.querySelector('.cm-deletedLine.cm-noChangedWords, .cm-deletedLine')).not.toBeNull())
+    const numbers = (gutterClass: string) =>
+      Array.from(document.querySelectorAll<HTMLElement>(`.cm-gutter.${gutterClass} .cm-gutterElement`))
+        .filter((element) => element.style.visibility !== 'hidden')
+        .map((element) => element.textContent)
+        .filter(Boolean)
+
+    const partly = { original: 'alpha\nprice = 10\nomega', value: 'alpha\nprice = 20\nbonus\nomega' }
+
+    it('draws a removed line after "−" on the danger tint and an added line after "+" on the success tint', async () => {
+      diff(partly.original, partly.value)
+      await drawn()
+
+      const [pricing, bonus] = changedLines()
+      expect(pricing).toHaveTextContent('price = 20')
+      expect(bonus).toHaveTextContent('bonus')
+      expect(removed.tint).toContain('color-mix')
+      expect(winningRule(pricing, 'background-color')).toBe(asRule(added.tint))
+      expect(winningRule(bonus, 'background-color')).toBe(asRule(added.tint))
+      expect(ruleEndingIn('.cm-changedLine::before', 'content', /removedFile/)).toBe(`"${added.mark}"`)
+      expect(ruleEndingIn('.cm-changedLine::before', 'color', /removedFile/)).toBe(asStyled(added.markColour))
+
+      const [gone] = deletedLines()
+      expect(gone).toHaveTextContent('price = 10')
+      expect(winningRule(gone.closest('.cm-deletedChunk')!, 'background-color')).toBe(asRule(removed.tint))
+      expect(winningRule(gone.closest('.cm-deletedChunk')!, 'color')).toBe(asStyled(colour.text))
+      expect(ruleEndingIn('.cm-deletedLine::before', 'content')).toBe(`"${removed.mark}"`)
+      expect(ruleEndingIn('.cm-deletedLine::before', 'color')).toBe(asStyled(removed.markColour))
+    })
+
+    it('draws no accept or reject buttons and marks no current line', async () => {
+      diff(partly.original, partly.value)
+      await drawn()
+
+      expect(screen.queryByRole('button', { name: /accept|reject/i })).not.toBeInTheDocument()
+      expect(document.querySelector('.cm-activeLine')).toBeNull()
+      expect(document.querySelector('.cm-activeLineGutter')).toBeNull()
+      expect(editorView().state.readOnly).toBe(true)
+    })
+
+    it("refuses the author's edits and has no fold gutter, whatever readOnly says", async () => {
+      const onChange = vi.fn()
+      diff(partly.original, partly.value, { readOnly: false, onChange })
+      await drawn()
+
+      act(() => typeAtStart(editorView()))
+
+      expect(onChange).not.toHaveBeenCalled()
+      expect(document.querySelector('.cm-foldGutter')).toBeNull()
+    })
+
+    it('is as tall as its text, whatever grow says', () => {
+      diff(partly.original, partly.value, { grow: false })
+
+      const editor = document.querySelector('.cm-editor')!
+      expect(winningRule(editor, 'height')).toBe('auto')
+      expect(winningRule(document.querySelector('.cm-scroller')!, 'overflow-y')).toBe('hidden')
+    })
+
+    describe('the changed words', () => {
+      const underline = (element: Element) => winningRule(element, 'text-decoration-line')
+
+      it('are underlined 2 px in the mark colour in a line that changed in part, in the removed and the added line', async () => {
+        diff(partly.original, partly.value)
+        await drawn()
+
+        const addedWord = document.querySelector('.cm-changedLine .cm-changedText')!
+        expect(addedWord).toHaveTextContent('20')
+        expect(underline(addedWord)).toBe('underline')
+        expect(winningRule(addedWord, 'text-decoration-thickness')).toBe('2px')
+        expect(winningRule(addedWord, 'text-decoration-color')).toBe(asStyled(added.markColour))
+        const removedWord = document.querySelector('.cm-deletedLine .cm-deletedText')!
+        expect(removedWord).toHaveTextContent('10')
+        expect(removedWord.closest('.cm-deletedLine')).not.toHaveClass('cm-noChangedWords')
+        expect(underline(removedWord)).toBe('underline')
+        expect(winningRule(removedWord, 'text-decoration-color')).toBe(asStyled(removed.markColour))
+      })
+
+      it('are not underlined in a line added whole', async () => {
+        diff(partly.original, partly.value)
+        await drawn()
+
+        const bonus = changedLines()[1]
+        expect(bonus).toHaveClass('cm-noChangedWords')
+        bonus.querySelectorAll('.cm-changedText').forEach((word) => expect(underline(word)).toBe('none'))
+      })
+
+      it('are not underlined in a line removed whole', async () => {
+        diff('alpha\ngone\nomega', 'alpha\nomega')
+        await drawn()
+
+        const [gone] = deletedLines()
+        expect(gone).toHaveTextContent('gone')
+        expect(gone).toHaveClass('cm-noChangedWords')
+        gone.querySelectorAll('.cm-deletedText').forEach((word) => expect(underline(word)).toBe('none'))
+      })
+
+      it('are not underlined in a line whose only change is its spaces', async () => {
+        diff('if (x) {\nrun()\n}', 'if (x) {\n  run()\n}')
+        await drawn()
+
+        const run = changedLines().find((line) => line.textContent?.includes('run()'))!
+        expect(run).toHaveClass('cm-noChangedWords')
+        const spaces = run.querySelectorAll('.cm-changedText')
+        expect(spaces.length).toBeGreaterThan(0)
+        spaces.forEach((word) => expect(underline(word)).toBe('none'))
+      })
+    })
+
+    describe('the line numbers', () => {
+      it("are two columns for a changed file: the text before's, then the text after's", async () => {
+        diff(partly.original, partly.value)
+        await drawn()
+
+        expect(document.querySelectorAll('.cm-gutter')).toHaveLength(2)
+        expect(Array.from(document.querySelectorAll('.cm-gutter')).map((column) => column.className)).toEqual([
+          expect.stringContaining('cm-beforeLineNumbers'),
+          expect.stringContaining('cm-lineNumbers'),
+        ])
+        expect(numbers('cm-beforeLineNumbers')).toEqual(['1', '2', '3'])
+        expect(numbers('cm-lineNumbers')).toEqual(['1', '2', '3', '4'])
+      })
+
+      it('are one column for a file added whole', () => {
+        diff('', 'one\ntwo')
+
+        expect(document.querySelectorAll('.cm-gutter')).toHaveLength(1)
+        expect(numbers('cm-lineNumbers')).toEqual(['1', '2'])
+        expect(changedLines()).toHaveLength(2)
+        expect(ruleEndingIn('.cm-changedLine::before', 'content', /removedFile/)).toBe(`"${added.mark}"`)
+      })
+
+      it('are one column for a file removed whole, each line removed', () => {
+        diff('one\ntwo', '')
+
+        expect(document.querySelectorAll('.cm-gutter')).toHaveLength(1)
+        expect(numbers('cm-lineNumbers')).toEqual(['1', '2'])
+        const lines = changedLines()
+        expect(lines).toHaveLength(2)
+        expect(lines[0].closest('.cm-editor')).toHaveClass('cm-removedFile')
+        expect(ruleEndingIn('.cm-removedFile .cm-changedLine', 'background-color')).toBe(asRule(removed.tint))
+        expect(ruleEndingIn('.cm-removedFile .cm-changedLine::before', 'content')).toBe(`"${removed.mark}"`)
+        expect(editorView().state.doc.toString()).toBe('one\ntwo')
+      })
+
+      it('make no row for the last line break of either text', async () => {
+        diff('a\nb\n', 'a\nc\n')
+        await drawn()
+
+        expect(editorView().state.doc.toString()).toBe('a\nc')
+        expect(numbers('cm-lineNumbers')).toEqual(['1', '2'])
+        expect(numbers('cm-beforeLineNumbers')).toEqual(['1', '2'])
+      })
+
+      it('make no row for the last line break of a file added whole', () => {
+        diff('', 'one\ntwo\n')
+
+        expect(numbers('cm-lineNumbers')).toEqual(['1', '2'])
+      })
+    })
+
+    describe('the unchanged lines', () => {
+      const lines = (from: number, to: number) =>
+        Array.from({ length: to - from + 1 }, (_, index) => `line ${from + index}`).join('\n')
+      // Ten unchanged lines between two changes: 3 stay on each side and the 4 between them fold.
+      const original = `first\n${lines(1, 10)}\nlast`
+      const value = `FIRST\n${lines(1, 10)}\nLAST`
+
+      it('fold to a button that shows how many, keeping 3 lines on each side of a change', async () => {
+        diff(original, value)
+
+        const button = await screen.findByRole('button', { name: 'Show 4 unchanged lines' })
+        expect(button).toHaveAttribute('tabindex', '0')
+        expect(screen.getByText('line 3')).toBeInTheDocument()
+        expect(screen.getByText('line 8')).toBeInTheDocument()
+        expect(screen.queryByText('line 4')).not.toBeInTheDocument()
+        expect(screen.queryByText('line 7')).not.toBeInTheDocument()
+      })
+
+      it('show their lines after a click', async () => {
+        diff(original, value)
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Show 4 unchanged lines' }))
+
+        expect(screen.getByText('line 4')).toBeInTheDocument()
+        expect(screen.getByText('line 7')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /unchanged lines/ })).not.toBeInTheDocument()
+      })
+
+      it('show their lines after Enter', async () => {
+        diff(original, value)
+
+        fireEvent.keyDown(await screen.findByRole('button', { name: 'Show 4 unchanged lines' }), { key: 'Enter' })
+
+        expect(screen.getByText('line 4')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /unchanged lines/ })).not.toBeInTheDocument()
+      })
+
+      it('show their lines after Space', async () => {
+        diff(original, value)
+
+        fireEvent.keyDown(await screen.findByRole('button', { name: 'Show 4 unchanged lines' }), { key: ' ' })
+
+        expect(screen.getByText('line 7')).toBeInTheDocument()
+      })
+
+      it('stay folded after another key', async () => {
+        diff(original, value)
+
+        fireEvent.keyDown(await screen.findByRole('button', { name: 'Show 4 unchanged lines' }), { key: 'a' })
+
+        expect(screen.queryByText('line 4')).not.toBeInTheDocument()
+      })
+
+      it('do not fold a run of 3 or fewer lines', async () => {
+        diff(`first\n${lines(1, 6)}\nlast`, `FIRST\n${lines(1, 6)}\nLAST`)
+        await drawn()
+
+        expect(screen.queryByRole('button', { name: /unchanged lines/ })).not.toBeInTheDocument()
+        expect(screen.getByText('line 4')).toBeInTheDocument()
+      })
+
+      it('read in Vietnamese in the Vietnamese texts', async () => {
+        diff(original, value, {}, { texts: platformVietnamese })
+
+        expect(await screen.findByRole('button', { name: 'Xem 4 dòng không đổi' })).toBeInTheDocument()
+      })
+
+      it('are a button in the primary text colour on the canvas, with a focus ring from the keyboard', async () => {
+        diff(original, value)
+
+        const row = await screen.findByRole('button', { name: 'Show 4 unchanged lines' })
+        expect(winningRule(row, 'color')).toBe(asStyled(colour.primaryText))
+        expect(winningRule(row, 'background')).toBe(asStyled(colour.canvas))
+        expect(ruleEndingIn('.cm-collapsedLines:focus-visible', 'outline')).toBe(`2px solid ${colour.focusRing}`)
+      })
+    })
+
+    it("shows a new text before as the merge view's own change", async () => {
+      const { rerender } = diff(partly.original, partly.value)
+      await drawn()
+
+      rerender({ original: 'alpha\nprice = 15\nomega' })
+
+      await waitFor(() => expect(deletedLines()[0]).toHaveTextContent('price = 15'))
+    })
+
+    it('shows a file that turns from changed to added whole as one column', async () => {
+      const { rerender } = diff(partly.original, partly.value)
+      await drawn()
+
+      rerender({ original: '' })
+
+      await waitFor(() => expect(document.querySelectorAll('.cm-gutter')).toHaveLength(1))
+      expect(deletedLines()).toHaveLength(0)
     })
   })
 })
