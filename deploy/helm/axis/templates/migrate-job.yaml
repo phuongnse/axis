@@ -39,6 +39,10 @@ spec:
             - migrate
             - --parallel
             - {{ .Values.migrate.parallel | quote }}
+          {{- with include "axis.keyServiceEnv" . }}
+          env:
+            {{- . | nindent 12 }}
+          {{- end }}
           securityContext:
             {{- include "axis.containerSecurityContext" . | nindent 12 }}
           {{- with .Values.migrate.resources }}

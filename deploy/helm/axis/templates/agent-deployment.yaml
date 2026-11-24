@@ -33,6 +33,9 @@ spec:
           # extension, module or cell setting, so it does not use axis.hostEnv.
           env:
             {{- include "axis.tenancyEnv" . | nindent 12 }}
+            {{- with include "axis.keyServiceEnv" . }}
+            {{- . | nindent 12 }}
+            {{- end }}
             {{- if .Values.ai.allowTenantKeys }}
             - name: Ai__AllowTenantKeys
               value: "true"

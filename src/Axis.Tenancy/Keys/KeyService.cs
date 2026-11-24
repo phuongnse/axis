@@ -23,14 +23,17 @@ public interface IKeyService
     SecretValue Unwrap(string purpose, string setting, string wrapped);
 }
 
-/// <summary>Reads the key service of a host from <c>KeyService:Kind</c> and <c>KeyService:KeyFile</c>.</summary>
+/// <summary>Reads the key service of a host from <c>KeyService:Kind</c>, <c>KeyService:KeyFile</c> and <c>KeyService:KeyId</c>.</summary>
 public static class KeyService
 {
-    /// <summary>The setting that turns the key service on. The only kind is <c>file</c>.</summary>
+    /// <summary>The setting that turns the key service on. The kinds are <c>file</c> and <c>aws-kms</c>.</summary>
     public const string KindSetting = "KeyService:Kind";
 
     /// <summary>The setting that names the key file of the <c>file</c> kind, 32 random bytes in base64.</summary>
     public const string KeyFileSetting = "KeyService:KeyFile";
+
+    /// <summary>The setting that names the AWS KMS key of the <c>aws-kms</c> kind: a key id, an alias or an ARN.</summary>
+    public const string KeyIdSetting = "KeyService:KeyId";
 
     /// <summary>The purpose of <c>Platform:SecretKey</c> and <c>Platform:PreviousSecretKey</c>.</summary>
     public const string InstallationKey = "installation-key";
@@ -39,13 +42,15 @@ public static class KeyService
     public const string AgentHostKey = "agent-host-key";
 
     private const string FileKind = "file";
+    private const string AwsKmsKind = "aws-kms";
 
     /// <summary>
     /// Returns the key service, or <see langword="null"/> when <c>KeyService:Kind</c> is blank, and then a host reads plain keys. A message
     /// never contains a path or a key.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The kind is not <c>file</c>, or <c>KeyService:KeyFile</c> is missing, cannot be read or does not hold 32 bytes in base64.
+    /// The kind is neither <c>file</c> nor <c>aws-kms</c>, <c>KeyService:KeyFile</c> is missing, cannot be read or does not hold 32 bytes in
+    /// base64, or <c>KeyService:KeyId</c> is missing or names no region.
     /// </exception>
     public static IKeyService? Load(IConfiguration configuration)
     {
@@ -57,9 +62,21 @@ public static class KeyService
             return null;
         }
 
-        if (kind.Trim() != FileKind)
+        kind = kind.Trim();
+        if (kind == AwsKmsKind)
         {
-            throw new InvalidOperationException($"The setting {KindSetting} must be {FileKind}.");
+            var keyId = configuration[KeyIdSetting];
+            if (string.IsNullOrWhiteSpace(keyId))
+            {
+                throw new InvalidOperationException($"The setting {KeyIdSetting} is required.");
+            }
+
+            return AwsKmsKeyService.Create(keyId.Trim());
+        }
+
+        if (kind != FileKind)
+        {
+            throw new InvalidOperationException($"The setting {KindSetting} must be {FileKind} or {AwsKmsKind}.");
         }
 
         var path = configuration[KeyFileSetting];

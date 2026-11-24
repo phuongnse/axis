@@ -1271,4 +1271,25 @@ describe('the Axis Helm chart', () => {
       .join('\n')
     assert.equal(spec.trim(), file.trim())
   })
+
+  test('with keyService set, every Deployment, Job and CronJob that mounts the installation key gets the key service settings', () => {
+    const keyId = 'arn:aws:kms:eu-west-1:111122223333:key/test'
+    const output = renderOk('--set', 'keyService.kind=aws-kms', '--set', `keyService.keyId=${keyId}`)
+    const readers = documents(output).filter((document) => /^kind: (Deployment|Job|CronJob)$/m.test(document) && /path: Platform__SecretKey$/m.test(document))
+    // The server, the worker, the agent host, the publisher, the migrate Job and both cell CronJobs.
+    assert.ok(readers.length >= 7, `${readers.length} hosts read the installation key`)
+    for (const document of readers) {
+      assert.match(document, /- name: KeyService__Kind\n\s+value: "aws-kms"\n/, document.match(/^  name: .+$/m)[0])
+      assert.match(document, new RegExp(`- name: KeyService__KeyId\\n\\s+value: "${keyId}"\\n`), document.match(/^  name: .+$/m)[0])
+    }
+    assert.equal(documents(output).filter((document) => /KeyService__/.test(document) && !readers.includes(document)).length, 0)
+  })
+
+  test('without keyService no document has a key service setting, and a kind without a key id fails and names keyService.keyId', () => {
+    assert.doesNotMatch(renderOk(), /KeyService__/)
+    const result = render('--set', 'keyService.kind=aws-kms')
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /keyService\.keyId is required/)
+    assert.notEqual(render('--set', 'keyService.kind=file', '--set', 'keyService.keyId=x').status, 0)
+  })
 })
