@@ -153,9 +153,10 @@ their own controls where they expect them.
   as [buttons](actions-and-controls.md#buttons) says.
 - **A title row's actions keep their roles.** `TitleRowActions` draws the actions of a part's and a field group's title
   row, each in its own role: a section's Add is a secondary button with its border, and a tool is subtle.
-- **A view switch sits above what it switches** _(planned, #5130)_. A switch between two views of one content, such as Form
+- **A view switch sits above what it switches**. A switch between two views of one content, such as Form
   and JSON, is a row of line tabs right above that content, in the one look every tab row of the workspace has, see
-  [tab bars](actions-and-controls.md#tab-bars).
+  [tab bars](actions-and-controls.md#tab-bars). A switch between the widths a page is drawn at, such as Desktop and Phone
+  on the page canvas, stays a [segmented control](actions-and-controls.md#tab-bars), as it changes what shows at once.
 - **The layout follows the work**. A region puts what to act on first, then the input, the action and the
   result. An action sits after what it acts on, at the foot of its region when the input can be long, and the result
   comes after it.

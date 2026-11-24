@@ -1,8 +1,8 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import type { StudioRevision } from '../platform/studio'
+import type { StudioRevision, StudioRevisionChange } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioRevisionPage } from './StudioHistory'
@@ -19,7 +19,7 @@ const revision: StudioRevision = {
   time: '2026-11-02T09:30:00Z',
 }
 
-function stubServer(shown: StudioRevision, users: boolean) {
+function stubServer(shown: StudioRevision, users: boolean, resources: StudioRevisionChange[] = []) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string) => {
@@ -27,7 +27,7 @@ function stubServer(shown: StudioRevision, users: boolean) {
         return new Response(JSON.stringify({ id: 'me', displayName: 'Me', roles: [], users }))
       }
       if (input.startsWith(`/api/studio/apps/${application}/revisions/r1`)) {
-        return new Response(JSON.stringify({ revision: shown, resources: [] }))
+        return new Response(JSON.stringify({ revision: shown, resources }))
       }
       return new Response(null, { status: 404 })
     }),
@@ -89,6 +89,28 @@ describe('StudioRevisionPage', () => {
     // /api/me has answered once the page stays without a link.
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/me', expect.anything()))
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('shows a changed package file as its line diff, with its removed and added lines marked', async () => {
+    stubServer(revision, true, [
+      {
+        file: 'packages/approval-rules/adapter.py',
+        change: 'changed',
+        id: null,
+        kind: null,
+        name: null,
+        before: 'def limit():\n    return 1000\n',
+        after: 'def limit():\n    return 5000\n',
+      },
+    ])
+    renderPage()
+
+    const section = (await screen.findAllByTestId('studio-changes-file'))[0]
+    const editor = await within(section).findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })
+    expect(editor).toBeVisible()
+    await waitFor(() => expect(section.querySelector('.cm-deletedLine')).toHaveTextContent('return 1000'))
+    expect(section.querySelector('.cm-changedLine')).toHaveTextContent('return 5000')
+    expect(within(section).queryByTestId('json-diff-before')).toBeNull()
   })
 
   it('shows a revision the server made as System, in plain text, and leaves out Through without a client', async () => {

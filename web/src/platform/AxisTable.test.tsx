@@ -1280,6 +1280,9 @@ describe('AxisTable', () => {
         expect(entries.map((entry) => entry.textContent)).toEqual(['Rename', 'Delete'])
         expect(entries[0]).not.toHaveClass('ant-dropdown-menu-item-danger')
         expect(entries[1]).toHaveClass('ant-dropdown-menu-item-danger')
+        const divider = within(menu).getByRole('separator')
+        expect(divider.compareDocumentPosition(entries[0]) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+        expect(divider.compareDocumentPosition(entries[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       })
 
       it('saves the address as a view, and opens it again at page 1 with a history entry', async () => {

@@ -1995,6 +1995,63 @@ describe('StudioPage publishing', () => {
       expect(fetchMock.mock.calls.map(([input]) => input)).toContain(`${folder}/releases/live/diff`)
     })
 
+    it('counts a package file with the resources, lists it after them sorted by path, and draws its line diff', async () => {
+      /** A package file of the live diff, with no kind: added, changed or removed, as the server answers it. */
+      const packageLiveFile = (
+        file: string,
+        change: 'added' | 'changed' | 'removed',
+        before: string | null,
+        after: string | null,
+      ) => ({
+        file,
+        change,
+        id: null,
+        kind: null,
+        name: null,
+        titles: null,
+        before,
+        after,
+        target: null,
+        by: [],
+      })
+      stubPublishing(
+        publisher,
+        [],
+        { folderContentHash: 'hash-4', active: true },
+        liveDiff([
+          packageLiveFile('packages/approval-rules/old.py', 'removed', 'def gone():\n    return 0\n', null),
+          liveFile('roles/buyer.json', 'changed', 'Buyer', [revision('b', 'author', 'Ana')]),
+          packageLiveFile(
+            'packages/approval-rules/adapter.py',
+            'changed',
+            'def limit():\n    return 1000\n',
+            'def limit():\n    return 5000\n',
+          ),
+          liveFile('roles/approver.json', 'added', 'Approver', []),
+          packageLiveFile('packages/approval-rules/new.py', 'added', null, 'def fresh():\n    return 1\n'),
+        ]),
+      )
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(await screen.findByRole('heading', { name: '5 files changed since the live release' })).toBeVisible()
+      const section = sectionOf()
+      const files = within(section).getAllByTestId('studio-changes-file')
+      expect(files.map((file) => file.dataset.file)).toEqual([
+        'roles/approver.json',
+        'roles/buyer.json',
+        'packages/approval-rules/adapter.py',
+        'packages/approval-rules/new.py',
+        'packages/approval-rules/old.py',
+      ])
+      expect(within(section).getAllByText('Package file')).toHaveLength(3)
+
+      const adapter = files[2]
+      expect(await within(adapter).findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })).toBeVisible()
+      await waitFor(() => expect(adapter.querySelector('.cm-deletedLine')).toHaveTextContent('return 1000'))
+      expect(adapter.querySelector('.cm-changedLine')).toHaveTextContent('return 5000')
+      expect(within(files[0]).getByTestId('json-diff-after')).toHaveTextContent('"label": "second"')
+    })
+
     it('names the person who accepted an AI request that cannot be read', async () => {
       stubPublishing(
         publisher,

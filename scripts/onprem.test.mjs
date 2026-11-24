@@ -32,6 +32,8 @@
 // PostgreSQL serves a certificate of the same authority, every connection string sets SSL Mode=VerifyFull with
 // that authority as Root Certificate, and the test checks in pg_stat_ssl that every Axis connection uses TLS.
 // The production hosts refuse a connection string with a weaker mode.
+// They also refuse a plain installation key and a missing key service, so the setup writes a key file, wraps the installation key with
+// `platform key wrap` in the admin image, and Compose mounts the key file on every service that reads the key.
 // The identity provider imports a copy of the development realm that adds the https redirect addresses of the tenants.
 // The production server refuses an identity provider over plain http. The proxy serves the identity host over https, and
 // only the server, the worker, the admin tool and the publisher in this test trust the certificate authority, through SSL_CERT_FILE.
@@ -55,6 +57,7 @@ import { listedImage } from './lib/docker-images.mjs'
 import { freePort, startOnFreePorts } from './lib/free-ports.mjs'
 import { addAccount, cookieHeader, preparePlatformClient, signIn } from './lib/keycloak-sign-in.mjs'
 import { buildPackage, copyReadable, downloadTrivyDatabase, removeAsImageUser, writable } from './lib/package-build.mjs'
+import { keyServicePath, wrapKey, writeKeyFile } from './lib/key-service.mjs'
 import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
@@ -78,20 +81,26 @@ const applicationPackageHost = 'application-package-host'
 const allProfiles = ['admin', 'replicas', 'application-packages']
 const hosts = { one: 'one.axis.test', two: 'two.axis.test' }
 
+// The key file of the key service. The hosts read /run/secrets as settings, so it is mounted outside it, at keyServicePath.
+const keyFile = 'KeyService__KeyFile'
+
 const secretFiles = {
-  server: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
-  'server-2': ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
+  server: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey', keyFile],
+  'server-2': ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey', keyFile],
   proxy: [],
   identity: ['IdentityProvider__AdminClientSecret', 'KC_DB_PASSWORD', 'KC_DB_URL', 'KC_DB_USERNAME'],
-  worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
-  agent: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
+  worker: ['ConnectionStrings__Platform', 'Platform__SecretKey', keyFile],
+  agent: ['ConnectionStrings__Platform', 'Platform__SecretKey', keyFile],
   'package-host-dotnet': [],
   'package-host-python': [],
   'package-host-node': [],
   'application-package-host': [],
-  admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey'],
-  publisher: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
+  admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey', keyFile],
+  publisher: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey', keyFile],
 }
+
+// secretTarget: where Compose mounts a secret: /run/secrets/<name>, and the key file at keyServicePath.
+const secretTarget = (source) => (source === keyFile ? keyServicePath : `/run/secrets/${source}`)
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -184,7 +193,7 @@ describe('the example holds no secret', () => {
       }
       const secrets = (service.secrets ?? []).map((secret) => secret.source).sort()
       assert.deepEqual(secrets, [...secretFiles[name]].sort(), `${name} secrets`)
-      for (const secret of service.secrets ?? []) assert.equal(secret.target, `/run/secrets/${secret.source}`)
+      for (const secret of service.secrets ?? []) assert.equal(secret.target, secretTarget(secret.source), `${name} mounts ${secret.source} elsewhere`)
     }
     assert.equal(
       config.services.worker.secrets.some((secret) => secret.source === 'ConnectionStrings__PlatformSchema'),
@@ -233,6 +242,21 @@ describe('the example holds no secret', () => {
     assert.deepEqual(sort(listed), sort(mounted))
   })
 
+  test('every service that mounts the installation key mounts the key file at the path KeyService__KeyFile names, with the file key service, and no other service mounts it', () => {
+    const { services } = render([scenariosFile])
+    for (const [name, service] of Object.entries(services)) {
+      const sources = (service.secrets ?? []).map((secret) => secret.source)
+      const mountsKey = sources.includes('Platform__SecretKey')
+      assert.equal(sources.includes(keyFile), mountsKey, `${name} mounts the installation key and the key file together or neither`)
+      if (!mountsKey) continue
+      const mount = service.secrets.find((secret) => secret.source === keyFile)
+      assert.equal(mount.target, keyServicePath, `${name} key file target`)
+      assert.equal(service.environment.KeyService__Kind, 'file', `${name} KeyService__Kind`)
+      assert.equal(service.environment.KeyService__KeyFile, mount.target, `${name} KeyService__KeyFile names another path than the mount`)
+    }
+    assert.ok(Object.values(services).some((service) => (service.secrets ?? []).some((secret) => secret.source === keyFile)), 'no service mounts the key file')
+  })
+
   test('the scenario secret and Studio__Tests come only with compose.scenarios.yaml, in the publisher and the servers', () => {
     const scenario = 'Scenarios__ServerConnectionString'
     for (const [name, service] of Object.entries(render().services)) {
@@ -247,7 +271,7 @@ describe('the example holds no secret', () => {
     const { services, secrets } = render([scenariosFile])
     const publisherSecrets = (services.publisher.secrets ?? []).map((secret) => secret.source).sort()
     assert.deepEqual(publisherSecrets, [...secretFiles.publisher, scenario].sort())
-    for (const secret of services.publisher.secrets) assert.equal(secret.target, `/run/secrets/${secret.source}`)
+    for (const secret of services.publisher.secrets) assert.equal(secret.target, secretTarget(secret.source))
     assert.ok(secrets[scenario].file, 'the scenario secret has no file')
     for (const name of ['server', 'server-2']) {
       assert.equal(services[name].environment.Studio__Tests, 'true', `${name} Studio__Tests`)
@@ -261,9 +285,9 @@ describe('the example holds no secret', () => {
     assert.equal(services.publisher.environment?.Studio__Tests, undefined)
   })
 
-  test('the agent host mounts the platform connection and the installation key only, and publishes only its health port on 127.0.0.1', () => {
+  test('the agent host mounts the platform connection, the installation key and the key file only, and publishes only its health port on 127.0.0.1', () => {
     const { agent } = render().services
-    assert.deepEqual((agent.secrets ?? []).map((secret) => secret.source).sort(), ['ConnectionStrings__Platform', 'Platform__SecretKey'])
+    assert.deepEqual((agent.secrets ?? []).map((secret) => secret.source).sort(), ['ConnectionStrings__Platform', keyFile, 'Platform__SecretKey'])
     assert.equal(agent.environment.Tenancy__Source, 'directory')
     assert.equal((agent.secrets ?? []).some((secret) => secret.source === 'ConnectionStrings__PlatformSchema'), false, 'the agent host holds the schema connection string')
     assert.deepEqual(
@@ -846,7 +870,14 @@ describe('the on-premises installation', () => {
         join(secrets, 'Scenarios__ServerConnectionString'),
         `Host=postgres;Port=5432;Database=postgres;Username=axis_scenario;Password=${passwords.scenario}${trust}`,
       )
-      writeFile(join(secrets, 'Platform__SecretKey'), randomBytes(32).toString('base64'))
+      // The installation key is wrapped with `platform key wrap` in the admin image, as the doc says, so the hosts, which refuse a plain key,
+      // start with the key file and the wrapped key.
+      const installationKey = randomBytes(32).toString('base64')
+      writeKeyFile(join(secrets, keyFile))
+      const wrapped = wrapKey({ image: `axis-admin:${version}`, keyFile: join(secrets, keyFile), key: installationKey })
+      assert.notEqual(wrapped, installationKey, 'the installation key is not wrapped')
+      assert.notEqual(Buffer.from(wrapped, 'base64').length, 32, 'the wrapped key is as long as a plain key')
+      writeFile(join(secrets, 'Platform__SecretKey'), wrapped)
       adminClientSecret = password()
       writeFile(join(secrets, 'IdentityProvider__AdminClientSecret'), adminClientSecret)
       // The identity provider's own database, with the same trust as every other connection.

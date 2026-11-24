@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 
 namespace Axis.Tenancy.Tests;
 
@@ -171,6 +173,64 @@ public sealed class KeyServiceTests : IDisposable
         Assert.Equal("failed", Assert.Throws<InvalidOperationException>(() => cipher.UnwrapKey(KeyService.AgentHostKey, wrapped, "failed")).Message);
     }
 
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public void A_host_outside_development_and_testing_refuses_a_missing_key_service_and_names_the_setting_and_not_the_key(string environment)
+    {
+        var plain = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var settings = Configure(("Platform:SecretKey", plain));
+
+        var forKeyService = Assert.Throws<InvalidOperationException>(() => KeyService.Load(settings, Host(environment)));
+        var forCipher = Assert.Throws<InvalidOperationException>(() => TenantSecretCipher.Load(settings, Host(environment)));
+
+        Assert.Equal("The setting KeyService:Kind is required outside Development and Testing.", forKeyService.Message);
+        Assert.Equal(forKeyService.Message, forCipher.Message);
+        Assert.DoesNotContain(plain, forCipher.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_host_outside_development_and_testing_refuses_a_plain_installation_key_with_a_key_service_and_names_the_setting()
+    {
+        var keyFileBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var plain = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => TenantSecretCipher.Load(Settings(keyFileBase64, plain, null), Host("Production")));
+
+        Assert.Contains("Platform:SecretKey", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(plain, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(_folder, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_host_outside_development_and_testing_loads_a_wrapped_installation_key()
+    {
+        var keyFileBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var plain = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var wrapped = KeyServiceOf(WriteKeyFile(keyFileBase64)).Wrap(KeyService.InstallationKey, plain);
+
+        var cipher = TenantSecretCipher.Load(Settings(keyFileBase64, wrapped, null), Host("Production"));
+
+        var stored = cipher.Encrypt("a", TenantSecretFields.RuntimePassword, "p4ssw0rd");
+        Assert.Equal("p4ssw0rd", TenantSecretCipher.FromKey(Convert.FromBase64String(plain)).Decrypt("a", TenantSecretFields.RuntimePassword, stored).Reveal());
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Testing")]
+    public void A_development_or_testing_host_loads_a_plain_installation_key_with_no_key_service(string environment)
+    {
+        var plain = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var settings = Configure(("Platform:SecretKey", plain));
+
+        Assert.Null(KeyService.Load(settings, Host(environment)));
+        var cipher = TenantSecretCipher.Load(settings, Host(environment));
+        var stored = cipher.Encrypt("a", TenantSecretFields.RuntimePassword, "p4ssw0rd");
+        Assert.Equal("p4ssw0rd", TenantSecretCipher.FromKey(Convert.FromBase64String(plain)).Decrypt("a", TenantSecretFields.RuntimePassword, stored).Reveal());
+    }
+
+    private static StubEnvironment Host(string environment) => new StubEnvironment(environment);
+
     private string WriteKeyFile(string base64, string name = "key-file")
     {
         var path = Path.Combine(_folder, name);
@@ -190,4 +250,15 @@ public sealed class KeyServiceTests : IDisposable
 
     private static IConfiguration Configure(params (string Key, string? Value)[] values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values.Select(value => new KeyValuePair<string, string?>(value.Key, value.Value))).Build();
+
+    private sealed class StubEnvironment(string name) : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = name;
+
+        public string ApplicationName { get; set; } = "Axis.Tenancy.Tests";
+
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
 }

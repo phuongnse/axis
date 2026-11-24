@@ -265,7 +265,7 @@ not a NexKit check: the [performance workflow](#workflows-outside-nexkits-checks
 1. builds the three production images, writes the generated application of typical size with seed 1
    into `artifacts/load/apps/load`, and starts the reference stack of `deploy/compose/compose.yaml`
    with a load override in `artifacts/load`: PostgreSQL over TLS, a certificate authority made for the
-   run, and the secret files. The stack starts PostgreSQL, then the identity provider and the proxy,
+   run, and the secret files, with the installation key wrapped by `platform key wrap` in the admin image. The stack starts PostgreSQL, then the identity provider and the proxy,
    then `server` and the worker, then `server-2` with the `replicas` profile;
 2. after the health checks, runs `admin migrate` and creates the tenant `load`;
 3. sets up the `load` realm through the identity provider's admin API: the redirect addresses and

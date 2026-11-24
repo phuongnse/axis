@@ -38,6 +38,7 @@ public sealed class PackageIsolationStartTests
         {
             builder.UseEnvironment(environment);
             builder.UseTestPlatform();
+            builder.UseTestKeyService(TestPlatform.SecretKey);
             builder.UseSetting("Extensions:Isolation", isolation);
             builder.UseSetting("Tenants:default:Hosts:0", "localhost");
             builder.UseSetting("Tenants:default:ConnectionString", TestPlatform.UnreachableDatabase);

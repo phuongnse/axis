@@ -24,9 +24,9 @@ import {
 } from 'react'
 import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
-import { Chevron } from './Chevron'
 import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
+import { FoldButton } from './FoldButton'
 import { nameCompare } from './listOrder'
 import { paginationItems } from './pagination'
 import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
@@ -766,7 +766,7 @@ export function AxisTable<T extends object>({
 }
 
 /**
- * The fold of a row, a subtle `AxisButton` with `Chevron`: named "Show the rows in it" or "Hide the rows in it"
+ * The fold of a row, a small `FoldButton`: named "Show the rows in it" or "Hide the rows in it"
  * for a row with group rows, and "Show the details" or "Hide the details" for a row with details, see
  * docs/reference/actions-and-controls.md#tables.
  */
@@ -774,16 +774,7 @@ function RowFold({ group, open, onToggle }: { group: boolean; open: boolean; onT
   const names = group
     ? { show: 'shell.table.showRows', hide: 'shell.table.hideRows' }
     : { show: 'shell.table.showDetails', hide: 'shell.table.hideDetails' }
-  return (
-    <AxisButton
-      role="subtle"
-      size="small"
-      icon={<Chevron point={open ? 'down' : 'right'} />}
-      nameKey={open ? names.hide : names.show}
-      aria-expanded={open}
-      onClick={onToggle}
-    />
-  )
+  return <FoldButton size="small" open={open} onToggle={onToggle} names={names} />
 }
 
 /**

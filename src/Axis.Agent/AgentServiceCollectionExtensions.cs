@@ -26,7 +26,7 @@ public static class AgentServiceCollectionExtensions
     /// <exception cref="InvalidOperationException">
     /// <c>Health:Urls</c> is blank, a binding has an unknown <c>Kind</c>, no <c>Model</c>, a <c>KeyFile</c> that cannot be read or a
     /// <c>MaxOutputTokens</c> that is not a whole number of at least 1, <c>Ai:DefaultBinding</c> or <c>Ai:ReviewBinding</c> names no binding, <c>Ai:FixRounds</c> is not a whole number of at least 0,
-    /// <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1, <c>Ai:RequestTimeout</c> is not a positive time span, <c>Ai:HostKeyFile</c> with <c>Ai:DefaultBinding</c> set names a file that cannot be read, does not unwrap with the key service or holds no EC P-256 private key, <c>KeyService:Kind</c> is set and its settings are wrong, or <c>Ai:ScriptedAnswersFile</c> is set outside Development and Testing,
+    /// <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1, <c>Ai:RequestTimeout</c> is not a positive time span, <c>Ai:HostKeyFile</c> with <c>Ai:DefaultBinding</c> set names a file that cannot be read, does not unwrap with the key service or holds no EC P-256 private key, <c>KeyService:Kind</c> is set and its settings are wrong, <c>KeyService:Kind</c> is blank outside Development and Testing while a host key or the installation key is read, or <c>Ai:ScriptedAnswersFile</c> is set outside Development and Testing,
     /// names a file that cannot be read or holds no array of answers.
     /// With <c>Ai:DefaultBinding</c> set, also <c>Tenancy:Source</c> is unknown, no tenant is configured under <c>configuration</c>,
     /// <c>Ai:AllowTenantKeys</c> is not <c>true</c> or <c>false</c>,
@@ -54,7 +54,7 @@ public static class AgentServiceCollectionExtensions
             scriptedAnswers = ScriptedModelAdapter.ReadAnswers(scriptedAnswersFile, AiSettings.ScriptedAnswersFileSetting);
         }
 
-        var hostKey = settings.HostKeyFile is { } hostKeyFile ? AgentHostKey.Load(hostKeyFile, KeyService.Load(configuration)) : null;
+        var hostKey = settings.HostKeyFile is { } hostKeyFile ? AgentHostKey.Load(hostKeyFile, KeyService.Load(configuration, environment)) : null;
         var tenantKeys = settings.DefaultBinding is null ? null : TenantModelKeySettings.Load(configuration);
         (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, TenantUsageStore? Usage, ITenantKeySource KeySource, HostKeyStore? HostKeys)? tenants =
             settings.DefaultBinding is null ? null : LoadTenantCatalog(configuration, environment);
@@ -151,7 +151,7 @@ public static class AgentServiceCollectionExtensions
 
         // Read first, so a bad value stops the start even when the database is not there.
         var refreshInterval = TenancySettings.RefreshInterval(configuration);
-        var cipher = TenantSecretCipher.Load(configuration);
+        var cipher = TenantSecretCipher.Load(configuration, environment);
         var catalog = BackgroundTenantCatalog.FromDirectory(
             platformConnectionString,
             cipher,

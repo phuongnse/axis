@@ -2533,6 +2533,7 @@
   "shell.studio.changes.changedBy": "Người thay đổi: {authors}",
   "shell.studio.changes.you": "bạn",
   "shell.studio.changes.aiRequest": "yêu cầu AI “{name}”",
+  "shell.studio.changes.packageFile": "Tệp của gói mở rộng",
   "shell.studio.request.queued": "Đang chờ đến lượt xử lý…",
   "shell.studio.request.running": "Đang chạy…",
   "shell.studio.request.validated": "Đã kiểm tra lỗi. Ứng dụng không có lỗi.",

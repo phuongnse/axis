@@ -608,7 +608,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | The rest of the data encrypted at rest by the database or disk | [Business](reference/keys-and-data-protection.md#business) |
 | Connection secrets stored encrypted | [Deployment bindings](reference/tenant-setting-commands.md#deployment-bindings) |
 | Rotate the installation key | [Installation key](reference/tenant-setting-commands.md#installation-key) |
-| Every secret rests on a cloud or customer key service | _(planned for M35)_ |
+| The installation key and the agent host's private key wrapped by AWS KMS or a key file | [Key policy](reference/keys-and-data-protection.md#key-policy) |
 | A key that the customer holds for its own tenant | _(planned for M57)_ |
 | Encrypted connections everywhere | [TLS](reference/installation.md#tls) |
 
