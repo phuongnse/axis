@@ -13,7 +13,7 @@ describe('the design-system shell states', () => {
 
   beforeEach(() => {
     // The bundle installs the same fixture fetch, so the states are drawn as the preview draws them.
-    installFixtureFetch({ ...routes, ...stateRoutes(previews), ...chosenRoutes(previews) }, fixtureScopes)
+    installFixtureFetch({ ...routes, ...stateRoutes(previews), ...chosenRoutes(previews, routes) }, fixtureScopes)
   })
 
   afterEach(() => {

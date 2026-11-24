@@ -11,7 +11,7 @@ describe('the design-system Entity with expressions state', () => {
 
   beforeEach(() => {
     // The bundle installs the same fixture fetch, so the state is drawn as the preview draws it.
-    installFixtureFetch({ ...routes, ...stateRoutes(previews), ...chosenRoutes(previews) }, fixtureScopes)
+    installFixtureFetch({ ...routes, ...stateRoutes(previews), ...chosenRoutes(previews, routes) }, fixtureScopes)
   })
 
   afterEach(() => {
