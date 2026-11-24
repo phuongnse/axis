@@ -172,7 +172,7 @@ With nothing to save it is not drawn. At narrow width the bar's actions wrap, as
   on a site's form, see [layout](shell.md#layout) and [saving](form-widget.md#saving).
 - **Undo and Redo**. They show, as icons after the line, only where the editor gives them, so a site's
   form has none.
-- **Discard** _(planned, #5133)_. Discard is in the destructive tone, drawn in `dangerText`, wherever the bar shows.
+- **Discard**. Discard is in the destructive tone, drawn in `dangerText`, wherever the bar shows.
 
 ## Form and JSON
 

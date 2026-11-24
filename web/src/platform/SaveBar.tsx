@@ -15,8 +15,9 @@ import { useUnsavedChanges } from './unsavedChanges'
  * rather than fold, as Discard is its only action to fold and a menu of one entry is never drawn, see
  * docs/reference/actions-and-controls.md#buttons. It draws Undo and Redo only when the editor gives `history`. It is shown while there is something
  * to save or, with `history`, a step can be redone, and it is not drawn otherwise. Discard asks first, because no Undo
- * brings the changes back, see docs/reference/actions-and-controls.md#undo-rather-than-confirm. `data-testid` names the
- * bar and `saveTestId` its Save button.
+ * brings the changes back, see docs/reference/actions-and-controls.md#undo-rather-than-confirm. Discard is in the
+ * destructive tone, see docs/reference/studio-resource-form.md#save-bar. `data-testid` names the bar and `saveTestId`
+ * its Save button.
  */
 export function SaveBar({
   unsaved,
@@ -89,6 +90,7 @@ export function SaveBar({
                   {
                     key: 'discard',
                     labelKey: 'shell.studio.discard',
+                    destructive: true,
                     disabled: busy,
                     onClick: () => setDiscardOpen(true),
                   },
