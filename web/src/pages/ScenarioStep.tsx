@@ -1,13 +1,14 @@
-import { Card, ConfigProvider, Flex, Input, Select, Typography } from 'antd'
+import { ConfigProvider, Flex, Input, Select, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { fillText } from '../platform/fillText'
 import type { ReactNode } from 'react'
-import { useContext, useState } from 'react'
+import { useContext, useId, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
+import { PaneHeader } from '../platform/PaneHeader'
 import type { StudioNameField } from '../platform/studio'
 import {
   changeStepType,
@@ -33,6 +34,7 @@ import {
 } from '../platform/scenarioSteps'
 import type { SeedField } from '../platform/seedValues'
 import { StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
+import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFieldTexts } from './fieldTexts'
@@ -241,6 +243,8 @@ export function ScenarioStep({
   const stepValue = steps[index]
   const step: Step = isObject(stepValue) ? stepValue : {}
   const type = stepTypes.find((candidate) => candidate === step.type)
+  const { spacing } = useDesignTokens()
+  const headingId = useId()
   const pointer = `/steps/${index}`
   const at = (key: string) => `${pointer}/${key}`
   const text = (key: string) => (typeof step[key] === 'string' ? (step[key] as string) : undefined)
@@ -373,7 +377,6 @@ export function ScenarioStep({
               allowClear
               disabled={disabled}
               value={kind ?? null}
-              style={{ minWidth: 240 }}
               options={[
                 { value: 'user', label: t('shell.studio.scenario.assigneeUser') },
                 { value: 'role', label: t('shell.studio.scenario.assigneeRole') },
@@ -411,7 +414,6 @@ export function ScenarioStep({
             <Select
               virtual={false}
               value={kind ?? null}
-              style={{ minWidth: 240 }}
               options={[
                 { value: 'user', label: t('shell.studio.scenario.assigneeUser') },
                 { value: 'role', label: t('shell.studio.scenario.assigneeRole') },
@@ -450,7 +452,6 @@ export function ScenarioStep({
         <Select
           virtual={false}
           value={text('channel') ?? 'none'}
-          style={{ minWidth: 160 }}
           options={['none', 'inApp', 'email'].map((option) => ({ value: option, label: option }))}
           onChange={(next: string) => onChange(at('channel'), next === 'none' ? undefined : next)}
         />
@@ -468,7 +469,6 @@ export function ScenarioStep({
             virtual={false}
             value={kind}
             disabled={step.save !== undefined}
-            style={{ minWidth: 160 }}
             options={expectKinds.map((option) => ({ value: option, label: option }))}
             onChange={(next: string) =>
               onChange(at('expect'), next === 'none' ? undefined : next === 'invalid' ? { invalid: '' } : next)
@@ -525,7 +525,6 @@ export function ScenarioStep({
               allowClear={!required}
               value={text(name) ?? null}
               disabled={exclusive && step.assignee !== undefined}
-              style={{ minWidth: 160 }}
               options={(stateOptions[type!] ?? []).map((option) => ({ value: option, label: option }))}
               onChange={(next: string | undefined) => onChange(at(name), next)}
             />
@@ -557,59 +556,64 @@ export function ScenarioStep({
   const properties = type ? stepProperties[type] : []
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <Card
-        size="small"
-        data-testid="studio-scenario-step"
-        title={fillText(t('shell.studio.scenario.step'), { number: index + 1 })}
-        extra={
-          componentDisabled ? undefined : (
-            <RowActions
-              actions={[
-                {
-                  key: 'moveUp',
-                  labelKey: 'shell.studio.scenario.moveUp',
-                  disabled: index === 0,
-                  onClick: () => swap(index - 1),
-                },
-                {
-                  key: 'moveDown',
-                  labelKey: 'shell.studio.scenario.moveDown',
-                  disabled: index === steps.length - 1,
-                  onClick: () => swap(index + 1),
-                },
-                {
-                  key: 'remove',
-                  labelKey: 'shell.studio.scenario.remove',
-                  meaning: 'remove',
-                  onClick: () => onChange(pointer, undefined),
-                },
-              ]}
-            />
-          )
-        }
-      >
-        <Flex vertical gap="small">
-          <div data-testid={`studio-field-${at('type')}`}>
-            <AxisField {...fieldText('type')}>
-              <Select
-                showSearch
-                optionFilterProp="label"
-                virtual={false}
-                value={type ?? null}
-                style={{ minWidth: 200 }}
-                options={stepTypes.map((option) => ({ value: option, label: option }))}
-                onChange={(next: StepType) => onChange(pointer, changeStepType(step, next))}
-              />
-            </AxisField>
-          </div>
-          {properties.map(({ name }) => (
-            <div key={name} data-testid={`studio-field-${at(name)}`}>
-              {control(name)}
+      <SectionPart testId="studio-scenario-step">
+        <section aria-labelledby={headingId}>
+          <PaneHeader
+            level={3}
+            inset={0}
+            id={headingId}
+            title={fillText(t('shell.studio.scenario.step'), { number: index + 1 })}
+            actions={
+              componentDisabled ? undefined : (
+                <RowActions
+                  actions={[
+                    {
+                      key: 'moveUp',
+                      labelKey: 'shell.studio.scenario.moveUp',
+                      disabled: index === 0,
+                      onClick: () => swap(index - 1),
+                    },
+                    {
+                      key: 'moveDown',
+                      labelKey: 'shell.studio.scenario.moveDown',
+                      disabled: index === steps.length - 1,
+                      onClick: () => swap(index + 1),
+                    },
+                    {
+                      key: 'remove',
+                      labelKey: 'shell.studio.scenario.remove',
+                      meaning: 'remove',
+                      onClick: () => onChange(pointer, undefined),
+                    },
+                  ]}
+                />
+              )
+            }
+          />
+          <Flex vertical gap="small" style={{ paddingTop: spacing.sm }}>
+            <div data-testid={`studio-field-${at('type')}`}>
+              <AxisField {...fieldText('type')}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  virtual={false}
+                  value={type ?? null}
+                  options={stepTypes.map((option) => ({ value: option, label: option }))}
+                  onChange={(next: StepType) => onChange(pointer, changeStepType(step, next))}
+                />
+              </AxisField>
             </div>
-          ))}
-          {type === undefined && <Typography.Text type="secondary">{t('shell.studio.scenario.none')}</Typography.Text>}
-        </Flex>
-      </Card>
+            {properties.map(({ name }) => (
+              <div key={name} data-testid={`studio-field-${at(name)}`}>
+                {control(name)}
+              </div>
+            ))}
+            {type === undefined && (
+              <Typography.Text type="secondary">{t('shell.studio.scenario.none')}</Typography.Text>
+            )}
+          </Flex>
+        </section>
+      </SectionPart>
     </div>
   )
 }

@@ -132,7 +132,7 @@ afterEach(() => localStorage.clear())
 describe.each(['light', 'dark'])('ConnectorEditor in %s mode', (mode) => {
   beforeEach(() => localStorage.setItem('axis.themeMode', mode))
 
-  it('renders inside the theme root with the bindings as names and the operations as cards', () => {
+  it('renders inside the theme root with the bindings as names and the operations as blocks', () => {
     renderEditor()
 
     const editor = screen.getByTestId('studio-connector-editor')
@@ -807,5 +807,44 @@ describe('ConnectorEditor', () => {
 
     expect(screen.queryByText(/Only the name is stored/)).toBeNull()
     expect(field('baseUrl')).toHaveAccessibleDescription(texts('baseUrl').help)
+  })
+})
+
+describe('ConnectorEditor blocks', () => {
+  const rule = `1px solid ${designTokensFor('light').colour.borderSubtle}`
+  /** The title row of a block: the first child of its section, which the rule sits under. */
+  const titleRowOf = (block: HTMLElement) =>
+    within(block).getByRole('heading', { level: 3 }).closest('section')!.firstElementChild as HTMLElement
+
+  it('draws each operation as a block whose title row holds its name or Operation N and Delete operation', () => {
+    renderEditor({
+      ...connector,
+      operations: [connector.operations[0], { name: '', method: 'GET', path: '/items' }],
+    })
+
+    expect(document.querySelector('.ant-card')).toBeNull()
+    const first = screen.getByTestId('studio-operation-0')
+    const second = screen.getByTestId('studio-operation-1')
+    expect(within(first).getByRole('heading', { level: 3, name: 'createPurchaseOrder' })).toBeInTheDocument()
+    expect(within(second).getByRole('heading', { level: 3, name: 'Operation 2' })).toBeInTheDocument()
+    expect(titleRowOf(first)).toHaveStyle({ borderBottom: rule })
+    expect(titleRowOf(second)).toHaveStyle({ borderBottom: rule })
+    expect(first.previousElementSibling).toBeNull()
+    expect(second.previousElementSibling).toHaveAttribute('role', 'separator')
+    expect(within(titleRowOf(second)).getByRole('button', { name: 'Delete operation' })).toBeInTheDocument()
+  })
+
+  it('leaves the method and auth type selects as wide as their fields, with no minimum width of their own', () => {
+    renderEditor()
+
+    const selects = [
+      within(screen.getByTestId('studio-field-/operations/0/method')).getByRole('combobox'),
+      within(screen.getByTestId('studio-field-/auth/type')).getByRole('combobox'),
+    ]
+    for (const select of selects) {
+      const root = select.closest('.ant-select') as HTMLElement
+      expect(root).toHaveStyle({ width: '100%' })
+      expect(root.style.minWidth).toBe('')
+    }
   })
 })

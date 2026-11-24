@@ -293,7 +293,7 @@ describe('a module process with a customization layer', () => {
     return onReset
   }
 
-  it('marks a changed step on its graph node and on its card, with Reset to module', async () => {
+  it('marks a changed step on its graph node and on its block, with Reset to module', async () => {
     const onReset = renderLayered()
 
     expect(await screen.findByRole('button', { name: 'check, decision, Changed' }, slow)).toBe(

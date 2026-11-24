@@ -1,5 +1,5 @@
-import { Card, ConfigProvider, Flex, Input, Select, Typography } from 'antd'
-import { useContext } from 'react'
+import { ConfigProvider, Flex, Input, Select, Typography } from 'antd'
+import { useContext, useId } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
@@ -7,6 +7,7 @@ import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
+import { PaneHeader } from '../platform/PaneHeader'
 import { StudioNamesContext } from '../platform/studioNames'
 import type { StudioNames } from '../platform/studio'
 import type { JsonSchema } from '../platform/studioSchemas'
@@ -22,7 +23,7 @@ import { Expression, NamePicker } from './ProcessFields'
 import { moved, requiredStepKeys, uniqueStepName } from './processPalette'
 import { stepTypes, withType } from './processStepSchema'
 import { ReferencePicker } from './ReferencePicker'
-import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { PartBoundary, SectionPart, SectionParts } from '../platform/SectionParts'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -76,11 +77,12 @@ function stepNames(steps: unknown[]): string[] {
 
 /**
  * The editor of a process. It shows the process's name, entity and start condition with the generic form, the start
- * step, and the steps as cards in file order. A decision shows its branches and its `otherwise`, an end shows only
- * its name, type and label, and every transition is a picker over the step names of the draft. A task shows its full panel:
- * label, assignee, form, due time, deadline, escalations and outcomes. Every other step has an optional label.
- * An operation shows its operation panel and its `next`. The editor edits the draft through `onChange`, so a key it does not show stays as it is, and removing a step leaves the transitions that name it for
- * the compiler to report.
+ * step, and the steps in file order as blocks, each under a title row and parted from the next by a rule. A decision
+ * shows its branches and its `otherwise`, an end shows only its name, type and label, and every transition is a picker
+ * over the step names of the draft. A task shows its full panel: label, assignee, form, due time, deadline, escalations
+ * and outcomes. Every other step has an optional label. An operation shows its operation panel and its `next`. The
+ * editor edits the draft through `onChange`, so a key it does not show stays as it is, and removing a step leaves the
+ * transitions that name it for the compiler to report.
  */
 export function ProcessEditor({
   schema,
@@ -123,25 +125,29 @@ export function ProcessEditor({
             </div>
             <div data-testid="studio-field-/steps">
               <Flex vertical gap="small">
-                {steps.map((step, index) => (
-                  <Step
-                    key={index}
-                    schema={schema}
-                    index={index}
-                    step={isContent(step) ? step : {}}
-                    entity={text(value.entity)}
-                    names={names}
-                    last={index === steps.length - 1}
-                    onMove={(offset) => onChange('/steps', moved(steps, index, offset))}
-                    onRemove={() =>
-                      onChange(
-                        '/steps',
-                        steps.filter((_, position) => position !== index),
-                      )
-                    }
-                    onChange={onChange}
-                  />
-                ))}
+                <PartBoundary>
+                  <SectionParts>
+                    {steps.map((step, index) => (
+                      <Step
+                        key={index}
+                        schema={schema}
+                        index={index}
+                        step={isContent(step) ? step : {}}
+                        entity={text(value.entity)}
+                        names={names}
+                        last={index === steps.length - 1}
+                        onMove={(offset) => onChange('/steps', moved(steps, index, offset))}
+                        onRemove={() =>
+                          onChange(
+                            '/steps',
+                            steps.filter((_, position) => position !== index),
+                          )
+                        }
+                        onChange={onChange}
+                      />
+                    ))}
+                  </SectionParts>
+                </PartBoundary>
                 <div>
                   <Select
                     aria-label={t('shell.studio.process.addStep')}
@@ -243,7 +249,6 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
                       <div data-testid={`studio-field-${pointer}/type`}>
                         <AxisField {...field('parameters.type')} required>
                           <Select
-                            style={{ minWidth: 160 }}
                             virtual={false}
                             value={typeof content.type === 'string' ? content.type : undefined}
                             options={parameterTypes.map((type) => ({ value: type, label: type }))}
@@ -277,8 +282,8 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
 }
 
 /**
- * The card of one step of a process, as the Form tab shows it, for the Design tab's side panel. Move up, Move down and
- * Delete are entries of the card's "…" menu, Delete last after a divider, which a read-only editor does not show, see
+ * One step of a process, as the Form tab shows it, for the Design tab's side panel. Move up, Move down and
+ * Delete are entries of the block's "…" menu, Delete last after a divider, which a read-only editor does not show, see
  * docs/reference/process-designer.md#step-panel. Move up and Move down call `onMove`, and Delete calls `onRemove`.
  * Each owns the change, the selection and what is said.
  */
@@ -343,88 +348,93 @@ function Step({
 }) {
   const { componentDisabled } = ConfigProvider.useConfig()
   const { field } = useFieldTexts('process')
+  const { spacing } = useDesignTokens()
+  const headingId = useId()
   const pointer = `/steps/${index}`
   const type = typeof step.type === 'string' ? step.type : undefined
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <Card
-        size="small"
-        data-testid={`studio-step-${index}`}
-        title={`${text(step.name)}, ${type ?? ''}`}
-        extra={
-          componentDisabled ? undefined : (
-            <span data-testid={`studio-step-actions-${index}`}>
-              <RowActions
-                actions={[
-                  {
-                    key: 'moveUp',
-                    labelKey: 'shell.studio.process.moveUp',
-                    disabled: index === 0,
-                    onClick: () => onMove(-1),
-                  },
-                  {
-                    key: 'moveDown',
-                    labelKey: 'shell.studio.process.moveDown',
-                    disabled: last,
-                    onClick: () => onMove(1),
-                  },
-                  { key: 'delete', labelKey: 'shell.studio.delete', meaning: 'remove', onClick: onRemove },
-                ]}
+      <SectionPart testId={`studio-step-${index}`}>
+        <section aria-labelledby={headingId}>
+          <PaneHeader
+            level={3}
+            inset={0}
+            id={headingId}
+            title={`${text(step.name)}, ${type ?? ''}`}
+            actions={
+              componentDisabled ? undefined : (
+                <span data-testid={`studio-step-actions-${index}`}>
+                  <RowActions
+                    actions={[
+                      {
+                        key: 'moveUp',
+                        labelKey: 'shell.studio.process.moveUp',
+                        disabled: index === 0,
+                        onClick: () => onMove(-1),
+                      },
+                      {
+                        key: 'moveDown',
+                        labelKey: 'shell.studio.process.moveDown',
+                        disabled: last,
+                        onClick: () => onMove(1),
+                      },
+                      { key: 'delete', labelKey: 'shell.studio.delete', meaning: 'remove', onClick: onRemove },
+                    ]}
+                  />
+                </span>
+              )
+            }
+          />
+          <Flex vertical gap="small" style={{ paddingTop: spacing.sm }}>
+            {layer && <LayerMarkTag layer={layer} list="/steps" index={index} name={text(step.name)} />}
+            <div data-testid={`studio-field-${pointer}/name`}>
+              <AxisField {...field('steps.name')} required>
+                <Input value={text(step.name)} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
+              </AxisField>
+            </div>
+            <div data-testid={`studio-field-${pointer}/type`}>
+              <AxisField {...field('steps.type')} required>
+                <Select
+                  virtual={false}
+                  value={type}
+                  options={stepTypes(schema).map((option) => ({ value: option, label: option }))}
+                  onChange={(next: string) => onChange(pointer, withType(step, next, schema))}
+                />
+              </AxisField>
+            </div>
+            {type !== undefined && type !== 'task' && panelTypes.has(type) && (
+              <StepLabel pointer={pointer} step={step} onChange={onChange} />
+            )}
+            {type === 'decision' && <Decision pointer={pointer} step={step} names={names} onChange={onChange} />}
+            {type === 'operation' && (
+              <>
+                <OperationPanel pointer={pointer} step={step} entity={entity} onChange={onChange} />
+                <Transition
+                  pointer={`${pointer}/next`}
+                  path="steps.next"
+                  value={step.next}
+                  names={names}
+                  onChange={onChange}
+                />
+                <JsonOnlyKeys pointer={pointer} keys={operationJsonOnlyKeys(step)} />
+              </>
+            )}
+            {type === 'task' && <Task pointer={pointer} step={step} names={names} onChange={onChange} />}
+            {type === 'timer' && <Timer pointer={pointer} step={step} names={names} onChange={onChange} />}
+            {type === 'subProcess' && <SubProcess pointer={pointer} step={step} names={names} onChange={onChange} />}
+            {type === 'waitEvent' && (
+              <WaitEvent pointer={pointer} step={step} entity={entity} names={names} onChange={onChange} />
+            )}
+            {type !== undefined && !panelTypes.has(type) && (
+              <JsonOnlyKeys
+                pointer={pointer}
+                keys={Object.keys(step).filter((key) => key !== 'name' && key !== 'type')}
               />
-            </span>
-          )
-        }
-      >
-        <Flex vertical gap="small">
-          {layer && <LayerMarkTag layer={layer} list="/steps" index={index} name={text(step.name)} />}
-          <div data-testid={`studio-field-${pointer}/name`}>
-            <AxisField {...field('steps.name')} required>
-              <Input value={text(step.name)} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
-            </AxisField>
-          </div>
-          <div data-testid={`studio-field-${pointer}/type`}>
-            <AxisField {...field('steps.type')} required>
-              <Select
-                style={{ minWidth: 240 }}
-                virtual={false}
-                value={type}
-                options={stepTypes(schema).map((option) => ({ value: option, label: option }))}
-                onChange={(next: string) => onChange(pointer, withType(step, next, schema))}
-              />
-            </AxisField>
-          </div>
-          {type !== undefined && type !== 'task' && panelTypes.has(type) && (
-            <StepLabel pointer={pointer} step={step} onChange={onChange} />
-          )}
-          {type === 'decision' && <Decision pointer={pointer} step={step} names={names} onChange={onChange} />}
-          {type === 'operation' && (
-            <>
-              <OperationPanel pointer={pointer} step={step} entity={entity} onChange={onChange} />
-              <Transition
-                pointer={`${pointer}/next`}
-                path="steps.next"
-                value={step.next}
-                names={names}
-                onChange={onChange}
-              />
-              <JsonOnlyKeys pointer={pointer} keys={operationJsonOnlyKeys(step)} />
-            </>
-          )}
-          {type === 'task' && <Task pointer={pointer} step={step} names={names} onChange={onChange} />}
-          {type === 'timer' && <Timer pointer={pointer} step={step} names={names} onChange={onChange} />}
-          {type === 'subProcess' && <SubProcess pointer={pointer} step={step} names={names} onChange={onChange} />}
-          {type === 'waitEvent' && (
-            <WaitEvent pointer={pointer} step={step} entity={entity} names={names} onChange={onChange} />
-          )}
-          {type !== undefined && !panelTypes.has(type) && (
-            <JsonOnlyKeys
-              pointer={pointer}
-              keys={Object.keys(step).filter((key) => key !== 'name' && key !== 'type')}
-            />
-          )}
-        </Flex>
-      </Card>
+            )}
+          </Flex>
+        </section>
+      </SectionPart>
     </div>
   )
 }
@@ -687,14 +697,13 @@ const emptyNotify = { to: [], channels: [], message: { subject: { textKey: '' },
  * The escalations of a task as rows. Each has an `after` duration, and Reassign and Notify switches that add or remove
  * its `reassign` and `notify`. A new escalation holds only an empty `after`, which the diagnostics mark until one of
  * the switches is on. Removing the last escalation removes the `escalations` key. Add escalation is on the title row, and
- * each escalation's Remove is the trash icon. A read-only editor shows neither, see
- * docs/reference/studio-editors-by-kind.md#process-editor.
+ * each escalation's Remove is the trash icon. Each row is set apart from the next by spacing, not by a box. A read-only
+ * editor shows neither, see docs/reference/studio-editors-by-kind.md#process-editor.
  */
 function Escalations({ pointer, step, onChange }: { pointer: string; step: Content; onChange: ChangeHandler }) {
   const t = useText()
   const { componentDisabled } = ConfigProvider.useConfig()
   const { field, group } = useFieldTexts('process')
-  const { colour, radius, spacing } = useDesignTokens()
   const escalationsPointer = `${pointer}/escalations`
   if (step.escalations !== undefined && !Array.isArray(step.escalations)) {
     return <JsonOnlyKeys pointer={pointer} keys={['escalations']} />
@@ -726,13 +735,7 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
             const rowPointer = `${escalationsPointer}/${index}`
             const row = isContent(escalation) ? escalation : {}
             return (
-              <Flex
-                key={index}
-                vertical
-                gap="small"
-                style={{ border: `1px solid ${colour.border}`, borderRadius: radius.base, padding: spacing.xs }}
-                data-testid={`studio-field-${rowPointer}`}
-              >
+              <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
                 <Flex gap="small" align="flex-end" wrap>
                   <div data-testid={`studio-field-${rowPointer}/after`} style={{ flex: 1 }}>
                     <AxisField {...field('steps.escalations.after')} required>

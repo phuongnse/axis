@@ -2941,6 +2941,7 @@
   "shell.studio.texts.addFailed": "Không thêm được khóa.",
   "shell.studio.connector.addOperation": "Thêm thao tác",
   "shell.studio.connector.removeOperation": "Xóa thao tác",
+  "shell.studio.connector.operation": "Thao tác {number}",
   "shell.studio.connector.addInput": "Thêm đầu vào",
   "shell.studio.connector.addOutput": "Thêm đầu ra",
   "shell.studio.connector.removeField": "Xóa",
