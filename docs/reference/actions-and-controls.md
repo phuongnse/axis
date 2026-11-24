@@ -233,8 +233,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   takes `error` and `LabelTexts` takes `invalid`. An error shows from the refused action on, and while the value stays
   wrong. It goes as soon as the value is right. A record form marks each field the server refuses the same way, and a
   cell of a child collection too, see [saving](form-widget.md#saving).
-- **A box in error looks it in the forms that draw their own error line** _(planned, #5136)_. A form that draws its own error
-  line, such as the text table, gives its boxes the same error look and `aria-invalid` too.
+- **A box in error looks it in the forms that draw their own error line**. A form that draws its own error
+  line, such as the text table, gives a box in error the same error look and `aria-invalid` too, as the text
+  table's **New key** box does.
 - **AxisFieldGroup's required and fold** _(planned, #5049)_. `AxisFieldGroup` also takes `required` and `fold`, for #3264's build.
 - **One way to the first error**. A refused action that submits what a person typed, such as Save, Add, Done or Next,
   moves the focus to the first box in error and scrolls it into view. `AxisForm` sets

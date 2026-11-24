@@ -205,6 +205,30 @@ describe('TextTable', () => {
     expect(onAdd).not.toHaveBeenCalled()
   })
 
+  it('marks New key in error on a refused Add key and clears the mark once the key is right', async () => {
+    const { onAdd } = renderTable()
+    const add = screen.getByTestId('studio-text-add')
+    const key = within(add).getByRole('textbox', { name: 'New key' })
+
+    await userEvent.type(key, 'greeting')
+    await userEvent.click(within(add).getByRole('button', { name: 'Add key' }))
+
+    expect(key).toHaveAttribute('aria-invalid', 'true')
+    expect(key).toHaveClass('ant-input-status-error')
+    expect(key).toHaveFocus()
+    expect(key).toHaveAccessibleDescription('This key exists.')
+    expect(within(add).getByRole('textbox', { name: 'en' })).not.toHaveAttribute('aria-invalid')
+    expect(within(add).getByRole('textbox', { name: 'vi' })).not.toHaveAttribute('aria-invalid')
+
+    await userEvent.type(key, 's')
+
+    expect(key).not.toHaveAttribute('aria-invalid')
+    expect(key).not.toHaveClass('ant-input-status-error')
+    expect(key).not.toHaveAccessibleDescription('This key exists.')
+    expect(within(add).queryByTestId('studio-text-add-problem')).toBeNull()
+    expect(onAdd).not.toHaveBeenCalled()
+  })
+
   it('keeps the inputs and shows a failure when the key could not be added', async () => {
     const { onAdd } = renderTable(
       columns,
