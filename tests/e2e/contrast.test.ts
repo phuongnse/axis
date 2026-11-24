@@ -65,13 +65,36 @@ test("text needs 4.5:1, or 3:1 when large, and a border or an icon needs 3:1", (
   assert.equal(requiredRatio("icon", true), 3);
 });
 
+test("a colour the browser writes as color(srgb …) reads its channels from 0 to 1, with alpha last", () => {
+  assert.equal(contrast("color(srgb 0 0 0 / 1)", white), 21);
+  assert.equal(contrast("color(srgb 0 0 0)", white), 21);
+  assert.equal(
+    contrast("color(srgb 0.5 0.5 0.5 / 0.5)", white),
+    contrast("rgba(127.5, 127.5, 127.5, 0.5)", white),
+  );
+  assert.equal(backgroundOf(["color(srgb 0 0 0 / 0.5)", white]), "#808080");
+});
+
+test("a colour-mix tint the browser computes in srgb blends like the rgba it stands for", () => {
+  const tint = "color(srgb 0.811765 0.133333 0.180392 / 0.16)";
+  const rgba = "rgba(207, 34, 46, 0.16)";
+  assert.equal(
+    contrast("#1f2328", backgroundOf([tint, white])),
+    contrast("#1f2328", backgroundOf([rgba, white])),
+  );
+});
+
 test("a colour in a format the helper does not know throws, so no miss passes silently", () => {
   assert.throws(
     () => contrast("hsl(0 0% 0%)", white),
     /Cannot parse the colour/,
   );
   assert.throws(
-    () => backgroundOf(["color(srgb 0 0 0)"]),
+    () => backgroundOf(["lab(50% 0 0)"]),
+    /Cannot parse the colour/,
+  );
+  assert.throws(
+    () => contrast("color(display-p3 0 0 0)", white),
     /Cannot parse the colour/,
   );
 });

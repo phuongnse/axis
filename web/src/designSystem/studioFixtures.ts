@@ -1,4 +1,9 @@
 import type {
+  AuthoringPlan,
+  AuthoringRequest,
+  AuthoringRequestChecks,
+  AuthoringRequestDiff,
+  AuthoringRequestStep,
   ExpressionCheck,
   ExpressionReading,
   ExpressionScope,
@@ -8,6 +13,8 @@ import type {
   StudioDiagnostic,
   StudioFormMetadataAnswer,
   StudioKindListItem,
+  StudioLiveDiff,
+  StudioLiveDiffEntry,
   StudioNameEntity,
   StudioNames,
   StudioPageMetadataAnswer,
@@ -19,10 +26,12 @@ import type {
   StudioResourceItem,
   StudioResourceReferences,
   StudioRevision,
+  StudioRevisionChange,
   StudioRevisionDiff,
 } from '../platform/studio'
 import {
   application,
+  currentUser,
   entity as requestEntity,
   fields,
   formWidget,
@@ -33,7 +42,8 @@ import {
 import type { FixtureRoute } from './fixtureFetch'
 
 // The answers of the `studio` preview. Its states answer the same `/api/studio/apps` path, so each state brings its own
-// routes, and the preview shows one state at a time, see docs/reference/widget-previews.md#the-bundle.
+// routes, and the preview shows one state at a time. A state may also answer a path the shared routes answer, such as
+// `/api/me`, while it shows, see docs/reference/widget-previews.md#the-bundle.
 
 const appsPath = '/api/studio/apps'
 const folderPath = `${appsPath}/${application}`
@@ -428,18 +438,36 @@ const typicalReleases = {
   partChanges: [],
 } satisfies StudioReleases
 
-/** The revisions of Typical, newest first: a person in Studio, a command-line client, and the server's own start of history. */
+/** Revision r3 of Typical: a person's change in Studio, which the Revision state opens at `&revision=r3`. */
+const approvalStepRevision = {
+  id: 'r3',
+  summary: 'Added the approval step',
+  author: 'Alex Morgan',
+  userId: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+  client: 'studio',
+  request: null,
+  time: '2026-10-21T09:30:00Z',
+} satisfies StudioRevision
+
+/** Revision r4 of Typical: a change made outside Studio, which History lists first and Package file revision opens. */
+const outsideChangeRevision = {
+  id: 'r4',
+  summary: 'Outside change',
+  author: 'Axis',
+  userId: null,
+  client: null,
+  request: null,
+  time: '2026-10-22T10:15:00Z',
+} satisfies StudioRevision
+
+/**
+ * The revisions of Typical, newest first: an outside change, a person in Studio, a command-line client, and the server's
+ * own start of history.
+ */
 const typicalRevisions = {
   items: [
-    {
-      id: 'r3',
-      summary: 'Added the approval step',
-      author: 'Alex Morgan',
-      userId: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
-      client: 'studio',
-      request: null,
-      time: '2026-10-21T09:30:00Z',
-    },
+    outsideChangeRevision,
+    approvalStepRevision,
     {
       id: 'r2',
       summary: 'Added the supplier entity',
@@ -461,33 +489,36 @@ const typicalRevisions = {
   ],
   page: 1,
   pageSize: 20,
-  totalCount: 3,
+  totalCount: 4,
   start: 'r1',
 } satisfies { items: StudioRevision[]; page: number; pageSize: number; totalCount: number; start: string }
 
-/** The newest revision of Typical with the three files it changed, which the Revision state opens. */
+/** The page file that revision r3 changed, and that the publish page lists as a change since the live release. */
+const requestListChange: StudioRevisionChange = {
+  file: 'pages/request-list.json',
+  change: 'changed',
+  id: pageId,
+  kind: 'page',
+  name: 'RequestList',
+  before: JSON.stringify({
+    kind: 'page',
+    name: 'RequestList',
+    title: { textKey: 'requestList.title' },
+    widgets: [],
+  }),
+  after: JSON.stringify({
+    kind: 'page',
+    name: 'RequestList',
+    title: { textKey: 'requestList.title' },
+    widgets: [{ type: 'table', name: 'requests', entity: 'Request' }],
+  }),
+}
+
+/** Revision r3 of Typical with the three files it changed, which the Revision state opens. */
 const typicalRevisionDiff = {
-  revision: typicalRevisions.items[0],
+  revision: approvalStepRevision,
   resources: [
-    {
-      file: 'pages/request-list.json',
-      change: 'changed',
-      id: pageId,
-      kind: 'page',
-      name: 'RequestList',
-      before: JSON.stringify({
-        kind: 'page',
-        name: 'RequestList',
-        title: { textKey: 'requestList.title' },
-        widgets: [],
-      }),
-      after: JSON.stringify({
-        kind: 'page',
-        name: 'RequestList',
-        title: { textKey: 'requestList.title' },
-        widgets: [{ type: 'table', name: 'requests', entity: 'Request' }],
-      }),
-    },
+    requestListChange,
     {
       file: 'roles/approver.json',
       change: 'added',
@@ -507,6 +538,104 @@ const typicalRevisionDiff = {
       after: null,
     },
   ],
+} satisfies StudioRevisionDiff
+
+/**
+ * The three files of the `approval-rules` package that revision r4 changes, sorted by file: `adapter.py` changed, `old.py`
+ * removed and `new.py` added. Each file is Python text, not JSON, and it has no resource id, kind or name. The changed file
+ * keeps a run of unchanged lines, so its line diff folds one.
+ */
+const approvalRulesFiles = [
+  {
+    file: 'packages/approval-rules/adapter.py',
+    change: 'changed',
+    id: null,
+    kind: null,
+    name: null,
+    before: [
+      '"""Approval rules for purchase requests."""',
+      '',
+      'from decimal import Decimal',
+      '',
+      'from .old import legacy_limit',
+      '',
+      '',
+      'def approval_level(amount: Decimal) -> int:',
+      '    """Return the approval level that an amount needs."""',
+      '    if amount <= Decimal("500"):',
+      '        return 1',
+      '    if amount <= Decimal("5000"):',
+      '        return 2',
+      '    return 3',
+      '',
+      '',
+      'def needs_review(amount: Decimal) -> bool:',
+      '    return amount > legacy_limit()',
+      '',
+    ].join('\n'),
+    after: [
+      '"""Approval rules for purchase requests."""',
+      '',
+      'from decimal import Decimal',
+      '',
+      'from .new import review_limit',
+      '',
+      '',
+      'def approval_level(amount: Decimal) -> int:',
+      '    """Return the approval level that an amount needs."""',
+      '    if amount <= Decimal("1000"):',
+      '        return 1',
+      '    if amount <= Decimal("5000"):',
+      '        return 2',
+      '    return 3',
+      '',
+      '',
+      'def needs_review(amount: Decimal) -> bool:',
+      '    return amount > review_limit()',
+      '',
+    ].join('\n'),
+  },
+  {
+    file: 'packages/approval-rules/new.py',
+    change: 'added',
+    id: null,
+    kind: null,
+    name: null,
+    before: null,
+    after: [
+      'from decimal import Decimal',
+      '',
+      '',
+      'def review_limit() -> Decimal:',
+      '    return Decimal("1000")',
+      '',
+    ].join('\n'),
+  },
+  {
+    file: 'packages/approval-rules/old.py',
+    change: 'removed',
+    id: null,
+    kind: null,
+    name: null,
+    before: [
+      'from decimal import Decimal',
+      '',
+      '',
+      'def legacy_limit() -> Decimal:',
+      '    return Decimal("500")',
+      '',
+    ].join('\n'),
+    after: null,
+  },
+] satisfies StudioRevisionChange[]
+
+/**
+ * Revision r4 of Typical, the outside change with the three package files it changed. History opens it at
+ * `&revision=r4`.
+ */
+const packageRevisionDiff = {
+  revision: outsideChangeRevision,
+  resources: approvalRulesFiles,
 } satisfies StudioRevisionDiff
 
 /** Release 2 of Typical's history, which is live: it pins the Organization module and compares with release 1. */
@@ -718,6 +847,7 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/release-list`]: () => releasePage(answers.releases),
     [`${folderPath}/revisions`]: () => typicalRevisions,
     [`${folderPath}/revisions/${typicalRevisionId}`]: () => typicalRevisionDiff,
+    [`${folderPath}/revisions/${packageRevisionId}`]: () => packageRevisionDiff,
     [`${folderPath}/settings`]: () => settings,
     // A table of the open application asks for the person's kept choices, and no state keeps any.
     ...Object.fromEntries(
@@ -795,8 +925,17 @@ const newFolder: Folder = {
   bare: true,
 }
 
-/** The id of the newest revision of Typical, which the Revision state opens at `&revision=<id>`. */
-export const typicalRevisionId = typicalRevisions.items[0].id
+/** The id of revision r3 of Typical, which the Revision state opens at `&revision=<id>`. */
+export const typicalRevisionId = approvalStepRevision.id
+
+/** The id of revision r4 of Typical, the outside change that Package file revision opens at `&revision=<id>`. */
+export const packageRevisionId = outsideChangeRevision.id
+
+/** The id of the ready AI request of the Authoring request state, which opens at `&request=<id>`. */
+export const authoringRequestId = id(50)
+
+/** The id of the draft of that request, whose changes are the three package files of revision r4. */
+const authoringDraftId = id(51)
 
 /** The id of the Request entity of the Typical folder, which the Entity state opens at `&resource=<id>`. */
 export const typicalEntityId = id(firstEntityId)
@@ -936,9 +1075,144 @@ const withExpressions: Record<string, FixtureRoute> = {
     ({ type: null, fields: [], functions: [] } satisfies ExpressionScope),
 }
 
+/** The plan the author approved: a summary and the three changes that the draft makes to the package's files. */
+const approvedPlan = {
+  summary: 'Raise the first approval limit to 1000, and move the review limit into its own file.',
+  questions: [],
+  changes: [
+    'Raise the first approval limit in adapter.py from 500 to 1000.',
+    'Import the review limit from new.py instead of old.py.',
+    'Remove old.py, and add new.py with the review limit.',
+  ],
+  decisions: [],
+  risks: [],
+  checks: [],
+  checklist: [],
+  details: [],
+} satisfies AuthoringPlan
+
+/** The checks of the draft: it compiles and its packages build, and no scenario ran for this change. */
+const draftChecks = {
+  compile: { outcome: 'passed', diagnostics: [] },
+  packages: { outcome: 'passed', items: [] },
+  scenarios: { outcome: 'notRun', request: null, diagnostics: [], items: [] },
+} satisfies AuthoringRequestChecks
+
+/** The finished steps of the ready request, in order: its plan, the work on the draft, the checks and the review. */
+const draftSteps = [
+  {
+    kind: 'plan',
+    summary: null,
+    outcome: null,
+    tokens: 6120,
+    startedAt: '2026-11-23T09:00:00Z',
+    finishedAt: '2026-11-23T09:01:00Z',
+    checks: null,
+    resource: null,
+  },
+  {
+    kind: 'work',
+    summary: null,
+    outcome: null,
+    tokens: 18450,
+    startedAt: '2026-11-23T09:02:00Z',
+    finishedAt: '2026-11-23T09:05:00Z',
+    checks: null,
+    resource: null,
+  },
+  {
+    kind: 'check',
+    summary: null,
+    outcome: 'passed',
+    tokens: 0,
+    startedAt: '2026-11-23T09:05:00Z',
+    finishedAt: '2026-11-23T09:06:00Z',
+    checks: draftChecks,
+    resource: null,
+  },
+  {
+    kind: 'review',
+    summary: null,
+    outcome: 'passed',
+    tokens: 2400,
+    startedAt: '2026-11-23T09:06:00Z',
+    finishedAt: '2026-11-23T09:07:00Z',
+    checks: { review: { outcome: 'passed', findings: null } },
+    resource: null,
+  },
+] satisfies AuthoringRequestStep[]
+
+/** The ready AI request of the signed-in author, whose draft changes the three package files of `approval-rules`. */
+const readyRequest = {
+  id: authoringRequestId,
+  application,
+  author: currentUser.id,
+  authorName: currentUser.displayName,
+  text: 'Raise the first approval limit to 1000, and keep the review limit in its own file.',
+  title: 'Raise the approval limit',
+  state: 'ready',
+  plan: approvedPlan,
+  round: 1,
+  tokens: 27000,
+  autoAccept: false,
+  sentAt: '2026-11-23T09:00:00Z',
+  approvedAt: '2026-11-23T09:01:30Z',
+  finishedAt: null,
+  draft: authoringDraftId,
+  steps: draftSteps,
+} satisfies AuthoringRequest
+
+/**
+ * The draft's changes, which start from revision r4 and change the package's three files, as the request's diff gives
+ * them.
+ */
+const draftDiff = {
+  start: packageRevisionId,
+  tip: authoringDraftId,
+  resources: approvalRulesFiles.map((file) => ({ ...file, target: null })),
+  cursor: null,
+} satisfies AuthoringRequestDiff
+
+/** The files that differ from the live release, as the publish page reads them: Typical's page and the package's files. */
+const liveDiff = {
+  release: 2,
+  resources: [
+    { ...requestListChange, titles: null, by: [{ ...approvalStepRevision, authoringRequest: null }] },
+    ...approvalRulesFiles.map((file) => ({
+      ...file,
+      titles: null,
+      by: [{ ...outsideChangeRevision, authoringRequest: null }],
+    })),
+  ] satisfies StudioLiveDiffEntry[],
+  cursor: null,
+} satisfies StudioLiveDiff & { cursor: string | null }
+
+/**
+ * The routes of the Authoring request state: Typical's, with the ready request, its draft's changes and the author's
+ * Ask AI.
+ */
+const authoringRequestRoutes: Record<string, FixtureRoute> = {
+  ...workspaceRoutes(typicalFolder),
+  [`${folderPath}/authoring-requests/${authoringRequestId}`]: () => readyRequest,
+  [`${folderPath}/authoring-requests/${authoringRequestId}/diff`]: () => draftDiff,
+  '/api/me': () => ({ ...currentUser, studioAi: true }),
+}
+
+/**
+ * The routes of the Publish page: Typical's, with a person who may publish and the files that differ from the live
+ * release.
+ */
+const publishPageRoutes: Record<string, FixtureRoute> = {
+  ...workspaceRoutes(typicalFolder),
+  '/api/me': () => ({ ...currentUser, studioPublisher: true }),
+  [`${folderPath}/releases/live/diff`]: () => liveDiff,
+}
+
 /** The applications Studio lists in each state, with the routes of the open application where the state opens one. */
 export const studioFixtures = {
   typical: workspaceRoutes(typicalFolder),
+  authoringRequest: authoringRequestRoutes,
+  publishPage: publishPageRoutes,
   withExpressions,
   empty: { [appsPath]: () => ({ items: [] }) satisfies { items: StudioApplication[] } },
   loading: { [appsPath]: () => new Promise<never>(() => {}) },

@@ -112,8 +112,8 @@ choices.
   pagination use `primaryText`, and destructive menu entries use `dangerText`.
 - **A marked choice on the selected tint.** A menu that marks a choice, such as the open application in
   Studio's application menu, draws it in `primaryText` on the selected tint, never in Ant Design's
-  selected colour, which is hard to read in dark mode. The theme draws Ant Design's selected menu item
-  this way, so a menu marks its choice by selecting it.
+  selected colour, which is hard to read in dark mode. The theme draws Ant Design's selected menu item,
+  and the title of a submenu that holds it, this way, so a menu marks its choice by selecting it.
 - **A text trigger ends in a caret.** A button with text that opens a menu, such as the account button
   and Studio's application switcher, ends in a caret, which `AxisButton`'s `caret` option draws. An
   icon-only trigger has none.

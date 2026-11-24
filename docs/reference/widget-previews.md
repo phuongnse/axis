@@ -67,7 +67,9 @@ The header line names every card once, in the order of the groups in
 such as `Table` or `TaskInbox`. Every preview has at least one state, and a preview with only one shows
 it as "Typical". A state can bring its own fixtures, on its own paths in the fixture application, or fixtures on
 paths that its preview's other states answer too, which makes the preview show one state at a time. A
-change that adds a state to a widget adds that state to the widget's preview in the same change.
+state's fixtures may also answer a path that the shared routes answer, such as `/api/me`. While the state
+shows, its answer replaces the shared one, and every other state gets the shared answer. A change that adds a
+state to a widget adds that state to the widget's preview in the same change.
 
 | Group | Previews | States | What they show |
 | --- | --- | --- | --- |
@@ -84,7 +86,7 @@ change that adds a state to a widget adds that state to the widget's preview in 
 | Shared states | `states` | "Loading", "Load error" | Drawn once, the states every widget shares: a table while it loads and a table whose request fails. |
 | Shared states | `statusTag` | "Typical" | Every tone of the [status tag](shared-widgets.md#which-widget), on `surface` and on `canvas`. |
 | Shell | `shell`, `signIn`, `identitySignIn` | see [shell](shell.md#design-system-previews) | Each draws its states in a frame that fills the window down to the canvas's padding and is never shorter than the state's height, one state at a time under the State control. The page scrolls inside the frame, as it does in a window, so the state's menus and dialogs open in the middle of what shows. |
-| Studio | `studio` | "Typical", "Empty", "Loading", "Failed", "Many rows", "Long names", "Access denied", "Overview with errors and changes not live", "Overview of a new application", "Entity", "Entity with expressions", "Policy matrix", "Releases", "History", "Revision", "Release page" | Studio in the shell, in sixteen states that share the `/api/studio/apps` path, so it shows one state at a time. Entity with expressions opens an entity whose computed field and validation read their expressions back in words, over Typical's fixtures. Revision opens one revision's page over Typical's fixtures, and Release page opens release 2 over them. Each framed state fills the window down to the canvas's padding and is never shorter than the state's height. |
+| Studio | `studio` | "Typical", "Empty", "Loading", "Failed", "Many rows", "Long names", "Access denied", "Overview with errors and changes not live", "Overview of a new application", "Entity", "Entity with expressions", "Policy matrix", "Releases", "History", "Revision", "Release page", "Package file revision", "Authoring request", "Publish page" | Studio in the shell, in nineteen states that share the `/api/studio/apps` path, so it shows one state at a time. Entity with expressions opens an entity whose computed field and validation read their expressions back in words, over Typical's fixtures. Revision opens one revision's page over Typical's fixtures, and Release page opens release 2 over them. Package file revision opens revision r4 of Typical, an outside change to the files of the `approval-rules` package. Authoring request opens a ready AI request of the signed-in author, whose draft changes the same files. Publish page opens the publish page for a person who may publish, with the files that differ from the live release. Each framed state fills the window down to the canvas's padding and is never shorter than the state's height. |
 | Studio | `studioPageDesign`, `studioFormDesign`, `studioProcessDesign` | "Typical" | Each opens a page, a form or a process in its designer, over the fixtures of `studio`'s Typical state. |
 | Sign-up | `signUp` | "Typical" | The [sign-up page](sign-up.md#the-page) over fixtures, in a frame that fills the window down to the canvas's padding and is never shorter than the state's height. |
 

@@ -860,6 +860,9 @@ const framedPreviews: Record<
       "History",
       "Revision",
       "Release page",
+      "Package file revision",
+      "Authoring request",
+      "Publish page",
     ],
     pickedInState: true,
   },
@@ -1253,7 +1256,7 @@ for (const [slug, expectKeyElement] of [
     "history",
     async (state: FrameLocator) => {
       await expect(state.getByTestId("studio-history")).toBeVisible();
-      await expect(state.getByTestId("studio-revision-row")).toHaveCount(3);
+      await expect(state.getByTestId("studio-revision-row")).toHaveCount(4);
     },
   ],
   [
@@ -1267,6 +1270,27 @@ for (const [slug, expectKeyElement] of [
     "release-page",
     async (state: FrameLocator) => {
       await expect(state.getByTestId("studio-release")).toBeVisible();
+    },
+  ],
+  [
+    "package-file-revision",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-revision")).toBeVisible();
+      await expect(state.getByTestId("studio-changes-file")).toHaveCount(3);
+    },
+  ],
+  [
+    "authoring-request",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-ai-request")).toBeVisible();
+      await expect(state.getByTestId("studio-changes-file")).toHaveCount(3);
+    },
+  ],
+  [
+    "publish-page",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-publish-confirm")).toBeVisible();
+      await expect(state.getByTestId("studio-changes-file")).toHaveCount(4);
     },
   ],
 ] as const) {

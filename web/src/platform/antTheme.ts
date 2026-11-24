@@ -126,6 +126,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       },
       Menu: {
         itemSelectedColor: colour.primaryText,
+        // The title of a submenu that holds the selected entry, see docs/reference/actions-and-controls.md#menus.
+        subMenuItemSelectedColor: colour.primaryText,
         horizontalItemSelectedColor: colour.primaryText,
         collapsedWidth: 64,
         dangerItemColor: colour.dangerText,

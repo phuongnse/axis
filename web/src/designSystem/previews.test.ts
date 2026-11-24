@@ -1,8 +1,8 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { docsTables } from '../test/docTables'
 import { cardGroups, cardName } from './cardOrder'
 import { fixtureScopes, routes } from './fixtures'
-import { previews, stateSlug } from './previews'
+import { chooseFixtures, chosenRoutes, type PreviewState, previews, stateSlug } from './previews'
 
 function hasEmptyState(name: string): boolean {
   return ['taskInbox', 'detail', 'kpi'].includes(name) || name.startsWith('chart-')
@@ -234,7 +234,7 @@ describe('design-system previews', () => {
     }
   })
 
-  test('the studio preview has its sixteen states, each with a slug of its own and a frame', () => {
+  test('the studio preview has its nineteen states, each with a slug of its own and a frame', () => {
     const states = previews.studio
 
     expect(states.map(({ caption }) => caption)).toEqual([
@@ -254,6 +254,9 @@ describe('design-system previews', () => {
       'History',
       'Revision',
       'Release page',
+      'Package file revision',
+      'Authoring request',
+      'Publish page',
     ])
     expect(states.map(({ caption }) => stateSlug(caption))).toEqual([
       'typical',
@@ -272,6 +275,9 @@ describe('design-system previews', () => {
       'history',
       'revision',
       'release-page',
+      'package-file-revision',
+      'authoring-request',
+      'publish-page',
     ])
     for (const { frameHeight, fixtures } of states) {
       expect(frameHeight).toBeGreaterThan(0)
@@ -279,7 +285,7 @@ describe('design-system previews', () => {
     }
   })
 
-  test("a state's shared fixture paths are scoped and in no route of the shared routes or of a state", () => {
+  test("a state's shared fixture paths are scoped and in no route of a state", () => {
     const stateOwn = Object.values(previews).flatMap((states) =>
       states.flatMap((state) => Object.keys(state.routes ?? {})),
     )
@@ -289,10 +295,43 @@ describe('design-system previews', () => {
 
     expect(paths.length).toBeGreaterThan(0)
     for (const path of paths) {
-      expect(Object.keys(routes)).not.toContain(path)
       expect(stateOwn).not.toContain(path)
       expect(fixtureScopes.some((scope) => path.startsWith(scope))).toBe(true)
     }
+  })
+
+  describe('chosenRoutes', () => {
+    const shared = { '/api/me': () => 'shared' }
+    const own: PreviewState = {
+      caption: 'Own',
+      draw: () => null,
+      fixtures: { '/api/me': () => 'own', '/api/own': () => 'own page' },
+    }
+    const plain: PreviewState = { caption: 'Plain', draw: () => null }
+    const answers = chosenRoutes({ preview: [own, plain] }, shared)
+
+    test("answers a path the shared routes answer with the chosen state's fixture when it has one", () => {
+      chooseFixtures(own)
+
+      expect(answers['/api/me']()).toBe('own')
+    })
+
+    test('answers a path the shared routes answer with the shared answer when the chosen state has none', () => {
+      chooseFixtures(plain)
+
+      expect(answers['/api/me']()).toBe('shared')
+    })
+
+    test('logs a path that neither answers as a missing fixture, and answers it with a 404', () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+      chooseFixtures(plain)
+
+      const response = answers['/api/own']() as Response
+
+      expect(response.status).toBe(404)
+      expect(error).toHaveBeenCalledWith('No design-system fixture for', '/api/own')
+      error.mockRestore()
+    })
   })
 
   describe('the cards table in widget-previews.md', () => {

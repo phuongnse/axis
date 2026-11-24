@@ -499,16 +499,19 @@ to the frame shows in every state. How previews work is in
 - **Process instance.** The `shell` preview gains Process instance, which opens a waiting instance from the fixture
   site's Approvals page, on its Diagram. It uses fixtures of the instance detail and of the instance's release texts.
 - **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
-  through the shell over fixtures of the purchase request sample, in sixteen states: Typical, Empty,
+  through the shell over fixtures of the purchase request sample, in nineteen states: Typical, Empty,
   Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live,
   Overview of a new application, Entity, Entity with expressions, Policy matrix, Releases, History,
-  Revision and Release page. Clicks in the sidebar move between Overview, Settings, the kind lists and
-  Releases, all answered from fixtures. Entity opens an entity in the entity designer and Policy matrix
-  the policy matrix, both over the fixtures of Typical. Entity with expressions opens an entity whose
-  computed field and validation read their expressions back in words, over the fixtures of Typical.
-  Releases opens the release list and History the revision list, over the same fixtures. Revision opens
-  one revision's page, with its three changed files, over the fixtures of Typical. Release page opens
-  release 2 over the fixtures of Typical.
+  Revision, Release page, Package file revision, Authoring request and Publish page. Clicks in the
+  sidebar move between Overview, Settings, the kind lists and Releases, all answered from fixtures.
+  Entity opens an entity in the entity designer and Policy matrix the policy matrix, both over the
+  fixtures of Typical. Entity with expressions opens an entity whose computed field and validation
+  read their expressions back in words, over the fixtures of Typical. Releases opens the release list
+  and History the revision list, over the same fixtures. Revision opens one revision's page, with its
+  three changed files, over the fixtures of Typical. Release page opens release 2 over the fixtures of
+  Typical. Package file revision opens revision r4 of Typical, an outside change to the files of the
+  `approval-rules` package. Authoring request opens a ready AI request of the signed-in author, whose
+  draft changes the same files. Publish page opens the publish page for a person who may publish.
 - **Studio's designers** are three previews that follow `studio`: `studioPageDesign`, `studioFormDesign`
   and `studioProcessDesign`. Each draws Studio through the shell with a page, a form or a process open in
   its designer. Each has one state, Typical, over the fixtures of the `studio` preview's Typical state.

@@ -1,4 +1,4 @@
-// WCAG 2.x contrast for hex and CSS red-green-blue colours. A translucent colour is blended over what lies under it.
+// WCAG 2.x contrast for hex, CSS red-green-blue and sRGB colours. A translucent colour is blended over what lies under it.
 
 interface Rgba {
   red: number
@@ -19,6 +19,15 @@ function parseColour(value: string): Rgba {
       green: Number(rgba[2]),
       blue: Number(rgba[3]),
       alpha: rgba[4] === undefined ? 1 : Number(rgba[4]),
+    }
+  // The browser writes a colour-mix() in srgb as color(srgb r g b / a), with each channel from 0 to 1.
+  const srgb = /^color\(\s*srgb\s+([\d.e+-]+)\s+([\d.e+-]+)\s+([\d.e+-]+)\s*(?:\/\s*([\d.e+-]+)\s*)?\)$/.exec(value)
+  if (srgb)
+    return {
+      red: Number(srgb[1]) * 255,
+      green: Number(srgb[2]) * 255,
+      blue: Number(srgb[3]) * 255,
+      alpha: srgb[4] === undefined ? 1 : Number(srgb[4]),
     }
   throw new Error(`Cannot parse the colour ${value}`)
 }

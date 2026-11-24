@@ -9,6 +9,7 @@ import { KpiWidget } from '../platform/KpiWidget'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
 import { SignInPromptDialog } from '../platform/SignInPrompt'
 import type { EntityWidgetMetadata, WidgetMetadata } from '../platform/site'
+import { studioRequestAddress } from '../platform/studioAddress'
 import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
@@ -20,6 +21,8 @@ import { StatusTagPreview } from './StatusTagPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview, TypedOnMount } from './ShellPreview'
 import {
+  authoringRequestId,
+  packageRevisionId,
   studioFixtures,
   typicalEntityId,
   typicalFormId,
@@ -103,7 +106,10 @@ export interface PreviewState {
   caption: string
   draw: () => ReactNode
   routes?: Record<string, FixtureRoute>
-  /** Answers on paths the preview's other states answer too, so the state shows alone. */
+  /**
+   * Answers on paths the preview's other states answer too, so the state shows alone. A path the shared routes answer
+   * too, such as `/api/me`, gets this answer while the state shows, and the other states keep the shared one.
+   */
   fixtures?: Record<string, FixtureRoute>
   /** The address the state starts at. */
   entry?: InitialEntry
@@ -418,6 +424,21 @@ export const previews: Record<string, readonly PreviewState[]> = {
       fixtures: studioFixtures.releasePage,
       entry: `/studio?app=${application}&view=release&release=2`,
     },
+    {
+      caption: 'Package file revision',
+      fixtures: studioFixtures.typical,
+      entry: `/studio?app=${application}&view=history&revision=${packageRevisionId}`,
+    },
+    {
+      caption: 'Authoring request',
+      fixtures: studioFixtures.authoringRequest,
+      entry: studioRequestAddress(application, authoringRequestId),
+    },
+    {
+      caption: 'Publish page',
+      fixtures: studioFixtures.publishPage,
+      entry: `/studio?app=${application}&view=publish`,
+    },
   ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
   studioPageDesign: studioDesignerStates(typicalPageId),
   studioFormDesign: studioDesignerStates(typicalFormId),
@@ -520,16 +541,20 @@ export function chooseFixtures(state: PreviewState): void {
 }
 
 /**
- * The fixture paths that states answer for themselves, each answered by the chosen state. A path the chosen state lacks
- * is logged as a missing fixture and answered with a 404, as a path with no route is.
+ * The fixture paths that states answer for themselves, each answered by the chosen state, or by the shared `routes` when
+ * the chosen state has no answer on it. A path that neither answers is logged as a missing fixture and answered with a
+ * 404, as a path with no route is.
  */
-export function chosenRoutes(all: Record<string, readonly PreviewState[]>): Record<string, FixtureRoute> {
+export function chosenRoutes(
+  all: Record<string, readonly PreviewState[]>,
+  shared: Record<string, FixtureRoute>,
+): Record<string, FixtureRoute> {
   const paths = Object.values(all).flatMap((states) => states.flatMap((state) => Object.keys(state.fixtures ?? {})))
   return Object.fromEntries(
     paths.map((path) => [
       path,
       (init) => {
-        const answer = chosen[path]
+        const answer = chosen[path] ?? shared[path]
         if (answer) {
           return answer(init)
         }
