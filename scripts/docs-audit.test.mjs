@@ -422,8 +422,8 @@ describe('milestone issues', () => {
   ])
   const titleOf = (milestone) => `The roadmap and the docs of ${milestone} match its close on GitHub`
   const markers = [
-    { file: 'docs/a.md', line: 3, milestone: 'M37' },
-    { file: 'docs/b.md', line: 9, milestone: 'M37' },
+    { file: 'docs/a.md', line: 3, milestone: 'M35' },
+    { file: 'docs/b.md', line: 9, milestone: 'M35' },
   ]
 
   test('opens a milestone issue for a milestone closed while its roadmap row is not Done, and none when the row reads Done', () => {
@@ -444,26 +444,35 @@ describe('milestone issues', () => {
   })
 
   test('opens a milestone issue for planned markers that name a milestone with no open issue, linking each marker', () => {
-    const found = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'open', open_issues: 0 }], markers)
+    const found = milestoneFindings(statuses, [{ title: 'M35 Shipping', state: 'open', open_issues: 0 }], markers)
     const { issues } = issuesFrom([], [], 1, [], found)
     assert.deepEqual(
       issues.map((i) => i.title),
-      [titleOf('M37')],
+      [titleOf('M35')],
     )
     assert.match(issues[0].body, /\[docs\/a\.md:3\]\(https:\/\/github\.com\/phuongnse\/axis\/blob\/main\/docs\/a\.md#L3\)/)
     assert.match(issues[0].body, /\[docs\/b\.md:9\]/)
   })
 
+  test('opens no milestone issue for planned markers of a milestone whose roadmap row reads Planned', () => {
+    const plannedMarkers = [
+      { file: 'docs/a.md', line: 3, milestone: 'M37' },
+      { file: 'docs/b.md', line: 9, milestone: 'M37' },
+    ]
+    const found = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'open', open_issues: 0 }], plannedMarkers)
+    assert.deepEqual(found, [])
+  })
+
   test('opens no milestone issue for planned markers of a milestone that still has an open issue', () => {
-    const found = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'open', open_issues: 2 }], markers)
+    const found = milestoneFindings(statuses, [{ title: 'M35 Shipping', state: 'open', open_issues: 2 }], markers)
     assert.deepEqual(issuesFrom([], [], 1, [], found), { issues: [], leftOut: [] })
   })
 
   test('leaves out a milestone that an open issue already covers by its marker, closed or named by markers', () => {
     const closed = milestoneFindings(statuses, [{ title: 'M35 Shipping', state: 'closed', open_issues: 0 }], [])
-    const named = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'open', open_issues: 0 }], markers)
+    const named = milestoneFindings(statuses, [{ title: 'M35 Shipping', state: 'open', open_issues: 0 }], markers)
     assert.deepEqual(issuesFrom([], ['text\n<!-- docs-audit milestone M35 -->'], 1, [], closed), { issues: [], leftOut: [] })
-    assert.deepEqual(issuesFrom([], ['text\n<!-- docs-audit milestone M37 -->'], 1, [], named), { issues: [], leftOut: [] })
+    assert.deepEqual(issuesFrom([], ['text\n<!-- docs-audit milestone M35 -->'], 1, [], named), { issues: [], leftOut: [] })
   })
 
   test('opens the milestone issues before the code and test issues', () => {

@@ -161,9 +161,10 @@ const milestonePattern = /^M\d+\b/
 
 /**
  * Returns each GitHub milestone whose close disagrees with its roadmap row: closed while the row does not read Done,
- * or with no open issue while a planned marker names it. A title that does not start with M<n> is skipped.
- * markers lists the planned markers as plannedMilestoneMarkers gives them, and keeps only those of a milestone with
- * no open issue.
+ * or with no open issue while a planned marker names it and its row does not read Planned. A Planned milestone can
+ * exist on GitHub with only its closed readiness docs issues, as docs/delivery.md#the-life-of-a-milestone says, so it
+ * is left out. A title that does not start with M<n> is skipped. markers lists the planned markers as
+ * plannedMilestoneMarkers gives them, and keeps only those of a milestone with no open issue.
  */
 export function milestoneFindings(statuses, githubMilestones, markers) {
   const findings = []
@@ -172,7 +173,8 @@ export function milestoneFindings(statuses, githubMilestones, markers) {
     if (!milestone) continue
     const status = statuses.get(milestone)
     const closed = state === 'closed' && status !== 'Done'
-    const named = open_issues === 0 ? markers.filter((m) => m.milestone === milestone).map(({ file, line }) => ({ file, line })) : []
+    const named =
+      open_issues === 0 && status !== 'Planned' ? markers.filter((m) => m.milestone === milestone).map(({ file, line }) => ({ file, line })) : []
     if (closed || named.length) findings.push({ milestone, status, closed, markers: named })
   }
   return findings

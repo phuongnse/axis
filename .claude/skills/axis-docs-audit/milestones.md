@@ -6,7 +6,10 @@ that way is skipped. The step lists two cases, as [the life of a milestone](../.
 says the close must agree with the roadmap:
 
 1. A milestone is closed on GitHub, and its roadmap row does not read Done.
-2. A milestone has no open issue on GitHub, and a `_(planned for Mx)_` marker in a doc under `docs/` names it.
+2. A milestone has no open issue on GitHub, its roadmap row does not read Planned, and a `_(planned for Mx)_`
+   marker in a doc under `docs/` names it. A Planned milestone is left out: its readiness docs issues can be
+   closed before its breakdown, so it can exist on GitHub with no open issue while its markers are right, and
+   its markers stay until it is built.
 
 For each listed milestone, the step opens one issue. Its title is `The roadmap and the docs of Mx match
 its close on GitHub`, and it carries the labels `documentation` and `docs-audit`. Its hidden marker is
