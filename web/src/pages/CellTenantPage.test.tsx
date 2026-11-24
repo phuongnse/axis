@@ -681,7 +681,12 @@ describe('CellTenantPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Suspend acme?')
     await user.click(within(dialog).getByRole('button', { name: /Suspend$/ }))
-    expect(await screen.findByTestId('cell-tenant-action-error')).toHaveTextContent('Try again.')
+    const alert = await screen.findByTestId('cell-tenant-action-error')
+    expect(alert).toHaveTextContent('Try again.')
+    expect(
+      alert.compareDocumentPosition(within(dialog).getByText(/^The hosts of the tenant answer 503/)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     await user.click(await within(dialog).findByRole('button', { name: /Suspend$/ }))
 
     await waitFor(() => expect(statusTag('Suspended')).toBeInTheDocument())
@@ -921,7 +926,12 @@ describe('CellTenantPage', () => {
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: /Download$/ }))
 
-    expect(await screen.findByTestId('cell-tenant-download-error')).toHaveTextContent('The export has expired.')
+    const alert = await screen.findByTestId('cell-tenant-download-error')
+    expect(alert).toHaveTextContent('The export has expired.')
+    expect(
+      alert.compareDocumentPosition(within(dialog).getByText(/^The ZIP is restricted data/)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(createObjectURL).not.toHaveBeenCalled()
   })
@@ -1036,9 +1046,12 @@ describe('CellTenantPage', () => {
     await user.type(within(dialog).getByRole('textbox', { name: 'Host' }), 'taken.example.com')
     await user.click(within(dialog).getByRole('button', { name: 'Add' }))
 
-    expect(await screen.findByTestId('cell-tenant-host-error')).toHaveTextContent(
-      'The cell refused the request: Another tenant holds this host.',
-    )
+    const alert = await screen.findByTestId('cell-tenant-host-error')
+    expect(alert).toHaveTextContent('The cell refused the request: Another tenant holds this host.')
+    expect(
+      alert.compareDocumentPosition(within(dialog).getByRole('textbox', { name: 'Host' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.queryByTestId('cell-tenant-host-records')).not.toBeInTheDocument()
   })
@@ -1069,9 +1082,12 @@ describe('CellTenantPage', () => {
     )
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByTestId('cell-tenant-quotas-error')).toHaveTextContent(
-      'The request did not reach the cell.',
-    )
+    const alert = await screen.findByTestId('cell-tenant-quotas-error')
+    expect(alert).toHaveTextContent('The request did not reach the cell.')
+    expect(
+      alert.compareDocumentPosition(within(dialog).getByRole('radiogroup', { name: 'Users' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('keeps Delete disabled until the typed text equals the tenant id exactly', async () => {

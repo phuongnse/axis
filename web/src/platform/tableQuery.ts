@@ -55,7 +55,7 @@ export function columnsChoice(keys: readonly string[], shown: readonly string[])
  * when the table is `searchable`, and it is not trimmed. `filter` is read only when the table is `filterable`, and
  * a `filter` that is not valid for `fields` is dropped, see docs/reference/record-api.md#paging-and-sorting.
  * `columns` is read only when the table has the `columnsControl`, with the first field first and unknown or repeated
- * names dropped, see docs/reference/actions-and-controls.md#tables. A `prefix` goes before every name in the URL, so a
+ * names dropped, see docs/reference/tables.md#tables. A `prefix` goes before every name in the URL, so a
  * second table on a page keeps its view under names of its own, and the other names are never read.
  */
 export function parseTableQuery(

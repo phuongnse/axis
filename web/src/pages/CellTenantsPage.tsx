@@ -53,7 +53,7 @@ const staleArchiveMs = 26 * 60 * 60 * 1000
  * limits and the time of its newest archive, which carries a mark when it is more than 26 hours old. The server searches,
  * filters, sorts and pages the list. The table has Search, which looks in the id and the hosts, Filter on every column,
  * Columns, a sort on every column but Hosts, and a pager with a page size, all kept in the address, see
- * `docs/reference/cell-console.md#views` and `docs/reference/actions-and-controls.md#tables`. Create tenant opens the
+ * `docs/reference/cell-console.md#views` and `docs/reference/tables.md#tables`. Create tenant opens the
  * dialog that creates a tenant, and the list loads again when the create job ends or Refresh is pressed.
  */
 export function CellTenantsPage() {

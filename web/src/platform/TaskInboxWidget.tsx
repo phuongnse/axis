@@ -71,7 +71,7 @@ function ClaimedTag({ claimer }: { claimer: string }) {
 /**
  * Lists the signed-in user's open tasks in the task API's order until the view sorts them, paged on the server. The table
  * has Search, Filter on Subject and Due, Columns, a sort on Subject and Due, Refresh and paging, see
- * docs/reference/actions-and-controls.md#tables. The view lives in the URL as `search`, `filter`, `columns`, `sort`, `page`
+ * docs/reference/tables.md#tables. The view lives in the URL as `search`, `filter`, `columns`, `sort`, `page`
  * and `pageSize`, and the widget sends `search`, `filter`, `sort`, `page` and `pageSize` to the task API unchanged, so the
  * server does the work. A new view goes back to page 1. Each row links to the task's address under the inbox page. Task
  * stays first, with no sort or filter, because its label is resolved in the browser. With no sort, rows keep the task API's

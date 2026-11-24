@@ -30,7 +30,7 @@ const noParameters: readonly string[] = []
  * The Jobs view of the cell console: the jobs of the cell, newest first unless sorted, with their steps and errors. The server
  * searches, filters, sorts and pages the list. The table has Search, which looks in the tenant and the error, Filter, Columns,
  * Refresh, a sort on Created, Kind, Tenant and State, and a pager with a page size, all kept in the address, see
- * `docs/reference/cell-console.md#views` and `docs/reference/actions-and-controls.md#tables`. A failed job
+ * `docs/reference/cell-console.md#views` and `docs/reference/tables.md#tables`. A failed job
  * other than a `purge` job offers Run again, behind a confirmation that names the job's kind and tenant. Confirming queues a
  * new job with an `Idempotency-Key`, which stays for a retry after a network error or a 5xx and goes with a final answer.
  * The page puts the new job first on the shown page and follows it every 2 seconds until it ends, then loads the page again.
@@ -164,8 +164,8 @@ export function CellJobsPage() {
           onCancel={() => setConfirming(null)}
         >
           <Flex vertical gap="small">
-            <Typography.Text>{t('shell.cell.jobs.runAgainBody')}</Typography.Text>
             {actionError && <AxisAlert data-testid="cell-jobs-action-error" kind="error" message={actionError} />}
+            <Typography.Text>{t('shell.cell.jobs.runAgainBody')}</Typography.Text>
           </Flex>
         </Modal>
       )}

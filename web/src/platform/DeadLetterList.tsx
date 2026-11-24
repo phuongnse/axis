@@ -56,7 +56,7 @@ const noParameters: readonly string[] = []
  * Lists the open dead letters of a process, newest first, under the instance list. The table has Filter on Kind,
  * Attempts, Last error and Created and a pager, and the server applies the filter. The view lives in the address
  * under the `deadLetters.` prefix, because the instance list keeps the plain names, see
- * docs/reference/process-inspector-widget.md#dead-letters and docs/reference/actions-and-controls.md#tables. A row has a
+ * docs/reference/process-inspector-widget.md#dead-letters and docs/reference/tables.md#tables. A row has a
  * button for each command the server lists in the item's `commands`, and the widget never decides who may take one.
  * A button opens the reason dialog, and a success reads the list again. A failure, a 403 included, shows an error in
  * this section only.

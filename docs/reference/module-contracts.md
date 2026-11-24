@@ -510,7 +510,7 @@ transitions through a layer, and relaxes and restores points.
   tag of its module, as other kinds' lists do. A contract
   opens with a notice that only added states and transitions can be edited, and shows the lifecycle as
   a state diagram, then the core validations, the effects and the ceilings, each with its named point.
-- **Filter.** Each of these tables has a [Filter](actions-and-controls.md#tables) on every column, the named point
+- **Filter.** Each of these tables has a [Filter](tables.md#tables) on every column, the named point
   included, and shows every row on one page with no pager. A filter is kept in the address under the table's own
   prefix: `states.filter`, `transitions.filter`, `validations.filter`, `effects.filter` or `ceiling.filter`. A state or
   transition that the saved contract does not have stays shown under any filter, so an author sees what they just

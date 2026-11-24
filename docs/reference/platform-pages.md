@@ -134,7 +134,7 @@ sorts and pages them, see [the list route](user-administration.md#read-routes).
 - **Refresh.** Refresh, in the toolbar, loads the list again.
 - **Paging.** The pager says "1–20 of N" and has a page size picker.
 - **The address.** The view lives in the address as `search`, `filter`, `sort`, `page`, `pageSize` and
-  `columns`, so a reload or the Back button keeps it. See [tables](actions-and-controls.md#tables).
+  `columns`, so a reload or the Back button keeps it. See [tables](tables.md#tables).
 - **Refusals.** A `403` shows that the page is for administrators. A `404`, which a preview tenant and
   a tenant without a users client answer, shows the not-found page. Any other failure shows an error
   message.
@@ -330,8 +330,8 @@ tenant with no directory row. A `403` or `404` is not logged, and any other fail
   and sends it under every mode, because the server stores it under every mode.
 - **Save.** The "Save" button sends the three values with `PUT /api/tenant/outside-clients`, then reads
   `GET /api/tenant/outside-clients` again, so the tab shows what the server stored, with the IDs and the domains trimmed
-  and without repeats. It then says "The setting was saved."
-- **A failed save.** The tab says "The setting was not saved." and keeps the edited values on screen. A `502` says "The
+  and without repeats. It then says "The setting was saved." above the mode
+- **A failed save.** The tab says "The setting was not saved." above the mode and keeps the edited values on screen. A `502` says "The
   setting was stored, but the identity provider did not apply it. Save again to apply it.", because the server keeps the
   stored change when the identity provider fails.
 - **Apps with consent.** Below the switch, a table headed "Apps with consent" lists each outside MCP client that people
@@ -360,7 +360,7 @@ The page shows names and the values that the administrator may read, and never a
 person may not read. Its texts are `shell.audit.*`.
 
 - **The table.** It lists the audit records from `GET /api/tenant/audit-records`, newest first, 20 to a page,
-  in [the table](actions-and-controls.md#tables) that every list uses. The server filters, sorts and pages them.
+  in [the table](tables.md#tables) that every list uses. The server filters, sorts and pages them.
 - **Columns.** Each row has the time, the person, the action, the application, the entity, the record and
   the changes. The person is the display name, else the user id, and "System" for `system`. The changes
   column lists each changed field with its old and new value, or only the field's label when the
@@ -387,7 +387,7 @@ person may restore. The rules, the routes and the refusals are in [recycle bin](
 `shell.recycleBin.*`.
 
 - **The table.** It lists the records from `GET /api/tenant/recycle-bin`, oldest deletion first, 20 to a
-  page, in [the table](actions-and-controls.md#tables) that every list uses. A row shows the record by its
+  page, in [the table](tables.md#tables) that every list uses. A row shows the record by its
   display value, or by its id when the person may not read the display field, then its entity, its
   application, who deleted it and when, and when it will be purged. The record has no page of its own while
   it is in the bin, so its name is not a link.

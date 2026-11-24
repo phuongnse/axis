@@ -620,7 +620,7 @@ below answers `200`.
 
 A person's columns and saved views of a table are kept on the server for that person, so they come back on any
 browser. The address still wins, and [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md)
-gives the reasons. The rules that a table follows are in [actions and controls](actions-and-controls.md#tables).
+gives the reasons. The rules that a table follows are in [actions and controls](tables.md#tables).
 
 | Route                                                        | What it does                                                                                                                              |
 | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |

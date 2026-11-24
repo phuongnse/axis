@@ -91,7 +91,7 @@ tenant button of the Tenants view and the actions of the Tenant view.
   tenant and the error, its Filter on Created, Kind, Tenant, State and Error, its Columns, Refresh, a sort on the header
   of Created, Kind, Tenant and State, and a pager with a page size. The server searches, filters, sorts and pages the
   list, 20 jobs to a page by default, see [the job list](tenant-lifecycle.md#routes). The search, the filter, the
-  columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).
+  columns, the sort, the page and the page size live in the address, see [tables](tables.md#tables).
   The tenant of a job links to that tenant's Tenant view. On a tenant's own page and in the Create tenant
   dialog it is plain text, because there the link would lead back to the same page or to a tenant that may not exist yet.
   A row shows the time, the kind, the tenant and the state, a `StatusTag` in `neutral` for `queued` and `running`, in
@@ -102,7 +102,7 @@ tenant button of the Tenants view and the actions of the Tenant view.
   column, its Columns, Refresh, a sort on the header of every column but Hosts, a pager with a page size, and a Create tenant
   button that opens the dialog of [creating a tenant](#actions). The server searches, filters, sorts and pages the
   list, 20 tenants to a page by default, see [the tenant list](tenant-lifecycle.md#routes). The search, the filter,
-  the columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).
+  the columns, the sort, the page and the page size live in the address, see [tables](tables.md#tables).
   A row shows:
   - the id, the status and the hosts. The status is a `StatusTag`: `active`, `provisioning` and `deleting` are
     `neutral`, and `readOnly` and `suspended` are `attention`;
@@ -121,15 +121,15 @@ tenant button of the Tenants view and the actions of the Tenant view.
     section, read from [the usage days route](tenant-lifecycle.md#routes) and newest first until the table is sorted.
     The table has Filter on every column, Columns, a sort on every header and a pager with a page size, 20 days by
     default. The `filter`, `columns`, `sort`, `page` and `pageSize` live in the address under their plain names, see
-    [tables](actions-and-controls.md#tables). It has no Search, because a day holds no text. If the days fail to load,
+    [tables](tables.md#tables). It has no Search, because a day holds no text. If the days fail to load,
     this part shows its own error and the rest of the view still works.
   - **Host verification.** Each host that the operator or a tenant administrator asked for, from the
     [tenant read](tenant-lifecycle.md#routes)'s `hostRequests`: pending with the date its request expires, verified or
     expired. The table has Filter on every column, which filters its own rows. The filter lives in the address under
-    `hostRequests.`, see [tables](actions-and-controls.md#tables).
+    `hostRequests.`, see [tables](tables.md#tables).
   - **Quotas.** The quotas of the tenant read, with the rows that override the cell's defaults. The table has Filter on
     every column, which filters its own rows. The filter lives in the address under `quotas.`, see
-    [tables](actions-and-controls.md#tables).
+    [tables](tables.md#tables).
   - **Dates of a deletion.** A `deleting` tenant shows its purge date, `deleteAfter` of the
     [tenant read](tenant-lifecycle.md#routes), as the first fact, beside its status tag. An id that was a tenant and is
     purged shows the status Deleted as a `muted` tag, the date it was purged and the date its deletion is complete as
@@ -197,7 +197,7 @@ Set quotas and Add a host apply at once.
   job, and for a create, for each request body. A retry after a network error or a `5xx` sends the same key, so it cannot queue a second job. Any
   `2xx` or `4xx` answer is final and drops the key, and the next action gets a new one. A create whose field
   changed gets a new key, because the server hashes the body into the request that a key names.
-- **A failed request.** A network error, a `5xx` or a refusing `4xx` leaves the confirmation or the dialog open with an error. A `401` or `403` goes through
+- **A failed request.** A network error, a `5xx` or a refusing `4xx` leaves the confirmation or the dialog open with an error first in its body. A `401` or `403` goes through
   the console's sign-in and forbidden handling.
 - **The job.** The queued job heads the tenant's jobs, or the shown page of the Jobs view after a run again. The view reads
   it at once and then every 2 seconds, and shows its state and steps. When the job succeeds or fails, the view

@@ -199,7 +199,7 @@ const noParameters: readonly string[] = []
  * relaxed a contract point. The other columns are the label, the time it was published, who published it and the note,
  * from the release's first activation. An empty label or note shows the em dash, and Published by is a name, never an
  * id. The table has Search, Filter, Columns, Refresh, a sort on Release, Label, Published and Published by, and a pager
- * with a page size, all kept in the address, see docs/reference/actions-and-controls.md#tables and
+ * with a page size, all kept in the address, see docs/reference/tables.md#tables and
  * docs/reference/authoring-publishing.md#release-list. `history` gives the live number and reloads the page when it reloads. When
  * `canActivate`, every row but the live one has an Activate… icon button, off while `busy`. The button opens a dialog
  * that says which release replaces the live one, or why it cannot, and its confirmation calls `onActivate`.

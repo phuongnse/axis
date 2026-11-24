@@ -666,7 +666,11 @@ describe('UsersPage', () => {
     const dialog = await confirmation('Invite this person?')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Invite' }))
 
-    expect(await screen.findByTestId('users-invite-problem')).toHaveTextContent('The invitation could not be sent.')
+    const problem = await screen.findByTestId('users-invite-problem')
+    expect(problem).toHaveTextContent('The invitation could not be sent.')
+    expect(
+      problem.compareDocumentPosition(within(form).getByLabelText(/^Email\*?$/)) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     await vi.waitFor(() => expect(requested(fetchMock).filter(isList)).toHaveLength(2))
   })
 

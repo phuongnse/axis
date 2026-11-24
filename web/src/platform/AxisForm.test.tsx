@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { withAntdStyles } from '../test/antdStyles'
+import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { AxisField } from './AxisField'
 import { AxisForm, type AxisFormProps } from './AxisForm'
@@ -12,7 +13,7 @@ import { ThemeModeProvider } from './theme'
 
 const catalogs = [{ texts: {}, fallbackTexts: {} }]
 
-function renderForm(props: Pick<AxisFormProps<unknown>, 'unmarked'> = {}) {
+function renderForm(props: Pick<AxisFormProps<unknown>, 'unmarked' | 'message'> = {}) {
   render(
     <ThemeModeProvider initialMode="light">
       <ConfigProvider theme={{ token: { motion: false } }}>
@@ -46,6 +47,26 @@ describe('AxisForm', () => {
     expect(first.parentElement).toBe(second.parentElement)
     expect(first.parentElement).toHaveStyle({ gap: `${spacing.lg}px` })
     expect(first.closest('form')).toHaveClass('ant-form-vertical')
+  })
+
+  it('draws its message first, spacing-lg above its first field', () => {
+    renderForm({ message: <AxisAlert data-testid="form-message" kind="error" message="Not saved" /> })
+    const message = screen.getByTestId('form-message')
+    const first = screen.getByRole('textbox', { name: 'First' }).closest('.ant-form-item') as HTMLElement
+    const { spacing } = designTokensFor('light')
+
+    expect(message.parentElement).toBe(first.parentElement)
+    expect(message.parentElement).toHaveStyle({ gap: `${spacing.lg}px` })
+    expect(message.parentElement?.firstElementChild).toBe(message)
+    expect(message.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('draws no message before its first field when it has none', () => {
+    renderForm()
+    const first = screen.getByRole('textbox', { name: 'First' }).closest('.ant-form-item') as HTMLElement
+
+    expect(first.parentElement?.firstElementChild).toBe(first)
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('marks a required field with the shared required mark', () => {

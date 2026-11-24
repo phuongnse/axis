@@ -122,8 +122,14 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
       destroyOnHidden
     >
       <Flex vertical gap="middle">
-        {errors.length > 0 && <AxisAlert data-testid="task-reassign-error" kind="error" message={errors.join(' ')} />}
-        <AxisForm form={form} initialValues={{ kind: 'role' }} onFinish={(values) => void send(values)}>
+        <AxisForm
+          form={form}
+          initialValues={{ kind: 'role' }}
+          onFinish={(values) => void send(values)}
+          message={
+            errors.length > 0 && <AxisAlert data-testid="task-reassign-error" kind="error" message={errors.join(' ')} />
+          }
+        >
           <AxisField name="kind" label={t('shell.task.reassignTarget')} help={t('shell.task.reassignTarget.help')}>
             <Radio.Group
               role="radiogroup"

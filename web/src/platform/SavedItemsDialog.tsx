@@ -279,8 +279,12 @@ export function SavedItemsDialog<T>({
             ))}
           </Flex>
         )}
-        {failed && <AxisAlert kind="error" message={t(texts.saveFailed)} />}
-        <AxisForm form={form} initialValues={{ name: '' }} onFinish={({ name }) => void save(name)}>
+        <AxisForm
+          form={form}
+          initialValues={{ name: '' }}
+          onFinish={({ name }) => void save(name)}
+          message={failed && <AxisAlert kind="error" message={t(texts.saveFailed)} />}
+        >
           <AxisField
             name="name"
             label={t(texts.name)}

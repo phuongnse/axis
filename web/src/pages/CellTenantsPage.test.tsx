@@ -555,9 +555,12 @@ describe('CellTenantsPage', () => {
     await fillDialog(user, dialog)
     await user.click(createButton(dialog))
 
-    expect(await within(dialog).findByTestId('cell-create-error')).toHaveTextContent(
-      'A tenant of the cell already has this id.',
-    )
+    const alert = await within(dialog).findByTestId('cell-create-error')
+    expect(alert).toHaveTextContent('A tenant of the cell already has this id.')
+    expect(
+      alert.compareDocumentPosition(within(dialog).getByRole('textbox', { name: 'Tenant ID' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(within(dialog).queryByTestId('cell-jobs')).not.toBeInTheDocument()
   })
 

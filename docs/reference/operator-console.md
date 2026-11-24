@@ -200,7 +200,7 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   with its state as a tag and Process as its line, as a site's instance page is, see [page header](shell.md#page-header).
   It offers the commands that the
   detail lists. The view is paged on the server. Its table has the toolbar of
-  [tables](actions-and-controls.md#tables), with Search, Filter, Columns and Refresh, a sort on
+  [tables](tables.md#tables), with Search, Filter, Columns and Refresh, a sort on
   Failed, and a pager with a page size. Search looks in the step or call and the error. Each column
   filters, and the Application and Process columns filter by name, so the view has no Application
   picker. The Process filter offers the processes of the active releases. The address keeps the view
@@ -216,7 +216,7 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   no process. The view lists them in every state, newest first until it is sorted, and is paged on
   the server. Each shows the application, the kind, the event, the trigger or webhook, the
   attempts, the last error, the state and the time it was created. Its table has the toolbar of
-  [tables](actions-and-controls.md#tables), with Search, Filter, Columns and Refresh, a sort on
+  [tables](tables.md#tables), with Search, Filter, Columns and Refresh, a sort on
   Kind, Attempts, State and Created, and a pager with a page size. The Application column filters
   on the applications of the tenant by name, and the view has no Application picker. Search looks
   in the kind and the last error. The address keeps the view as `deadLetters.search`,
@@ -230,7 +230,7 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   application, the webhook, the event, the state, the attempts, the last status code and the
   delivery time. The State column is a `StatusTag`: `delivered` is `success`, `pending` is
   `neutral`, `deadLettered` is `danger` and `discarded` is `muted`. Its table has the toolbar of
-  [tables](actions-and-controls.md#tables), with Search, Filter, Columns and Refresh, a sort on State, Attempts, Status code and Delivered, and a
+  [tables](tables.md#tables), with Search, Filter, Columns and Refresh, a sort on State, Attempts, Status code and Delivered, and a
   pager with a page size. The Application and Webhook columns filter by name, and the view has no
   pickers above the table. The Webhook filter offers the webhooks of the active releases, so a
   delivery whose webhook an older release held cannot be picked by name. The Event column has no
@@ -241,7 +241,7 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
 - **Schedules.** Each schedule trigger of each active release, with its process, its schedule and
   time zone, and its last and next occurrence, see [schedules](process-events.md#schedules). The
   view is ordered by application and trigger name until it is sorted and is paged on the server.
-  Its table has the toolbar of [tables](actions-and-controls.md#tables), with Search, Filter,
+  Its table has the toolbar of [tables](tables.md#tables), with Search, Filter,
   Columns and Refresh, a sort on every column but Schedule, and a pager with a page size. The
   address keeps the view as `search`, `filter`, `sort`, `page`, `pageSize` and `columns`.
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
@@ -256,7 +256,7 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   Live `StatusTag` in `neutral`. The releases are never paged.
   The publish requests table is paged on the server and shows each request with its kind, target,
   status, label, who asked, when it was asked and when it finished. Its table has the toolbar of
-  [tables](actions-and-controls.md#tables), with Search, Filter, Columns and Refresh, a sort on
+  [tables](tables.md#tables), with Search, Filter, Columns and Refresh, a sort on
   Status, Label, Requested by, Requested and Finished, and a pager with a page size. Kind and Target
   filter by their values and do not sort. Requested by filters, searches and sorts on the name
   stored with the request, so it can differ from the name the cell shows after a person is renamed. Who asked is

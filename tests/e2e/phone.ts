@@ -10,7 +10,7 @@ export async function noSideways(page: Page) {
 
 /**
  * Expects the moved lines of every row to sit under the content of the cells that stay, so a cell that wraps never runs
- * under them. See docs/reference/actions-and-controls.md#tables.
+ * under them. See docs/reference/tables.md#tables.
  */
 export async function movedLinesClear(page: Page) {
   const overlaps = await page.evaluate(() => {

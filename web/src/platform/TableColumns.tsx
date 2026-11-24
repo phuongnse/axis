@@ -20,7 +20,7 @@ interface Line {
 }
 
 /**
- * The Columns button of a table and the dialog it opens, see docs/reference/actions-and-controls.md#tables. The dialog
+ * The Columns button of a table and the dialog it opens, see docs/reference/tables.md#tables. The dialog
  * lists the shown columns in order, then the hidden ones. The first column identifies the row, so it stays first and
  * shown. Reset sets the dialog back to every column in its first order, and only Apply puts the choice in force.
  */

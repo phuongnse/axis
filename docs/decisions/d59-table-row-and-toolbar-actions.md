@@ -19,7 +19,7 @@ remove data that should stay, and only the server can refuse a request
 - **`visibleWhen` only shapes the UI.**
 - **An action acts on one row.**
 
-The actions are in [tables](../reference/actions-and-controls.md#tables) and
+The actions are in [tables](../reference/tables.md#tables) and
 [frontend](../reference/frontend.md), and the delete in
 [the record API](../reference/record-api.md#create-update-and-delete).
 

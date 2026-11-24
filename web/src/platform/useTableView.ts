@@ -14,7 +14,7 @@ import {
 
 /**
  * The saved views of a table with a key, and the means to open, save, rename, overwrite and delete them, see
- * docs/reference/actions-and-controls.md#tables. The writes answer whether the server took them.
+ * docs/reference/tables.md#tables. The writes answer whether the server took them.
  */
 export interface TableSavedViews {
   views: SavedTableView[]
@@ -30,7 +30,7 @@ export interface TableSavedViews {
 
 /**
  * A table's view, its search, filter, columns, sort, page, page size and data source parameter values, kept in the address, see
- * docs/reference/actions-and-controls.md#tables. An invalid, empty, repeated or out-of-order value, or a search the
+ * docs/reference/tables.md#tables. An invalid, empty, repeated or out-of-order value, or a search the
  * table cannot make or a filter that is not valid for `fields`, is rewritten without a history entry. `setView` adds a history entry unless `replace` is set.
  * A view change keeps the scroll position, see docs/reference/frontend.md#routing.
  * `prefix` goes before every address name, so a second table on a page keeps its view under names of its own.

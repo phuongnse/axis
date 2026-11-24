@@ -27,7 +27,7 @@ const viewsTexts: SavedItemsTexts = {
 
 /**
  * The Views button of a table with a key, which opens the one saved items dialog with the person's views, see
- * docs/reference/actions-and-controls.md#tables. The Name field and Save view save the table's current search, filter
+ * docs/reference/tables.md#tables. The Name field and Save view save the table's current search, filter
  * and sort, and Overwrite replaces a view's with them.
  */
 export function TableViewsButton({ saved }: { saved: TableSavedViews }) {

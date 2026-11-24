@@ -124,7 +124,7 @@ right of the heading, and a page with no parameters says so in one line. Each pa
 box. It has a name, a type picker over `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum`
 and `reference`, and a Required switch. The name, type and Required switch sit one to a row, each as wide as
 the field it fills. Remove parameter is a trash icon at the row's top right, named by its tooltip, as a
-table's [row actions](actions-and-controls.md#tables) show a known Remove. Add parameter appends a `text` parameter
+table's [row actions](tables.md#tables) show a known Remove. Add parameter appends a `text` parameter
 with an empty name. A `reference` parameter also has a target entity picker, and an `enum` parameter its
 values. A type change removes the `target` or the `values` that the new type does not take, and switching Required off removes the `required` key.
 The names answer lists each page's parameters, which is how a navigate action knows them. A
@@ -295,7 +295,7 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 - **Lists.** The lists of a process's parameters, a decision's branches, a task's outcomes and escalations, and an
   operation's rows have Add on their title row as a secondary button. Each row's Remove is the trash icon, named by its
   tooltip. Each step's Move up, Move down and Delete are entries of its "…" menu, with Delete last after a divider, the
-  table's [row actions](actions-and-controls.md#tables). A task's deadline and a wait
+  table's [row actions](tables.md#tables). A task's deadline and a wait
   for event's timeout have Add or Remove on their group's title row, also as a secondary button, and Remove in the
   destructive tone, so it is outlined in `dangerText`. A read-only tab,
   such as while the JSON has an error, shows no Add, no Remove and no menu.

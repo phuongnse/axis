@@ -46,7 +46,7 @@ const deliveryStates = ['delivered', 'pending', 'deadLettered', 'discarded']
  * the view sorts them, with the state, the attempts and the last status code of each, paged on the server. The table has
  * Search, Filter, Columns and Refresh, a sort on State, Attempts, Status code and Delivered, and a pager with a page size,
  * all kept in the address under the `webhookDeliveries.` prefix, because Schedules and Dead letters keep their own names,
- * see docs/reference/operator-console.md#views and docs/reference/actions-and-controls.md#tables. The Application and
+ * see docs/reference/operator-console.md#views and docs/reference/tables.md#tables. The Application and
  * Webhook columns filter by name, so the view has no pickers above the table. A failure shows an error in this part only.
  */
 export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhookDeliveriesProps) {

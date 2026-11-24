@@ -36,7 +36,7 @@ request opens its own page.
     MCP works on your applications with its own subscription, once your administrator allows it. Give it
     this address:" The [address](#connected-apps) follows, with its copy button.
 - **The AI requests page**. The page lists every request of the application, newest
-  first, in one [table](actions-and-controls.md#tables) with four columns:
+  first, in one [table](tables.md#tables) with four columns:
   - **Request** is the request's name, as the link to its page. Until AI names it, the name is the first
     sentence of its words, cut at 80 characters with an ellipsis. It has no sort.
   - **State** is a [status tag](shared-widgets.md#which-widget) with the state's one word, as the
@@ -151,7 +151,7 @@ else. Its line says what the work is doing or did.
 Under Show the steps comes the request's History, a table of its steps, newest first. Its columns are Step,
 Result, Started and Duration.
 
-- The table has no paging, search or filter. It is part of one request, which [tables](actions-and-controls.md#tables)
+- The table has no paging, search or filter. It is part of one request, which [tables](tables.md#tables)
   allows for a table that is part of one thing.
 - Duration reads "40 s", "3 min" or "1 h 5 min" in the reader's language. A step that is still running
   shows an em dash.
@@ -161,7 +161,7 @@ Result, Started and Duration.
 - The results read "Plan written", "Saved", "All scenarios pass", "No changes requested", "Refused" or
   "Ran out of time". The only free text is the author's own comment in a step.
 - **Writes that follow each other.** Writes that follow each other fold into one group row, as
-  [folding group rows](actions-and-controls.md#tables) says. The row reads "Wrote 3 resources", or "Changed 3
+  [folding group rows](tables.md#tables) says. The row reads "Wrote 3 resources", or "Changed 3
   resources" when one of them is a delete. Its Result is the outcome the writes share, or "Results differ". Its
   Duration runs from the first write's start to the last write's end.
 - **Each write.** Each write is a row under its group, with its own Result, Started and Duration.
@@ -437,7 +437,7 @@ changed what and can undo it.
 
 - **History.** The History entry of the sidebar lists the application's revisions, newest first: the
   summary, who, when, and through which client. A revision the server made, such as the start of
-  history, shows System as its author and no client. The list is a [table](actions-and-controls.md#tables)
+  history, shows System as its author and no client. The list is a [table](tables.md#tables)
   paged on the server, [20 revisions at a time](authoring-revisions.md#list), with Search, Filter, Columns,
   Refresh, a sort on Who, When and Through and a pager with a page size. All of them live in the address. A revision's summary opens its diff as a page of
   its own, at `&view=history&revision=<id>`, with History still marked in the sidebar. The page shows

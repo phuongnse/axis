@@ -68,7 +68,7 @@ function formatTime(value: string | null, locale: string) {
  * only. The picker starts on the first application of the tenant and sits above both tables, outside the address. The
  * releases table marks the active release and every off-standard release with its relaxed points, and is never paged.
  * The requests table is paged on the server and has the full toolbar, with its view kept in the address under the
- * `publishRequests.` prefix, see docs/reference/operator-console.md#views and docs/reference/actions-and-controls.md#tables.
+ * `publishRequests.` prefix, see docs/reference/operator-console.md#views and docs/reference/tables.md#tables.
  * The view has no publish or activate command, because those stay in Studio. A failed load shows an error in each table in
  * place of its rows, and the requests table keeps its toolbar.
  */

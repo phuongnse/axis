@@ -33,7 +33,7 @@ function textOf(column: TextColumn, key: string): string {
  * The text keys of an application as a table: a row per key and a column per locale, in the order of `columns`. Only
  * an editable column takes input, and it edits the draft through `onChange`. A key that a column lacks shows as
  * missing, and typing in an editable cell adds it. The search is AxisTable's own, see
- * docs/reference/actions-and-controls.md#tables: it keeps the rows whose key or text in any locale contains the
+ * docs/reference/tables.md#tables: it keeps the rows whose key or text in any locale contains the
  * search, ignoring letter case, and lives in the address as `search`. Filter is there too, on the key and on each
  * locale's text, where a missing or empty text is empty, and lives in the address as `filter`. The table pages, so a key past page 1 needs a
  * search. `onAdd` writes a new key in every locale and answers how that went. With a `layer`, each key that the

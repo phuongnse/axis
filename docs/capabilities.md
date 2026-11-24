@@ -220,10 +220,10 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | --- | --- |
 | Sort, page and filter any list | [Paging and sorting](reference/record-api.md#paging-and-sorting) |
 | Filter a report's rows | [Query parameters](reference/data-sources.md#query-parameters) |
-| Filter on every column of every table | [Tables](reference/actions-and-controls.md#tables) |
+| Filter on every column of every table | [Tables](reference/tables.md#tables) |
 | Search the text of a list | [Paging and sorting](reference/record-api.md#paging-and-sorting) |
 | Search across every kind of record at once | _(planned for M53)_ |
-| Replace a saved view with the current search, filter and sort | [Tables](reference/actions-and-controls.md#tables) |
+| Replace a saved view with the current search, filter and sort | [Tables](reference/tables.md#tables) |
 
 ### Reports and dashboards
 
@@ -297,8 +297,8 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Search a table | [Search](reference/table-widget.md#search) |
 | Sort and page a table | [Paging and sorting](reference/table-widget.md#paging-and-sorting) |
 | Filter a table on its columns | [Filter](reference/table-widget.md#filter) |
-| Save a table's search, filter and sort as a named view | [Tables](reference/actions-and-controls.md#tables) |
-| Overwrite a saved view | [Tables](reference/actions-and-controls.md#tables) |
+| Save a table's search, filter and sort as a named view | [Tables](reference/tables.md#tables) |
+| Overwrite a saved view | [Tables](reference/tables.md#tables) |
 | Keep each person's columns of a table | [Table views and columns](reference/frontend.md#table-views-and-columns) |
 | Choose the columns of an application's table | [Column chooser](reference/table-widget.md#column-chooser) _(planned for M42)_ |
 | Act on one row, or from the toolbar | [Row and toolbar actions](reference/table-widget.md#row-and-toolbar-actions) |

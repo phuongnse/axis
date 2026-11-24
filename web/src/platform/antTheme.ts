@@ -318,7 +318,7 @@ export function useChoiceActionsTheme(): ThemeConfig {
 }
 
 /**
- * The cell padding of a table, see docs/reference/actions-and-controls.md#tables. A row is `spacing-xs` above and below
+ * The cell padding of a table, see docs/reference/tables.md#tables. A row is `spacing-xs` above and below
  * a line of the `smallControl` size, which a line of text and a small icon button both fill, and `spacing-lg` on each
  * side keeps columns apart. A compact table has `spacing-sm` on each side. `AxisTable` applies it through a nested
  * ConfigProvider.

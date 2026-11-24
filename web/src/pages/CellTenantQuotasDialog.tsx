@@ -83,6 +83,7 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
         initialValues={start}
         onValuesChange={(_changed, all) => setChoices(all)}
         onFinish={() => void save()}
+        message={error && <AxisAlert data-testid="cell-tenant-quotas-error" kind="error" message={error} />}
       >
         {Object.keys(quotas).map((key) => {
           const label = t(`shell.cell.tenant.quota.${key}`)
@@ -123,7 +124,6 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
             </Fragment>
           )
         })}
-        {error && <AxisAlert data-testid="cell-tenant-quotas-error" kind="error" message={error} />}
       </AxisForm>
     </Modal>
   )

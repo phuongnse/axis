@@ -44,7 +44,7 @@ const sessionFields = [
  * session but the current one and a button to end all the others. When the last login is too old to
  * end sessions, the buttons are disabled and Sign in again starts a fresh login that returns here.
  * Both tables have a Filter that narrows their own rows, kept in the address under `authenticators.`
- * and `sessions.`, see docs/reference/actions-and-controls.md#tables.
+ * and `sessions.`, see docs/reference/tables.md#tables.
  */
 export function AccountPage() {
   const t = useText()

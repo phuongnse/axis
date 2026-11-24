@@ -6,6 +6,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { DialogFooter } from '../platform/DialogFooter'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
+import { AxisForm } from '../platform/AxisForm'
 import { AxisTable } from '../platform/AxisTable'
 import { FilledText } from '../platform/FilledText'
 import { recordPageSize } from '../platform/tableQuery'
@@ -73,7 +74,7 @@ function tagsSelect(value: string[], onChange: (next: string[]) => void) {
  * domains trimmed and without repeats. A failed save keeps the edited values on screen, and a `502` says that the change is stored and
  * that saving again applies it. Each option has its own help. Below the choice, a table lists the apps that people consented to, read with
  * `GET /api/tenant/connected-apps`: the name, the client ID, the people who consented and the last use. The table
- * filters its own rows, kept in the address under `connectedApps.`, see docs/reference/actions-and-controls.md#tables.
+ * filters its own rows, kept in the address under `connectedApps.`, see docs/reference/tables.md#tables.
  * Each row has a Revoke button that asks for a confirmation naming the client, then sends
  * `POST /api/tenant/connected-apps/{clientId}/revoke` and reads the list again. A failed revoke keeps the row, and a
  * `502` says that revoking again finishes it. A list that does not load shows a message and leaves the choice working.
@@ -169,44 +170,49 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
 
   return (
     <Flex vertical gap="middle" data-testid="connected-apps">
-      <AxisChoiceField
-        label={t('shell.users.connectedApps.mode')}
-        help={t('shell.users.connectedApps.modeHelp')}
-        value={mode}
-        onChange={(value) => {
-          const next = modes.find((candidate) => candidate === value)
-          if (next) {
-            setMode(next)
-          }
-        }}
-        options={modes.map((value) => ({
-          value,
-          label: t(`shell.users.connectedApps.${value}`),
-          help: t(`shell.users.connectedApps.${value}Help`),
-        }))}
-      />
-      {mode === 'allowList' && (
-        <AxisField label={t('shell.users.connectedApps.clients')} help={t('shell.users.connectedApps.clientsHelp')}>
-          {tagsSelect(clients, setClients)}
-        </AxisField>
-      )}
-      {mode === 'all' && (
-        <AxisField label={t('shell.users.connectedApps.domains')} help={t('shell.users.connectedApps.domainsHelp')}>
-          {tagsSelect(domains, setDomains)}
-        </AxisField>
-      )}
-      {notice && (
-        <AxisAlert
-          data-testid="connected-apps-notice"
-          kind={notice === 'saved' ? 'success' : 'error'}
-          message={t(`shell.users.connectedApps.${notice}`)}
+      <AxisForm
+        message={
+          notice && (
+            <AxisAlert
+              data-testid="connected-apps-notice"
+              kind={notice === 'saved' ? 'success' : 'error'}
+              message={t(`shell.users.connectedApps.${notice}`)}
+            />
+          )
+        }
+      >
+        <AxisChoiceField
+          label={t('shell.users.connectedApps.mode')}
+          help={t('shell.users.connectedApps.modeHelp')}
+          value={mode}
+          onChange={(value) => {
+            const next = modes.find((candidate) => candidate === value)
+            if (next) {
+              setMode(next)
+            }
+          }}
+          options={modes.map((value) => ({
+            value,
+            label: t(`shell.users.connectedApps.${value}`),
+            help: t(`shell.users.connectedApps.${value}Help`),
+          }))}
         />
-      )}
-      <div>
-        <AxisButton role="finish" loading={busy} onClick={() => void save()}>
-          {t('shell.users.connectedApps.save')}
-        </AxisButton>
-      </div>
+        {mode === 'allowList' && (
+          <AxisField label={t('shell.users.connectedApps.clients')} help={t('shell.users.connectedApps.clientsHelp')}>
+            {tagsSelect(clients, setClients)}
+          </AxisField>
+        )}
+        {mode === 'all' && (
+          <AxisField label={t('shell.users.connectedApps.domains')} help={t('shell.users.connectedApps.domainsHelp')}>
+            {tagsSelect(domains, setDomains)}
+          </AxisField>
+        )}
+        <div>
+          <AxisButton role="finish" loading={busy} onClick={() => void save()}>
+            {t('shell.users.connectedApps.save')}
+          </AxisButton>
+        </div>
+      </AxisForm>
       <Typography.Title level={3}>{t('shell.users.connectedApps.apps')}</Typography.Title>
       <AxisTable<TenantConnectedApp>
         testId="connected-apps-list"

@@ -37,7 +37,7 @@ const statuses = ['new', 'changed', 'published'] as const
  * name, a link that opens the resource, with a neutral tag of the module's label for a module resource, then the
  * description, the status and who changed it last and when. The table has Search, Filter, Columns, Refresh, a sort on Name,
  * Status, Last modified by and Last modified at, and a pager with a page size, all kept in the address, see
- * docs/reference/actions-and-controls.md#tables. The server builds the rows in the UI locale, see
+ * docs/reference/tables.md#tables. The server builds the rows in the UI locale, see
  * docs/reference/studio-resource-form.md#kind-list. The list loads again after a write (`folderRevision`), a reconnect and
  * Refresh. A failed load shows one error above the table.
  */

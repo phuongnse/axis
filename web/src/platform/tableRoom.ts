@@ -1,4 +1,4 @@
-/** Which columns move under their row first, see docs/reference/actions-and-controls.md#tables. */
+/** Which columns move under their row first, see docs/reference/tables.md#tables. */
 export type ColumnPriority = 'low' | 'high'
 
 /** A shown column as the room measures it: its key, the width it needs in px and its priority. */
@@ -12,7 +12,7 @@ const rank = { low: 0, unset: 1, high: 2 }
 
 /**
  * Decides which columns move under their row when a table is too narrow, see
- * docs/reference/actions-and-controls.md#tables. `available` is the table's width and `others` the width of what is
+ * docs/reference/tables.md#tables. `available` is the table's width and `others` the width of what is
  * not a data column, such as the checkboxes and the row actions. Columns move `low` first, then those without a
  * priority, then `high`, and within each group from the right. The first column never moves. `scrolls` is true when
  * the columns that stay still do not fit. A table with no width yet moves nothing. `moved` is in moving order.

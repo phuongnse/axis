@@ -259,7 +259,7 @@ A child collection field shows its rows as a table under the field's label.
   italic "—". A read-only file cell shows its download link, or a dash when it has no file.
 - **References in cells**. A reference cell has the same Open button as a reference field, and a read-only
   reference cell is a link to its record page.
-- **Table.** The table is the shared table, see [tables](actions-and-controls.md#tables). A reference
+- **Table.** The table is the shared table, see [tables](tables.md#tables). A reference
   cell's input keeps at least 240px and the other inputs at least 160px.
 - **Rows.** Delete row is the row's icon action: a trash icon button in `dangerText`, with its name as
   a tooltip on hover and on keyboard focus. Below 992px it stays a trash icon, as the row's one action, and does not fold. Add row is the table
@@ -267,7 +267,7 @@ A child collection field shows its rows as a table under the field's label.
   [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`, and
   focus moves to the row's first input.
 - **Order** _(planned for M42)_. Each editable row has a drag handle, and the keyboard moves a row with Move up and
-  Move down in the row's menu. The rows reorder through the table's `reorder`, see [tables](actions-and-controls.md#tables).
+  Move down in the row's menu. The rows reorder through the table's `reorder`, see [tables](tables.md#tables).
   The form sends the rows in the shown order, because a new order counts as a change.
   The server keeps the order it is sent, see [child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
   A read-only collection has no handle. As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.

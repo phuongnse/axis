@@ -24,12 +24,12 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 
 ## Fields
 
-- **The table.** The fields are the [standard table](actions-and-controls.md#tables), one row per field,
+- **The table.** The fields are the [standard table](tables.md#tables), one row per field,
   in the file's order. An entity's field order is its order everywhere else: the file, the default form
   and the lists that name fields in the entity's field order.
 - **Reordering** _(planned, #5049)_. Each row starts with a handle named Drag to reorder. Dragging it moves the
   row to its place, and the rows between make room. The keyboard uses the same handle: Space picks the row
-  up, the arrow keys move it, Space drops it and Escape cancels, as [tables](actions-and-controls.md#tables)
+  up, the arrow keys move it, Space drops it and Escape cancels, as [tables](tables.md#tables)
   say. While a search or a filter hides rows, the handles are off, and their tooltip says "Clear the search
   and the filter to reorder". The table has no sort.
 - **Row menu** _(planned, #5049)_. Each row's "…" menu holds Move up, Move down and Delete, the way to move a row

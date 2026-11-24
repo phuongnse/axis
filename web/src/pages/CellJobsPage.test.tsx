@@ -313,7 +313,12 @@ describe('CellJobsPage', () => {
     await user.click(within(within(table).getAllByRole('row')[1]).getByRole('button', { name: 'Run again' }))
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: 'Run again' }))
-    expect(await screen.findByTestId('cell-jobs-action-error')).toHaveTextContent('Try again.')
+    const alert = await screen.findByTestId('cell-jobs-action-error')
+    expect(alert).toHaveTextContent('Try again.')
+    expect(
+      alert.compareDocumentPosition(within(dialog).getByText(/^A new job starts at the first step/)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     await user.click(await within(dialog).findByRole('button', { name: /Run again$/ }))
 
     expect(await screen.findByTestId('cell-jobs-action-error')).toHaveTextContent(

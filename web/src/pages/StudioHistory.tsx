@@ -65,7 +65,7 @@ function useRevisionTime(): (time: string) => string {
  * The History of the open application: one row for each revision, newest first unless the view sorts them, paged on the
  * server. A row shows the summary, which opens the revision's page, who made it, when, and the client it came through.
  * The table has Search, Filter, Columns, Refresh, a sort on Who, When and Through and a pager with a page size, all kept
- * in the address, see docs/reference/actions-and-controls.md#tables and docs/reference/authoring-revisions.md#list.
+ * in the address, see docs/reference/tables.md#tables and docs/reference/authoring-revisions.md#list.
  * Every row but the start of history, which the server names, has an Undo… icon button, off while an undo runs: nothing
  * undoes the start of history. An undo runs at once. When it succeeds the list reloads and `onUndone` gets the folder's
  * diagnostics. When later revisions changed the same files, a warning names each of them and nothing is undone.

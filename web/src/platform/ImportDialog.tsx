@@ -233,7 +233,12 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
       }
     >
       <Flex vertical gap="middle">
-        <AxisForm form={form} onFinish={() => void upload()} onFinishFailed={() => chooseRef.current?.focus()}>
+        <AxisForm
+          form={form}
+          onFinish={() => void upload()}
+          onFinishFailed={() => chooseRef.current?.focus()}
+          message={problem !== null && <AxisAlert data-testid="import-problem" kind="error" message={problem} />}
+        >
           <AxisField
             name="file"
             label={t('shell.table.importFileField')}
@@ -274,7 +279,6 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
               ))}
             </ul>
           )}
-          {problem !== null && <AxisAlert data-testid="import-problem" kind="error" message={problem} />}
         </div>
       </Flex>
     </Modal>
