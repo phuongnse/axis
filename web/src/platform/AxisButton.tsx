@@ -1,6 +1,7 @@
 import { EllipsisOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Flex, Space, Tooltip, type ButtonProps, type FlexProps } from 'antd'
 import {
+  Children,
   createContext,
   useContext,
   useLayoutEffect,
@@ -223,7 +224,6 @@ export function AxisActionRow({
   align?: FlexProps['align']
   outlined?: boolean
 }) {
-  const t = useText()
   const rowRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<() => void>(() => {})
   const needed = useRef(0)
@@ -277,48 +277,67 @@ export function AxisActionRow({
     <ActionRowContext.Provider value={!outlined}>
       <Flex gap="small" justify={justify} align={align} {...rowProps}>
         {children}
-        {fold &&
-          (folding && folded ? (
-            <Dropdown
-              trigger={['click']}
-              autoFocus
-              menu={{
-                ...menuOf(fold, t),
-                'aria-label': t('shell.actionRow.more'),
-              }}
-            >
-              <AxisButton role="subtle" nameKey="shell.actionRow.more" icon={<EllipsisOutlined />} />
-            </Dropdown>
-          ) : (
-            fold.map((action) => (
-              <AxisButton
-                key={action.key}
-                role="secondary"
-                destructive={action.destructive}
-                disabled={action.disabled}
-                onClick={action.onClick}
-                {...action.attributes}
-              >
-                {actionText(action, t)}
-              </AxisButton>
-            ))
-          ))}
+        {fold && (folding && folded ? <FoldMenu actions={fold} /> : <FoldButtons actions={fold} />)}
         {end}
       </Flex>
     </ActionRowContext.Provider>
   )
 }
 
+/** The "…" menu of `actions`, named More actions, see docs/reference/actions-and-controls.md#menus. */
+function FoldMenu({ actions }: { actions: readonly AxisAction[] }) {
+  const t = useText()
+  return (
+    <Dropdown
+      trigger={['click']}
+      autoFocus
+      menu={{
+        ...menuOf(actions, t),
+        'aria-label': t('shell.actionRow.more'),
+      }}
+    >
+      <AxisButton role="subtle" nameKey="shell.actionRow.more" icon={<EllipsisOutlined />} />
+    </Dropdown>
+  )
+}
+
+/** The `actions` as secondary buttons, in their order, each with its spinner while it waits. */
+function FoldButtons({ actions }: { actions: readonly AxisAction[] }) {
+  const t = useText()
+  return (
+    <>
+      {actions.map((action) => (
+        <AxisButton
+          key={action.key}
+          role="secondary"
+          loading={action.loading}
+          destructive={action.destructive}
+          disabled={action.disabled}
+          onClick={action.onClick}
+          {...action.attributes}
+        >
+          {actionText(action, t)}
+        </AxisButton>
+      ))}
+    </>
+  )
+}
+
 /**
  * The actions of a title row, such as a section's or a field group's, each drawn in its own role, see
  * docs/reference/shell.md#layout. Unlike an `AxisActionRow`, it draws no action as a text button, so a section's Add
- * keeps its border and a tool stays subtle.
+ * keeps its border and a tool stays subtle. With `fold` of two or more actions, and three actions in all counting the
+ * children, the `fold` actions become one "…" More actions menu beside the children. A joined group among the children
+ * counts as one action. Otherwise they are secondary buttons, see docs/reference/actions-and-controls.md#menus.
  */
-export function TitleRowActions({ children }: { children: ReactNode }) {
+export function TitleRowActions({ children, fold = [] }: { children?: ReactNode; fold?: AxisAction[] }) {
+  const count = Children.toArray(children).length + fold.length
+  const folded = count >= 3 && fold.length >= 2
   return (
     <ActionRowContext.Provider value={false}>
       <Flex gap="small" align="center" wrap>
         {children}
+        {folded ? <FoldMenu actions={fold} /> : fold.length > 0 && <FoldButtons actions={fold} />}
       </Flex>
     </ActionRowContext.Provider>
   )

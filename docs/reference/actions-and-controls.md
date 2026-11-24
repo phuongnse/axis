@@ -106,7 +106,8 @@ choices.
 - **One builder.** Every menu of actions or choices is built by `menuOf` from one action type, `AxisAction`,
   in `web/src/platform/menuActions.tsx`. A row's actions, an action row's fold, a split button's menu and a
   menu of choices take the same actions. A choice with no address is a checked radio entry. A choice with an
-  address is a link, marked `aria-current="page"` when it is the current page. The shell's navigation tree lists
+  address is a link, marked `aria-current="page"` when it is the current page. A menu entry keeps the action's
+  `attributes`, such as its `data-testid`. The shell's navigation tree lists
   pages, not actions or choices, so it is not one of these menus, see [layout](shell.md#layout).
 - **Selected and current states.** The selected tab, the active menu entry and the current page of a
   pagination use `primaryText`, and destructive menu entries use `dangerText`.
@@ -132,7 +133,8 @@ choices.
 - **One threshold everywhere**. One or two actions show as buttons in a table's row or a list's item. From three
   on, or when the row runs out of room, they fold into one "…" menu.
 - **One threshold on a heading** _(planned, #5134)_. One or two actions show as buttons on a page's heading or a section's
-  title row. From three on, they fold into one "…" menu, as a row's actions do.
+  title row. From three on, the actions the heading marks as foldable fold into one "…" menu of two or more, as a row's
+  actions do.
 - **A destructive entry comes last.** In a menu of actions, a destructive entry comes after the others, behind one
   divider.
 - **A menu never holds one entry**. A menu has at least two entries.

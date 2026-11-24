@@ -5,6 +5,7 @@ import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { PageActions, PageLayout } from './PageLayout'
+import type { AxisAction } from './menuActions'
 import { formatValue } from './formatValue'
 import { buildCompleteBody, buildRecordBody } from './recordBody'
 import { fetchRecord, type RecordProblem } from './records'
@@ -80,10 +81,12 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * API has none for shows that it does not exist, or that the person cannot open it, with a link back to the inbox. A
  * task assigned to someone else shows only that.
  *
- * An open task shows a Release and a Claim button for each of `release` and `claim` that the task read's `commands`
- * lists. A click shows the task the route returns. A 403 or 409 shows a message and loads the task again.
+ * An open task shows a Release and a Claim action for each of `release` and `claim` that the task read's `commands`
+ * lists. On the heading they are buttons beside the outcomes, and from three actions in all they fold into one More
+ * actions menu, see docs/reference/task-inbox-widget.md#task-page. A click shows the task the route returns. A 403 or
+ * 409 shows a message and loads the task again.
  *
- * An open task whose `commands` lists `reassign` also shows a Reassign… button. It opens a dialog
+ * An open task whose `commands` lists `reassign` also shows a Reassign… action. It opens a dialog
  * where the user picks a role of the task read's `reassignRoles` or a person, and gives a reason.
  * On success the page returns to the inbox. A 400 shows in the dialog. A 403 or 409 closes the
  * dialog, shows the same message as Claim and Release and loads the task again.
@@ -310,7 +313,7 @@ function TaskBody({
               task={task}
               tasksPath={tasksPath}
               locale={locale}
-              commandButtons={commands.buttons}
+              commandActions={commands.actions}
               onDone={onDone}
               onAssignedElsewhere={onAssignedElsewhere}
               onDecided={onDecided}
@@ -335,12 +338,11 @@ interface TaskCommandsProps {
 const taskCommands = ['release', 'claim'] as const
 
 /**
- * The command buttons for the heading, in the order Release, Claim, then Reassign…, each of `release`, `claim` and
+ * The command actions for the heading, in the order Release, Claim, then Reassign…, each of `release`, `claim` and
  * `reassign` that `commands` lists, and the panel to show in the page: the message of a command that failed and the
  * reassign dialog while it is open.
  */
 function useTaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassign }: TaskCommandsProps) {
-  const t = useText()
   // The command being sent, so both buttons wait for its answer.
   const [pending, setPending] = useState<string | null>(null)
   const [message, setMessage] = useState<CommandMessage | null>(null)
@@ -372,23 +374,20 @@ function useTaskCommands({ commands, reassignRoles, usersPath, onCommand, onReas
     return answer === null ? null : answer.problem
   }
 
-  const buttons: ReactNode[] = listed.map((command) => (
-    <AxisButton
-      key={command}
-      role="secondary"
-      loading={pending === command}
-      disabled={pending !== null && pending !== command}
-      onClick={() => void run(command)}
-    >
-      {t(`shell.task.${command}`)}
-    </AxisButton>
-  ))
+  const actions: AxisAction[] = listed.map((command) => ({
+    key: command,
+    labelKey: `shell.task.${command}`,
+    loading: pending === command,
+    disabled: pending !== null && pending !== command,
+    onClick: () => void run(command),
+  }))
   if (canReassign) {
-    buttons.push(
-      <AxisButton key="reassign" role="secondary" disabled={pending !== null} onClick={() => setReassigning(true)}>
-        {t('shell.task.reassign')}
-      </AxisButton>,
-    )
+    actions.push({
+      key: 'reassign',
+      labelKey: 'shell.task.reassign',
+      disabled: pending !== null,
+      onClick: () => setReassigning(true),
+    })
   }
   const panel = (
     <>
@@ -403,29 +402,29 @@ function useTaskCommands({ commands, reassignRoles, usersPath, onCommand, onReas
       )}
     </>
   )
-  return { buttons, panel }
+  return { actions, panel }
 }
 
 interface OpenTaskFormProps {
   task: TaskItem
   tasksPath: string
   locale: string
-  /** The command buttons, which go on the heading before the outcomes. */
-  commandButtons: ReactNode[]
+  /** The command actions, which fold beside the outcomes on the heading from three actions on. */
+  commandActions: AxisAction[]
   onDone: () => void
   onAssignedElsewhere: () => void
   onDecided: () => void
 }
 
 /**
- * The step's form over the subject record of an open task. The command buttons and the outcomes sit on the page's
- * heading, in one `PageActions`, and a wizard shows the outcomes on its last step only.
+ * The step's form over the subject record of an open task. The outcomes and the command actions sit on the page's
+ * heading, in one `PageActions`, the outcomes first. A wizard shows the outcomes on its last step only.
  */
 function OpenTaskForm({
   task,
   tasksPath,
   locale,
-  commandButtons,
+  commandActions,
   onDone,
   onAssignedElsewhere,
   onDecided,
@@ -534,23 +533,20 @@ function OpenTaskForm({
   }
 
   const actions = (
-    <PageActions>
-      <Flex gap="small">
-        {commandButtons}
-        {steps.last && ready === true && (
-          <AxisButtonGroup
-            role="main"
-            nameKey="shell.task.outcomes"
-            actions={task.outcomes.map((outcome) => ({
-              key: outcome.name,
-              label: t(outcome.labelKey),
-              loading: sending === outcome.name,
-              disabled: saving || (sending !== null && sending !== outcome.name),
-              onClick: () => void complete(outcome.name),
-            }))}
-          />
-        )}
-      </Flex>
+    <PageActions fold={commandActions}>
+      {steps.last && ready === true && (
+        <AxisButtonGroup
+          role="main"
+          nameKey="shell.task.outcomes"
+          actions={task.outcomes.map((outcome) => ({
+            key: outcome.name,
+            label: t(outcome.labelKey),
+            loading: sending === outcome.name,
+            disabled: saving || (sending !== null && sending !== outcome.name),
+            onClick: () => void complete(outcome.name),
+          }))}
+        />
+      )}
     </PageActions>
   )
   if (ready === false) {

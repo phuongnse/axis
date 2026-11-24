@@ -1,7 +1,9 @@
 import { Flex, Typography } from 'antd'
 import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { TitleRowActions } from './AxisButton'
 import { ContentInsetContext } from './contentInsetContext'
+import type { AxisAction } from './menuActions'
 import { useDesignTokens } from './themeMode'
 
 /** The element of the page's heading that {@link PageActions} draws into: `null` before it is drawn, `undefined` outside a page. */
@@ -81,18 +83,25 @@ export function PageName({ name, line }: { name: string; line?: string | null })
  * The page's own actions, drawn on the right of its heading from wherever in the page they are written, so a widget
  * fills it as a page does, see docs/reference/shell.md#page-header. Outside a `PageLayout`, as in a widget preview, they
  * draw where they stand, in a row on the right. With `inPlace` they do so inside a `PageLayout` too, for a widget on a
- * designer's canvas, whose own page heading is not theirs.
+ * designer's canvas, whose own page heading is not theirs. They are drawn through `TitleRowActions`, so `fold` works as
+ * it does there: from three actions on, its actions fold into one "…" menu beside `children`.
  */
-export function PageActions({ children, inPlace }: { children: ReactNode; inPlace?: boolean }) {
+export function PageActions({
+  children,
+  fold,
+  inPlace,
+}: {
+  children?: ReactNode
+  /** The actions that fold into one More actions menu from three actions on, see `TitleRowActions`. */
+  fold?: AxisAction[]
+  inPlace?: boolean
+}) {
   const slot = useContext(ActionsSlot)
+  const row = <TitleRowActions fold={fold}>{children}</TitleRowActions>
   if (inPlace || slot === undefined) {
-    return (
-      <Flex gap="small" justify="end" wrap>
-        {children}
-      </Flex>
-    )
+    return <Flex justify="end">{row}</Flex>
   }
-  return slot ? createPortal(children, slot) : null
+  return slot ? createPortal(row, slot) : null
 }
 
 /**

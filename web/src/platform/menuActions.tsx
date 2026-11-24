@@ -31,7 +31,10 @@ export type AxisAction = Named & {
   href?: string
   /** The text key of the heading of the group a choice sits in. */
   groupKey?: string
+  /** A button shows it as a spinner. A menu entry does not show it. */
+  loading?: boolean
   onClick?: () => void
+  /** The attributes of its button, such as a `data-testid`. A menu entry keeps them too, and the fixed fields win. */
   attributes?: object
 }
 
@@ -59,6 +62,7 @@ function labelOf(action: AxisAction, t: Text): ReactNode {
 /** The entry of `action` in an Ant Design menu. A choice with no address is a checked radio entry. */
 function entryOf(action: AxisAction, t: Text): Item {
   const entry = {
+    ...action.attributes,
     key: action.key,
     label: labelOf(action, t),
     danger: action.destructive,

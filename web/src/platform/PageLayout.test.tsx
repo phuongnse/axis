@@ -1,9 +1,12 @@
 import { act, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import { useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ContentInsetContext } from './contentInsetContext'
 import { spacingTokens } from './designTokens'
 import { PageActions, PageLayout, PageName } from './PageLayout'
+import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 
 describe('PageLayout', () => {
@@ -136,6 +139,42 @@ describe('PageLayout', () => {
 
     expect(screen.getByRole('button', { name: 'Activate…' })).toBeInTheDocument()
     expect(within(screen.getByTestId('page-actions')).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('folds the fold actions of PageActions into one More actions menu in the heading slot', async () => {
+    const texts = { 'shell.actionRow.more': 'More actions' }
+    const onBeta = vi.fn()
+    render(
+      <ThemeModeProvider>
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          <TextProvider catalogs={[{ texts, fallbackTexts: texts }]} development={false}>
+            <PageLayout title="Purchase requests">
+              <PageActions
+                fold={[
+                  { key: 'b', label: 'Beta', onClick: onBeta },
+                  { key: 'c', label: 'Gamma' },
+                ]}
+              >
+                <button type="button">Alpha</button>
+              </PageActions>
+            </PageLayout>
+          </TextProvider>
+        </ConfigProvider>
+      </ThemeModeProvider>,
+    )
+
+    const actions = await screen.findByTestId('page-actions')
+    expect(await within(actions).findByRole('button', { name: 'Alpha' })).toBeInTheDocument()
+    expect(within(actions).queryByRole('button', { name: 'Beta' })).not.toBeInTheDocument()
+    await userEvent.click(within(actions).getByRole('button', { name: 'More actions' }))
+    const menu = await screen.findByRole('menu', { name: 'More actions' })
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Beta', 'Gamma'])
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Beta' }))
+    expect(onBeta).toHaveBeenCalledTimes(1)
   })
 
   it('names the heading through PageName, with its line, and gives the title back when it unmounts', () => {

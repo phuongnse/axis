@@ -1,4 +1,4 @@
-import type { MenuProps } from 'antd'
+import { Menu, type MenuProps } from 'antd'
 import { render } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -136,5 +136,16 @@ describe('menuOf', () => {
     const { getByRole } = render(<>{(items![0] as { label: ReactNode }).label}</>)
 
     expect(getByRole('link', { name: 'text:test.billing' })).toHaveAttribute('href', 'https://billing.example')
+  })
+
+  it('gives an entry the attributes of its action, such as its test id, and keeps its own label', () => {
+    const { items } = menuOf(
+      [action('a', { attributes: { 'data-testid': 'entry-a', label: 'Other' } }), action('b')],
+      text,
+    )
+    const { getByTestId } = render(<Menu items={items} />)
+
+    expect(getByTestId('entry-a')).toHaveTextContent('text:test.a')
+    expect(getByTestId('entry-a')).not.toHaveTextContent('Other')
   })
 })

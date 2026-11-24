@@ -100,9 +100,10 @@ form of its step over the subject record and a button for each outcome.
 - **Facts.** The first part of the page is two facts, one to a row: Record ("Bản ghi", the inbox's column
   name), which is the subject record as a link, see [opening things](actions-and-controls.md#opening-things), and Due,
   when the step has a `dueIn`. Neither is a read-only field of the form below, because the form belongs to the step.
-- **Actions on the heading.** Release, Claim and Reassign… are secondary buttons on the heading's right.
-  The outcomes follow them as one group named Decision ("Quyết định", `shell.task.outcomes`), see
-  [buttons](actions-and-controls.md#buttons). A group of one is a plain `main` button.
+- **Actions on the heading.** The outcomes come first, as one group named Decision ("Quyết định",
+  `shell.task.outcomes`), see [buttons](actions-and-controls.md#buttons). A group of one is a plain `main` button.
+  Release, Claim and Reassign… follow it as secondary buttons. With three or more actions in all, and two or more of
+  those commands, the commands fold into one More actions menu, see [menus](actions-and-controls.md#menus).
 - **Saving.** A change to the form saves through the [save bar](studio-resource-form.md#save-bar), which
   sends the changed values and the record's `version` to [saving a task](task-api.md#saving-a-task). That leaves the
   task open, and the page shows the saved record as the form's new start, so the bar goes away and a later outcome sends
@@ -129,13 +130,15 @@ form of its step over the subject record and a button for each outcome.
   `version` is sent even when no field changed, and the task API then ignores it. On success the page
   goes to the inbox page's plain address, without the paging the person came from, and without asking
   [Leave without saving?](studio.md#editor).
-- **Claim and Release.** An open task shows a Claim button and a Release button, each only when the
-  task read's `commands` lists it, so none when `commands` is empty. `reassign` is ignored here. A click
+- **Claim and Release.** An open task lists a Claim action and a Release action, each only when the
+  task read's `commands` lists it, so none when `commands` is empty. `reassign` is ignored here. On the
+  heading they are buttons beside the outcomes while the heading has fewer than three actions in all.
+  From three on they fold into the More actions menu, see [menus](actions-and-controls.md#menus). A click
   posts to the claim or release route, see [task deadlines](task-deadlines.md#claim-and-release), and
   the page then shows the task the route returns, with its new `commands`. The page keeps the form it
   already shows, so values the user typed stay. While a click is pending, its button shows as loading
-  and the other is disabled. The page shows no claimed tag, because it does not know the signed-in
-  user's id.
+  and the other is disabled. In the menu, the pending entry shows no spinner, and the other entries are
+  disabled. The page shows no claimed tag, because it does not know the signed-in user's id.
 - **Reassign.** The task page shows Reassign, see
   [inbox and task page](task-deadlines.md#inbox-and-task-page).
 - **Comments.** _(planned for M43)_ An open task has a comments section, for the people who may act on it, see

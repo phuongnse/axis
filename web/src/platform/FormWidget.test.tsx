@@ -2766,8 +2766,8 @@ describe('FormWidget', () => {
       const action = await screen.findByRole('button', { name: 'Close note' })
       expect(action).toHaveClass('ant-btn-variant-outlined')
       expect(screen.queryByTestId('page-actions')).not.toBeInTheDocument()
-      const row = action.closest<HTMLElement>('.ant-flex')!.parentElement!
-      expect(row).toHaveClass('ant-flex-justify-end')
+      const row = action.closest<HTMLElement>('.ant-flex-justify-end')!
+      expect(row).toBeInTheDocument()
       expect(
         container.querySelector('form')!.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_PRECEDING,
       ).toBeTruthy()

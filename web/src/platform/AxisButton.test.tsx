@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AxisActionRow, AxisButton, AxisButtonGroup, AxisSplitButton } from './AxisButton'
+import { AxisActionRow, AxisButton, AxisButtonGroup, AxisSplitButton, TitleRowActions } from './AxisButton'
 import { antThemeFor, textButtonClass } from './antTheme'
 import { buttonRoles } from './buttonRoles'
 import { designTokensFor } from './designTokens'
@@ -654,6 +654,78 @@ describe('an action row that folds', () => {
     fireEvent.keyDown(document.activeElement!, { key: 'Enter', keyCode: 13 })
 
     expect(onClick).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("a heading's actions", () => {
+  const beta = (onClick = () => {}) => ({ key: 'b', label: 'Beta', onClick })
+  const gamma = (onClick = () => {}) => ({ key: 'c', label: 'Gamma', onClick })
+
+  it('folds two fold actions beside one child into one More actions menu, in their order', async () => {
+    const onBeta = vi.fn()
+    renderIn(
+      'light',
+      <TitleRowActions fold={[beta(onBeta), gamma()]}>
+        <AxisButton role="main">Alpha</AxisButton>
+      </TitleRowActions>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button')).toHaveLength(2)
+    await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    const menu = await screen.findByRole('menu', { name: 'More actions' })
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Beta', 'Gamma'])
+    expect(screen.queryByRole('button', { name: 'Beta' })).not.toBeInTheDocument()
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Beta' }))
+    expect(onBeta).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps one child and one fold action as two buttons, with no More actions menu', () => {
+    renderIn(
+      'light',
+      <TitleRowActions fold={[beta()]}>
+        <AxisButton role="main">Alpha</AxisButton>
+      </TitleRowActions>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Beta' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+  })
+
+  it('keeps two fold actions as buttons with no child, and folds three of them into a menu', async () => {
+    const { unmount } = renderIn('light', <TitleRowActions fold={[beta(), gamma()]} />)
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Beta', 'Gamma'])
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    unmount()
+
+    renderIn('light', <TitleRowActions fold={[beta(), gamma(), { key: 'd', label: 'Delta' }]} />)
+    await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    const menu = await screen.findByRole('menu', { name: 'More actions' })
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Beta', 'Gamma', 'Delta'])
+    expect(screen.queryByRole('button', { name: 'Beta' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a fold of one action as a button at three actions in all, as a menu of one is never drawn', () => {
+    renderIn(
+      'light',
+      <TitleRowActions fold={[beta()]}>
+        <AxisButton role="main">Alpha</AxisButton>
+        <AxisButton role="main">Epsilon</AxisButton>
+      </TitleRowActions>,
+    )
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Alpha', 'Epsilon', 'Beta'])
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 })
 
