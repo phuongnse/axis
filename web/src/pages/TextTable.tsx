@@ -158,32 +158,40 @@ export function TextTable({
           })),
         ]}
       />
-      <Flex gap="small" align="center" wrap data-testid="studio-text-add">
-        <Input
-          aria-label={t('shell.studio.texts.newKey')}
-          placeholder={t('shell.studio.texts.newKey')}
-          style={{ width: 240 }}
-          value={newKey}
-          onChange={(event) => setNewKey(event.target.value)}
-        />
-        {columns.map((column) => (
-          <Input
-            key={column.id}
-            aria-label={column.locale}
-            placeholder={column.locale}
-            style={{ width: 240 }}
-            value={newTexts[column.locale] ?? ''}
-            onChange={(event) => setNewTexts((current) => ({ ...current, [column.locale]: event.target.value }))}
-          />
-        ))}
-        <AxisButton role="secondary" loading={adding} disabled={adding} onClick={add}>
-          {t('shell.studio.texts.addKey')}
-        </AxisButton>
-        {problem && (
-          <Typography.Text type="danger" data-testid="studio-text-add-problem">
-            {problem}
-          </Typography.Text>
-        )}
+      <Flex vertical gap="small" data-testid="studio-text-add">
+        {/* The key and each locale share the row's width equally, and Add key sits under them, not beside a box. */}
+        <Flex gap="small">
+          <div style={{ flex: '1 1 0', minWidth: 0 }}>
+            <Input
+              aria-label={t('shell.studio.texts.newKey')}
+              placeholder={t('shell.studio.texts.newKey')}
+              style={{ width: '100%' }}
+              value={newKey}
+              onChange={(event) => setNewKey(event.target.value)}
+            />
+          </div>
+          {columns.map((column) => (
+            <div key={column.id} style={{ flex: '1 1 0', minWidth: 0 }}>
+              <Input
+                aria-label={column.locale}
+                placeholder={column.locale}
+                style={{ width: '100%' }}
+                value={newTexts[column.locale] ?? ''}
+                onChange={(event) => setNewTexts((current) => ({ ...current, [column.locale]: event.target.value }))}
+              />
+            </div>
+          ))}
+        </Flex>
+        <Flex gap="small" align="center" wrap>
+          <AxisButton role="secondary" loading={adding} disabled={adding} onClick={add}>
+            {t('shell.studio.texts.addKey')}
+          </AxisButton>
+          {problem && (
+            <Typography.Text type="danger" data-testid="studio-text-add-problem">
+              {problem}
+            </Typography.Text>
+          )}
+        </Flex>
       </Flex>
     </Flex>
   )

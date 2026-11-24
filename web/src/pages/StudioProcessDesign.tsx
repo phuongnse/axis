@@ -28,13 +28,13 @@ function nameAt(list: unknown[], index: number): string {
 }
 
 /**
- * The Design tab of a process: the graph of the draft, and the card of the selected step, which is the one the Form tab
- * shows. The card is in the panel `SidePanel` draws in the shell's right column, titled Step, with no close button. It
- * gives way while the Problems or Ask AI panel is open, see docs/reference/process-designer.md#step-panel. A node selects a step, and an edge selects itself and the step it leaves. An edit in the card
- * draws the graph again. With an edge selected, the panel offers Remove line above the card, which clears the
+ * The Design tab of a process: the graph of the draft, and the block of the selected step, which is the one the Form tab
+ * shows. The block is in the panel `SidePanel` draws in the shell's right column, titled Step, with no close button. It
+ * gives way while the Problems or Ask AI panel is open, see docs/reference/process-designer.md#step-panel. A node selects a step, and an edge selects itself and the step it leaves. An edit in the block
+ * draws the graph again. With an edge selected, the panel offers Remove line above the block, which clears the
  * transition's target and keeps its branch or outcome. Removing a step leaves the transitions that named it, for the
  * checker to report. Delete in the canvas removes the selected edge, or else the selected step. A hidden live region
- * says what was removed. Move up and Move down on the card are one edit each, and the live region says where the step
+ * says what was removed. Move up and Move down on the block are one edit each, and the live region says where the step
  * went. With no step selected, the panel says so. The canvas comes first, so Tab reaches its edges
  * and nodes before the panel. A drag from a step's handle to another step sets a transition. A step with one `next`
  * sets it at once. A decision or a task opens a menu at the drop point that lists its branches, `otherwise` or
@@ -49,7 +49,7 @@ function nameAt(list: unknown[], index: number): string {
  * region says what was added, after which step, or why nothing was.
  *
  * With `layer`, the designer shows a module process with the application's customization layer applied. A step the
- * layer added or changed is marked Added or Changed on its graph node and on its card, which also has Reset to module.
+ * layer added or changed is marked Added or Changed on its graph node and on its block, which also has Reset to module.
  * A step the layer removed is a muted row under the graph, marked Removed, with Reset to module.
  */
 export default function StudioProcessDesign({

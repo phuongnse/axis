@@ -220,4 +220,23 @@ describe('TextTable', () => {
     expect(await within(add).findByText('The key could not be added.')).toBeVisible()
     expect(within(add).getByRole('textbox', { name: 'New key' })).toHaveValue('hi')
   })
+
+  it('shares the add row width equally between the key and each locale, with Add key under them', () => {
+    renderTable()
+    const add = screen.getByTestId('studio-text-add')
+    const boxes = within(add).getAllByRole('textbox')
+    const wrappers = boxes.map((box) => box.parentElement as HTMLElement)
+
+    // Each box fills its wrapper, and none keeps a fixed width of its own.
+    for (const box of boxes) {
+      expect(box).toHaveStyle({ width: '100%' })
+      expect(box.style.width).toBe('100%')
+    }
+    expect(wrappers[0].style.flex).not.toBe('')
+    for (const wrapper of wrappers) {
+      expect(wrapper.style.flex).toBe(wrappers[0].style.flex)
+    }
+    const button = within(add).getByRole('button', { name: 'Add key' })
+    expect(wrappers.some((wrapper) => wrapper.parentElement?.contains(button))).toBe(false)
+  })
 })

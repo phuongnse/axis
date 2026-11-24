@@ -130,10 +130,10 @@ their own controls where they expect them.
   rule reaches past the page's padding to the page area's edges. In a drawer, a dialog, the sidebar, a
   tile or a column of a grid it stays inside. A runtime page's widget list, a record's detail and a record form also
   keep it inside.
-- **Rules, not boxes** _(planned, #5128)_. One `borderSubtle` rule parts a block from the one beside it, and no border, box
+- **Rules, not boxes**. One `borderSubtle` rule parts a block from the one beside it, and no border, box
   or rounded corner goes round a region. It follows dividers over containers, as Material's containment has it, and a
   code editor's split panes, and keeps clear of boxes inside boxes.
-- **Where a rule goes** _(planned, #5128)_. A rule goes under a block's title row, as under Files, Input, Output and Log, and
+- **Where a rule goes**. A rule goes under a block's title row, as under Files, Input, Output and Log, and
   where one block ends and the next begins, such as between a run's Output and its Log. Inside a block's content no
   rule is drawn at will: the parts of one task sit together under one title, set apart by spacing. Where a rule is
   needed is judged on the whole page, not by applying a rule everywhere.
@@ -141,11 +141,11 @@ their own controls where they expect them.
   edge, as the rules under the header and beside the sidebar do.
 - **What fills a region fills it to its rules** _(planned, #5128)_. A log, a code editor or a table reaches the region's
   rules, with no box of its own.
-- **One inset per region** _(planned, #5128)_. A region's title row, its content and its action bar start and end at the same
+- **One inset per region**. A region's title row, its content and its action bar start and end at the same
   inset, `spacing-md` in a pane of a workspace and `spacing-lg` on a page. An action bar at the foot of a pane takes the
   pane's inset and keeps its actions' outlines, as it holds the pane's main action, and its look never depends on
   which buttons a person's rights show.
-- **Fields as wide as each other** _(planned, #5128)_. Every field of a region is as wide as the others, and no button stands
+- **Fields as wide as each other**. Every field of a region is as wide as the others, and no button stands
   loose beside an input. An action of the whole region, such as Reset or Import, sits in its title row, and an action
   of one control goes with the control.
 - **A title row's tools are light**. Tools such as the explorer's New and Refresh are subtle buttons, or
