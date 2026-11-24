@@ -62,6 +62,8 @@ The inventory lists every key, algorithm and certificate that Axis uses, one to 
 
 A signed-in person reads the public half of the agent host's key pair from the server, which answers the row that the agent host published in `platform.host_keys`. A value sealed with that key opens only in the agent host, because the server, the worker and the installation key hold no private half. Nothing vouches for the key except the agent host publishing it, see [threat I34](threat-model-installation.md).
 
+Before anything seals with the key, the web app checks the answer. It refuses a suite other than kem 16, kdf 1 and aead 2, a key that is not an EC P-256 JWK, a point that Web Crypto does not import as a P-256 public key, and a key id that is not the key's RFC 7638 thumbprint. A missing key (404) is a normal state, and any other failure or refused key stops the seal.
+
 | Route | What it does |
 | --- | --- |
 | `GET /api/agent-host/key` | Answers `{ keyId, kem, kdf, aead, publicKey }` with `kem` 16, `kdf` 1 and `aead` 2, the suite ids of RFC 9180, and `publicKey` as `{ kty, crv, x, y }`, an EC P-256 JWK. It answers a `401` with no session and a `404` when no key is published |
