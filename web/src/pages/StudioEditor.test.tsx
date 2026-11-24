@@ -2724,6 +2724,18 @@ describe('StudioEditor problems in the JSON view', () => {
 
   const problemButton = (name: string) => screen.findByRole('button', { name }, slow)
 
+  it('draws the JSON tools all as text, each named by its text', async () => {
+    await openJsonTab()
+    await editJson('{')
+    await problemButton('1 problem')
+
+    for (const name of ['1 problem', 'Find', 'Format', 'Copy']) {
+      const button = screen.getByRole('button', { name })
+      expect(button.textContent).toBe(name)
+      expect(button.querySelector('.anticon')).toBeNull()
+    }
+  })
+
   it('counts a syntax error and marks it in words, and shows no count once the text is fixed', async () => {
     await openJsonTab()
     expect(screen.queryByRole('button', { name: /problem/ })).not.toBeInTheDocument()

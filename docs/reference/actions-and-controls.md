@@ -65,17 +65,16 @@ widget names a role, never an Ant Design button type.
   are one joined group in their role. Each button of the group is as wide as the widest, stays a button of its own
   with no selected state, and the group has a name for assistive technology. A group of one is a plain button of its
   role.
-- **Which actions go together** _(planned, #5130)_. Do the actions change or remove the same thing? Then they manage that
+- **Which actions go together**. Do the actions change or remove the same thing? Then they manage that
   thing. If not, they are tools, which stay side by side.
-- **Actions that manage one thing fold into a split button** _(planned, #5130)_. From three on, the one used most stays the
+- **Actions that manage one thing fold into a split button**. From three on, the one used most stays the
   button and the others are the entries of a menu on its joined caret, in their order, a destructive one in
   `dangerText`. Its menu holds at least two entries and never repeats the button, and a destructive entry comes last,
   after a divider. It is one button in one shape, as Ant Design joins one with Space.Compact: its text does the action and
   its caret opens the menu. `AxisSplitButton` draws it.
-- **Tools stay side by side** _(planned, #5130)_. Find, Format, Copy, Zoom in, Zoom out, Move up, Move down, Undo and Redo
-  stay as buttons, because a menu would cost a click each time. They fold into "…" only when their row runs out of
-  room.
-- **All text or all icons** _(planned, #5130)_. A group of actions is all text or all icons. The "…" or the caret that opens
+- **Tools stay side by side**. Find, Format, Copy, Zoom in, Zoom out, Undo and Redo stay as
+  buttons, because a menu would cost a click each time. They fold into "…" only when their row runs out of room.
+- **All text or all icons**. A group of actions is all text or all icons. The "…" or the caret that opens
   a menu is no action of its own, so it stays an icon beside text or icons alike.
 - **A page's actions and a tree's rows keep their own rules**. A page's actions keep the page's rules, and
   a file tree's node keeps its actions on a right click, Shift+F10 or the menu key.
