@@ -85,8 +85,10 @@ A client registers as the pinned specification prefers, and a tenant administrat
 clients may connect at all.
 
 - **Client ID Metadata Documents** _(planned for M35)_. A client may use the URL of its metadata
-  document as its client id. The realm fetches the document, checks that its redirect URIs are
-  `https` or a loopback address, and shows its name on the consent screen.
+  document as its client id. The realm fetches the document only when its URL is `https` on a
+  domain in the tenant setting `Ai:ClientDocumentDomains`, or loopback in Development. It checks
+  that the redirect URIs of the document are `https` or a loopback address, and shows its name on
+  the consent screen.
 - **Dynamic client registration.** A client registers without a token at the registration endpoint
   that the realm's metadata names as `registration_endpoint`. The realm makes it a public client
   that requires consent, and its token's scope is limited to what the client asked for, because the
@@ -119,7 +121,9 @@ clients may connect at all.
 - **The administrator's switch.** The tenant setting `Ai:OutsideClients`, one of `all`, `allowList`
   and `none`, decides which outside clients may connect, and `none` is the default of a new tenant.
   Under `allowList`, `Ai:AllowedClients` lists the client ids that may connect. Both are stored with
-  the tenant, and `tenant create` and `tenant restore` apply them to the realm. An outside client is a
+  the tenant, and `tenant create` and `tenant restore` apply them to the realm. `Ai:ClientDocumentDomains` lists the
+  exact DNS names from which the realm may fetch a client's metadata document, is empty for a new tenant, is stored
+  with the tenant and is changed through the same routes. The realm does not read it yet. An outside client is a
   public client that is not one of Keycloak's own. One that the switch does not allow is turned off,
   so it gets no code and no token: every outside client is off under `none`, only the listed ones are
   on under `allowList`, and every one is on under `all`. A token issued before a client is turned off
@@ -127,7 +131,7 @@ clients may connect at all.
   already be registered. The confidential clients of Axis, the agent host's included, and Keycloak's
   own clients are never turned off. A tenant administrator reads and changes both settings through the routes in
   [outside MCP clients](user-administration.md#outside-mcp-clients), and each change writes a platform audit record.
-- **Connected apps.** A tenant administrator changes both settings in the Connected apps tab of the
+- **Connected apps.** A tenant administrator changes these settings in the Connected apps tab of the
   [users page](platform-pages.md#connected-apps).
 - **Consents.** The Connected apps tab also lists each client with consent, the people who consented and the last
   use, and revokes a client's consent there, see [connected apps](platform-pages.md#connected-apps).

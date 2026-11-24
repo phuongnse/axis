@@ -125,6 +125,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.PlatformAccounts).HasColumnName("platform_accounts");
             tenant.Property(t => t.AiOutsideClients).HasColumnName("ai_outside_clients").HasDefaultValue(TenantOutsideClients.None);
             tenant.Property(t => t.AiAllowedClients).HasColumnName("ai_allowed_clients").HasColumnType("text[]").HasDefaultValueSql("'{}'::text[]");
+            tenant.Property(t => t.AiClientDocumentDomains).HasColumnName("ai_client_document_domains").HasColumnType("text[]").HasDefaultValueSql("'{}'::text[]");
             tenant.Property(t => t.ApplicationPackages).HasColumnName("application_packages").HasDefaultValue(false);
             tenant.Property(t => t.Application).HasColumnName("application");
             tenant.Property(t => t.PreviewOf).HasColumnName("preview_of");

@@ -77,7 +77,7 @@ async function openRevoke(user: ReturnType<typeof userEvent.setup>, clientId: st
   return screen.findByRole('dialog')
 }
 
-const none: TenantOutsideClients = { outsideClients: 'none', allowedClients: [] }
+const none: TenantOutsideClients = { outsideClients: 'none', allowedClients: [], clientDocumentDomains: [] }
 
 function renderTab(initial: TenantOutsideClients, address = '/users') {
   return render(
@@ -105,7 +105,7 @@ afterEach(() => {
 describe('ConnectedAppsTab', () => {
   it('shows the stored mode, and the list of client ids only under Allow list', async () => {
     const user = userEvent.setup()
-    renderTab({ outsideClients: 'allowList', allowedClients: ['claude'] })
+    renderTab({ outsideClients: 'allowList', allowedClients: ['claude'], clientDocumentDomains: [] })
 
     expect(screen.getByRole('radio', { name: /^Allow list/ })).toBeChecked()
     expect(screen.getByText('claude')).toBeVisible()
@@ -129,7 +129,11 @@ describe('ConnectedAppsTab', () => {
   it('sends both values, then reads them again and shows what the server stored', async () => {
     const user = userEvent.setup()
     const fetchMock = stubServer({
-      stored: { outsideClients: 'allowList', allowedClients: ['claude', 'stored-by-server'] },
+      stored: {
+        outsideClients: 'allowList',
+        allowedClients: ['claude', 'stored-by-server'],
+        clientDocumentDomains: [],
+      },
     })
     renderTab(none)
 
@@ -140,16 +144,42 @@ describe('ConnectedAppsTab', () => {
     expect(puts(fetchMock)).toHaveLength(1)
     const [input, init] = puts(fetchMock)[0]
     expect(input).toBe('/api/tenant/outside-clients')
-    expect(JSON.parse(init?.body as string)).toEqual({ outsideClients: 'allowList', allowedClients: ['claude'] })
+    expect(JSON.parse(init?.body as string)).toEqual({
+      outsideClients: 'allowList',
+      allowedClients: ['claude'],
+      clientDocumentDomains: [],
+    })
     expect(fetchMock).toHaveBeenLastCalledWith('/api/tenant/outside-clients', expect.anything())
     expect(screen.getByText('claude')).toBeVisible()
     expect(screen.getByText('stored-by-server')).toBeVisible()
   })
 
+  it('shows the trusted domains only under All and sends them with Save', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubServer()
+    renderTab({ outsideClients: 'all', allowedClients: [], clientDocumentDomains: ['apps.example.com'] })
+
+    const domains = screen.getByRole('combobox', { name: 'Trusted domains' })
+    expect(screen.getByText('apps.example.com')).toBeVisible()
+    await user.type(domains, 'docs.example.org{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('The setting was saved.')).toBeVisible()
+    expect(JSON.parse(puts(fetchMock)[0][1]?.body as string)).toEqual({
+      outsideClients: 'all',
+      allowedClients: [],
+      clientDocumentDomains: ['apps.example.com', 'docs.example.org'],
+    })
+    await user.click(screen.getByRole('radio', { name: /^None/ }))
+    expect(screen.queryByRole('combobox', { name: 'Trusted domains' })).toBeNull()
+  })
+
   it('sends the list under every mode', async () => {
     const user = userEvent.setup()
-    const fetchMock = stubServer({ stored: { outsideClients: 'none', allowedClients: ['claude'] } })
-    renderTab({ outsideClients: 'allowList', allowedClients: ['claude'] })
+    const fetchMock = stubServer({
+      stored: { outsideClients: 'none', allowedClients: ['claude'], clientDocumentDomains: [] },
+    })
+    renderTab({ outsideClients: 'allowList', allowedClients: ['claude'], clientDocumentDomains: [] })
 
     await user.click(screen.getByRole('radio', { name: /^None/ }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -158,6 +188,7 @@ describe('ConnectedAppsTab', () => {
     expect(JSON.parse(puts(fetchMock)[0][1]?.body as string)).toEqual({
       outsideClients: 'none',
       allowedClients: ['claude'],
+      clientDocumentDomains: [],
     })
   })
 

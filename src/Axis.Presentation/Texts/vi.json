@@ -253,6 +253,8 @@
   "shell.users.connectedApps.noneHelp": "Không ứng dụng khách MCP nào bên ngoài Axis được kết nối.",
   "shell.users.connectedApps.clients": "ID ứng dụng khách được phép",
   "shell.users.connectedApps.clientsHelp": "Nhập ID ứng dụng khách rồi nhấn Enter để thêm. Chỉ ứng dụng khách trong danh sách này được kết nối.",
+  "shell.users.connectedApps.domains": "Tên miền tin cậy",
+  "shell.users.connectedApps.domainsHelp": "Các tên miền mà nhà cung cấp danh tính được phép đọc tài liệu mô tả của ứng dụng khách MCP. Nhập tên miền, ví dụ apps.example.com, rồi nhấn Enter để thêm.",
   "shell.users.connectedApps.save": "Lưu",
   "shell.users.connectedApps.saved": "Đã lưu thiết lập.",
   "shell.users.connectedApps.saveFailed": "Không lưu được thiết lập.",

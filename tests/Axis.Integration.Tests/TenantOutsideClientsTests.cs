@@ -25,6 +25,8 @@ public sealed class TenantOutsideClientsTests(PostgreSqlFixture database, Keyclo
     private const string ConnectedApps = "/api/tenant/connected-apps";
 
     private static readonly string[] _grantedScopes = ["profile"];
+    private static readonly string[] _oneDomain = ["apps.example.com"];
+    private static readonly string[] _messyDomains = [" Apps.Example.COM ", "apps.example.com", "docs.example.org"];
 
     private readonly HttpClient _http = new();
     private Uri _baseAddress = null!;
@@ -46,7 +48,8 @@ public sealed class TenantOutsideClientsTests(PostgreSqlFixture database, Keyclo
             using var anonymous = Client(factory, id);
 
             using var memberRead = await SendAsync(member, HttpMethod.Get);
-            using var memberWrite = await SendAsync(member, HttpMethod.Put, new { outsideClients = "all" });
+            using var memberWrite = await SendAsync(
+                member, HttpMethod.Put, new { outsideClients = "all", clientDocumentDomains = _oneDomain });
             using var anonymousRead = await SendAsync(anonymous, HttpMethod.Get);
             using var anonymousWrite = await SendAsync(anonymous, HttpMethod.Put, new { outsideClients = "all" });
 
@@ -55,7 +58,7 @@ public sealed class TenantOutsideClientsTests(PostgreSqlFixture database, Keyclo
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousRead.StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, anonymousWrite.StatusCode);
             Assert.Equal(0, await CountAsync("platform.audit_records"));
-            Assert.Equal(("none", ""), await StoredAsync(id));
+            Assert.Equal(("none", "", ""), await StoredAsync(id));
             Assert.True(await EnabledAsync(id, Listed));
             Assert.True(await EnabledAsync(id, Other));
         }
@@ -79,14 +82,87 @@ public sealed class TenantOutsideClientsTests(PostgreSqlFixture database, Keyclo
             using var read = await SendAsync(client, HttpMethod.Get);
 
             Assert.Equal(HttpStatusCode.NoContent, set.StatusCode);
-            Assert.Equal(("allowList", Listed), await StoredAsync(id));
+            Assert.Equal(("allowList", Listed, ""), await StoredAsync(id));
             Assert.True(await EnabledAsync(id, Listed));
             Assert.False(await EnabledAsync(id, Other));
-            Assert.Equal([("tenant outside-clients set", id, "admin", "outsideClients,allowedClients")], await RecordsAsync());
+            Assert.Equal([("tenant outside-clients set", id, "admin", "outsideClients,allowedClients,clientDocumentDomains")], await RecordsAsync());
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             var body = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
             Assert.Equal("allowList", body.GetProperty("outsideClients").GetString());
             Assert.Equal([Listed], body.GetProperty("allowedClients").EnumerateArray().Select(item => item.GetString()).ToArray());
+        }
+        finally
+        {
+            await DeleteRealmAsync(id);
+        }
+    }
+
+    [Fact]
+    public async Task An_administrators_PUT_stores_the_client_document_domains_trimmed_lower_cased_and_unique_and_the_record_holds_none()
+    {
+        var tenant = await PrepareAsync();
+        var (id, _) = await AddRealmTenantAsync(tenant, ActivationSecret);
+        try
+        {
+            await using var factory = Start();
+            using var client = Client(factory, id).SignedInAs("admin");
+
+            using var set = await SendAsync(
+                client,
+                HttpMethod.Put,
+                new { outsideClients = "all", clientDocumentDomains = _messyDomains });
+            using var read = await SendAsync(client, HttpMethod.Get);
+
+            Assert.Equal(HttpStatusCode.NoContent, set.StatusCode);
+            Assert.Equal(("all", "", "apps.example.com,docs.example.org"), await StoredAsync(id));
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+            var body = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            Assert.Equal(
+                ["apps.example.com", "docs.example.org"],
+                body.GetProperty("clientDocumentDomains").EnumerateArray().Select(item => item.GetString()).ToArray());
+            Assert.Equal(
+                [("tenant outside-clients set", id, "admin", "outsideClients,allowedClients,clientDocumentDomains")],
+                await RecordsAsync());
+            Assert.Equal(0, await CountAsync("platform.audit_records r WHERE row_to_json(r)::text LIKE '%example%'"));
+        }
+        finally
+        {
+            await DeleteRealmAsync(id);
+        }
+    }
+
+    [Fact]
+    public async Task A_bad_client_document_domain_answers_400_and_stores_nothing()
+    {
+        var tenant = await PrepareAsync();
+        var (id, _) = await AddRealmTenantAsync(tenant, ActivationSecret);
+        try
+        {
+            await using var factory = Start();
+            using var client = Client(factory, id).SignedInAs("admin");
+
+            var statuses = new List<HttpStatusCode>();
+            foreach (var domain in new[]
+            {
+                "127.0.0.1",
+                "[::1]",
+                "localhost",
+                "app.localhost",
+                "https://apps.example.com",
+                "apps.example.com:443",
+                "apps.example.com/path",
+                "*.example.com",
+                "  ",
+            })
+            {
+                using var response = await SendAsync(client, HttpMethod.Put, new { outsideClients = "all", clientDocumentDomains = new[] { "docs.example.org", domain } });
+                statuses.Add(response.StatusCode);
+            }
+
+            Assert.All(statuses, status => Assert.Equal(HttpStatusCode.BadRequest, status));
+            Assert.Equal(9, statuses.Count);
+            Assert.Equal(("none", "", ""), await StoredAsync(id));
+            Assert.Equal(0, await CountAsync("platform.audit_records"));
         }
         finally
         {
@@ -120,7 +196,7 @@ public sealed class TenantOutsideClientsTests(PostgreSqlFixture database, Keyclo
 
             Assert.All(statuses, status => Assert.Equal(HttpStatusCode.BadRequest, status));
             Assert.Equal(5, statuses.Count);
-            Assert.Equal(("none", ""), await StoredAsync(id));
+            Assert.Equal(("none", "", ""), await StoredAsync(id));
             Assert.Equal(0, await CountAsync("platform.audit_records"));
             Assert.True(await EnabledAsync(id, Listed));
             Assert.True(await EnabledAsync(id, Other));
@@ -146,7 +222,7 @@ public sealed class TenantOutsideClientsTests(PostgreSqlFixture database, Keyclo
 
             Assert.Equal(HttpStatusCode.BadGateway, set.StatusCode);
             Assert.Equal(HttpStatusCode.BadGateway, again.StatusCode);
-            Assert.Equal(("allowList", Listed), await StoredAsync(id));
+            Assert.Equal(("allowList", Listed, ""), await StoredAsync(id));
             Assert.Equal(2, await CountAsync("platform.audit_records WHERE command = 'tenant outside-clients set'"));
             Assert.True(await EnabledAsync(id, Listed));
             Assert.True(await EnabledAsync(id, Other));
@@ -511,16 +587,16 @@ public sealed class TenantOutsideClientsTests(PostgreSqlFixture database, Keyclo
         Assert.True(response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound);
     }
 
-    private async Task<(string Mode, string Allowed)> StoredAsync(string id)
+    private async Task<(string Mode, string Allowed, string Domains)> StoredAsync(string id)
     {
         await using var connection = new NpgsqlConnection(_platform);
         await connection.OpenAsync(CancellationToken);
         await using var command = new NpgsqlCommand(
-            "SELECT ai_outside_clients, array_to_string(ai_allowed_clients, ',') FROM platform.tenants WHERE id = @id", connection);
+            "SELECT ai_outside_clients, array_to_string(ai_allowed_clients, ','), array_to_string(ai_client_document_domains, ',') FROM platform.tenants WHERE id = @id", connection);
         command.Parameters.AddWithValue("id", id);
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         Assert.True(await reader.ReadAsync(CancellationToken));
-        return (reader.GetString(0), reader.GetString(1));
+        return (reader.GetString(0), reader.GetString(1), reader.GetString(2));
     }
 
     private async Task<List<(string Command, string TenantId, string Actor, string Changed)>> RecordsAsync()

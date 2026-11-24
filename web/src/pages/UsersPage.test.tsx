@@ -224,7 +224,7 @@ describe('UsersPage', () => {
       'fetch',
       vi.fn(async (input: string) => {
         if (input === outsideClientsPath) {
-          return json({ outsideClients: 'allowList', allowedClients: ['claude'] })
+          return json({ outsideClients: 'allowList', allowedClients: ['claude'], clientDocumentDomains: [] })
         }
         if (input === '/api/tenant/connected-apps') {
           return json({ items: [] })

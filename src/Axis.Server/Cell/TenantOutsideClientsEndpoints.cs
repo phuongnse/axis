@@ -23,10 +23,11 @@ namespace Axis.Server.CellApi;
 /// role (<c>403</c>) and a tenant with a directory row that is not a preview tenant and has realm details (<c>404</c>), and for
 /// <c>PUT</c> then the body (<c>400</c>). The connected apps route also needs the tenant's users client details (<c>404</c>).
 /// <para>
-/// <c>PUT</c> replaces <c>Ai:OutsideClients</c> and <c>Ai:AllowedClients</c> with a platform audit record in the same transaction
-/// that names <c>outsideClients</c> and <c>allowedClients</c> and never holds a client id, and then brings the realm in step. A
-/// failure at the identity provider is a <c>502</c> with a fixed title, and the stored change and its record stay. <c>GET</c>
-/// answers both stored values.
+/// <c>PUT</c> replaces <c>Ai:OutsideClients</c>, <c>Ai:AllowedClients</c> and <c>Ai:ClientDocumentDomains</c> with a platform audit
+/// record in the same transaction that names <c>outsideClients</c>, <c>allowedClients</c> and <c>clientDocumentDomains</c> and never
+/// holds a client id or a domain, and then brings the realm in step. The realm does not read the domains yet. A failure at the
+/// identity provider is a <c>502</c> with a fixed title, and the stored change and its record stay. <c>GET</c> answers all three
+/// stored values.
 /// </para>
 /// <para>
 /// <c>GET /api/tenant/connected-apps</c> answers each outside client that holds a consent, with the people who consented and the
@@ -69,11 +70,11 @@ internal static partial class TenantOutsideClientsEndpoints
         await using var platform = CellEndpoints.Open(dataSource);
         var stored = await platform.Tenants.AsNoTracking()
             .Where(row => row.Id == open.TenantId && row.PreviewOf == null)
-            .Select(row => new { row.AiOutsideClients, row.AiAllowedClients })
+            .Select(row => new { row.AiOutsideClients, row.AiAllowedClients, row.AiClientDocumentDomains })
             .SingleOrDefaultAsync(cancellationToken);
         return stored is null
             ? NoSetting()
-            : Results.Ok(new TenantOutsideClientsResponse(stored.AiOutsideClients, stored.AiAllowedClients));
+            : Results.Ok(new TenantOutsideClientsResponse(stored.AiOutsideClients, stored.AiAllowedClients, stored.AiClientDocumentDomains));
     }
 
     private static async Task<IResult> SetAsync(
@@ -110,8 +111,18 @@ internal static partial class TenantOutsideClientsEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Each allowed client needs a client id.");
         }
 
+        // Each domain is an exact DNS host name that a tenant could own, so the check of a tenant's own host applies, and loopback names never pass.
+        var domains = (body.ClientDocumentDomains ?? []).Select(domain => domain?.Trim().ToLowerInvariant() ?? "").ToArray();
+        if (domains.Any(domain => !CellHostRequests.IsValidHost(domain) || domain == "localhost" || domain.EndsWith(".localhost", StringComparison.Ordinal)))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Each client document domain must be a DNS name such as apps.example.com.");
+        }
+
         var mode = body.OutsideClients;
         var allowed = requested.Select(clientId => clientId!.Trim()).Distinct(StringComparer.Ordinal).ToArray();
+        var documentDomains = domains.Distinct(StringComparer.Ordinal).ToArray();
 
         await using (var platform = writer.Open())
         {
@@ -124,9 +135,10 @@ internal static partial class TenantOutsideClientsEndpoints
 
             row.AiOutsideClients = mode;
             row.AiAllowedClients = allowed;
+            row.AiClientDocumentDomains = documentDomains;
             row.Version++;
             await PlatformAuditRecords.WriteAsync(
-                platform, SetCommand, open.TenantId, ["outsideClients", "allowedClients"], open.CallerId, cancellationToken);
+                platform, SetCommand, open.TenantId, ["outsideClients", "allowedClients", "clientDocumentDomains"], open.CallerId, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
 
@@ -333,10 +345,10 @@ internal static partial class TenantOutsideClientsEndpoints
 }
 
 /// <summary>The body of <c>PUT /api/tenant/outside-clients</c>.</summary>
-internal sealed record TenantOutsideClientsRequest(string? OutsideClients, string?[]? AllowedClients);
+internal sealed record TenantOutsideClientsRequest(string? OutsideClients, string?[]? AllowedClients, string?[]? ClientDocumentDomains);
 
 /// <summary>The answer of <c>GET /api/tenant/outside-clients</c>.</summary>
-internal sealed record TenantOutsideClientsResponse(string OutsideClients, IReadOnlyList<string> AllowedClients);
+internal sealed record TenantOutsideClientsResponse(string OutsideClients, IReadOnlyList<string> AllowedClients, IReadOnlyList<string> ClientDocumentDomains);
 
 /// <summary>The answer of <c>GET /api/tenant/connected-apps</c>.</summary>
 internal sealed record TenantConnectedAppsResponse(IReadOnlyList<TenantConnectedApp> Items);

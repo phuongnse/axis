@@ -121,7 +121,7 @@ internal static class CellHostRequests
             new CellCnameRecord(request.Host, $"{request.TenantId}.{cell.TenantDomain!.Trim()}"));
 
     // A host of a tenant's own must be a public DNS name that can carry a CNAME, so it has at least two labels and is no IP address.
-    private static bool IsValidHost(string host)
+    internal static bool IsValidHost(string host)
     {
         if (host.Length is 0 or > MaxHostLength || Uri.CheckHostName(host) != UriHostNameType.Dns)
         {

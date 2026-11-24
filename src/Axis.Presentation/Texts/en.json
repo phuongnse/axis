@@ -253,6 +253,8 @@
   "shell.users.connectedApps.noneHelp": "No MCP client from outside Axis may connect.",
   "shell.users.connectedApps.clients": "Allowed client IDs",
   "shell.users.connectedApps.clientsHelp": "Type a client ID and press Enter to add it. Only the clients on this list may connect.",
+  "shell.users.connectedApps.domains": "Trusted domains",
+  "shell.users.connectedApps.domainsHelp": "The domains from which the identity provider may read an MCP client's metadata document. Type a domain, such as apps.example.com, and press Enter to add it.",
   "shell.users.connectedApps.save": "Save",
   "shell.users.connectedApps.saved": "The setting was saved.",
   "shell.users.connectedApps.saveFailed": "The setting was not saved.",

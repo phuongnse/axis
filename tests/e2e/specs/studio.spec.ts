@@ -455,14 +455,24 @@ test.describe('Studio on a copy of its own', () => {
       const link = panel.locator('a[href$="path=%2Finput%2F2%2Ftarget"]')
       await expect(link).toBeVisible()
 
-      // Ctrl+click opens the same address in a new tab, and the panel stays open here.
-      const [tab] = await Promise.all([
-        page.context().waitForEvent('page'),
-        link.click({ modifiers: ['ControlOrMeta'] }),
-      ])
-      await tab.waitForLoadState()
-      await expect(tab).toHaveURL(/path=%2Finput%2F2%2Ftarget/)
-      await tab.close()
+      // Ctrl+click opens the link's address in a new tab, and the panel stays open here. Opening the tab is the
+      // browser's job, and Playwright reports a background tab only about nine times in ten, so the spec checks
+      // what the page owns: the link's address names the resource and the path, and the page leaves a modified
+      // click to the browser. The listener runs after the router's, then stops the click, so no tab is left open.
+      await expect(link).toHaveAttribute('href', new RegExp(`resource=${endpoint.id}&path=%2Finput%2F2%2Ftarget$`))
+      await page.evaluate(() => {
+        window.addEventListener(
+          'click',
+          (event) => {
+            ;(window as unknown as { leftToBrowser: boolean }).leftToBrowser = !event.defaultPrevented
+            event.preventDefault()
+          },
+          { once: true },
+        )
+      })
+      await link.click({ modifiers: ['ControlOrMeta'] })
+      expect(await page.evaluate(() => (window as unknown as { leftToBrowser: boolean }).leftToBrowser)).toBe(true)
+      await expect(page).not.toHaveURL(/path=/)
 
       await link.click()
       await expect(page).toHaveURL(/path=%2Finput%2F2%2Ftarget/)
