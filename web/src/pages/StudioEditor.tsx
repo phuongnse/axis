@@ -1,4 +1,3 @@
-import { AlignLeftOutlined, CopyOutlined, SearchOutlined } from '@ant-design/icons'
 import { ConfigProvider, Flex, message, Modal, Tabs } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import {
@@ -1172,6 +1171,7 @@ export function StudioEditor({
                   onChange={(key) => openTab(key as 'design' | 'form' | 'json' | 'usedBy')}
                   tabBarExtraContent={
                     tab === 'json' ? (
+                      // A group of actions is all text or all icons, see docs/reference/actions-and-controls.md#buttons.
                       <AxisActionRow align="center">
                         {jsonProblems > 0 && (
                           <AxisButton
@@ -1184,20 +1184,15 @@ export function StudioEditor({
                               : t('shell.studio.jsonView.problems').replace('{count}', String(jsonProblems))}
                           </AxisButton>
                         )}
-                        <AxisButton
-                          role="subtle"
-                          nameKey="shell.studio.json.find"
-                          icon={<SearchOutlined />}
-                          onClick={() => jsonViewRef.current?.openFind()}
-                        />
-                        <AxisButton
-                          role="subtle"
-                          nameKey="shell.studio.json.format"
-                          icon={<AlignLeftOutlined />}
-                          disabled={jsonInvalid}
-                          onClick={format}
-                        />
-                        <AxisButton role="subtle" nameKey="shell.copy.copy" icon={<CopyOutlined />} onClick={copy} />
+                        <AxisButton role="subtle" onClick={() => jsonViewRef.current?.openFind()}>
+                          {t('shell.studio.json.find')}
+                        </AxisButton>
+                        <AxisButton role="subtle" disabled={jsonInvalid} onClick={format}>
+                          {t('shell.studio.json.format')}
+                        </AxisButton>
+                        <AxisButton role="subtle" onClick={copy}>
+                          {t('shell.copy.copy')}
+                        </AxisButton>
                       </AxisActionRow>
                     ) : undefined
                   }
