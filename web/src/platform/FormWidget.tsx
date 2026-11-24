@@ -4,6 +4,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState, type Rea
 import { useLocation, useNavigate } from 'react-router'
 import { antLocaleFor } from './antLocale'
 import { AxisActionRow, AxisButton } from './AxisButton'
+import { actionText, type AxisAction } from './menuActions'
 import { useCanvasActions } from './canvasActions'
 import { FormCanvasContext } from './formCanvas'
 import { formStatePath } from './formState'
@@ -65,14 +66,15 @@ function FooterRow({ children }: { children: ReactNode }) {
  * the `update` fields. Without the `create` or `update` grant the form has no save bar. The form has
  * no Save or Cancel row: it saves through `SaveBar`, which shows Discard and Save while there is a change, on a
  * wizard's last step, and never on a designer's canvas, see docs/reference/form-widget.md#saving. A saved
- * record shows its history below the form, and an outlined button on the page heading for each of the widget's
+ * record shows its history below the form, and an action on the page heading for each of the widget's
  * `startProcess` actions, which lists only the processes the user may start. An action saves the changed fields, then
- * starts its process for the record. A saved record also shows a button for each `navigate` action, after the
- * start buttons. It opens the target page with the record as it was loaded, so unsaved edits are not
- * used, and it is hidden when the SPA cannot work out an expression. A new record has no action buttons. Without
- * a page heading the buttons sit at the top of the form on the right, see
- * docs/reference/form-widget.md#start-process-actions. On a designer's canvas every action is a button, on any step
- * and on a new record, and stays inside the form.
+ * starts its process for the record. A saved record also shows an action for each `navigate` action, after the
+ * start actions. It opens the target page with the record as it was loaded, so unsaved edits are not
+ * used, and it is hidden when the SPA cannot work out an expression. The first action is the outlined main button, a
+ * second is a secondary button, and from three on the rest fold into the More actions menu. A new record has no
+ * actions. Without a page heading they sit at the top of the form on the right, see
+ * docs/reference/form-widget.md#start-process-actions. On a designer's canvas every action is a button that never folds,
+ * on any step and on a new record, and stays inside the form.
  *
  * A widget that names a form and lets the user save follows the server's form state endpoint as the
  * user edits: a field the answer hides is not shown or sent, a field it requires is marked required,
@@ -317,55 +319,61 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   // The row under the fields holds a wizard's Back and Next. It is an action row only where Next is a solid button.
   // Without one, Back stays outlined. See docs/reference/actions-and-controls.md#buttons.
   const Row = steps.last ? FooterRow : AxisActionRow
-  // A saved record's actions are outlined `main` buttons on the page heading, see docs/reference/form-widget.md#start-process-actions.
-  const startButtons =
+  // A saved record's actions sit on the page heading: the first is the `main` button and the rest fold from three on,
+  // see docs/reference/form-widget.md#start-process-actions. Start actions come before navigate actions.
+  const keyOf = (action: StartProcessAction | NavigateAction) => `actions/${widget.actions.indexOf(action)}`
+  const startActions: AxisAction[] =
     canvas.active || (steps.last && recordId !== null)
       ? widget.actions
           .filter((action): action is StartProcessAction => action.type === 'startProcess')
-          .map((action) => (
-            <AxisButton
-              role="main"
-              key={action.instancesPath}
-              htmlType="button"
-              disabled={saving || starting}
-              onClick={() => void runAction(action)}
-              {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
-            >
-              {t(action.labelKey)}
-            </AxisButton>
-          ))
+          .map((action) => ({
+            key: keyOf(action),
+            labelKey: action.labelKey,
+            disabled: saving || starting,
+            onClick: () => void runAction(action),
+            attributes: canvas.props(keyOf(action)),
+          }))
       : []
-  const navigateButtons =
+  const navigateActions: AxisAction[] =
     canvas.active || (recordId !== null && record?.id === recordId)
       ? widget.actions
           .filter((action): action is NavigateAction => action.type === 'navigate')
-          .map((action, index) => {
+          .flatMap((action) => {
             // The canvas has no record, so its button has no target.
             const open =
               recordId !== null && record
                 ? navigateTarget(sitePath, action, { id: recordId, values: record.values })
                 : null
-            return (
-              (canvas.active || open) && (
-                <AxisButton
-                  role="main"
-                  key={index}
-                  htmlType="button"
-                  disabled={saving || starting}
-                  onClick={() => {
-                    if (open) {
-                      void runNavigate(open)
-                    }
-                  }}
-                  {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
-                >
-                  {t(action.labelKey)}
-                </AxisButton>
-              )
-            )
+            return canvas.active || open
+              ? [
+                  {
+                    key: keyOf(action),
+                    labelKey: action.labelKey,
+                    disabled: saving || starting,
+                    onClick: () => {
+                      if (open) {
+                        void runNavigate(open)
+                      }
+                    },
+                    attributes: canvas.props(keyOf(action)),
+                  },
+                ]
+              : []
           })
       : []
-  const actionButtons = [...startButtons, ...navigateButtons].filter(Boolean)
+  const [firstAction, ...otherActions] = [...startActions, ...navigateActions]
+  const actionButton = (action: AxisAction, role: 'main' | 'secondary') => (
+    <AxisButton
+      role={role}
+      key={action.key}
+      htmlType="button"
+      disabled={action.disabled}
+      onClick={action.onClick}
+      {...action.attributes}
+    >
+      {actionText(action, t)}
+    </AxisButton>
+  )
   // The page's heading names the record, see docs/reference/shell.md#page-header. A designer's canvas keeps its own heading.
   const label = entity.labelKey ? t(entity.labelKey) : entity.name
   const name = record ? recordName(entity, record, { locale, text: t }) : null
@@ -374,9 +382,11 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
       {/* The form is the first part and a saved record's history the last, see docs/reference/form-widget.md#history. */}
       <SectionParts>
         <Flex vertical gap="middle">
-          {actionButtons.length > 0 && (
-            <PageActions inPlace={inCanvas}>
-              <Flex gap="small">{actionButtons}</Flex>
+          {firstAction && (
+            // A designer's canvas never folds, so each action stays a button the author can pick.
+            <PageActions inPlace={inCanvas} fold={canvas.active ? [] : otherActions}>
+              {actionButton(firstAction, 'main')}
+              {canvas.active && otherActions.map((action) => actionButton(action, 'secondary'))}
             </PageActions>
           )}
           {!inCanvas && recordId === null && (

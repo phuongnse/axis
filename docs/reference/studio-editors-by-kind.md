@@ -223,7 +223,8 @@ panel, its undo and its drag and drop.
   column, which selects the action as a button does. At narrow width a table row with two or more actions folds into a
   menu, and three or more other row actions fold into the "…" menu at any width, see
   [frontend](frontend.md). The canvas cannot open that menu, because it cancels the click, so the
-  author selects such an action from the tree and the panel.
+  author selects such an action from the tree and the panel. A form's actions on the heading never fold on the
+  canvas, because the canvas cannot open a menu, so each stays a button that selects its action.
 - **Palette.** The side pane lists the ten widget types above the widget tree. Enter, Space or a click
   inserts a new widget after the selected widget, at the end of the selected container's first list,
   or at the end of the page's list on an empty page. The author can also drag a type onto the canvas.

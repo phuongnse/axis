@@ -220,9 +220,13 @@ function detailFailedAt(problem: { code: string; values: Record<string, number> 
 const studioResourceId = '0192f6d1-7b2e-7c40-8a9f-6e7d8c9b0a1f'
 
 /** The detail text with the application and the resource that open the process in Studio. */
-function detailWithStudio() {
+function detailWithStudio(commands?: string[]) {
   const detail = JSON.parse(detailText) as Record<string, unknown>
-  return JSON.stringify({ ...detail, studio: { app: 'PurchasingApp', resource: studioResourceId } })
+  return JSON.stringify({
+    ...detail,
+    ...(commands && { commands }),
+    studio: { app: 'PurchasingApp', resource: studioResourceId },
+  })
 }
 
 const parentId = '0192f4c0-1a2b-7c3d-8e4f-5a6b7c8d9e01'
@@ -1074,6 +1078,35 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     expect(screen.queryByTestId('inspector-command-cancel')).not.toBeInTheDocument()
     expect(screen.queryByTestId('inspector-command-retry')).not.toBeInTheDocument()
+  })
+
+  it('folds Cancel and Retry into the More actions menu beside Open in Studio', async () => {
+    stubApi({ detail: { status: 200, body: detailWithStudio(['cancel', 'retry']) } })
+
+    renderPage()
+
+    const heading = within(await screen.findByTestId('page-actions'))
+    expect(await heading.findByTestId('inspector-open-studio')).toHaveTextContent('Open in Studio')
+    expect(heading.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
+    expect(heading.queryByTestId('inspector-command-cancel')).not.toBeInTheDocument()
+    expect(heading.queryByTestId('inspector-command-retry')).not.toBeInTheDocument()
+
+    await userEvent.click(heading.getByRole('button', { name: 'More actions' }))
+
+    expect(await screen.findByTestId('inspector-command-cancel')).toHaveTextContent('Cancel instance')
+    await userEvent.click(screen.getByTestId('inspector-command-retry'))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('keeps a single command as a button beside Open in Studio', async () => {
+    stubApi({ detail: { status: 200, body: detailWithStudio(['cancel']) } })
+
+    renderPage()
+
+    const heading = within(await screen.findByTestId('page-actions'))
+    expect(await heading.findByTestId('inspector-open-studio')).toBeInTheDocument()
+    expect(heading.getByTestId('inspector-command-cancel')).toHaveTextContent('Cancel instance')
+    expect(heading.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
   it('leaves out a command this build does not know', async () => {
