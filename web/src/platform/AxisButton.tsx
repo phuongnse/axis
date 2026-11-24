@@ -151,6 +151,9 @@ function IconButton(props: IconButtonProps) {
   const hushed = useRef(false)
   const name = nameValues ? fillText(t(nameKey), nameValues) : t(nameKey)
   const tone: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
+  // A button with an address is a link, and a link never takes an underline,
+  // see docs/reference/actions-and-controls.md#buttons.
+  const linkStyle: CSSProperties = attributes.href ? { textDecoration: 'none' } : {}
   return (
     <Tooltip
       title={doneKey === undefined ? name : t(doneKey)}
@@ -167,7 +170,7 @@ function IconButton(props: IconButtonProps) {
         disabled={disabled}
         aria-label={nameSuffix ? `${name} ${nameSuffix}` : name}
         icon={<span aria-hidden>{icon}</span>}
-        style={{ ...tone, ...chosen.style, ...style }}
+        style={{ ...tone, ...chosen.style, ...linkStyle, ...style }}
         onMouseEnter={(event) => {
           pointerOver.current = true
           onMouseEnter?.(event)
@@ -332,7 +335,9 @@ export function TitleRowActions({ children }: { children: ReactNode }) {
  * `finish` is a solid `danger` fill with white text. `selected` draws a subtle button on the selected tint in
  * `primaryText`, and sets the one `aria-pressed`, or `aria-current` for `"page"` and `"step"`, in place of any the caller
  * passes. Inside an `AxisActionRow`, `secondary` and `subtle` are text buttons, and a destructive `secondary` is in
- * `dangerText`. Every text button carries `textButtonClass`. `caret` adds a down caret after the text of any text role. The role is not passed on to the DOM.
+ * `dangerText`. Every text button carries `textButtonClass`. `caret` adds a down caret after the text of any text role.
+ * The role is not passed on to the DOM. A button with an `href` is a link that draws no underline, see
+ * docs/reference/actions-and-controls.md#buttons.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
@@ -341,7 +346,10 @@ export function AxisButton(props: AxisButtonProps) {
 
   if (isIconButton(props)) return <IconButton {...props} />
 
-  const { role, style, className, disabled, caret, children, destructive, selected, ...attributes } = props
+  const { role, style: callerStyle, className, disabled, caret, children, destructive, selected, ...attributes } = props
+  // A button with an address is a link, and a link never takes an underline,
+  // see docs/reference/actions-and-controls.md#buttons.
+  const style: CSSProperties | undefined = attributes.href ? { textDecoration: 'none', ...callerStyle } : callerStyle
   const chosen = withSelected(selected, attributes, tint, colour.primaryText, disabled)
   const body = {
     ...chosen.rest,

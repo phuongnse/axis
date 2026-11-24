@@ -409,7 +409,8 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   [shell layout](shell.md#layout). It never opens a dialog. A record the person cannot open is plain text.
 - **A link goes to an address.** A link is a real `<a href>` or the router's link, so it opens in a new tab and its
   address can be copied. It is in `primaryText`. An action with no address is a button, never a link.
-- **A link is underlined** _(planned, #5134)_. In running text, and on hover when a link stands alone, it is underlined.
+- **A link is underlined**. A link in running text, which is a sentence that `FilledText` fills, is always underlined.
+  Any other link stands alone and is underlined only on hover. A menu's entries and a button with an address are never underlined.
 - **What opens a view gets an address.** A resource named in Problems, test results or a form's Used on is a
   real link to the resource at its path, and a shared grant's Open policy links to the policy. Ctrl+click opens
   either in a new tab. See [Studio's route and address](studio.md#route-and-address).

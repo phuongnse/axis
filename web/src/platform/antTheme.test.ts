@@ -73,6 +73,10 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
     }
   })
 
+  it('sets the Ant Design link tokens to no underline and an underline on hover, as opening things says', () => {
+    expect(antThemeFor(mode).token).toMatchObject({ linkDecoration: 'none', linkHoverDecoration: 'underline' })
+  })
+
   it('draws links and state text in the text tokens', () => {
     expect(token.colorLink).toBe(colour.primaryText)
     expect(token.colorLinkHover).toBe(colour.primaryText)
