@@ -37,6 +37,12 @@ describe('colour tokens', () => {
     const names = new Set([...frontendDocBullet('Colours').matchAll(/`(\w+)`/g)].map((match) => match[1]))
     expect([...names].sort()).toEqual(Object.keys(colourTokens).sort())
   })
+
+  it('borderSubtle stands apart from surface within 0.1 as much in light mode as in dark', () => {
+    const light = contrast(colourTokens.borderSubtle.light, colourTokens.surface.light)
+    const dark = contrast(colourTokens.borderSubtle.dark, colourTokens.surface.dark)
+    expect(Math.abs(light - dark)).toBeLessThanOrEqual(0.1)
+  })
 })
 
 describe.each(['light', 'dark'] as const)('colour contrast in %s mode', (mode) => {
