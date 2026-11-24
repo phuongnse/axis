@@ -8,7 +8,7 @@ import { formatBytes, type TenantUsageDay } from './tenantUsage'
  * The day table of a tenant's usage, as the users page's "Usage" section and the cell console's Tenant view show it. The
  * sizes and counts are formatted for `locale`, and `testId` names the table. Without a `view` the table is the users
  * page's, newest first, with no filter and no sort. With a `view` every column filters and sorts, for a table that the server
- * pages, see docs/reference/actions-and-controls.md#tables. `loading` and `failure` are those of {@link AxisTable}.
+ * pages, see docs/reference/tables.md#tables. `loading` and `failure` are those of {@link AxisTable}.
  */
 export function TenantUsageDayTable({
   days,

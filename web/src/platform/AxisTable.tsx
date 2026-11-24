@@ -45,7 +45,7 @@ import type { TableSavedViews } from './useTableView'
 import { visuallyHidden } from './visuallyHidden'
 
 /**
- * How wide a column is, see docs/reference/actions-and-controls.md#tables.
+ * How wide a column is, see docs/reference/tables.md#tables.
  * - `fixed`: a value of a fixed form, such as a number, a date, a boolean, an enum or the row's actions, as wide as
  *   its content and never wrapping.
  * - `freeText`: text, a reference or a file. The free-text columns share the width the others leave in equal parts, and
@@ -61,14 +61,14 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'width' | 'render'> & {
   key: string
   kind: ColumnKind
   render?: (value: unknown, row: T, index: number) => ReactNode
-  /** Which columns move under their row first when the table is too narrow, see docs/reference/actions-and-controls.md#tables. */
+  /** Which columns move under their row first when the table is too narrow, see docs/reference/tables.md#tables. */
   priority?: ColumnPriority
-  /** The text the search looks in, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables. */
+  /** The text the search looks in, for a table that holds its rows, see docs/reference/tables.md#tables. */
   searchText?: (row: T) => string
-  /** The value the column's header sorts by, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables. */
+  /** The value the column's header sorts by, for a table that holds its rows, see docs/reference/tables.md#tables. */
   sortValue?: (row: T) => string | number | null
   /**
-   * What the column filters on, see docs/reference/actions-and-controls.md#tables: its kind of value and, for an enum,
+   * What the column filters on, see docs/reference/tables.md#tables: its kind of value and, for an enum,
    * its options. A column that gives it has a filter in the builder of any table with a view. Only a table that holds
    * its rows reads `value`, how a row gives the value (null is empty), so a table paged on the server may leave it out.
    * A column without `filter` has no filter. Dates compare as ISO text. A column whose header is not plain text gives a
@@ -83,7 +83,7 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'width' | 'render'> & {
 }
 
 /**
- * The view of a table: its search, filter, sort, page and page size, see docs/reference/actions-and-controls.md#tables.
+ * The view of a table: its search, filter, sort, page and page size, see docs/reference/tables.md#tables.
  * Without a `total`, the table holds all its rows, and AxisTable searches, filters, sorts and pages them itself. With a `total`,
  * the server has done that work, and `dataSource` is the page.
  */
@@ -102,12 +102,12 @@ export interface AxisTableView {
   saved?: TableSavedViews
   /**
    * Whether the table pages its rows. With `false`, every row shows and there is no pager. Only a table that holds its
-   * rows reads it, see docs/reference/actions-and-controls.md#tables.
+   * rows reads it, see docs/reference/tables.md#tables.
    */
   paging?: boolean
 }
 
-/** An action on the selected rows, see docs/reference/actions-and-controls.md#tables. It is a text button. */
+/** An action on the selected rows, see docs/reference/tables.md#tables. It is a text button. */
 export interface AxisBulkAction<T> {
   key: string
   /** The text key of its name. */
@@ -117,7 +117,7 @@ export interface AxisBulkAction<T> {
 }
 
 /**
- * The toolbar of every table, see docs/reference/actions-and-controls.md#tables. AxisTable draws the view's Search, Filter
+ * The toolbar of every table, see docs/reference/tables.md#tables. AxisTable draws the view's Search, Filter
  * Columns and Views on the left. The toolbar gives the right side: Refresh, the secondary actions such as Import and Export, and
  * the main action last. Each is there only when the table has it.
  */
@@ -144,15 +144,15 @@ export interface AxisTableProps<T> {
   view?: AxisTableView
   /**
    * Whether a row is one the filter never hides, such as a row added since the last save. Only a table that holds its
-   * rows reads it, and only for the filter, see docs/reference/actions-and-controls.md#tables.
+   * rows reads it, and only for the filter, see docs/reference/tables.md#tables.
    */
   keep?: (row: T) => boolean
   toolbar?: AxisTableToolbar
-  /** A title at the left end of the toolbar, before the search, see docs/reference/actions-and-controls.md#tables. */
+  /** A title at the left end of the toolbar, before the search, see docs/reference/tables.md#tables. */
   title?: ReactNode
-  /** Whether each cell has `spacing-sm` on each side, see docs/reference/actions-and-controls.md#tables. */
+  /** Whether each cell has `spacing-sm` on each side, see docs/reference/tables.md#tables. */
   compact?: boolean
-  /** Whether the table has no header row, see docs/reference/actions-and-controls.md#tables. */
+  /** Whether the table has no header row, see docs/reference/tables.md#tables. */
   headless?: boolean
   /** What sits between the toolbar and the rows, such as a filter bar, messages and dialogs. */
   below?: ReactNode
@@ -172,12 +172,12 @@ export interface AxisTableProps<T> {
   blankRow?: (row: T) => boolean
   /**
    * What a row folds open to when it has more to show than its columns, such as a call's attempt, or `null` for a row
-   * with none. A fold in the row's first cell opens and closes it, see docs/reference/actions-and-controls.md#tables.
+   * with none. A fold in the row's first cell opens and closes it, see docs/reference/tables.md#tables.
    */
   details?: (row: T) => ReactNode | null
   /**
    * The rows a row folds open to, or `null` for a row with none: its group rows, closed at first, which open from the
-   * fold in its first cell and may have rows of their own, see docs/reference/actions-and-controls.md#tables. Paging, search,
+   * fold in its first cell and may have rows of their own, see docs/reference/tables.md#tables. Paging, search,
    * filter and sort work on the rows of `dataSource` alone, and a row's rows follow it. Every row's key must be unique in the
    * table, so a caller prefixes the key of a row inside another with the key of the row that holds it. A row that has rows
    * in it opens those, so `details` is for the rows that have none.
@@ -211,17 +211,17 @@ function valueCompare(locale: string): (left: string | number, right: string | n
     typeof left === 'number' && typeof right === 'number' ? left - right : compareNames(String(left), String(right))
 }
 
-/** The least a free-text value is wide before a column moves under its row, in px, see docs/reference/actions-and-controls.md#tables. */
+/** The least a free-text value is wide before a column moves under its row, in px, see docs/reference/tables.md#tables. */
 const freeTextMinWidth = 160
 
 /**
  * A row's actions fold into one menu from this many on, and at narrow width from two on, see
- * docs/reference/actions-and-controls.md#tables. A table set up for this many actions folds each row with two or more.
+ * docs/reference/tables.md#tables. A table set up for this many actions folds each row with two or more.
  */
 const foldFrom = 3
 
 /**
- * The one table of the platform, see docs/reference/actions-and-controls.md#tables. It draws the toolbar in its fixed
+ * The one table of the platform, see docs/reference/tables.md#tables. It draws the toolbar in its fixed
  * order, with the Columns button after Search and Filter for a view that turns it on, then the Views button for a view with `saved`, the columns by their kind, rows and a header of the `tableRow` size, the row actions, which a row
  * folds into one "…" menu from three on, or below 992 px from two on, the row checkboxes and the selection bar of the bulk actions, the paging, the columns that move under their row and then the sideways scrolling when the page is narrower than the columns, and the em
  * dash for an empty cell.
@@ -634,7 +634,7 @@ export function AxisTable<T extends object>({
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
           {/* The search box keeps its own width, so Filter, Columns and Views follow it on one line, see
-              docs/reference/actions-and-controls.md#tables. */}
+              docs/reference/tables.md#tables. */}
           {(title !== undefined || searchable || filterable || arrangeable || view?.saved !== undefined) && (
             <Flex gap="small" align="center" wrap style={{ minWidth: 0 }}>
               {title !== undefined && <div data-testid="axis-table-title">{title}</div>}
@@ -770,7 +770,7 @@ export function AxisTable<T extends object>({
 /**
  * The fold of a row, a small `FoldButton`: named "Show the rows in it" or "Hide the rows in it"
  * for a row with group rows, and "Show the details" or "Hide the details" for a row with details, see
- * docs/reference/actions-and-controls.md#tables.
+ * docs/reference/tables.md#tables.
  */
 function RowFold({ group, open, onToggle }: { group: boolean; open: boolean; onToggle: () => void }) {
   const names = group
@@ -844,7 +844,7 @@ function titleText<T>(column: AxisColumn<T>): ReactNode {
 }
 
 /**
- * The cells of a row that moved under it, one "Title: value" line each, see docs/reference/actions-and-controls.md#tables.
+ * The cells of a row that moved under it, one "Title: value" line each, see docs/reference/tables.md#tables.
  * They sit in the row's first cell, so the row holds its own values. The zero-width box keeps the lines from widening
  * that column, and the lines are as wide as the row.
  */
@@ -896,7 +896,7 @@ function MovedCells({
  * `AxisTable` asks for a table set up for three or more, so a menu never holds one entry either. A known Remove,
  * `meaning: 'remove'`, is the trash icon in `dangerText` and a red entry in a menu. An action with an `href` is drawn
  * as a link button, which opens a path in the router. It is exported for a list that is not a table, see
- * docs/reference/actions-and-controls.md#tables.
+ * docs/reference/tables.md#tables.
  */
 export function RowActions({ actions, fold = false }: { actions: AxisAction[] | null; fold?: boolean }) {
   const t = useText()

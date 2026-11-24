@@ -137,20 +137,28 @@ export function InviteUserModal({
         onCancel={onClose}
       >
         <Flex vertical gap="middle">
-          {problem && (
-            <AxisAlert data-testid="users-invite-problem" kind="error" message={t(`shell.users.invite.${problem}`)} />
-          )}
-          {rolesFailed && (
-            <AxisAlert
-              data-testid="users-invite-roles-failed"
-              kind="warning"
-              message={t('shell.users.invite.rolesFailed')}
-            />
-          )}
           <AxisForm
             form={form}
             name="invite"
             onFinish={(values) => setPending({ email: values.email.trim(), displayName: values.displayName.trim() })}
+            message={
+              <>
+                {problem && (
+                  <AxisAlert
+                    data-testid="users-invite-problem"
+                    kind="error"
+                    message={t(`shell.users.invite.${problem}`)}
+                  />
+                )}
+                {rolesFailed && (
+                  <AxisAlert
+                    data-testid="users-invite-roles-failed"
+                    kind="warning"
+                    message={t('shell.users.invite.rolesFailed')}
+                  />
+                )}
+              </>
+            }
           >
             <AxisField
               name="email"

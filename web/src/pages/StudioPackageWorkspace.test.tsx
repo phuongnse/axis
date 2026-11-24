@@ -105,7 +105,7 @@ const failedTest = {
  * `readTest` answers otherwise. A move answers `moveStatus` with a problem when it is not 200, and moves nothing. The
  * package's run inputs start as `saved` at version `v0`, or have no version before the first save, and a write with a wrong version
  * answers `409`. A run answers `202`, and its request has ended with the run `greet`. Every request is recorded in
- * `requests`, and `writesSent` has those that are not reads. `manifest` replaces the package's `axis-package.json`.
+ * `requests`, and `writesSent` has those that are not reads. A run answers `writes[runRoute]` when it has one. `manifest` replaces the package's `axis-package.json`.
  */
 function stubPackage(
   writes: Record<string, () => Response> = {},
@@ -149,7 +149,7 @@ function stubPackage(
         })
       }
       if (input === runRoute) {
-        return json({ id: 'r1', status: 'queued', kind: 'run' }, 202)
+        return writes[runRoute]?.() ?? json({ id: 'r1', status: 'queued', kind: 'run' }, 202)
       }
       if (input === requestRoute) {
         return json({
@@ -1135,6 +1135,23 @@ describe('StudioPackageWorkspace', () => {
       await within(runPanel()).findByTestId('studio-run-outcome', {}, { timeout: 3000 })
       const sent = requests.filter((call) => call.method !== 'GET').map((call) => `${call.method} ${call.url}`)
       expect(sent).toEqual([`PUT ${fileRoute('src/b.ts')}`, `POST ${runRoute}`])
+    })
+
+    it('shows a run that could not start above the Operation field', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      stubPackage({ [runRoute]: () => json({ title: 'The run was refused.' }, 500) })
+      renderWorkspace(true)
+      const panel = await openRun()
+
+      await userEvent.type(within(panel).getByRole('textbox', { name: /^name/ }), 'Ada')
+      await userEvent.click(within(panel).getByRole('button', { name: 'Run' }))
+
+      const alert = await within(panel).findByTestId('studio-run-error')
+      expect(alert).toHaveTextContent('The run could not be started or checked.')
+      expect(
+        alert.compareDocumentPosition(within(panel).getByRole('combobox', { name: 'Operation' })) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
     })
 
     it('posts no run and shows the file’s conflict notice when its save answers 409', async () => {

@@ -1361,9 +1361,12 @@ describe('ProcessInstancePage', () => {
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'orderNumber (text)' }), { target: { value: '12' } })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
-    expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(
-      'The request has errors. Not declared.',
-    )
+    const alert = await within(dialog).findByTestId('inspector-command-error')
+    expect(alert).toHaveTextContent('The request has errors. Not declared.')
+    expect(
+      alert.compareDocumentPosition(within(dialog).getByRole('textbox', { name: 'Reason' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 

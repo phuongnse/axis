@@ -397,6 +397,7 @@ export function StudioPackageRun({
         ) : (
           <div style={{ ...scroll, display: 'flex', flexDirection: 'column', gap: spacing.md }}>
             {inputsFailed && <AxisAlert kind="warning" message={t('shell.studio.packages.run.inputsFailed')} />}
+            {problem !== null && <AxisAlert data-testid="studio-run-error" kind="error" message={problem} />}
             <AxisField
               label={t('shell.studio.packages.run.operation')}
               help={t('shell.studio.packages.run.operationHelp')}
@@ -497,7 +498,6 @@ export function StudioPackageRun({
                 },
               ]}
             />
-            {problem !== null && <AxisAlert data-testid="studio-run-error" kind="error" message={problem} />}
           </div>
         )}
         <ActionBar

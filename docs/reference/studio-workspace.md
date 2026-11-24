@@ -224,7 +224,7 @@ The Overview's changes and a release's changes share one list.
 
 The Releases entry lists the application's releases from
 [`GET .../release-list`](authoring-publishing.md#release-list) on the
-[shared table](actions-and-controls.md#tables), one row per release, the highest number first unless the
+[shared table](tables.md#tables), one row per release, the highest number first unless the
 view sorts them: a publish gives a release its label and note, and activating goes to whichever release is
 wanted. The table is paged on the server, [20 releases at a time](authoring-publishing.md#release-list), with Search,
 Filter, Columns, Refresh, a sort on Release, Label, Published and Published by, and a pager with a page size.
@@ -284,7 +284,7 @@ The page shows, in order:
    the row shows, and the live release's Until, which reads "now", is empty.
 
 Each table holds its rows, so it filters them itself and keeps its filter in the address, see
-[tables](actions-and-controls.md#tables). The Modules and packages table uses the plain name `filter`, and
+[tables](tables.md#tables). The Modules and packages table uses the plain name `filter`, and
 Activations the `activations.` prefix, so a link opens the same rows in both.
 
 The parts from Relaxed points to Activations each have a `heading5` heading, and a rule falls between all the parts and

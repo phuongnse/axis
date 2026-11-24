@@ -106,7 +106,14 @@ export function ReasonDialog({
     >
       <Flex vertical gap="middle">
         {children}
-        <AxisForm form={form} initialValues={{ reason: initialValue }} onFinish={({ reason }) => void send(reason)}>
+        <AxisForm
+          form={form}
+          initialValues={{ reason: initialValue }}
+          onFinish={({ reason }) => void send(reason)}
+          message={
+            error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />
+          }
+        >
           <AxisField
             name="reason"
             label={label ?? t('shell.inspector.commands.reason')}
@@ -117,7 +124,6 @@ export function ReasonDialog({
             <Input.TextArea rows={3} showCount maxLength={maxLength} />
           </AxisField>
         </AxisForm>
-        {error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />}
       </Flex>
     </Modal>
   )

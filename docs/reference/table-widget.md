@@ -5,7 +5,7 @@ This page describes the table widget, which lists the records or data source row
 ## Table widget
 
 A `table` widget lists the records of its entity through the record API, or the rows of its data source. It draws on
-the platform's one shared table, `AxisTable`, whose look is in [tables](actions-and-controls.md#tables).
+the platform's one shared table, `AxisTable`, whose look is in [tables](tables.md#tables).
 
 ### Columns
 
@@ -16,9 +16,9 @@ label. A child collection and a `references` field have no column.
   otherwise the first column. For a data source it is the first column. It comes first. With a `navigate` row action it
   is the link that opens the row, see [opening a row](#opening-a-row).
 - **`priority`**. A `table` widget's `priorities` gives a column `high` or `low` by name, as `{ "amount": "low" }`,
-  for what moves under its row first when [room runs out](actions-and-controls.md#tables).
+  for what moves under its row first when [room runs out](tables.md#tables).
 - **Layout.** Text, reference and file columns are free text, which shares the width left and wraps. Every other
-  column, an enum too, fits its content and does not wrap, see [tables](actions-and-controls.md#tables). Every cell
+  column, an enum too, fits its content and does not wrap, see [tables](tables.md#tables). Every cell
   and the actions column line up at the top, so a row with wrapped text reads along its first line. Number columns sit
   on the right in tabular figures, see [shown values](frontend.md#shown-values).
 
@@ -39,7 +39,7 @@ right.
 - **When.** An entity table has a search box when the entity's display field is among the fields the user may read,
   that is in the widget's `entity.fields`. A data source table has one when the data source's metadata has
   `"search": true`.
-- **Applying.** The box applies as [tables](actions-and-controls.md#tables) says, so typing does not request rows
+- **Applying.** The box applies as [tables](tables.md#tables) says, so typing does not request rows
   for every key. The text lives in the URL as `search`, a new search adds a history entry, and paging and sorting
   keep it.
 - **The text.** The text is sent to the rows request as typed, without trimming. An empty text means no search, so
@@ -51,7 +51,7 @@ right.
 ### Filter
 
 A table with a column the builder offers has a Filter button in the toolbar, after the search box, which opens the
-builder of [tables](actions-and-controls.md#tables).
+builder of [tables](tables.md#tables).
 
 - **Columns.** The builder offers the text, enum, integer, decimal, money and date columns. It leaves out boolean,
   reference, file and date-time columns, as the record API refuses the first three and the builder's date picker gives
@@ -339,7 +339,7 @@ the main action. The page designer's canvas draws it and opens nothing.
    until the import is `committed` or `failed`. On `committed` the dialog closes, a success message shows above the
    table and the current page of rows loads again. A `failed` commit lists its errors in the dialog.
 
-Picking another file starts a new import. A `403`, `413` or `415` on the upload each shows its own message, and any
+Picking another file starts a new import. A `403`, `413` or `415` on the upload each shows its own message above the file field, and any
 other failure shows the generic one. The progress and the errors sit in an `aria-live` region, and the picker and every
 button take the keyboard.
 
@@ -371,7 +371,7 @@ again, with no success message. A failure shows above the table.
 _(planned for M42)_
 
 A table with `bulkActions` shows a checkbox on each row and an "N selected" bar above the rows, as
-[tables](actions-and-controls.md#tables) says. The bar holds the bulk actions. The table's metadata lists a bulk action
+[tables](tables.md#tables) says. The bar holds the bulk actions. The table's metadata lists a bulk action
 only when the person may run it:
 
 - A `startProcess` needs the `start` grant on its process.
@@ -383,7 +383,7 @@ inputs are drawn as the [form widget](form-widget.md) draws them. The same value
 
 The SPA makes one call to the [bulk route](record-api.md#bulk-actions), with the selected rows' ids and, for an
 update, their versions. It then shows a result for each row, clears the selection and loads the current page of rows
-again. Each row that failed is listed, as [tables](actions-and-controls.md#tables) says.
+again. Each row that failed is listed, as [tables](tables.md#tables) says.
 
 The reasons are in [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 
@@ -412,7 +412,7 @@ The reasons are in [D159](../decisions/d159-pages-show-related-lists-boards-and-
 
 _(planned for M42)_
 
-A `table` widget has the Columns control of [tables](actions-and-controls.md#tables). It keeps each person's choice of
+A `table` widget has the Columns control of [tables](tables.md#tables). It keeps each person's choice of
 columns under the table's key, see [table views and columns](frontend.md#table-views-and-columns). The identifying
 column stays first and always shows. The `priorities` still decide what moves under a row when room runs out.
 

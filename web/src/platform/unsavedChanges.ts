@@ -24,7 +24,7 @@ const viewParameters = ['search', 'filter', 'sort', 'page', 'pageSize']
 
 /**
  * The address without an editor's view: a table's `search`, `filter`, `sort`, `page` and `pageSize`, also under the
- * table's prefix such as `fields.search`, see docs/reference/actions-and-controls.md#tables, and the `field` whose drawer
+ * table's prefix such as `fields.search`, see docs/reference/tables.md#tables, and the `field` whose drawer
  * is open, see docs/reference/studio.md#editor. The columns a person keeps stay.
  */
 export function withoutEditorView(params: URLSearchParams): URLSearchParams {

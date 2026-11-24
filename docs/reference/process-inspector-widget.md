@@ -38,7 +38,7 @@ The page lists the process's instances, newest first in the API's order, with th
 step, release and times.
 
 - **Toolbar.** The table has Search, Filter, Columns, a sort on every column and Refresh, see
-  [tables](actions-and-controls.md#tables). Search looks in the record label and the step. Filter has every
+  [tables](tables.md#tables). Search looks in the record label and the step. Filter has every
   column: Record and Step as text, State as its five states, Release as a number, and Started and Ended as
   dates. Columns shows, hides and orders the columns, with Record always first. Refresh loads the list again.
 - **Server.** The widget sends `search`, `filter`, `sort`, `page` and `pageSize` to the instances path as they
@@ -287,7 +287,7 @@ call that is not resolvable has none, because the server decides what may be res
   `true` or `false`, and an empty optional output is left out. A `failed` outcome sends no output.
 - **Answer.** On success, the dialog closes and the page reads the instance again. On a `400`, the
   message of each `/reason`, `/outcome` and declared `/output/{name}` error shows under its field. The
-  problem's title shows in the dialog, and the message of any other key follows it there. Any other
+  problem's title shows above the fields in the dialog, and the message of any other key follows it there. Any other
   refusal shows its title, and any other failure shows a generic text.
 
 ## Dead letters
@@ -296,7 +296,7 @@ Under the instance list, a Dead letters part lists the process's open dead lette
 `{deadLettersPath}?state=open`, newest first, with the kind, the attempts, the last error and the time
 it was dead-lettered.
 
-- **Toolbar.** The table has Filter, see [tables](actions-and-controls.md#tables). Filter has every
+- **Toolbar.** The table has Filter, see [tables](tables.md#tables). Filter has every
   column: Kind and Last error as text, Attempts as a number, and Created as a date. It has no search
   box, no sort, no Columns and no saved views.
 - **Server.** The widget sends `filter` with `state=open` to the dead letters path, and the server

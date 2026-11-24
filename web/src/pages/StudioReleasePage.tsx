@@ -85,7 +85,7 @@ const noParameters: readonly string[] = []
  * the release. The Details part and the activations come from `history`, and the rest from the release route, which loads
  * again when `history` does. A number that the history lacks shows one line and a link to every release, and so does a
  * failed load. The parts table and the activations each have Filter on every column, kept in the address, with the
- * activations under the `activations.` prefix, see docs/reference/actions-and-controls.md#tables.
+ * activations under the `activations.` prefix, see docs/reference/tables.md#tables.
  */
 export function StudioReleasePage({
   application,

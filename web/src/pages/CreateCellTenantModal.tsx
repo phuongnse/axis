@@ -115,8 +115,12 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
         <CellJobTable jobs={[job]} locale={locale} />
       ) : (
         <Flex vertical gap="middle">
-          {error && <AxisAlert data-testid="cell-create-error" kind="error" message={error} />}
-          <AxisForm form={form} name="create-cell-tenant" onFinish={(values) => void create(values)}>
+          <AxisForm
+            form={form}
+            name="create-cell-tenant"
+            onFinish={(values) => void create(values)}
+            message={error && <AxisAlert data-testid="cell-create-error" kind="error" message={error} />}
+          >
             <AxisField
               name="id"
               label={t('shell.cell.create.id')}

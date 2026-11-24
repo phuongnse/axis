@@ -411,6 +411,56 @@ describe('theme values', () => {
     expect(antForms(sources)).toEqual([])
   })
 
+  /** The children of each AxisForm in a file, which end at its closing tag. A tag's own braces hide its `>` and `/>`. */
+  function formChildren(text: string): string[] {
+    const children: string[] = []
+    for (const match of text.matchAll(/<AxisForm[\s>]/g)) {
+      let depth = 0
+      let end = match.index + '<AxisForm'.length
+      for (; end < text.length; end++) {
+        if (text[end] === '{') {
+          depth++
+        } else if (text[end] === '}') {
+          depth--
+        } else if (text[end] === '>' && depth === 0) {
+          break
+        }
+      }
+      if (text[end - 1] === '/') {
+        continue
+      }
+      const close = text.indexOf('</AxisForm>', end)
+      children.push(text.slice(end + 1, close === -1 ? undefined : close))
+    }
+    return children
+  }
+
+  /** The files that draw an AxisAlert among an AxisForm's children, instead of through its `message`. */
+  function alertsInForms(files: Record<string, string>) {
+    return Object.entries(files)
+      .filter(([, text]) => formChildren(text).some((children) => children.includes('<AxisAlert')))
+      .map(([file]) => file)
+  }
+
+  it("places every form's message through AxisForm's message, see docs/reference/actions-and-controls.md#messages", () => {
+    expect(alertsInForms(sources)).toEqual([])
+  })
+
+  it('names a form that draws an alert among its children, and not one whose message draws it', () => {
+    expect(
+      alertsInForms({
+        '../pages/Sample.tsx':
+          '<AxisForm form={form}>\n<AxisField/>\n{e && <AxisAlert kind="error" message={e} />}\n</AxisForm>',
+      }),
+    ).toEqual(['../pages/Sample.tsx'])
+    expect(
+      alertsInForms({
+        '../pages/Sample.tsx':
+          '<AxisForm message={e && <AxisAlert kind="error" message={e} />} onFinish={() => go()}>\n<AxisField/>\n</AxisForm>',
+      }),
+    ).toEqual([])
+  })
+
   it("names a file that renders Ant Design's form, and not one that only uses its hooks and items", () => {
     expect(antForms({ '../pages/Sample.tsx': '<Form layout="vertical">' })).toEqual(['../pages/Sample.tsx'])
     expect(antForms({ '../pages/Sample.tsx': 'const [form] = Form.useForm()\n<Form.Item name="a" />' })).toEqual([])

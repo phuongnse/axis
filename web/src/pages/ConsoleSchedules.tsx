@@ -29,7 +29,7 @@ const noParameters: readonly string[] = []
  * by application and trigger name until the view sorts them, paged on the server, each with its process, its cron
  * schedule and time zone, the last occurrence that ran and the next occurrence. The table has Search, Filter, Columns,
  * Refresh, a sort on every column but Schedule, and a pager with a page size, all kept in the address, see
- * docs/reference/operator-console.md#views and docs/reference/actions-and-controls.md#tables. A failure, a 403
+ * docs/reference/operator-console.md#views and docs/reference/tables.md#tables. A failure, a 403
  * included, shows an error in this part only.
  */
 export function ConsoleSchedules({ locale }: ConsoleSchedulesProps) {

@@ -59,7 +59,7 @@ const endedAtField = { name: 'endedAt', type: 'date-time' } as const
 /**
  * Lists the instances of the widget's process, newest first until the view sorts them, paged on the server. The table has
  * Search, Filter on every column, Columns, a sort on every column, Refresh and paging, see
- * docs/reference/actions-and-controls.md#tables. The view lives in the URL as `search`, `filter`, `columns`, `sort`,
+ * docs/reference/tables.md#tables. The view lives in the URL as `search`, `filter`, `columns`, `sort`,
  * `page` and `pageSize`, and the widget sends `search`, `filter`, `sort`, `page` and `pageSize` to the instances path
  * unchanged, so the server does the work. A new view goes back to page 1. The first column links each row to the
  * instance's address under the inspector page. A `403` shows that the user may not inspect the process. Any other

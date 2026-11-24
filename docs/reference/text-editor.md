@@ -13,12 +13,12 @@ the second view of the same draft.
 - **Search.** The search is the table's own, through its Search box. It keeps the rows whose key, or text
   in any locale, contains the search, ignoring letter case. It starts on Enter or on the search button,
   goes back to page 1, and lives in the address as `search`, so a reload or the Back button keeps it. See
-  [tables](actions-and-controls.md#tables).
+  [tables](tables.md#tables).
 - **Filter.** The table's Filter works on the key and on each locale's text. A missing text counts as empty,
   so "is empty" on a locale finds the keys it lacks. It narrows the rows already loaded and lives in the
-  address as `filter`. See [tables](actions-and-controls.md#tables).
+  address as `filter`. See [tables](tables.md#tables).
 - **Paging.** The table pages 20 rows at a time, as every table with a view does. See
-  [tables](actions-and-controls.md#tables).
+  [tables](tables.md#tables).
 - **Cells.** A cell edit goes into the draft, and Save sends one JSON Patch for the open resource only.
   Clearing a cell saves an empty string and keeps the key, because every locale holds the same keys
   (`AXC0027`).

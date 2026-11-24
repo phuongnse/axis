@@ -200,7 +200,12 @@ describe('ConnectedAppsTab', () => {
     await allowClient(user, 'claude')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByText('The setting was not saved.')).toBeVisible()
+    const notice = await screen.findByTestId('connected-apps-notice')
+    expect(notice).toHaveTextContent('The setting was not saved.')
+    expect(
+      notice.compareDocumentPosition(screen.getByRole('radio', { name: /^Allow list/ })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(screen.getByRole('radio', { name: /^Allow list/ })).toBeChecked()
     expect(screen.getByText('claude')).toBeVisible()
   })

@@ -121,8 +121,8 @@ them there.
   Output tab's title row then reads Tests, with the test's state as a status tag: queued, testing, passed or failed.
   Under it are the lines the host wrote. A test that cannot be sent or followed shows the request alert.
 - **Run.** Run… shows two panes parted by a rule that runs the panel's height. The Input pane is
-  one block under its title row, in the order a person works: Operation, then Saved input, then the Form and JSON
-  tabs and the values, with no rule between them. Run sits in the pane's action bar at its foot, outlined as the
+  one block under its title row. A message about the whole pane, such as a run that could not start, sits first, above
+  Operation. Then come Operation, Saved input, the Form and JSON tabs and the values, with no rule between them. Run sits in the pane's action bar at its foot, outlined as the
   pane's main action and lined up with the fields. The JSON shows each field the input lacks as `null`. The Output
   pane has the Output title row, with the outcome as a status tag beside the title and Duration on the row's right,
   then the output as read-only JSON, then a rule and the Log, wrapped. Each pane scrolls once from top to bottom, see

@@ -76,7 +76,7 @@ away instead.
 A list of objects is a table with one column per property, named by its field text. A list of plain
 values and a map with marked keys are rows of inputs, with no box round a row, and spacing sets the
 rows apart. Add, or Add row in a dialog, sits on the list's title row. Each row's Remove is its row action, see
-[tables](actions-and-controls.md#tables). A field in `readOnlyNames` shows none of them.
+[tables](tables.md#tables). A field in `readOnlyNames` shows none of them.
 
 - **A cell shows content, never a bare count.** A cell shows the value, Yes or No, a label's text, a
   nested list's items one to a line, or a map's entries as `key: value`. A label shows its text in the
@@ -142,7 +142,7 @@ is shown by its own editor, and deleting it breaks nothing it uses, so it has no
 [D141](../decisions/d141-the-reference-index-and-what-uses-a-resource.md). Changing the editor's tab clears every
 table's search, filter, sort, page and page size from the address, so one tab's view never filters another's table.
 
-The tab is the [standard table](actions-and-controls.md#tables), flat, with search and Filter on each column: Name as
+The tab is the [standard table](tables.md#tables), flat, with search and Filter on each column: Name as
 text, and Kind and How it is used as choices of those in the rows:
 
 1. Name: the other resource by its label, as the link that opens it at the path of the reference.

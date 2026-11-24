@@ -77,7 +77,7 @@ const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
  * The tenant's users for an administrator: a table that the server searches, filters, sorts and pages. It has Search, which
  * looks in the name and the email, Filter, Columns, a sort on every column, and a pager with a page size. All of them live in
  * the address, so reload and Back keep them, and a new search, filter or sort goes back to page 1, see
- * docs/reference/platform-pages.md#the-list and docs/reference/actions-and-controls.md#tables. The display name is drawn by `PersonName`: a link
+ * docs/reference/platform-pages.md#the-list and docs/reference/tables.md#tables. The display name is drawn by `PersonName`: a link
  * to the person's page, which shows their roles, followed by (you) on the administrator's own row. The Invite button opens the form that invites a person. A row's commands
  * are entries of its "…" row-actions menu. An invited account has Resend invitation. A row that is not disabled has Disable,
  * a disabled row has Enable, and an account has Reset authenticator. Each of these asks for a confirmation, then reloads

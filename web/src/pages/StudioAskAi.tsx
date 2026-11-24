@@ -87,10 +87,15 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
       onClose={onClose}
     >
       <Flex vertical gap="middle">
-        {sendFailed && (
-          <AxisAlert data-testid="studio-ask-ai-error" kind="error" message={t('shell.studio.askAi.sendFailed')} />
-        )}
-        <AxisForm form={form} onFinish={send}>
+        <AxisForm
+          form={form}
+          onFinish={send}
+          message={
+            sendFailed && (
+              <AxisAlert data-testid="studio-ask-ai-error" kind="error" message={t('shell.studio.askAi.sendFailed')} />
+            )
+          }
+        >
           <AxisField
             name="text"
             label={t('shell.studio.askAi.text')}

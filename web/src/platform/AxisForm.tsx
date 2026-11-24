@@ -10,14 +10,17 @@ export type AxisFormProps<Values> = Omit<
   children?: ReactNode
   /** Marks no field as required, for the sign-in pages, see docs/reference/actions-and-controls.md#fields. */
   unmarked?: boolean
+  /** A message about the whole form, of any kind, drawn first, see docs/reference/actions-and-controls.md#messages. */
+  message?: ReactNode
 }
 
 /**
  * A form on a platform screen: its labels above the inputs, the shared required mark, the focus on its first field in
- * error and its fields `spacing-lg` apart, see docs/reference/actions-and-controls.md#fields. A form that sets fields
- * in a row keeps `AxisFieldRow` or `ColumnGrid` inside it.
+ * error and its fields `spacing-lg` apart, see docs/reference/actions-and-controls.md#fields. Its message, if it has
+ * one, is drawn first, see docs/reference/actions-and-controls.md#messages. A form that sets fields in a row keeps
+ * `AxisFieldRow` or `ColumnGrid` inside it.
  */
-export function AxisForm<Values = unknown>({ unmarked = false, children, ...props }: AxisFormProps<Values>) {
+export function AxisForm<Values = unknown>({ unmarked = false, children, message, ...props }: AxisFormProps<Values>) {
   const { spacing } = useDesignTokens()
   return (
     <Form
@@ -28,6 +31,7 @@ export function AxisForm<Values = unknown>({ unmarked = false, children, ...prop
       scrollToFirstError={{ focus: true }}
     >
       <Flex vertical gap={spacing.lg}>
+        {message}
         {children}
       </Flex>
     </Form>

@@ -19,7 +19,7 @@ their views. Browser storage does not follow a person to another browser, and si
 - A view belongs to the person who saved it, and is never shared with others.
 - [D151](d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md)
   still holds: a view is still a filter kept in the address. The rules of the tables are in
-  [actions and controls](../reference/actions-and-controls.md#tables), and the routes and their limits
+  [actions and controls](../reference/tables.md#tables), and the routes and their limits
   are in [table views and columns](../reference/frontend.md#table-views-and-columns).
 
 ## Consequences

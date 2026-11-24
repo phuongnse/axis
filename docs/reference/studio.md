@@ -102,7 +102,7 @@ A kind's sidebar entry opens its list, see [workspace](studio-workspace.md#works
 resource opens it alone, under its [name](studio-workspace.md#names), with its editor below.
 
 - **One list for every kind**. A kind's list is the
-  [standard table](actions-and-controls.md#tables), with the same columns for every kind: Name,
+  [standard table](tables.md#tables), with the same columns for every kind: Name,
   Description, Status, Last modified by and Last modified at. Every column shows unless Columns hides it, and a
   cell with no value shows the dash. Name is a link. A list does not show the inside of a resource, such as its
   fields or references, a file name, or a count that leads nowhere.
@@ -174,7 +174,7 @@ what changed.
   join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
   asked about, and neither is the move that Studio makes after a delete, because the draft went with the resource.
   A move that only changes the `search`, `filter`, `sort`, `page` or `pageSize` of a
-  [table](actions-and-controls.md#tables), under the table's prefix too, such as `fields.filter`, or the
+  [table](tables.md#tables), under the table's prefix too, such as `fields.filter`, or the
   `field`, `validation` or `index` of an open [side panel](entity-designer.md#field-drawer), is not asked about either, because the editor stays on screen.
 
 ## References
@@ -467,7 +467,7 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   sources, the processes and the endpoints. A cell shows the OR of the role's actions from all its
   policies, as in [combining grants](security.md#combining-grants). A data source cell that lacks the
   `read` of its root entity warns and names that entity.
-- **Filter.** The table has a [Filter](actions-and-controls.md#tables) on the Role and on every target. A target filters
+- **Filter.** The table has a [Filter](tables.md#tables) on the Role and on every target. A target filters
   as text over the cell's actions, so "contains update" finds the roles that may update there. The filter is kept in
   the address as `matrix.filter`, and every role shows on one page with no pager.
 - **A cell's grants.** Selecting a cell opens its grants under the table, each with its actions, its filter in the

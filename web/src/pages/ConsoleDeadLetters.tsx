@@ -56,7 +56,7 @@ const deadLetterTones: Record<string, StatusTone> = { open: 'attention', redeliv
  * newest first until the view sorts them, including those that belong to no process, paged on the server. The table has
  * Search, Filter, Columns, Refresh, a sort on Kind, Attempts, State and Created, and a pager with a page size, all kept in
  * the address under the `deadLetters.` prefix, because Schedules on the same page keeps the plain names, see
- * docs/reference/operator-console.md#views and docs/reference/actions-and-controls.md#tables.
+ * docs/reference/operator-console.md#views and docs/reference/tables.md#tables.
  * A row has a button for each command the server lists in the item's `commands`, and the view never decides which
  * letter may take one. A button opens the reason dialog, and a success reads the list again. A failure, a 403
  * included, shows an error in this part only.

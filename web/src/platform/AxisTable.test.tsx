@@ -769,7 +769,7 @@ describe('AxisTable', () => {
     })
 
     it('has no slot for a control of its own', () => {
-      // @ts-expect-error A table has no control of its own for a view, see docs/reference/actions-and-controls.md#tables.
+      // @ts-expect-error A table has no control of its own for a view, see docs/reference/tables.md#tables.
       const toolbar: AxisTableToolbar = { view: <input aria-label="Search" /> }
       expect(toolbar).toBeDefined()
     })

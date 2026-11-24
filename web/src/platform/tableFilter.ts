@@ -199,7 +199,7 @@ export function matchesFilter<T>(
 
 /**
  * The local calendar day of a time as `YYYY-MM-DD`, or `null` for no time. A date column of a table that holds its rows
- * filters on it, so the day is the person's own and not the UTC day, see docs/reference/actions-and-controls.md#tables.
+ * filters on it, so the day is the person's own and not the UTC day, see docs/reference/tables.md#tables.
  */
 export function localDay(time: string | null): string | null {
   return time === null ? null : dayjs(time).format('YYYY-MM-DD')

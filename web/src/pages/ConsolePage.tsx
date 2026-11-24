@@ -37,7 +37,7 @@ function releaseText(row: ConsoleApplication): string | null {
 /**
  * The operator console for the platform operator. It shows the Tenant view: the status of the tenant of the host and a
  * table of its applications with each active release. The table filters its own rows, kept in the address under
- * `applications.`, see docs/reference/actions-and-controls.md#tables. Below it, the Failed work view lists the failed
+ * `applications.`, see docs/reference/tables.md#tables. Below it, the Failed work view lists the failed
  * instances and the calls with an unknown outcome, newest first, paged on the server with a filter on each column, whose
  * state the address keeps under the `failedWork.` names. Under it, the Webhook deliveries
  * view lists the recent webhook deliveries, paged on the server with the table toolbar, whose state the address keeps under

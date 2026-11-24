@@ -45,7 +45,7 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
   warning tone beside its due date. It is a `StatusTag`, see [shared widgets](shared-widgets.md). "Overdue"
   stays the tag of a past due time.
 - **View.** The table has Search, Filter on Subject and Due, Columns, a sort on Subject and Due, Refresh
-  and paging, see [tables](actions-and-controls.md#tables). Search, filter, sort, columns, page and page
+  and paging, see [tables](tables.md#tables). Search, filter, sort, columns, page and page
   size live in the URL, and the widget sends `search`, `filter`, `sort`, `page` and `pageSize` to the
   task API, see [list my tasks](task-api.md#list-my-tasks). The Task column stays first, with no sort or
   filter, because its label is resolved in the browser. A new view starts at page 1, and a failed load
@@ -76,7 +76,7 @@ The platform texts `shell.tasks.*` hold the choice and the two column headers.
 _(planned for M43)_
 
 In the Open view, each row has a checkbox. A selection shows an "N selected" bar, as the
-[bulk actions rule](actions-and-controls.md#tables) says. The bar has one button for each outcome that the list
+[bulk actions rule](tables.md#tables) says. The bar has one button for each outcome that the list
 items of every selected task name in `outcomes`. A click calls `complete-many` with that outcome and the selected
 ids, see [deciding several tasks](task-api.md#deciding-several-tasks). The page then shows a result for each task,
 with its subject and its outcome or its reason. It clears the selection and reloads the list. The platform texts

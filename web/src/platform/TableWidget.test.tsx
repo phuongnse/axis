@@ -2034,7 +2034,9 @@ describe('TableWidget import', () => {
     const input = dialog.querySelector('input[type=file]') as HTMLInputElement
     await userEvent.upload(input, new File(['x'], 'notes.txt', { type: 'text/plain' }), { applyAccept: false })
 
-    expect(await screen.findByTestId('import-problem')).toHaveTextContent('Only a CSV or Excel file can be imported.')
+    const problem = await screen.findByTestId('import-problem')
+    expect(problem).toHaveTextContent('Only a CSV or Excel file can be imported.')
+    expect(problem.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: 'Check' })).toBeEnabled()
     expect(uploads()).toHaveLength(0)
   })

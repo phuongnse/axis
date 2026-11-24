@@ -539,6 +539,7 @@ export function CellTenantPage() {
           onCancel={() => setConfirming(null)}
         >
           <Flex vertical gap="small">
+            {actionError && <AxisAlert data-testid="cell-tenant-action-error" kind="error" message={actionError} />}
             <Typography.Text>{t(actionTexts[confirming].body)}</Typography.Text>
             {confirming === 'delete' && (
               <AxisField
@@ -553,7 +554,6 @@ export function CellTenantPage() {
                 />
               </AxisField>
             )}
-            {actionError && <AxisAlert data-testid="cell-tenant-action-error" kind="error" message={actionError} />}
           </Flex>
         </Modal>
       )}
@@ -575,10 +575,10 @@ export function CellTenantPage() {
           onCancel={() => setDownloading(false)}
         >
           <Flex vertical gap="small">
-            <Typography.Text>{t('shell.cell.tenant.downloadBody')}</Typography.Text>
             {downloadError && (
               <AxisAlert data-testid="cell-tenant-download-error" kind="error" message={downloadError} />
             )}
+            <Typography.Text>{t('shell.cell.tenant.downloadBody')}</Typography.Text>
           </Flex>
         </Modal>
       )}

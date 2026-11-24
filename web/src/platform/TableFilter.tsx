@@ -44,7 +44,7 @@ function blankCondition(column: FilterColumn): FilterCondition {
 }
 
 /**
- * The Filter button of a table and the builder it opens, see docs/reference/actions-and-controls.md#tables. The button
+ * The Filter button of a table and the builder it opens, see docs/reference/tables.md#tables. The button
  * carries the number of conditions in force, and Apply puts the builder's filter in force without the conditions that
  * have no value.
  */

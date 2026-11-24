@@ -11,7 +11,7 @@ itself cannot be shared or reloaded either, because nothing in the address shows
 ## Decision
 
 - **A table whose rows grow has the full toolbar**. Its toolbar is the full standard
-  one, as [actions and controls](../reference/actions-and-controls.md#tables) draws it.
+  one, as [actions and controls](../reference/tables.md#tables) draws it.
 - **A table that is part of one thing is the exception**. Its rows belong to that
   one thing, such as the lines of a child collection on a form, so a search or a filter of its own
   would split it.

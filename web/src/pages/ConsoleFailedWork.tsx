@@ -37,7 +37,7 @@ const noParameters: readonly string[] = []
  * until the view sorts them, paged on the server. The table has Search, which looks in the step or call and the error,
  * Filter on each column, Columns, Refresh, a sort on Failed and a pager with a page size, all kept in the address under the
  * `failedWork.` prefix, because the page has other tables, see docs/reference/operator-console.md#views and
- * docs/reference/actions-and-controls.md#tables. The Application and Process columns filter by name, so the view has no
+ * docs/reference/tables.md#tables. The Application and Process columns filter by name, so the view has no
  * picker above the table. A failure, a 403 included, shows an error in this part only.
  */
 export function ConsoleFailedWork({ applications, locale }: ConsoleFailedWorkProps) {

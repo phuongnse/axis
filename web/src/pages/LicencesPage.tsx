@@ -23,7 +23,7 @@ const noParameters: string[] = []
  * The open source licences page, open without signing in. It names Axis's licence and links its text and Axis's source, which
  * points at the commit when the server's version names one. Below, the npm and NuGet packages Axis ships sit in two lists, one
  * above the other, that one search box filters by name or licence. Each list has a Filter of its own, kept in the address as
- * `npm.` and `nuget.`, see docs/reference/actions-and-controls.md#tables. Only a signed-in person sees versions.
+ * `npm.` and `nuget.`, see docs/reference/tables.md#tables. Only a signed-in person sees versions.
  */
 export function LicencesPage() {
   const t = useText()

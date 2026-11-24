@@ -137,7 +137,12 @@ export function HostRequestDialog({
             </Typography.Text>
           </>
         ) : (
-          <AxisForm form={form} initialValues={{ host: '' }} onFinish={({ host }) => void add(host)}>
+          <AxisForm
+            form={form}
+            initialValues={{ host: '' }}
+            onFinish={({ host }) => void add(host)}
+            message={error && <AxisAlert data-testid={`${testId}-error`} kind="error" message={error} />}
+          >
             <AxisField
               name="host"
               label={t(`${texts}.addHostField`)}
@@ -154,7 +159,6 @@ export function HostRequestDialog({
             </AxisField>
           </AxisForm>
         )}
-        {error && <AxisAlert data-testid={`${testId}-error`} kind="error" message={error} />}
       </Flex>
     </Modal>
   )

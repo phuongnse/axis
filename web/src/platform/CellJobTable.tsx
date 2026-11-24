@@ -13,7 +13,7 @@ import { useEmptyStyle } from './useEmptyStyle'
 /**
  * The table of the cell console's jobs, in the order given. The Jobs page shows the cell's, and a tenant's view can show the tenant's.
  * With a `view`, the table has the full toolbar of a table paged on the server: a header sort on Created, Kind, Tenant and State,
- * a filter on every column but Steps, Search, Columns and the pager, see `docs/reference/actions-and-controls.md#tables`, and
+ * a filter on every column but Steps, Search, Columns and the pager, see `docs/reference/tables.md#tables`, and
  * `loading`, `failure` and `onRefresh` give its loading, load failure and Refresh. Without one, the table shows its rows as given.
  * With `linkTenants`, each job's tenant links to the tenant's page, as the Jobs view does. A tenant's own page and the Create tenant
  * dialog leave it plain, because there the link would lead back to the same page or to a tenant that may not exist yet.
