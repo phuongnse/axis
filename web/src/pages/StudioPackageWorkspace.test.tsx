@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioDiagnostic, StudioRunInput } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
+import { designTokensFor } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioPackageWorkspace } from './StudioPackageWorkspace'
 
@@ -1020,6 +1021,23 @@ describe('StudioPackageWorkspace', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Run…' }))
       return runPanel()
     }
+
+    it('gives the Input pane one inset for its title row, its content and its action bar', async () => {
+      stubPackage()
+      renderWorkspace(true)
+      const panel = await openRun()
+      const pane = within(panel).getByRole('region', { name: 'Input' })
+      const row = within(pane).getByRole('heading', { level: 2, name: 'Input' }).parentElement!.parentElement!
+      const content = row.nextElementSibling as HTMLElement
+      const bar = pane.querySelector<HTMLElement>('[data-action-bar]')!
+      const inset = `${designTokensFor('light').spacing.md}px`
+
+      // jsdom keeps the logical `padding-inline` only in the style attribute, as ActionBar.test reads it.
+      for (const element of [row, bar]) {
+        expect(element.getAttribute('style')).toContain(`padding-inline: ${inset}`)
+      }
+      expect(content).toHaveStyle({ paddingLeft: inset, paddingRight: inset })
+    })
 
     it('opens from Run… with the input pane, and after a run shows the outcome, duration, output and log', async () => {
       stubPackage()

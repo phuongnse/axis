@@ -131,8 +131,8 @@ const noAntdComponent = (component, message, allowed = () => false) => ({
   },
 })
 
-// A card with size="small" is an item in a list, such as a Studio step. The last size or spread wins, as it does in
-// React, so a size that comes from a spread, a variable or a condition is not small.
+// A card with size="small" is an item in a list, such as a widget's placeholder on the page canvas. The last size or
+// spread wins, as it does in React, so a size that comes from a spread, a variable or a condition is not small.
 const isSmallCard = (node) => {
   const last = node.attributes.findLast(
     (attribute) => attribute.type === 'JSXSpreadAttribute' || attribute.name?.name === 'size',

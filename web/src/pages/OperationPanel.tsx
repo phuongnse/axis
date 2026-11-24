@@ -65,7 +65,6 @@ export function OperationPanel({
         <Flex vertical gap="small">
           <AxisField {...field('steps.operation')}>
             <Select
-              style={{ minWidth: 240 }}
               virtual={false}
               value={isPackage ? packageChoice : operation === '' ? undefined : operation}
               options={[

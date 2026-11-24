@@ -2943,6 +2943,7 @@
   "shell.studio.texts.addFailed": "The key could not be added.",
   "shell.studio.connector.addOperation": "Add operation",
   "shell.studio.connector.removeOperation": "Delete operation",
+  "shell.studio.connector.operation": "Operation {number}",
   "shell.studio.connector.addInput": "Add input",
   "shell.studio.connector.addOutput": "Add output",
   "shell.studio.connector.removeField": "Delete",
