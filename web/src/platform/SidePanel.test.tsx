@@ -155,6 +155,7 @@ describe('SidePanel width', () => {
 
     const handle = screen.getByRole('separator', { name: 'Resize panel' })
     expect(screen.getByTestId('panel-test')).toHaveStyle({ width: `${sizeTokens.sidePanel}px` })
+    expect(handle).toHaveAttribute('data-resize-handle')
     expect(handle).toHaveAttribute('aria-orientation', 'vertical')
     expect(handle).toHaveAttribute('aria-valuemin', String(sizeTokens.sidePanel))
     expect(handle).toHaveAttribute('aria-valuemax', '640')

@@ -1,4 +1,4 @@
-// Holds the table in docs/reference/shared-widgets.md#which-widget to the SPA's exports, and the SPA's sources to Ant Design's documented API.
+// Holds the table in docs/reference/shared-widgets.md#which-widget to the SPA's exports, and the SPA's sources to Ant Design's documented API and to ResizeHandle for every size handle.
 import { describe, expect, it } from 'vitest'
 import { docsTables, tablesIn } from '../test/docTables'
 
@@ -194,6 +194,63 @@ describe('bulleted lists', () => {
 
   it('finds no list in the SPA that skips useBulletList', () => {
     expect(rawBulletLists(spaSources)).toEqual([])
+  })
+})
+
+/** `ResizeHandle.tsx` as the glob names it, relative to this file in `src/platform/`. */
+const resizeHandlePath = './ResizeHandle.tsx'
+
+/** A cursor that only a size handle takes. */
+const resizeCursor = /\b(?:col|row|ew|ns)-resize\b/
+
+/**
+ * The size handles that a file draws on its own, see docs/reference/shared-widgets.md#what-the-build-checks: each line
+ * with a resize cursor as `path:line: text`, and each file with both a `separator` role and `aria-valuenow`, which is
+ * what ARIA calls a window splitter, as `path`. `ResizeHandle.tsx` is the one file that may.
+ */
+function ownSizeHandles(sources: Record<string, string>): string[] {
+  return Object.entries(sources).flatMap(([path, text]) => {
+    if (path === resizeHandlePath) return []
+    const cursors = text
+      .split('\n')
+      .flatMap((line, index) => (resizeCursor.test(line) ? [`${path}:${index + 1}: ${line.trim()}`] : []))
+    const splitter = /role="separator"/.test(text) && /aria-valuenow/.test(text) ? [path] : []
+    return [...cursors, ...splitter]
+  })
+}
+
+describe('size handles', () => {
+  it('refuses a resize cursor, with the line that names it', () => {
+    expect(ownSizeHandles({ 'a.tsx': "const x = 1\nstyle={{ cursor: 'col-resize' }}" })).toEqual([
+      "a.tsx:2: style={{ cursor: 'col-resize' }}",
+    ])
+  })
+
+  it('refuses a separator that reports a value', () => {
+    expect(ownSizeHandles({ 'a.tsx': '<div role="separator" tabIndex={0} aria-valuenow={width} />' })).toEqual([
+      'a.tsx',
+    ])
+  })
+
+  it('accepts a separator that reports no value, as a menu or a section draws', () => {
+    expect(
+      ownSizeHandles({
+        'a.tsx': '<div role="separator" />',
+        'b.tsx': "{ type: 'divider' }\nstyle={{ cursor: 'pointer' }}",
+      }),
+    ).toEqual([])
+  })
+
+  it('accepts ResizeHandle.tsx', () => {
+    expect(
+      ownSizeHandles({
+        [resizeHandlePath]: '<div role="separator" aria-valuenow={value} style={{ cursor: \'row-resize\' }} />',
+      }),
+    ).toEqual([])
+  })
+
+  it('finds no size handle in the SPA outside ResizeHandle.tsx', () => {
+    expect(ownSizeHandles(spaSources)).toEqual([])
   })
 })
 
