@@ -439,7 +439,7 @@ internal static class ProcessInspectionEndpoints
 
         // The graph is the pinned release's, so a newer release does not change a running instance.
         var pinned = await resolver.GetReleaseModelAsync(row.ReleaseId, cancellationToken);
-        var graph = Graph(pinned.Processes.Single(candidate => candidate.Id == process.Id));
+        var graph = Graph(pinned.Processes.Single(candidate => candidate.Id == process.Id), pinned.Events);
         var history = await InstanceQueries.HistoryAsync(connection, row.Id, cancellationToken);
         var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == process.Id);
 
@@ -925,12 +925,13 @@ internal static class ProcessInspectionEndpoints
         return false;
     }
 
-    internal static ProcessGraph Graph(ProcessModel model) =>
-        new(model.Start, model.Steps.Select(GraphStep).ToList());
-
     // A transition's On is text: a decision branch gives its index and the fallback gives "otherwise". A step's label key is its own
     // for every type. A decision branch's and a task outcome's transition gives the label's key, and a decision branch also its name.
-    private static ProcessGraphStep GraphStep(ProcessStepModel step) =>
+    // A wait and a raise give their event's name and label key, see docs/reference/process-inspection.md#instance-detail.
+    internal static ProcessGraph Graph(ProcessModel model, IReadOnlyList<EventModel> events) =>
+        new(model.Start, model.Steps.Select(step => GraphStep(step, events)).ToList());
+
+    private static ProcessGraphStep GraphStep(ProcessStepModel step, IReadOnlyList<EventModel> events) =>
         step switch
         {
             DecisionStepModel decision => new(
@@ -953,15 +954,20 @@ internal static class ProcessInspectionEndpoints
             OperationStepModel operation => Operation(step, operation.Name, operation.Next),
             CallConnectorStepModel call => Operation(step, call.Name, call.Next),
             PackageOperationStepModel package => Operation(step, package.Name, package.Next),
-            RaiseEventStepModel raise => Operation(step, raise.Name, raise.Next),
+            RaiseEventStepModel raise => new(
+                raise.Name,
+                "operation",
+                step.Label?.TextKey,
+                raise.Event,
+                EventLabelKey(events, raise.Event),
+                [Next(raise.Next)]),
             TimerStepModel timer => new(timer.Name, "timer", step.Label?.TextKey, null, null, [Next(timer.Next)]),
-            // An event has no label, so EventLabelKey is null.
             WaitEventStepModel wait => new(
                 wait.Name,
                 "waitEvent",
                 step.Label?.TextKey,
                 wait.Event,
-                null,
+                EventLabelKey(events, wait.Event),
                 wait.Timeout is { } timeout
                     ? [Next(wait.Next), new ProcessGraphTransition(timeout.Next, "timeout", null, null, timeout.AfterText)]
                     : [Next(wait.Next)]),
@@ -974,6 +980,10 @@ internal static class ProcessInspectionEndpoints
 
     private static ProcessGraphStep Operation(ProcessStepModel step, string name, string next) =>
         new(name, "operation", step.Label?.TextKey, null, null, [Next(next)]);
+
+    // An event is found by its name, ignoring letter case, as the engine finds it. Its label key is null when it has no label.
+    private static string? EventLabelKey(IReadOnlyList<EventModel> events, string name) =>
+        events.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase))?.Label?.TextKey;
 
     private static ProcessGraphTransition Next(string next) =>
         new(next, null, null, null, null);
@@ -1126,8 +1136,8 @@ internal sealed record ProcessGraph(string Start, IReadOnlyList<ProcessGraphStep
 
 /// <summary>
 /// A step of the graph: its type (<c>decision</c>, <c>task</c>, <c>operation</c>, <c>timer</c>, <c>waitEvent</c>, <c>end</c>), the text key of its
-/// label or null, where it leads, and for a <c>waitEvent</c> step the name of the event it waits for. <paramref name="EventLabelKey"/>
-/// is always null, since an event has no label. <paramref name="Event"/> and <paramref name="EventLabelKey"/> are null for any other step.
+/// label or null, where it leads, and the event of a <c>waitEvent</c> or a <c>raiseEvent</c> step. <paramref name="Event"/> is that event's name,
+/// and <paramref name="EventLabelKey"/> the text key of its label, or null when it has none. Both are null for any other step.
 /// </summary>
 internal sealed record ProcessGraphStep(
     string Name,

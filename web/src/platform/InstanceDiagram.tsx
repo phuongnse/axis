@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { fillText } from './fillText'
 import { formatDuration, isoDurationMs } from './formatValue'
 import {
+  eventText,
   transitionId,
   type GraphStep as InstanceStep,
   type GraphTransition as InstanceTransition,
@@ -98,8 +99,8 @@ export default function InstanceDiagram({
 /**
  * The words on a transition, see docs/reference/process-inspector-widget.md#process-graph: the author's label of a branch
  * or an outcome where the release has its text, else a decision branch's name or a task outcome's name. The fallback
- * reads Otherwise, a wait's next line its event's name, and a timeout "After {duration}". A transition with none of
- * these has no label. With `names`, the author's label is left out, as the page has no release texts.
+ * reads Otherwise, a wait's next line its event's label or its name where it has none, and a timeout "After {duration}".
+ * A transition with none of these has no label. With `names`, the author's label is left out, as the page has no release texts.
  */
 function transitionLabel(
   step: InstanceStep,
@@ -128,5 +129,5 @@ function transitionLabel(
   if (step.type === 'task' && transition.on !== null) {
     return transition.on
   }
-  return step.type === 'waitEvent' && transition.on === null ? (step.event ?? undefined) : undefined
+  return step.type === 'waitEvent' && transition.on === null ? eventText(t, step) : undefined
 }

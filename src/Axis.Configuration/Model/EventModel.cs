@@ -1,3 +1,5 @@
+using Axis.Configuration.Resources;
+
 namespace Axis.Configuration.Model;
 
 /// <summary>A compiled event: a business event about a record of a root entity, with typed payload fields.</summary>
@@ -6,6 +8,9 @@ public sealed record EventModel
     public required Guid Id { get; init; }
 
     public required string Name { get; init; }
+
+    /// <summary>The label of the event, a text resource, or null when it has none.</summary>
+    public TextReference? Label { get; init; }
 
     /// <summary>The event's file, relative to the application folder with <c>/</c> separators.</summary>
     public required string File { get; init; }

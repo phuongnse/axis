@@ -161,8 +161,9 @@ in any state. The body has these parts:
   `{ "start", "steps": [ { "name", "type", "labelKey", "event", "eventLabelKey", "transitions" } ] }`.
   - `type` is the step type: `decision`, `task`, `operation`, `timer`, `waitEvent` or `end`.
   - `labelKey` is the key of the step's `label`, or `null` when it has none.
-  - `event` is a `waitEvent` step's event name. `eventLabelKey` is the key of the event's `label`, and
-    is always `null`, since an event has no label. Both are `null` for any other step.
+  - `event` is the name of the event a `waitEvent` step waits for, or a `raiseEvent` step raises. The event is found
+    by its name, ignoring letter case, in the pinned release. `eventLabelKey` is the key of that event's `label`, or
+    `null` when the event has none. Both are `null` for any other step.
   - `transitions` is a list of `{ "next", "on", "branch", "labelKey", "after" }`, one for each step the step
     can lead to. `on` is always text or `null`. It is the zero-based index of
     a decision branch as text, such as `"0"`, as in the history's `decision`,

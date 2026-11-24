@@ -13,6 +13,7 @@ import { formatDuration } from './formatValue'
 import {
   attemptOutcomeText,
   attemptOutcomeTone,
+  eventText,
   problemText,
   type CallAttempt,
   type CallResponse,
@@ -220,7 +221,12 @@ export function RunOutput({ instance, runs, run, locale }: RunPaneProps) {
     }
   }
   if (made?.event) {
-    terms.push({ key: 'event', term: t('shell.inspector.run.eventRaised'), value: made.event.name })
+    const graphStep = instance.graph.steps.find((step) => step.name === run.step)
+    terms.push({
+      key: 'event',
+      term: t('shell.inspector.run.eventRaised'),
+      value: eventText(t, graphStep) ?? made.event.name,
+    })
     if (made.event.fields.length > 0) {
       terms.push({
         key: 'eventFields',

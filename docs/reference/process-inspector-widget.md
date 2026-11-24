@@ -155,7 +155,8 @@ wrong form show the not-found page, and the instance is not requested.
   - Output: a connector call's answer from the attempt that settled it, with Status as plain text, then Headers and
     Body. A package call's returned values. The record's changed fields as a diff: the value before on a "−" line on
     the `danger` tint, and the value after on a "+" line on the `success` tint, read as "Changed from X to Y". An
-    event it raised, as Event raised and Event fields, which only a `raiseEvent` step raises. The people it
+    event it raised, as Event raised and Event fields, which only a `raiseEvent` step raises. Event raised shows the
+    event's label, or its name where it has none. The people it
     notified, as Notified, Channels and Subject. A record it created.
     - **Coloured marks**. The "−" is in `dangerText` and the "+" in `successText`, as a
       file's line diff marks them, see [revisions](ai-authoring-in-studio.md#revisions).
@@ -188,7 +189,7 @@ wrong form show the not-found page, and the instance is not requested.
   as a step's does.
 - **Labels.** Step labels come from the texts of the instance's `releaseId`, loaded with
   `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as the inbox does. A step without a label
-  shows its name.
+  shows its name. Event labels come from the same texts, and an event without a label shows its name.
 
 ## Process graph
 

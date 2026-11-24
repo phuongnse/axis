@@ -6,9 +6,10 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Checks the events of an application and builds the checked ones. An event names a loaded root
-/// entity. Its field names are unique, ignoring letter case, and each field type is scalar: text,
-/// integer, decimal, boolean, date or date-time. The schema already refuses a type name that is not
-/// a field type. Every problem of an event is reported in one pass.
+/// entity. Its label, when it has one, is a text key that some locale has. Its field names are unique,
+/// ignoring letter case, and each field type is scalar: text, integer, decimal, boolean, date or
+/// date-time. The schema already refuses a type name that is not a field type. Every problem of an
+/// event is reported in one pass.
 /// </summary>
 internal static class EventChecker
 {
@@ -54,6 +55,8 @@ internal static class EventChecker
                     "/entity");
             }
 
+            ApplicationCompiler.CheckTextKey(@event.Label, @event, "/label", references, diagnostics);
+
             var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             for (var index = 0; index < @event.Fields.Count; index++)
             {
@@ -86,6 +89,7 @@ internal static class EventChecker
         {
             Id = @event.Id,
             Name = @event.Name,
+            Label = @event.Label,
             File = @event.File,
             Entity = new EntityReference(entity.Id, entity.Name),
             Fields = @event.Fields.Select(field => new EventFieldModel(field.Name, FieldTypes.Parse(field.Type))).ToList(),

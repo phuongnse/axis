@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { fillText } from './fillText'
 import { formatValue } from './formatValue'
 import {
+  eventText,
   problemText,
   processTitle,
   runParts,
@@ -122,9 +123,10 @@ export function useRunWords(
       if (lastChild) {
         return subProcess(lastChild)
       }
+      const step = instance.graph.steps.find((candidate) => candidate.name === item.step)
       const made = item.entries.at(-1)?.made
       if (made?.event) {
-        return say('event', { event: made.event.name })
+        return say('event', { event: eventText(t, step) ?? made.event.name })
       }
       if (made?.notified) {
         return say('notified')
@@ -136,7 +138,6 @@ export function useRunWords(
         return say('changed')
       }
 
-      const step = instance.graph.steps.find((candidate) => candidate.name === item.step)
       const after = runs[runs.indexOf(item) + 1]
       const transition = after === undefined ? undefined : takenTransition(instance, item, after.step)
       const waiting = item.finishedAt === null
@@ -161,7 +162,7 @@ export function useRunWords(
           }
           break
         case 'waitEvent': {
-          const event = step.event ?? ''
+          const event = eventText(t, step) ?? ''
           if (item.state === 'waitingForEvent') {
             return say('eventWaits', { event })
           }

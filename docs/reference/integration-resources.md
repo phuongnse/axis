@@ -433,8 +433,9 @@ An event about a note that was closed, in `events/note-closed.json`:
   `boolean`, `date` and `date-time`.
 - `fields` is required, but the list may be empty.
 - Field names are unique within the event, ignoring letter case.
-- **`label`.** _(planned, #5135)_ An event may have an optional `label`, a text resource like a step's `label`.
-  Its key joins the `AXC0028` check.
+- **`label`.** An event may have an optional `label`, a text resource like a step's `label`.
+  Its key joins the `AXC0028` check. A process instance's page names the event by its label in the reader's
+  language, and by its name where it has none, see [instance page](process-inspector-widget.md#instance-page).
 - An unknown entity is `AXC0110`, a child entity `AXC0111`, a repeated field
   name `AXC0112` and an `enum`, `reference` or `child-collection` field
   `AXC0113`. A type name that is not a field type is `AXC0004`.
