@@ -458,6 +458,30 @@ keys. It can be rotated without signing anyone out.
   `data protection keys: <m>`, never a value. It is written after every value has decrypted and
   before the first update.
 
+### Wrapped keys
+
+With a key service set, a host holds the installation key as a wrapped value. The key service is a key file of 32 random
+bytes in base64, `KeyService:KeyFile`, and `KeyService:Kind` is `file`, see [host settings](host-settings.md#tenancy-settings).
+`platform key wrap` makes the wrapped value from the plain key.
+
+```text
+platform key wrap --purpose installation-key|agent-host-key
+```
+
+- **Input and output.** It reads the plain key from standard input and drops one trailing line break. It writes the wrapped
+  value in base64, and one line break, to standard output. The key never goes on the command line. For the installation key,
+  the input is its base64 and the output is the value of `Platform:SecretKey` or `Platform:PreviousSecretKey`. For the agent
+  host's key, the input is the PEM of its private key and the output is the content of the file that `Ai:HostKeyFile` names.
+- **Purpose.** A wrapped value is bound to its purpose, `installation-key` or `agent-host-key`, and to the key file. A host
+  that reads it for the other purpose or with another key file stops at start.
+- **No check of the key.** The command does not check that the input is a valid key. The host checks the unwrapped key at
+  start, as it checks a plain key.
+- **Settings.** `KeyService:Kind` and `KeyService:KeyFile`. The command needs no database, no admin role and no
+  `Tenancy:Source`.
+- **Exit codes.** `0` when the value is written. `2` when the usage is wrong, the purpose is not one of the two, the key service
+  settings are missing or wrong, or standard input holds no key. A message names the setting and never a value or a path.
+- **Audit record.** None. The command touches no tenant and no database.
+
 ## Platform audit records
 
 A platform audit record says which command changed the tenant directory, a tenant's keys, passwords
@@ -511,7 +535,7 @@ A command writes its record either when its work for a tenant starts or together
 | `platform rekey`                                                                                                                 | One per run    | With no tenant, after every value has decrypted and before the first update                                                                                   | `tenant secrets: <n>` and `data protection keys: <m>`                                              |
 | `cell backup`, `cell restore-check`                                                                                              | One per tenant | See [cell backup](administration.md#cell-backup) and [cell restore check](administration.md#cell-restore-check)                                               | As those sections say                                                                              |
 | `cell operator invite`, `cell operator client add`                                                                               | One per run    | See [cell operator invite](cell-operator-commands.md#cell-operator-invite) and [cell operator client add](cell-operator-commands.md#cell-operator-client-add) | As those sections say                                                                              |
-| `tenant list`, `tenant binding list`, `version`, `publisher`                                                                     | None           | None of their own                                                                                                                                             |                                                                                                    |
+| `tenant list`, `tenant binding list`, `platform key wrap`, `version`, `publisher`                                                | None           | None of their own                                                                                                                                             |                                                                                                    |
 
 The publisher and the server also write records for the operator's work in a cell:
 

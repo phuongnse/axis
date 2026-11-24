@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,7 +29,7 @@ internal static class TenantBackupKeys
             return null;
         }
 
-        var key = BackupKeyFile.Read(cell.BackupKeyFile, out problem, Setting);
+        var key = KeyFile.Read(cell.BackupKeyFile, out problem, Setting);
         return key is null ? null : TenantSecretCipher.FromKey(key);
     }
 

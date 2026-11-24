@@ -1,12 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
+using Axis.Tenancy.Keys;
 using Microsoft.Extensions.Configuration;
 
 namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// Encrypts and decrypts the secrets of the tenant directory with AES-256-GCM under the installation key
-/// <c>Platform:SecretKey</c>. A stored value is a 12-byte nonce, the ciphertext and a 16-byte tag. The associated data
+/// <c>Platform:SecretKey</c>. With a key service set, see <see cref="KeyService"/>, the two key settings hold wrapped values. A stored value is a 12-byte nonce, the ciphertext and a 16-byte tag. The associated data
 /// is the UTF-8 bytes of the tenant id, a single zero byte and the UTF-8 bytes of the field name, so a value copied to
 /// another tenant or field does not decrypt. During a key rotation the optional <c>Platform:PreviousSecretKey</c> decrypts
 /// the values that the current key does not. It never encrypts.
@@ -40,17 +41,20 @@ public sealed class TenantSecretCipher
 
     /// <summary>
     /// Reads <c>Platform:SecretKey</c> and the optional <c>Platform:PreviousSecretKey</c>. A blank previous key counts as not
-    /// set. A message never contains a value.
+    /// set. With <c>KeyService:Kind</c> set, each setting holds a wrapped key, which the key service unwraps before the checks below. A
+    /// message never contains a value or a path.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// <c>Platform:SecretKey</c> is missing, or either setting is set and is not base64 or is not 32 bytes.
+    /// <c>Platform:SecretKey</c> is missing, either setting is set and is not base64 or is not 32 bytes, the key service settings are
+    /// wrong, or either setting does not unwrap with the key service.
     /// </exception>
     public static TenantSecretCipher Load(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var key = ReadKey(configuration, KeySetting)!;
-        var previousKey = ReadKey(configuration, PreviousKeySetting);
+        var keyService = KeyService.Load(configuration);
+        var key = ReadKey(configuration, KeySetting, keyService)!;
+        var previousKey = ReadKey(configuration, PreviousKeySetting, keyService);
         return new TenantSecretCipher(key, previousKey);
     }
 
@@ -70,12 +74,17 @@ public sealed class TenantSecretCipher
     }
 
     /// <summary>Returns the key of the setting, or <see langword="null"/> for a blank optional setting.</summary>
-    private static byte[]? ReadKey(IConfiguration configuration, string setting)
+    private static byte[]? ReadKey(IConfiguration configuration, string setting, IKeyService? keyService)
     {
         var value = configuration[setting];
         if (string.IsNullOrWhiteSpace(value))
         {
             return setting == KeySetting ? throw new InvalidOperationException($"The setting {setting} is required.") : null;
+        }
+
+        if (keyService is not null)
+        {
+            value = keyService.Unwrap(KeyService.InstallationKey, setting, value).Reveal();
         }
 
         var buffer = new byte[64];
@@ -118,6 +127,27 @@ public sealed class TenantSecretCipher
     {
         ArgumentNullException.ThrowIfNull(stored);
         return DecryptBound("", TenantSecretFields.DataProtectionKey(id), stored, $"The data protection key '{id}' does not decrypt with {Keys()}.");
+    }
+
+    /// <summary>
+    /// Wraps a key for a purpose, for the key service: the nonce, the ciphertext and the tag of the key's text. The associated data has an
+    /// empty tenant id, so a wrapped key never decrypts as a tenant field, and the purpose, so it unwraps only for that purpose.
+    /// </summary>
+    public byte[] WrapKey(string purpose, string key)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(purpose);
+        ArgumentNullException.ThrowIfNull(key);
+        return EncryptBound("", TenantSecretFields.WrappedKey(purpose), key);
+    }
+
+    /// <summary>Unwraps a key that <see cref="WrapKey"/> wrapped for the purpose.</summary>
+    /// <exception cref="InvalidOperationException">The value does not unwrap for this purpose and key. The message is <paramref name="failureMessage"/>.</exception>
+    public SecretValue UnwrapKey(string purpose, byte[] wrapped, string failureMessage)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(purpose);
+        ArgumentNullException.ThrowIfNull(wrapped);
+        ArgumentNullException.ThrowIfNull(failureMessage);
+        return DecryptBound("", TenantSecretFields.WrappedKey(purpose), wrapped, failureMessage);
     }
 
     private byte[] EncryptBound(string tenantId, string field, string plainText)

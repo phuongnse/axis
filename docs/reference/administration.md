@@ -18,6 +18,7 @@ commands that look after a cell. On this page, "database role" always means the 
 | `tenant rotate-passwords`                                                                                                              | [Database passwords](tenant-setting-commands.md#database-passwords)   |
 | `tenant data-key rotate` and `tenant data-key retire`                                                                                  | [Rotating the keys](data-encryption.md#rotating-the-keys)             |
 | `platform rekey`                                                                                                                       | [Installation key](tenant-setting-commands.md#installation-key)       |
+| `platform key wrap`                                                                                                                    | [Wrapped keys](tenant-setting-commands.md#wrapped-keys)               |
 | `migrate`, `activate`, `cell backup`, `cell restore-check`, `version`                                                                  | The sections of this page                                             |
 | `publisher`                                                                                                                            | [Publisher](publisher.md#publisher)                                   |
 | `cell operator invite`, `cell operator client add`                                                                                     | [Cell operator commands](cell-operator-commands.md)                   |
