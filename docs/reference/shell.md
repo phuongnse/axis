@@ -219,7 +219,8 @@ below it. It says what the page is.
   page have no step back to their list, because the browser leads back to it. `PageLayout` takes no breadcrumb, and no
   text names one.
 - **Site pages**. A page of an application site starts with its title in `heading4` as the page's
-  level-one heading, with no breadcrumb and no band of its own. The sidebar marks where the person is, and the browser
+  level-one heading, with no breadcrumb and no band of its own. A record's page is headed by the record instead, see
+  **A page that shows one thing**. The sidebar marks where the person is, and the browser
   goes back, with a table's search, sort and page kept in the address.
 - **Compact band.** A workspace page, such as every page of Studio, draws its band as one row of the
   `bar` height: the page's state first, then its own actions. It has no breadcrumb, and it stays under
@@ -230,7 +231,7 @@ below it. It says what the page is.
   page's heading, on its row, see [start process actions](form-widget.md#start-process-actions). A task page's
   Release, Claim and Reassign… and its outcomes sit there too, see [task page](task-inbox-widget.md#task-page). Other
   widgets' actions stay with them.
-- **A page that shows one thing** _(planned, #5133)_. The heading is the thing's name. The state the platform keeps of the
+- **A page that shows one thing**. The heading is the thing's name. The state the platform keeps of the
   thing is a tag beside the name, such as a task's Overdue, a process instance's Running or a release's Live. The line
   under the heading, in `textMuted`, is the thing's kind alone, such as Request or Task, and nothing more. A record has
   no tag, as its status is a field the author defines and its form shows. A new record has no name yet, so it is headed

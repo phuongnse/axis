@@ -382,6 +382,7 @@ const texts = {
   'shell.history.empty': 'No history yet.',
   'shell.history.fields': 'Changed: {fields}',
   'shell.history.action.record.updated': 'Updated',
+  'note.label': 'Note',
   'note.number': 'Number',
   'note.createdBy': 'Created by',
   'note.title': 'Title',
@@ -413,11 +414,15 @@ const texts = {
   'shell.form.processStarted': 'The process has started.',
   'shell.form.processRunning': 'This record is already in a running process.',
   'shell.form.startFailed': 'The process could not be started.',
+  'shell.form.newRecord': platformEnglish['shell.form.newRecord'],
   'shell.navigate.failed': 'The page could not be opened.',
   'noteClose.action': 'Close note',
   'noteClose.cannotClose': 'Only an open note can be closed.',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
+const vietnameseCatalogs = [
+  { texts: { ...texts, 'shell.form.newRecord': platformVietnamese['shell.form.newRecord'] }, fallbackTexts: texts },
+]
 
 /** An answer that never arrives: `fetch` rejects as on a lost connection. */
 const networkError = 'networkError'
@@ -515,6 +520,7 @@ function renderForm(
   recordPages?: Record<string, string>,
   onCanvas?: boolean,
   titled?: boolean,
+  textCatalogs: typeof catalogs = catalogs,
 ) {
   const path = `/e2e/noteform/${recordId ?? 'new'}`
   const formWidget = (
@@ -532,7 +538,7 @@ function renderForm(
       <MemoryRouter initialEntries={[{ pathname: path, state: { from: '/e2e/notes?pageSize=10' } }]}>
         {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
         <ConfigProvider theme={{ token: { motion: false } }}>
-          <TextProvider catalogs={catalogs} development={false}>
+          <TextProvider catalogs={textCatalogs} development={false}>
             <RecordPagesContext value={recordPages ? { sitePath: 'e2e', recordPages } : null}>
               <RecordList value={list}>
                 <CanvasActionsContext.Provider value={onCanvas ? { selected: undefined } : null}>
@@ -1489,6 +1495,78 @@ describe('FormWidget', () => {
         expect(within(value).getByText('Not set')).toHaveStyle({ fontStyle: 'italic' })
       }
       expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('page heading', () => {
+    // A note named by its title, so a saved record's page is headed by it.
+    const namedWidget: EntityWidgetMetadata = {
+      ...noteWidget,
+      entity: { ...noteWidget.entity, displayField: 'title' },
+    }
+
+    it('heads a new record with New and its entity, and no line under it', () => {
+      renderForm(null, noteWidget, undefined, undefined, null, undefined, false, true)
+
+      const heading = screen.getByTestId('page-heading')
+      expect(within(heading).getByRole('heading', { level: 1, name: 'New Note' })).toBeInTheDocument()
+      expect(heading).toHaveTextContent(/^New Note$/)
+    })
+
+    it('heads a new record in Vietnamese with the Vietnamese New text', () => {
+      renderForm(null, noteWidget, undefined, undefined, null, undefined, false, true, vietnameseCatalogs)
+
+      const heading = screen.getByTestId('page-heading')
+      expect(within(heading).getByRole('heading', { level: 1, name: 'Note mới' })).toBeInTheDocument()
+      expect(heading).toHaveTextContent(/^Note mới$/)
+    })
+
+    it("heads a saved record with its name, and its entity's label under it in textMuted", async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, namedWidget, 'light', undefined, null, undefined, false, true)
+
+      const heading = screen.getByTestId('page-heading')
+      expect(await within(heading).findByRole('heading', { level: 1, name: 'Buy paper' })).toBeInTheDocument()
+      expect(within(heading).getByText('Note')).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
+    })
+
+    it("keeps the page's title while the saved record loads", () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, namedWidget, undefined, undefined, null, undefined, false, true)
+
+      expect(
+        within(screen.getByTestId('page-heading')).getByRole('heading', { level: 1, name: 'Note' }),
+      ).toBeInTheDocument()
+    })
+
+    it("keeps the page's title for a record that is missing", async () => {
+      stubFetch({ status: 404, body: '{}' })
+      renderForm(noteId, namedWidget, undefined, undefined, null, undefined, false, true)
+
+      expect(await screen.findByTestId('record-not-found')).toBeInTheDocument()
+      expect(screen.getByTestId('page-heading')).toHaveTextContent(/^Note$/)
+    })
+
+    it.each([
+      ['an empty', '""'],
+      ['a null', 'null'],
+    ])("keeps the page's title for a record with %s display value", async (_, title) => {
+      stubFetch({ status: 200, body: `{"id":"${noteId}","version":1,"values":{"title":${title}},"labels":{}}` })
+      renderForm(noteId, namedWidget, undefined, undefined, null, undefined, false, true)
+
+      await screen.findByRole('textbox', { name: 'Title' })
+      expect(screen.getByTestId('page-heading')).toHaveTextContent(/^Note$/)
+    })
+
+    it("keeps the page's title on a designer's canvas, for a new record and a saved one", async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(null, noteWidget, undefined, undefined, null, undefined, true, true)
+      expect(screen.getByTestId('page-heading')).toHaveTextContent(/^Note$/)
+
+      cleanup()
+      renderForm(noteId, namedWidget, undefined, undefined, null, undefined, true, true)
+      await screen.findByRole('textbox', { name: 'Title' })
+      expect(screen.getByTestId('page-heading')).toHaveTextContent(/^Note$/)
     })
   })
 

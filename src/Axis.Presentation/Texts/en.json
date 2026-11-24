@@ -911,6 +911,7 @@
   "shell.inspector.deadLetters.loadFailed": "The dead letters could not be loaded.",
   "shell.form.save": "Save",
   "shell.form.cancel": "Cancel",
+  "shell.form.newRecord": "New {entity}",
   "shell.form.next": "Next",
   "shell.form.back": "Back",
   "shell.form.reload": "Reload",

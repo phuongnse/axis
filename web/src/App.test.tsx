@@ -76,6 +76,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.record.goToList': 'Go to {page}',
     'shell.form.save': 'Save',
     'shell.form.cancel': 'Cancel',
+    'shell.form.newRecord': 'New {entity}',
     'shell.table.empty': 'No records yet.',
   },
   vi: {
@@ -1265,7 +1266,7 @@ describe('App', () => {
     expect(navigation.getByRole('link', { name: 'Categories' })).toHaveAttribute('href', '/categories')
     await userEvent.click(screen.getByRole('button', { name: 'New' }))
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/noteform\/new$/)
-    expect(await screen.findByRole('heading', { level: 1, name: 'Note' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'New Note' })).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/pages/notes', expect.anything())
   })
 
@@ -1322,27 +1323,27 @@ describe('App', () => {
     expect(screen.queryByTestId('form-save-bar')).not.toBeInTheDocument()
     await userEvent.type(title, 'x')
     expect(await screen.findByTestId('form-save')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Note' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'New Note' })).toBeInTheDocument()
   })
 
-  it('shows the title of a form page as its level-one heading, and the table that opened it marked', async () => {
+  it('heads the form page of a new record with New and the entity, and marks the table that opened it', async () => {
     stubServer()
     renderApp('/e2e/notes?pageSize=100')
     expect(await screen.findByText('No records yet.')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'New' }))
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Note' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'New Note' })).toBeInTheDocument()
     const navigation = within(screen.getByRole('navigation', { name: 'shell.navigation.menu' }))
     expect(navigation.getByRole('link', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('shows the title of a form page as its level-one heading when the page was not opened from a table', async () => {
+  it('heads the form page of a new record with New and the entity when the page was not opened from a table', async () => {
     stubServer()
 
     renderApp('/e2e/noteform/new')
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Note' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'New Note' })).toBeInTheDocument()
     const navigation = within(screen.getByRole('navigation', { name: 'shell.navigation.menu' }))
     for (const link of navigation.getAllByRole('link')) {
       expect(link).not.toHaveAttribute('aria-current')

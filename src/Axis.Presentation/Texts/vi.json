@@ -911,6 +911,7 @@
   "shell.inspector.deadLetters.loadFailed": "Không tải được thư lỗi.",
   "shell.form.save": "Lưu",
   "shell.form.cancel": "Hủy",
+  "shell.form.newRecord": "{entity} mới",
   "shell.form.next": "Tiếp",
   "shell.form.back": "Quay lại",
   "shell.form.reload": "Tải lại",

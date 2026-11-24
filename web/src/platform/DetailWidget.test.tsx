@@ -2,7 +2,10 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { CanvasActionsContext } from './canvasActions'
+import { designTokensFor } from './designTokens'
 import { DetailWidget } from './DetailWidget'
+import { PageLayout } from './PageLayout'
 import { RecordList, type RecordListValue } from './recordList'
 import { RecordPagesContext } from './recordPages'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
@@ -143,6 +146,7 @@ const texts = {
   'shell.form.processRunning': 'This record is already in a running process.',
   'shell.form.startFailed': 'The process could not be started.',
   'shell.navigate.failed': 'The page could not be opened.',
+  'note.label': 'Note',
   'note.title': 'Title',
   'note.done': 'Done',
   'note.category': 'Category',
@@ -198,6 +202,21 @@ function renderDetail(
         </RecordPagesContext>
       </TextProvider>
       <CurrentLocation />
+    </MemoryRouter>,
+  )
+}
+
+// A detail under a page's title, as a site's page holds it. `namesPage` is the page's record page detail.
+function renderTitled(widget: EntityWidgetMetadata, namesPage: boolean, onCanvas = false) {
+  return render(
+    <MemoryRouter initialEntries={[`/e2e/notedetail?note=${noteId}`]}>
+      <TextProvider catalogs={catalogs} development={false}>
+        <CanvasActionsContext.Provider value={onCanvas ? { selected: undefined } : null}>
+          <PageLayout title="Page">
+            <DetailWidget widget={widget} sitePath="e2e" recordId={noteId} locale="en" namesPage={namesPage} />
+          </PageLayout>
+        </CanvasActionsContext.Provider>
+      </TextProvider>
     </MemoryRouter>,
   )
 }
@@ -523,6 +542,30 @@ describe('DetailWidget', () => {
 
     expect(await screen.findByTestId('cell-lines-0-product')).toHaveTextContent('Desk')
     expect(screen.getByTestId('cell-lines-1-product')).toHaveTextContent('—')
+  })
+
+  it('heads the page with the record name and the entity label under it, when the page names it', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper') })
+
+    renderTitled({ ...noteWidget, entity: { ...noteWidget.entity, displayField: 'title' } }, true)
+
+    const heading = screen.getByTestId('page-heading')
+    expect(await within(heading).findByRole('heading', { level: 1, name: 'Buy paper' })).toBeInTheDocument()
+    expect(within(heading).getByText('Note')).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
+  })
+
+  it("keeps the page's title when the page does not name it, or on a designer's canvas", async () => {
+    const named = { ...noteWidget, entity: { ...noteWidget.entity, displayField: 'title' } }
+    stubFetch({ status: 200, body: noteJson('Buy paper') })
+    const { unmount } = renderTitled(named, false)
+    expect(await screen.findByText('Buy paper')).toBeInTheDocument()
+    expect(screen.getByTestId('page-heading')).toHaveTextContent(/^Page$/)
+    unmount()
+
+    stubFetch({ status: 200, body: noteJson('Buy paper') })
+    renderTitled(named, true, true)
+    expect(await screen.findByText('Buy paper')).toBeInTheDocument()
+    expect(screen.getByTestId('page-heading')).toHaveTextContent(/^Page$/)
   })
 
   it('shows the missing-record line with a link to its list when the record API answers 404', async () => {

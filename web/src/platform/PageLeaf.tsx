@@ -38,7 +38,8 @@ export function PageLeaf({
   pageValues,
   recordId,
   returnTo,
-}: PageLeafProps & { widget: WidgetMetadata }): ReactNode {
+  namesPage,
+}: PageLeafProps & { widget: WidgetMetadata; namesPage?: boolean }): ReactNode {
   const detailId = detailRecordId(widget, pageValues)
   switch (widget.type) {
     case 'table':
@@ -62,7 +63,14 @@ export function PageLeaf({
       return (
         hasEntity(widget) &&
         detailId !== undefined && (
-          <DetailWidget key={detailId} widget={widget} sitePath={sitePath} recordId={detailId} locale={locale} />
+          <DetailWidget
+            key={detailId}
+            widget={widget}
+            sitePath={sitePath}
+            recordId={detailId}
+            locale={locale}
+            namesPage={namesPage}
+          />
         )
       )
     case 'taskInbox':

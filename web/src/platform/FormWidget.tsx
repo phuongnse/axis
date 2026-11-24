@@ -10,8 +10,10 @@ import { formStatePath } from './formState'
 import { navigateTarget, type NavigateOpen } from './navigateAction'
 import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
-import { PageActions } from './PageLayout'
+import { fillText } from './fillText'
+import { PageActions, PageName } from './PageLayout'
 import { newIdempotencyKey, startProcess } from './processes'
+import { recordName } from './recordName'
 import { requiredMark } from './requiredMark'
 import { RecordNotFound } from './RecordNotFound'
 import { SaveBar } from './SaveBar'
@@ -79,6 +81,10 @@ function FooterRow({ children }: { children: ReactNode }) {
  * record the form fills each empty field the user has not touched from the answer's `defaults`, and
  * does not send a default the user leaves unchanged. An error above the form scrolls into view and
  * takes focus, see docs/reference/form-widget.md#saving.
+ *
+ * The form names the page's heading, see docs/reference/shell.md#page-header: a new record's page is headed "New {entity}",
+ * and a saved record's page by its name, with the entity's label under it. The heading keeps the page's title while the
+ * record loads, when it is missing or failed, and when it has no name. On a designer's canvas the heading is not the form's.
  */
 export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
@@ -360,6 +366,9 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
           })
       : []
   const actionButtons = [...startButtons, ...navigateButtons].filter(Boolean)
+  // The page's heading names the record, see docs/reference/shell.md#page-header. A designer's canvas keeps its own heading.
+  const label = entity.labelKey ? t(entity.labelKey) : entity.name
+  const name = record ? recordName(entity, record, { locale, text: t }) : null
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
       {/* The form is the first part and a saved record's history the last, see docs/reference/form-widget.md#history. */}
@@ -370,6 +379,10 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
               <Flex gap="small">{actionButtons}</Flex>
             </PageActions>
           )}
+          {!inCanvas && recordId === null && (
+            <PageName name={fillText(t('shell.form.newRecord'), { entity: label })} line={null} />
+          )}
+          {!inCanvas && name !== null && <PageName name={name} line={label} />}
           {conflict && (
             <AxisAlert
               data-testid="form-conflict"

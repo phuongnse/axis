@@ -1,5 +1,5 @@
 import { Flex, Typography } from 'antd'
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ContentInsetContext } from './contentInsetContext'
 import { useDesignTokens } from './themeMode'
@@ -7,11 +7,21 @@ import { useDesignTokens } from './themeMode'
 /** The element of the page's heading that {@link PageActions} draws into: `null` before it is drawn, `undefined` outside a page. */
 const ActionsSlot = createContext<HTMLElement | null | undefined>(undefined)
 
+/** The name and line that a widget inside the page gives the heading in place of the page's title, see {@link PageName}. */
+interface NamedPage {
+  name: string
+  line: string | null
+}
+
+/** Sets the name and line of the heading, or clears them with `null`: `undefined` outside a page. */
+const NameSlot = createContext<((named: NamedPage | null) => void) | undefined>(undefined)
+
 /**
  * The layout of a page, see docs/reference/shell.md#page-header: its title as the page's level-one heading, drawn at the
  * size of a level-four one, with its `tags` beside it and its `line`, the kind of the thing, under it in `textMuted`,
  * and the page's sections stacked below. The page's own actions sit on the heading's right, which any component inside
- * the page fills through {@link PageActions}. With `band`, the heading sits alone in a band on the surface colour that
+ * the page fills through {@link PageActions}. A widget inside the page may name the heading through {@link PageName}, see
+ * docs/reference/shell.md#page-header. With `band`, the heading sits alone in a band on the surface colour that
  * spans the page area, see docs/reference/shell.md#page-header. It replaces the old page container. Pages add no
  * spacing or styling of their own.
  */
@@ -32,16 +42,39 @@ export function PageLayout({
   children?: ReactNode
 }) {
   const [slot, setSlot] = useState<HTMLElement | null>(null)
-  const heading = <PageHeading title={title} tags={tags} line={line} setActionsSlot={setSlot} />
+  const [named, setNamed] = useState<NamedPage | null>(null)
+  const heading = (
+    <PageHeading title={named?.name ?? title} tags={tags} line={named ? named.line : line} setActionsSlot={setSlot} />
+  )
 
   return (
     <ActionsSlot.Provider value={slot}>
-      <Flex vertical gap="middle">
-        {band ? <HeaderBand>{heading}</HeaderBand> : heading}
-        {children}
-      </Flex>
+      <NameSlot.Provider value={setNamed}>
+        <Flex vertical gap="middle">
+          {band ? <HeaderBand>{heading}</HeaderBand> : heading}
+          {children}
+        </Flex>
+      </NameSlot.Provider>
     </ActionsSlot.Provider>
   )
+}
+
+/**
+ * The name of the page's heading and its line, given by a widget inside the page in place of the title, as a record's
+ * page is headed by the record's name, see docs/reference/shell.md#page-header. It draws nothing. While it is mounted it
+ * sets the heading, and it clears the heading when it unmounts, so the title shows again. Outside a `PageLayout`, as in a
+ * widget preview, it does nothing.
+ */
+export function PageName({ name, line }: { name: string; line?: string | null }) {
+  const setNamed = useContext(NameSlot)
+  useLayoutEffect(() => {
+    if (!setNamed) {
+      return
+    }
+    setNamed({ name, line: line ?? null })
+    return () => setNamed(null)
+  }, [setNamed, name, line])
+  return null
 }
 
 /**

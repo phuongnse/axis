@@ -134,7 +134,11 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
         'button[aria-controls="shell-sidebar"][aria-expanded="false"]',
       ),
     "Form page": (state) =>
-      state.getByRole("heading", { name: "Request", exact: true, level: 1 }),
+      state.getByRole("heading", {
+        name: "New Request",
+        exact: true,
+        level: 1,
+      }),
     "Saved record": (state) =>
       state.getByRole("button", { name: "Submit for approval", exact: true }),
     "Saved record with a change": (state) => state.getByTestId("form-save-bar"),

@@ -77,7 +77,7 @@ describe('the design-system shell states', () => {
     expect(open).toHaveAttribute('href', `/sample/records/category/${categoryId}`)
     await userEvent.click(open)
 
-    expect(await screen.findByRole('heading', { name: 'Category' }, { timeout: 15000 })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Office furniture' }, { timeout: 15000 })).toBeVisible()
     expect(screen.queryByTestId('not-found')).toBeNull()
   }, 30000)
 

@@ -9,7 +9,9 @@ import { NotSet } from './EmptyValue'
 import { FileLink } from './FileInput'
 import { formatValue } from './formatValue'
 import { navigateTarget, type NavigateOpen } from './navigateAction'
+import { PageName } from './PageLayout'
 import { newIdempotencyKey, startProcess } from './processes'
+import { recordName } from './recordName'
 import {
   fetchRecord,
   isFileValue,
@@ -35,6 +37,8 @@ interface DetailWidgetProps {
   recordId: string
   /** The UI locale, for formatting values. */
   locale: string
+  /** Whether the page is the entity's record page, so the record names the page's heading. */
+  namesPage?: boolean
 }
 
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
@@ -62,8 +66,12 @@ const referenceLabels = (label: FieldLabel | undefined): (string | null)[] =>
  * nothing to save first, and then loads the record again. A button for each `navigate` action opens
  * its target page with the record's values, and is hidden when the SPA cannot work out an expression. On the
  * page designer's canvas the SPA draws a button for every action, also one it cannot work out.
+ *
+ * With `namesPage`, a detail on a page that the site names as its entity's record page heads the page with the record's
+ * name and the entity's label under it, see docs/reference/shell.md#page-header. It does so only once the record loads,
+ * and never on a designer's canvas.
  */
-export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidgetProps) {
+export function DetailWidget({ widget, sitePath, recordId, locale, namesPage }: DetailWidgetProps) {
   const t = useText()
   const navigate = useNavigate()
   const location = useLocation()
@@ -244,8 +252,11 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     )
   }
 
+  const label = entity.labelKey ? t(entity.labelKey) : entity.name
+  const name = recordName(entity, record, { locale, text: t })
   return (
     <Flex vertical gap="middle" data-testid="detail" aria-busy="false">
+      {namesPage && !canvas.active && name !== null && <PageName name={name} line={label} />}
       {started && <AxisAlert data-testid="detail-started" kind="success" message={t('shell.form.processStarted')} />}
       {errors.length > 0 && <AxisAlert data-testid="detail-error" kind="error" message={errors.join(' ')} />}
       <PartBoundary>
