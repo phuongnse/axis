@@ -14,7 +14,8 @@ export interface ColourValue {
  * colour text in that state colour, and focusRing colours every control's keyboard focus. fillSubtle is a shade off
  * surface, under a process graph and a step's icon tile. Each text colour, and focusRing, reaches WCAG contrast on
  * surface and canvas in both modes. onPrimary colours text and icons on a `primary` or `danger` fill and reaches 4.5:1
- * on each in both modes.
+ * on each in both modes. borderSubtle stands apart from surface about as much in light mode as in dark, see
+ * docs/reference/frontend.md#design-tokens-and-previews.
  */
 export const colourTokens = {
   primary: { light: '#5b3fd9', dark: '#5039bb' },
@@ -33,7 +34,7 @@ export const colourTokens = {
   text: { light: 'rgba(0,0,0,0.88)', dark: 'rgba(255,255,255,0.85)' },
   textMuted: { light: 'rgba(0,0,0,0.58)', dark: 'rgba(255,255,255,0.55)' },
   border: { light: '#8c8c8c', dark: '#6e6e6e' },
-  borderSubtle: { light: '#f0f0f0', dark: '#303030' },
+  borderSubtle: { light: '#dadada', dark: '#303030' },
   divider: { light: 'rgba(5,5,5,0.06)', dark: 'rgba(253,253,253,0.12)' },
   focusRing: { light: '#5b3fd9', dark: '#a38ee7' },
   onPrimary: { light: '#ffffff', dark: '#ffffff' },

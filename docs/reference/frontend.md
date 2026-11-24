@@ -52,8 +52,9 @@ component holds a number of its own.
   held to the 3:1 of a control's edge. Each tone's words reach 4.5:1 on its fill, on `surface` and on `canvas` in both
   modes. The tints come from the Ant Design theme in use, through `useStatusTints()` in `antTheme.ts`, see
   [which widget](shared-widgets.md#which-widget).
-- **Rules on a flush page** _(planned, #5134)_. `borderSubtle` stands apart from `surface` about as much in light mode as in
-  dark, because on a flush page a rule is all that parts two areas. `border` stays for controls.
+- **Rules on a flush page**. `borderSubtle` stands apart from `surface` about as much in light mode as in dark. Its
+  contrast on `surface` in light mode is within 0.1 of its contrast in dark mode, about 1.4:1 in both, because on a flush
+  page a rule is all that parts two areas. `border` stays for controls.
 - **One meaning, one sign**. A sign means one thing and looks one way. The same icon for the same meaning
   has one shape, size and colour on every screen, whichever widget draws it.
 - **One chevron** _(planned, #5122)_. Every chevron is Ant Design's `DownOutlined` at 12 px in `textMuted`, turned to point
