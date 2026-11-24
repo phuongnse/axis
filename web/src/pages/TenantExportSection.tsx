@@ -141,9 +141,19 @@ export function TenantExportSection() {
   const offerStart = !exported || exported.state === 'failed'
 
   return (
-    <SectionPart testName="tenant-export" heading={{ title: t('shell.users.export.title') }}>
+    <SectionPart
+      testName="tenant-export"
+      heading={{ title: t('shell.users.export.title') }}
+      message={
+        <>
+          <AxisAlert kind="warning" message={t('shell.users.export.warning')} />
+          {notice && (
+            <AxisAlert data-testid="tenant-export-notice" kind="error" message={t(`shell.users.export.${notice}`)} />
+          )}
+        </>
+      }
+    >
       <Flex vertical gap="small">
-        <AxisAlert kind="warning" message={t('shell.users.export.warning')} />
         {running && (
           <Typography.Text data-testid="tenant-export-running">{t('shell.users.export.running')}</Typography.Text>
         )}
@@ -164,9 +174,6 @@ export function TenantExportSection() {
               {t('shell.users.export.download')}
             </AxisButton>
           </Flex>
-        )}
-        {notice && (
-          <AxisAlert data-testid="tenant-export-notice" kind="error" message={t(`shell.users.export.${notice}`)} />
         )}
         {offerStart && (
           <div>

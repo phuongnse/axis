@@ -291,6 +291,13 @@ export function StudioAuthoringRequestPage({
         mark,
         body: (
           <Flex vertical gap={spacing.sm}>
+            {/* The accept's status or its conflict comes first, above the checks, the review and the changes. */}
+            {followed !== null &&
+              (conflicted ? (
+                <AcceptConflict application={application} conflicts={conflicts} resources={resources} />
+              ) : (
+                <StudioRequestStatus request={followed} releaseNumber={null} />
+              ))}
             <StudioAuthoringRequestResult
               application={application}
               request={request}
@@ -298,12 +305,6 @@ export function StudioAuthoringRequestPage({
               previewHost={previewHost}
               sites={resources.filter((item) => item.kind === 'site')}
             />
-            {followed !== null &&
-              (conflicted ? (
-                <AcceptConflict application={application} conflicts={conflicts} resources={resources} />
-              ) : (
-                <StudioRequestStatus request={followed} releaseNumber={null} />
-              ))}
           </Flex>
         ),
       }

@@ -484,14 +484,19 @@ export function CellTenantPage() {
             <CellTenantUsage tenant={id} locale={locale} />
           </SectionPart>
         )}
-        <SectionPart testName="cell-tenant-jobs" heading={{ title: t('shell.cell.tenant.jobs') }}>
-          {jobsFailed && (
-            <AxisAlert
-              data-testid="cell-tenant-jobs-error"
-              kind="error"
-              message={t('shell.cell.tenant.jobsLoadFailed')}
-            />
-          )}
+        <SectionPart
+          testName="cell-tenant-jobs"
+          heading={{ title: t('shell.cell.tenant.jobs') }}
+          message={
+            jobsFailed && (
+              <AxisAlert
+                data-testid="cell-tenant-jobs-error"
+                kind="error"
+                message={t('shell.cell.tenant.jobsLoadFailed')}
+              />
+            )
+          }
+        >
           {jobs && <CellJobTable jobs={jobs} locale={locale} />}
         </SectionPart>
       </SectionParts>

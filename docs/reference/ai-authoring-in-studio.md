@@ -278,12 +278,13 @@ A question is one that AI leaves to its author. A decision is a choice that AI m
 
 The Result item shows after the Work item, on a ready, failed or accepted request that has checks, so its author can
 decide. It shows what the request changes and how its checks and review went. Its parts come in this order: the
-checks and the review, then what changes. [Preview the draft](#preview-the-draft) and the accept's status, with
-[a conflict](#accepting), come after them, and the accept's status or conflict closes the item.
+accept's status, or its [conflict](#accepting), when the request has one, then the checks and the review, then what
+changes. [Preview the draft](#preview-the-draft) comes last.
 
 ### Checks and review
 
-Two lines open the Result item, Checks and Review. Each has its name in bold and its verdict as a
+Two lines come first in the Result item, after an accept's status or conflict when there is one: Checks and Review.
+Each has its name in bold and its verdict as a
 [status tag](shared-widgets.md#which-widget). The verdicts start in one column, so the tags line up. Each
 line's summary sits under it, across the columns and flush with the name.
 

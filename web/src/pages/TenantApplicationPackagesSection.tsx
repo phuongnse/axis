@@ -71,10 +71,13 @@ export function TenantApplicationPackagesSection() {
   }
 
   return (
-    <SectionPart testName="tenant-application-packages" heading={{ title: t('shell.users.applicationPackages.title') }}>
+    <SectionPart
+      testName="tenant-application-packages"
+      heading={{ title: t('shell.users.applicationPackages.title') }}
+      message={failure && <AxisAlert data-testid="tenant-application-packages-notice" kind="error" message={failure} />}
+    >
       <Flex vertical gap="small">
         <Typography.Text>{t(`shell.users.applicationPackages.${packages.on ? 'on' : 'off'}`)}</Typography.Text>
-        {failure && <AxisAlert data-testid="tenant-application-packages-notice" kind="error" message={failure} />}
         <Flex gap="small">
           <AxisButton
             role="secondary"

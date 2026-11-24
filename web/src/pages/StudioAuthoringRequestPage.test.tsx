@@ -885,7 +885,7 @@ describe('the feed', () => {
     )
   })
 
-  it('shows the accept the page follows, and its conflict, at the end of the Result item', async () => {
+  it('shows the accept the page follows, and its conflict, first in the Result item, above its checks', async () => {
     const server = serverOf(request({ ...approved, state: 'ready', steps: [ready] }))
     server.accept = ['failed']
     server.acceptDiagnostics = [{ ...problem('AXC0377'), message: 'Changed.', resourceId: 'e2' }]
@@ -897,6 +897,8 @@ describe('the feed', () => {
     const conflict = await screen.findByTestId('studio-ai-request-conflict', undefined, { timeout: 4000 })
     const items = Array.from(screen.getByTestId('steps-bar').children) as HTMLElement[]
     expect(items[2]).toContainElement(conflict)
+    const checks = screen.getByTestId('studio-ai-request-checks')
+    expect(conflict.compareDocumentPosition(checks) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 
@@ -1552,6 +1554,10 @@ describe('accepting a ready request', () => {
     expect(
       await screen.findByText('Not accepted. Nothing in the application changed.', undefined, { timeout: 4000 }),
     ).toBeVisible()
+    const status = screen.getByTestId('studio-request-status')
+    expect(status.compareDocumentPosition(screen.getByTestId('studio-ai-request-checks'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
     expect(screen.queryByTestId('studio-ai-request-conflict')).toBeNull()
     expect(await accept()).toBeVisible()
   })
@@ -1569,6 +1575,12 @@ describe('accepting a ready request', () => {
     await userEvent.click(await accept())
 
     const alert = await screen.findByTestId('studio-ai-request-conflict', undefined, { timeout: 4000 })
+    expect(alert.compareDocumentPosition(screen.getByTestId('studio-ai-request-checks'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    expect(alert.compareDocumentPosition(screen.getByTestId('studio-ai-request-review'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
     expect(
       within(alert).getByText('Someone changed these resources after AI read them, so nothing was accepted:'),
     ).toBeVisible()

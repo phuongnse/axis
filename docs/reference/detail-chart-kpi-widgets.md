@@ -87,7 +87,7 @@ as the [widget binding](data-sources.md#widget-binding) says.
 - **Rows.** The chart sends one request to `rowsPath` with `pageSize=100`, the largest page size, and never pages. The
   request carries each bound page parameter's value under the data source parameter's name, and a parameter whose
   page parameter has no value is left out. The chart asks again when a page parameter changes. When `totalCount` is
-  over 100, a note under the chart says that only the first 100 groups show. Each row is one category. A `reference`
+  over 100, a note above the chart says that only the first 100 groups show. Each row is one category. A `reference`
   category shows its label from `labels`, and a `null` category shows a platform text.
 - **Values.** Decimals arrive as [source text](table-widget.md#number-source-text). The SPA turns them into numbers only to
   draw, and the tooltip and the data table keep the source text.

@@ -282,7 +282,11 @@ describe('ChartWidget', () => {
 
     renderChart()
 
-    expect(await screen.findByTestId('chart-truncated')).toHaveTextContent('Only the first 100 groups show.')
+    const note = await screen.findByTestId('chart-truncated')
+    expect(note).toHaveTextContent('Only the first 100 groups show.')
+    expect(note.compareDocumentPosition(screen.getByRole('img', { name: 'Notes by category' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
   })
 
   it('shows the empty text when the data source has no group', async () => {
