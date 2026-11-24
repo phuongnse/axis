@@ -1,6 +1,6 @@
 import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
 import { Form, Input, Space } from 'antd'
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { AxisButton } from './AxisButton'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { EmptyDash } from './EmptyValue'
@@ -34,6 +34,11 @@ interface ChildCollectionTableProps {
   locale: string
   /** Shows every cell read-only, with no add or remove buttons. */
   readOnly?: boolean
+  /**
+   * What the toolbar shows on its left: the collection's label, required mark and help, see
+   * docs/reference/form-widget.md#child-collections. Ignored when read-only.
+   */
+  title?: ReactNode
 }
 
 // The types whose column is free text, as in a table widget. Every other type is a value of a fixed form.
@@ -55,11 +60,12 @@ interface OpenLookup {
 
 /**
  * Edits the rows of a child collection as a table drawn on `AxisTable`: one column per child field, each
- * editable cell the same input the form uses for that field type. Add row is the toolbar's main action,
- * above the table on the right, and Delete row is an icon row action. The first input of an added row takes focus. A reference cell shows the label of
- * the record it points to, with a search icon button that opens the reference lookup. A computed cell
- * and every cell of a read-only collection show their value as plain text, with no input. A read-only
- * collection has no add or remove buttons.
+ * editable cell the same input the form uses for that field type. An editable collection's toolbar shows
+ * its `title` on the left, and Add row, the main action, on the right. Delete row is an icon row action.
+ * The first input of an added row takes focus. A reference cell shows the label of the record it points
+ * to, with a search icon button that opens the reference lookup. A computed cell and every cell of a
+ * read-only collection show their value as plain text, with no input. A read-only collection has no
+ * toolbar, no title and no add or remove buttons.
  */
 export function ChildCollectionTable({
   field,
@@ -69,6 +75,7 @@ export function ChildCollectionTable({
   errors,
   locale,
   readOnly = false,
+  title,
 }: ChildCollectionTableProps) {
   const t = useText()
   const childFields = useMemo(() => field.fields ?? [], [field.fields])
@@ -237,6 +244,7 @@ export function ChildCollectionTable({
         columns={columns}
         dataSource={rows}
         emptyText={t('shell.table.empty')}
+        title={readOnly ? undefined : title}
         toolbar={
           readOnly
             ? undefined

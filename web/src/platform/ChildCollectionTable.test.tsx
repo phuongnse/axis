@@ -69,12 +69,14 @@ function Harness({
   errors = {},
   readOnly = false,
   collection = lines,
+  title,
 }: {
   initial?: RecordRow[]
   initialLabels?: RowLabels[]
   errors?: Record<string, string[]>
   readOnly?: boolean
   collection?: FieldMetadata
+  title?: React.ReactNode
 }) {
   const [rows, setRows] = useState<RecordRow[]>(initial)
   const [labels, setLabels] = useState<RowLabels[]>(initialLabels)
@@ -86,6 +88,7 @@ function Harness({
       errors={errors}
       locale="en"
       readOnly={readOnly}
+      title={title}
       onChange={(nextRows, nextLabels) => {
         setRows(nextRows)
         setLabels(nextLabels)
@@ -137,6 +140,23 @@ describe('the add and remove buttons of a child collection', () => {
 
     expect(remove).toHaveFocus()
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete row')
+  })
+})
+
+describe('the toolbar title of a child collection', () => {
+  it('shows the title on the left of the toolbar, before Add row', () => {
+    renderIn('light', <Harness title={<span>Lines title</span>} />)
+
+    const title = screen.getByTestId('axis-table-title')
+    expect(title).toHaveTextContent('Lines title')
+    const addRow = screen.getByRole('button', { name: 'Add row' })
+    expect(title.compareDocumentPosition(addRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('drops the title of a read-only collection, which has no toolbar', () => {
+    renderIn('light', <Harness readOnly title={<span>Lines title</span>} />)
+
+    expect(screen.queryByTestId('axis-table-title')).toBeNull()
   })
 })
 
