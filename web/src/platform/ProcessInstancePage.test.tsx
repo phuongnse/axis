@@ -7,6 +7,8 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { chooseOption, emptyDescription, formItem, optionTexts } from '../test/antd'
 import { ShellAsideHost } from '../test/shellAsideHost'
 import { dialog } from '../test/tableFilter'
+import { changeTint } from './changeTint'
+import { designTokensFor } from './designTokens'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
 import { ProcessInstancePage } from './ProcessInstancePage'
@@ -1846,7 +1848,7 @@ describe('ProcessInstancePage step run panel', () => {
     expect(panel.queryByText('503')).not.toBeInTheDocument()
   })
 
-  it('shows a changed field as a "−" line and a "+" line read as "Changed from X to Y", and a hidden change as Hidden', async () => {
+  it('shows a changed field as a "−" line and a "+" line on their tints with coloured marks, read as "Changed from X to Y", and a hidden change as Hidden', async () => {
     stubApi({
       detail: {
         status: 200,
@@ -1865,9 +1867,16 @@ describe('ProcessInstancePage step run panel', () => {
     renderPage('?step=registerPurchase&stepTab=output')
 
     const panel = await stepPanel()
+    const { colour } = designTokensFor('light')
     expect(panel.getByText('amount')).toBeVisible()
-    expect(panel.getByText('− 100')).toHaveAttribute('aria-hidden', 'true')
-    expect(panel.getByText('+ 120')).toHaveAttribute('aria-hidden', 'true')
+    const removed = panel.getByText('100')
+    expect(removed).toHaveAttribute('aria-hidden', 'true')
+    expect(removed).toHaveStyle({ background: changeTint(colour.danger) })
+    expect(within(removed).getByText('−')).toHaveStyle({ color: colour.dangerText })
+    const added = panel.getByText('120')
+    expect(added).toHaveAttribute('aria-hidden', 'true')
+    expect(added).toHaveStyle({ background: changeTint(colour.success) })
+    expect(within(added).getByText('+')).toHaveStyle({ color: colour.successText })
     expect(panel.getByText('Changed from 100 to 120')).toBeInTheDocument()
     const note = panel.getByText('note').closest('div')!
     expect(within(note).getByText('Hidden')).toBeVisible()
