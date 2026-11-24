@@ -21,12 +21,12 @@ public static class AgentServiceCollectionExtensions
     /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. With them it gives a step the author's access token through
     /// <see cref="AuthoringStepContext.AccessTokenAsync"/>, refreshed at the tenant's realm as the agent client, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>, and a step calls the tenant's MCP server as the author through <see cref="AuthoringStepContext.Mcp"/>. It also runs every registered <see cref="IAuthoringStep"/> on the
     /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims only a state that has a step.
-    /// With AI authoring on it registers <see cref="PlanningStep"/>, which writes the plan of a request in <c>planning</c>, and <see cref="WorkingStep"/>, which makes the approved change in the request's draft in <c>working</c>, and <see cref="CheckingStep"/>, which compiles the draft and runs every scenario on it in <c>checking</c>, and <see cref="ReviewingStep"/>, which reviews the checked draft in a new model session in <c>reviewing</c>, and <see cref="FixingStep"/>, which works on the stored draft again in <c>fixing</c>, and <see cref="AcceptingStep"/>, which asks for the accept of the draft of a <c>ready</c> request that asked for auto-accept. <see cref="TenantModelAdapters"/> gives the steps the adapter of a binding for a tenant, and under <c>directory</c> the adapter adds the tokens of each call to the tenant's usage over <c>ConnectionStrings:Platform</c>, see <c>docs/reference/tenant-quotas.md#usage</c>. With <c>Ai:ScriptedAnswersFile</c> set, every binding replays the answers of that file in order and no provider is called, see <c>docs/reference/model-bindings.md#bindings</c>. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
+    /// With AI authoring on it registers <see cref="PlanningStep"/>, which writes the plan of a request in <c>planning</c>, and <see cref="WorkingStep"/>, which makes the approved change in the request's draft in <c>working</c>, and <see cref="CheckingStep"/>, which compiles the draft and runs every scenario on it in <c>checking</c>, and <see cref="ReviewingStep"/>, which reviews the checked draft in a new model session in <c>reviewing</c>, and <see cref="FixingStep"/>, which works on the stored draft again in <c>fixing</c>, and <see cref="AcceptingStep"/>, which asks for the accept of the draft of a <c>ready</c> request that asked for auto-accept. <see cref="TenantModelAdapters"/> gives the steps the adapter of a binding for a tenant, and under <c>directory</c> the adapter adds the tokens of each call to the tenant's usage over <c>ConnectionStrings:Platform</c>, see <c>docs/reference/tenant-quotas.md#usage</c>. With <c>Ai:HostKeyFile</c> set, it reads the agent host's key pair from that EC P-256 PEM, registers it as <see cref="AgentHostKey"/> and, under <c>directory</c>, publishes the public half in <c>platform.host_keys</c> at the start, retrying every <c>Tenancy:RefreshInterval</c> until it works, see <c>docs/reference/host-settings.md#ai-settings</c>. With <c>Ai:ScriptedAnswersFile</c> set, every binding replays the answers of that file in order and no provider is called, see <c>docs/reference/model-bindings.md#bindings</c>. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Health:Urls</c> is blank, a binding has an unknown <c>Kind</c>, no <c>Model</c>, a <c>KeyFile</c> that cannot be read or a
     /// <c>MaxOutputTokens</c> that is not a whole number of at least 1, <c>Ai:DefaultBinding</c> or <c>Ai:ReviewBinding</c> names no binding, <c>Ai:FixRounds</c> is not a whole number of at least 0,
-    /// <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1, <c>Ai:RequestTimeout</c> is not a positive time span, or <c>Ai:ScriptedAnswersFile</c> is set outside Development and Testing,
+    /// <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1, <c>Ai:RequestTimeout</c> is not a positive time span, <c>Ai:HostKeyFile</c> with <c>Ai:DefaultBinding</c> set names a file that cannot be read or holds no EC P-256 private key, or <c>Ai:ScriptedAnswersFile</c> is set outside Development and Testing,
     /// names a file that cannot be read or holds no array of answers.
     /// With <c>Ai:DefaultBinding</c> set, also <c>Tenancy:Source</c> is unknown, no tenant is configured under <c>configuration</c>,
     /// <c>Ai:AllowTenantKeys</c> is not <c>true</c> or <c>false</c>,
@@ -54,13 +54,19 @@ public static class AgentServiceCollectionExtensions
             scriptedAnswers = ScriptedModelAdapter.ReadAnswers(scriptedAnswersFile, AiSettings.ScriptedAnswersFileSetting);
         }
 
+        var hostKey = settings.HostKeyFile is { } hostKeyFile ? AgentHostKey.Load(hostKeyFile) : null;
         var tenantKeys = settings.DefaultBinding is null ? null : TenantModelKeySettings.Load(configuration);
-        (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, TenantUsageStore? Usage, ITenantKeySource KeySource)? tenants =
+        (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, TenantUsageStore? Usage, ITenantKeySource KeySource, HostKeyStore? HostKeys)? tenants =
             settings.DefaultBinding is null ? null : LoadTenantCatalog(configuration, environment);
 
         services.AddSingleton(health);
         services.AddSingleton(settings);
-        if (tenants is var (catalog, modelKeys, usage, keySource))
+        if (hostKey is not null)
+        {
+            services.AddSingleton(hostKey);
+        }
+
+        if (tenants is var (catalog, modelKeys, usage, keySource, hostKeys))
         {
             services.AddTenancy(catalog);
             services.AddSingleton(catalog);
@@ -73,6 +79,11 @@ public static class AgentServiceCollectionExtensions
             if (usage is not null)
             {
                 services.AddSingleton(usage);
+            }
+
+            if (hostKeys is not null)
+            {
+                services.AddSingleton(hostKeys);
             }
 
             // The data keys decrypt the stored refresh tokens of the requests.
@@ -121,12 +132,13 @@ public static class AgentServiceCollectionExtensions
     // and reads the directory again every refresh interval. It ignores a Tenants section. Its key source reads the data keys from the
     // Tenants section, or under directory from the tenant directory as the server does. Under directory it also
     // reads a tenant's own model key from the same database, see docs/reference/model-bindings.md#a-tenants-own-key, and writes the tokens of
-    // its model calls to the tenant's usage there, see docs/reference/tenant-quotas.md#usage.
-    private static (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, TenantUsageStore? Usage, ITenantKeySource KeySource) LoadTenantCatalog(IConfiguration configuration, IHostEnvironment environment)
+    // its model calls to the tenant's usage there, see docs/reference/tenant-quotas.md#usage. It publishes the public half of its host key
+    // there too, see docs/reference/keys-and-data-protection.md#cryptographic-inventory.
+    private static (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, TenantUsageStore? Usage, ITenantKeySource KeySource, HostKeyStore? HostKeys) LoadTenantCatalog(IConfiguration configuration, IHostEnvironment environment)
     {
         if (TenancySettings.Source(configuration) != TenancySource.Directory)
         {
-            return (BackgroundTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment)), null, null, new ConfigurationTenantKeySource(configuration));
+            return (BackgroundTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment)), null, null, new ConfigurationTenantKeySource(configuration), null);
         }
 
         var platformConnectionString = configuration.GetConnectionString("Platform");
@@ -145,7 +157,8 @@ public static class AgentServiceCollectionExtensions
             cipher,
             refreshInterval,
             configuration.GetSection(TenantOptions.SectionName).Exists());
-        return (catalog, new DirectoryTenantModelKeys(platformConnectionString, cipher), new TenantUsageStore(NpgsqlDataSource.Create(platformConnectionString)), new DirectoryTenantKeySource(platformConnectionString, cipher));
+        var platform = NpgsqlDataSource.Create(platformConnectionString);
+        return (catalog, new DirectoryTenantModelKeys(platformConnectionString, cipher), new TenantUsageStore(platform), new DirectoryTenantKeySource(platformConnectionString, cipher), new HostKeyStore(platform));
     }
 
     /// <summary>Makes every binding return the scripted answers in order, for tests and the journey.</summary>

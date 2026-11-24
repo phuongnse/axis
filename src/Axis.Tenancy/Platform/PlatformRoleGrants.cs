@@ -9,7 +9,7 @@ namespace Axis.Tenancy.Platform;
 /// <c>tenant_usage</c>, <c>tenant_usage_latest</c> and <c>tenant_token_usage</c>, where a cell's worker and the agent host keep usage, on <c>tenant_leases</c>, where
 /// the hosts of a cell share their running work, on <c>operator_sessions</c>, where the cell console keeps the sessions of its operators, <c>INSERT</c> on <c>jobs</c>, where the provisioning API queues its
 /// jobs, <c>INSERT</c> on <c>tenant_host_requests</c>, where it stores the requests for hosts of a tenant's own, and <c>INSERT</c> and <c>UPDATE</c> on <c>tenant_daily_counters</c>,
-/// where it counts the emails of the day, and nothing else. The one exception to reading is
+/// where it counts the emails of the day, and <c>INSERT</c> and <c>UPDATE</c> on <c>host_keys</c>, where the agent host publishes its public key and which it never deletes from, and nothing else. The one exception to reading is
 /// <c>audit_records</c>: the role has no right on it at all.
 /// Any wider right it had there is revoked. The role name comes from configuration, so an EF Core migration
 /// cannot hold it. The server runs this step after the platform migrations.
@@ -64,6 +64,7 @@ public static class PlatformRoleGrants
             GRANT INSERT ON platform.jobs TO {role};
             GRANT INSERT ON platform.tenant_host_requests TO {role};
             GRANT INSERT, UPDATE ON platform.tenant_daily_counters TO {role};
+            GRANT INSERT, UPDATE ON platform.host_keys TO {role};
             REVOKE ALL ON platform.audit_records FROM {role};
             ALTER DEFAULT PRIVILEGES IN SCHEMA platform REVOKE ALL ON TABLES FROM {role};
             ALTER DEFAULT PRIVILEGES IN SCHEMA platform GRANT SELECT ON TABLES TO {role};

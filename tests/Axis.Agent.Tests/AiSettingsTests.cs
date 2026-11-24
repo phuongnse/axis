@@ -1,8 +1,10 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Axis.Agent;
 using Axis.Hosting;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +29,9 @@ public sealed class AiSettingsTests : IDisposable
         { "missing-kind", "Ai:Bindings:main:Kind" },
         { "missing-model", "Ai:Bindings:main:Model" },
         { "unreadable-key-file", "Ai:Bindings:main:KeyFile" },
+        { "unreadable-host-key-file", "Ai:HostKeyFile" },
+        { "p384-host-key-file", "Ai:HostKeyFile" },
+        { "public-host-key-file", "Ai:HostKeyFile" },
         { "default-names-no-binding", "Ai:DefaultBinding" },
         { "review-names-no-binding", "Ai:ReviewBinding" },
         { "max-output-tokens-zero", "Ai:Bindings:main:MaxOutputTokens" },
@@ -66,6 +71,15 @@ public sealed class AiSettingsTests : IDisposable
                 break;
             case "unreadable-key-file":
                 values["Ai:Bindings:main:KeyFile"] = missingFile;
+                break;
+            case "unreadable-host-key-file":
+                values["Ai:HostKeyFile"] = missingFile;
+                break;
+            case "p384-host-key-file":
+                values["Ai:HostKeyFile"] = HostKeyFile(ECCurve.NamedCurves.nistP384);
+                break;
+            case "public-host-key-file":
+                values["Ai:HostKeyFile"] = HostKeyFile(ECCurve.NamedCurves.nistP256, publicOnly: true);
                 break;
             case "default-names-no-binding":
                 values["Ai:DefaultBinding"] = "other-binding-name";
@@ -108,10 +122,42 @@ public sealed class AiSettingsTests : IDisposable
 
         var text = exception.ToString();
         Assert.Contains($"'{setting}'", text, StringComparison.Ordinal);
-        foreach (var secret in new[] { BadKind, ModelId, keyFile, missingFile, _folder, Key, "other-binding-name", "lots-of-tokens", "70707.5", "half-an-hour-value", "-4242", "three-rounds" })
+        foreach (var secret in new[] { BadKind, ModelId, keyFile, missingFile, _folder, "host-key.pem", Key, "other-binding-name", "lots-of-tokens", "70707.5", "half-an-hour-value", "-4242", "three-rounds" })
         {
             Assert.DoesNotContain(secret, text, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void A_p_256_host_key_file_is_loaded_with_its_key_id_and_public_key_and_only_with_ai_authoring_on()
+    {
+        var file = HostKeyFile(ECCurve.NamedCurves.nistP256);
+        using var expected = ECDiffieHellman.Create();
+        expected.ImportFromPem(File.ReadAllText(file));
+        var parameters = expected.ExportParameters(false);
+
+        var settings = AiSettings.Load(Configure(new Dictionary<string, string?>
+        {
+            ["Ai:Bindings:main:Kind"] = "anthropic",
+            ["Ai:Bindings:main:Model"] = ModelId,
+            ["Ai:DefaultBinding"] = "main",
+            ["Ai:HostKeyFile"] = file,
+        }));
+        using var key = AgentHostKey.Load(settings.HostKeyFile!);
+
+        Assert.Equal(JwkThumbprint.Of(parameters).KeyId, key.KeyId);
+        Assert.Equal([0x04, .. parameters.Q.X!, .. parameters.Q.Y!], key.PublicKey);
+    }
+
+    [Fact]
+    public void With_ai_authoring_off_a_bad_host_key_file_is_ignored()
+    {
+        var services = new ServiceCollection();
+
+        services.AddAxisAgent(Configure(new Dictionary<string, string?> { ["Ai:HostKeyFile"] = Path.Combine(_folder, "missing-key-file") }), new TestEnvironment());
+
+        Assert.Null(AiSettings.Load(Configure(new Dictionary<string, string?> { ["Ai:HostKeyFile"] = "anything" })).HostKeyFile);
+        Assert.DoesNotContain(services, service => service.ServiceType == typeof(AgentHostKey));
     }
 
     [Fact]
@@ -201,6 +247,14 @@ public sealed class AiSettingsTests : IDisposable
     {
         var path = Path.Combine(_folder, "key");
         File.WriteAllText(path, Key + "\n");
+        return path;
+    }
+
+    private string HostKeyFile(ECCurve curve, bool publicOnly = false)
+    {
+        var path = Path.Combine(_folder, "host-key.pem");
+        using var key = ECDiffieHellman.Create(curve);
+        File.WriteAllText(path, publicOnly ? key.ExportSubjectPublicKeyInfoPem() : key.ExportPkcs8PrivateKeyPem());
         return path;
     }
 

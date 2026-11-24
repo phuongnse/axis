@@ -75,6 +75,35 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("deleted_tenants", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.HostKeyRow", b =>
+                {
+                    b.Property<string>("Host")
+                        .HasColumnType("text")
+                        .HasColumnName("host");
+
+                    b.Property<string>("KeyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("key_id");
+
+                    b.Property<byte[]>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("public_key");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.HasKey("Host")
+                        .HasName("pk_host_keys");
+
+                    b.ToTable("host_keys", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_host_keys_public_key", "octet_length(public_key) = 65");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.JobRow", b =>
                 {
                     b.Property<Guid>("Id")

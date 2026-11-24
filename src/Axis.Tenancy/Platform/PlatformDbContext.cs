@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts, the requests for hosts of their own,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the tombstones of purged tenants, the results of the weekly restore check, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the public keys of the hosts, the provisioning jobs, the tombstones of purged tenants, the results of the weekly restore check, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -47,6 +47,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantDailyCounterRow> TenantDailyCounters => Set<TenantDailyCounterRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
+
+    public DbSet<HostKeyRow> HostKeys => Set<HostKeyRow>();
 
     public DbSet<JobRow> Jobs => Set<JobRow>();
 
@@ -418,6 +420,16 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             key.Property(k => k.FriendlyName).HasColumnName("friendly_name");
             key.HasIndex(k => k.FriendlyName).IsUnique().HasDatabaseName("ix_data_protection_keys_friendly_name");
             key.Property(k => k.Xml).HasColumnName("xml").HasColumnType("bytea");
+        });
+
+        modelBuilder.Entity<HostKeyRow>(hostKey =>
+        {
+            hostKey.ToTable("host_keys", table => table.HasCheckConstraint("ck_host_keys_public_key", "octet_length(public_key) = 65"));
+            hostKey.HasKey(k => k.Host).HasName("pk_host_keys");
+            hostKey.Property(k => k.Host).HasColumnName("host").ValueGeneratedNever();
+            hostKey.Property(k => k.KeyId).HasColumnName("key_id");
+            hostKey.Property(k => k.PublicKey).HasColumnName("public_key").HasColumnType("bytea");
+            hostKey.Property(k => k.PublishedAt).HasColumnName("published_at").HasColumnType("timestamp with time zone");
         });
 
         modelBuilder.Entity<DeletedTenantRow>(deleted =>

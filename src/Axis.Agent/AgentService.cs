@@ -1,6 +1,8 @@
 using Axis.Data.Storage;
 using Axis.Hosting;
 using Axis.Tenancy;
+using Axis.Tenancy.Platform;
+using Npgsql;
 
 namespace Axis.Agent;
 
@@ -11,7 +13,8 @@ namespace Axis.Agent;
 /// interval. A tenant whose runtime database role fails the <see cref="RuntimeRoleCheck"/> is left out until it passes. Beside the refresh it
 /// runs the work loop: it takes the tenants in turn through <see cref="TenantRounds"/> and runs one step of one request per turn with the
 /// <see cref="AuthoringRequestRunner"/>, which claims a request only in a state that has a registered step, see
-/// <c>docs/reference/authoring-requests.md#durable-requests</c>.
+/// <c>docs/reference/authoring-requests.md#durable-requests</c>. Under the directory source, with a host key, it also publishes the public half of
+/// the key in <c>platform.host_keys</c>, see <see cref="PublishHostKeyAsync"/>.
 /// </summary>
 internal sealed partial class AgentService(
     AiSettings settings,
@@ -22,7 +25,9 @@ internal sealed partial class AgentService(
     AuthoringRequestStore? store = null,
     AuthoringSteps? steps = null,
     AuthoringRequestRunner? runner = null,
-    AuthoringLoopOptions? loop = null) : BackgroundService
+    AuthoringLoopOptions? loop = null,
+    AgentHostKey? hostKey = null,
+    HostKeyStore? hostKeys = null) : BackgroundService
 {
     // Every tenant gets one step per turn, with the same share.
     private readonly TenantRounds _rounds = new(1, _ => 1);
@@ -36,7 +41,7 @@ internal sealed partial class AgentService(
         }
 
         await LoadTenantsAsync(tenants, stoppingToken);
-        await Task.WhenAll(KeepTenantsFreshAsync(tenants, stoppingToken), WorkAsync(tenants, stoppingToken));
+        await Task.WhenAll(KeepTenantsFreshAsync(tenants, stoppingToken), WorkAsync(tenants, stoppingToken), PublishHostKeyAsync(tenants, stoppingToken));
     }
 
     private async Task KeepTenantsFreshAsync(BackgroundTenantCatalog catalog, CancellationToken stoppingToken)
@@ -50,6 +55,37 @@ internal sealed partial class AgentService(
         {
             await Task.Delay(catalog.RefreshInterval, time, stoppingToken);
             await RefreshAsync(catalog, stoppingToken);
+        }
+    }
+
+    // Publishes the public half of the host key once, and retries every refresh interval until it works. Request work does not wait for it,
+    // because no request needs the key yet. Only the first failure is logged, and only its type: a connection message may name the database host.
+    private async Task PublishHostKeyAsync(BackgroundTenantCatalog catalog, CancellationToken stoppingToken)
+    {
+        if (hostKey is null || hostKeys is null || !catalog.FromDirectorySource)
+        {
+            return;
+        }
+
+        var failureLogged = false;
+        while (true)
+        {
+            try
+            {
+                await hostKeys.PublishAsync(HostKeyStore.AgentHost, hostKey.KeyId, hostKey.PublicKey, time.GetUtcNow(), stoppingToken);
+                LogHostKeyPublished(hostKey.KeyId);
+                return;
+            }
+            catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+            {
+                if (!failureLogged)
+                {
+                    failureLogged = true;
+                    LogHostKeyFailed(exception.GetType().Name, catalog.RefreshInterval);
+                }
+
+                await Task.Delay(catalog.RefreshInterval, time, stoppingToken);
+            }
         }
     }
 
@@ -170,6 +206,12 @@ internal sealed partial class AgentService(
 
     [LoggerMessage(LogLevel.Error, "Loading the tenant directory failed. The agent host retries every {RefreshInterval}.")]
     private partial void LogLoadFailed(Exception exception, TimeSpan refreshInterval);
+
+    [LoggerMessage(LogLevel.Information, "Published the agent host key {KeyId}.")]
+    private partial void LogHostKeyPublished(string keyId);
+
+    [LoggerMessage(LogLevel.Error, "Publishing the agent host key over ConnectionStrings:Platform failed ({Cause}). The agent host retries every {RefreshInterval}.")]
+    private partial void LogHostKeyFailed(string cause, TimeSpan refreshInterval);
 
     [LoggerMessage(LogLevel.Information, "Loaded {TenantCount} active tenant(s) from the tenant directory.")]
     private partial void LogLoaded(int tenantCount);
