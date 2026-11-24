@@ -306,6 +306,7 @@ function runLoadCell({ args = ['https://console.cell.test'], env = {} } = {}) {
       'scripts/lib/load-objectives.mjs',
       'scripts/lib/load-realm.mjs',
       'scripts/lib/load-stack.mjs',
+      'scripts/lib/key-service.mjs',
       'scripts/lib/postgres-tls.mjs',
       'samples/keycloak/axis-realm.json',
       'tests/load/cell.js',

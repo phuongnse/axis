@@ -9,7 +9,8 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { bracketMatching, codeFolding, foldGutter, foldKeymap, indentOnInput } from '@codemirror/language'
 import { diagnosticCount, linter, lintGutter, nextDiagnostic, type Diagnostic } from '@codemirror/lint'
 import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
-import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state'
+import { getChunks, getOriginalDoc, originalDocChangeEffect } from '@codemirror/merge'
+import { Annotation, ChangeSet, Compartment, EditorState, StateEffect, Transaction } from '@codemirror/state'
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
 import { useSelectedItemTint } from '../platform/antTheme'
@@ -21,6 +22,7 @@ import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { indentFolding, languageSupport, type FileLanguage } from './fileLanguage'
 import { findCount, findField, findNone, findPanel } from './jsonFindPanel'
 import { useFillHeight } from './jsonViewHeight'
+import { diffShape, diffText, lineDiff, type DiffShape } from './lineDiff'
 
 /** Marks a change that came from the value, not from the author, so it is not reported as an edit. */
 const external = Annotation.define<boolean>()
@@ -39,6 +41,13 @@ export interface CodeEditorProps {
   onChange?: (text: string) => void
   /** The language that colours, folds and indents the text, such as `fileLanguage(path)` of a file. */
   language: FileLanguage
+  /**
+   * The text before a change. With it, the editor draws `value` as a read-only line diff against it, as tall as its text,
+   * whatever `readOnly` and `grow` say, see docs/reference/ai-authoring-in-studio.md#revisions. It has no current line,
+   * fold gutter, history, completion or checks. Whether the editor is a diff is fixed when it is built, as `lint` is. An
+   * empty `original` is a file added whole, and an empty `value` against a text a file removed whole.
+   */
+  original?: string
   /** Refuses the author's edits. The cursor, find and `goTo` still work. */
   readOnly?: boolean
   /** Fills the window down to the shell footer, and stops its scroll at its end. Without it, the editor is as tall as its text. */
@@ -84,17 +93,18 @@ const checkDelay = 250
 /**
  * The one code editor of Studio, for a package's files and the JSON view, see
  * docs/reference/shared-widgets.md#which-widget. It folds, matches and closes brackets, indents on input, completes the
- * words of the text and marks the current line.
+ * words of the text and marks the current line. Given `original`, it draws a read-only line diff instead, see `lineDiff`.
  */
 export default function CodeEditor({
   label,
   value,
   onChange,
   language,
-  readOnly = false,
+  original,
+  readOnly: readOnlyProp = false,
   fill = false,
   boundary,
-  grow = false,
+  grow: growProp = false,
   lint,
   onProblems,
   onCursor,
@@ -112,16 +122,28 @@ export default function CodeEditor({
     readOnly: new Compartment(),
     phrases: new Compartment(),
     foldMarks: new Compartment(),
+    diff: new Compartment(),
   }))
+  const diffing = original !== undefined
+  const readOnly = readOnlyProp || diffing
+  const grow = growProp || diffing
+  // A file removed whole shows the text it had, each line marked removed, in no language's colours.
+  const shape = diffing ? diffShape(original, value) : null
+  const shown = shape === 'removed' ? diffText(original!) : diffing ? diffText(value) : value
+  const shownLanguage: FileLanguage = shape === 'removed' ? 'plain' : language
   const selectedTint = useSelectedItemTint()
   const theme = editorTheme(tokens, mode, selectedTint, !grow ? 'scroll' : readOnly ? 'grow' : 'growEditable')
   const texts = useMemo(() => codeTexts(t), [t])
   const phrases = useMemo(() => EditorState.phrases.of(texts), [texts])
+  const applied = useRef<{ original?: string; tokens: typeof tokens; shape: DiffShape | null } | undefined>(undefined)
   const latest = useRef({
     onChange,
-    value,
+    value: shown,
     theme,
-    language,
+    language: shownLanguage,
+    original,
+    shape,
+    tokens,
     readOnly,
     texts,
     phrases,
@@ -133,9 +155,12 @@ export default function CodeEditor({
   useEffect(() => {
     latest.current = {
       onChange,
-      value,
+      value: shown,
       theme,
-      language,
+      language: shownLanguage,
+      original,
+      shape,
+      tokens,
       readOnly,
       texts,
       phrases,
@@ -147,6 +172,8 @@ export default function CodeEditor({
 
   useEffect(() => {
     const initial = latest.current
+    const isDiff = initial.shape !== null
+    applied.current = { original: initial.original, tokens: initial.tokens, shape: initial.shape }
     let reported = 0
     const cursorOf = (state: EditorState): CodeCursor => {
       const head = state.selection.main.head
@@ -158,33 +185,30 @@ export default function CodeEditor({
       state: EditorState.create({
         doc: initial.value,
         extensions: [
-          lineNumbers(),
-          compartments.foldMarks.of(foldMarks(foldIcons.current!, initial.texts)),
-          codeFolding(),
+          // A line diff draws its own columns of numbers, and has no current line, fold gutter, completion or history.
+          isDiff ? compartments.diff.of(lineDiff(initial.original!, initial.tokens, initial.shape!)) : lineNumbers(),
+          isDiff ? [] : compartments.foldMarks.of(foldMarks(foldIcons.current!, initial.texts)),
+          isDiff ? [] : codeFolding(),
           bracketMatching(),
-          closeBrackets(),
+          isDiff ? [] : closeBrackets(),
           indentOnInput(),
           // The words of the text only: the language packages' own suggestions and snippets bring CodeMirror's English.
-          autocompletion({ override: [completeAnyWord] }),
-          highlightActiveLine(),
-          highlightActiveLineGutter(),
+          isDiff ? [] : autocompletion({ override: [completeAnyWord] }),
+          isDiff ? [] : [highlightActiveLine(), highlightActiveLineGutter()],
           compartments.language.of(languageExtension(initial.language)),
           compartments.readOnly.of(readOnlyExtension(initial.readOnly)),
           compartments.phrases.of(initial.phrases),
-          history(),
+          isDiff ? [] : history(),
           search({ top: true, createPanel: findPanel }),
           // Go to line opens a dialog with CodeMirror's own English text, so the editor leaves it out.
           keymap.of([
-            ...closeBracketsKeymap,
+            ...(isDiff ? [] : [...closeBracketsKeymap, ...historyKeymap, ...foldKeymap, ...completionKeymap]),
             ...defaultKeymap,
-            ...historyKeymap,
-            ...foldKeymap,
-            ...completionKeymap,
             ...searchKeymap.filter((binding) => binding.key !== 'Mod-Alt-g'),
           ]),
           compartments.theme.of(initial.theme),
           EditorView.contentAttributes.of({ 'aria-label': label }),
-          initial.lint
+          initial.lint && !isDiff
             ? [
                 lintGutter(),
                 linter((editor) => latest.current.lint?.(editor) ?? Promise.resolve([]), { delay: checkDelay }),
@@ -223,8 +247,8 @@ export default function CodeEditor({
   }, [compartments, theme])
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: compartments.language.reconfigure(languageExtension(language)) })
-  }, [compartments, language])
+    viewRef.current?.dispatch({ effects: compartments.language.reconfigure(languageExtension(shownLanguage)) })
+  }, [compartments, shownLanguage])
 
   useEffect(() => {
     viewRef.current?.dispatch({ effects: compartments.readOnly.reconfigure(readOnlyExtension(readOnly)) })
@@ -236,18 +260,48 @@ export default function CodeEditor({
 
   // The marks copy the chevrons as they are drawn now, so they follow the mode and the texts.
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: compartments.foldMarks.reconfigure(foldMarks(foldIcons.current!, texts)) })
+    if (applied.current?.shape === null) {
+      viewRef.current?.dispatch({ effects: compartments.foldMarks.reconfigure(foldMarks(foldIcons.current!, texts)) })
+    }
   }, [compartments, texts, tokens])
+
+  // A line diff follows the text before, the tokens and the file's shape. The merge view keeps the text it compares
+  // with, so a new text before reaches it as the merge view's own change.
+  useEffect(() => {
+    const view = viewRef.current
+    const done = applied.current
+    if (!view || !done || original === undefined || shape === null || done.shape === null) {
+      return
+    }
+    if (done.original === original && done.tokens === tokens && done.shape === shape) {
+      return
+    }
+    applied.current = { original, tokens, shape }
+    const effects: StateEffect<unknown>[] = [compartments.diff.reconfigure(lineDiff(original, tokens, shape))]
+    if (shape === 'changed' && getChunks(view.state)) {
+      const before = getOriginalDoc(view.state)
+      const next = diffText(original)
+      if (before.toString() !== next) {
+        effects.push(
+          originalDocChangeEffect(
+            view.state,
+            ChangeSet.of({ from: 0, to: before.length, insert: next }, before.length),
+          ),
+        )
+      }
+    }
+    view.dispatch({ effects })
+  }, [compartments, original, tokens, shape])
 
   useEffect(() => {
     const view = viewRef.current
-    if (view && view.state.doc.toString() !== value) {
+    if (view && view.state.doc.toString() !== shown) {
       view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: value },
+        changes: { from: 0, to: view.state.doc.length, insert: shown },
         annotations: [external.of(true), Transaction.addToHistory.of(false)],
       })
     }
-  }, [value])
+  }, [shown])
 
   useImperativeHandle(ref, () => ({
     goTo(line) {
@@ -336,6 +390,7 @@ function codeTexts(t: (key: string) => string): Record<string, string> {
     'Unfolded lines': t('shell.studio.code.unfolded'),
     to: t('shell.studio.code.to'),
     Completions: t('shell.studio.code.completions'),
+    '$ unchanged lines': fillText(t('shell.studio.code.unchangedLines'), { count: '$' }),
     [findField]: t('shell.studio.json.findField'),
     [findCount]: fillText(t('shell.studio.json.findCount'), { current: '$1', count: '$2' }),
     [findNone]: t('shell.studio.json.findNone'),
