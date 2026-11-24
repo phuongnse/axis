@@ -373,25 +373,49 @@ describe('TaskPage', () => {
     ).toEqual(['Record'])
   })
 
-  it('puts the outcomes on the heading as one group named Decision, after the commands', async () => {
-    stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands: ['claim', 'release', 'reassign'] } }] })
+  it('puts the outcomes first as one group named Decision, and folds Release and Reassign… into More actions', async () => {
+    const api = stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands: ['release', 'reassign'] } }] })
 
     renderPage()
 
     await screen.findByTestId('field-value-title')
     const actions = screen.getByTestId('page-actions')
-    expect(
-      within(actions)
-        .getAllByRole('button')
-        .map((button) => button.textContent),
-    ).toEqual(['Release', 'Claim', 'Reassign…', 'Approve', 'Return', 'Reject'])
     const group = within(actions).getByRole('group', { name: 'Decision' })
     expect(
       within(group)
         .getAllByRole('button')
         .map((button) => button.textContent),
     ).toEqual(['Approve', 'Return', 'Reject'])
+    expect(screen.queryByRole('button', { name: 'Release' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reassign…' })).not.toBeInTheDocument()
     expect(within(screen.getByTestId('task-form')).queryByRole('button')).not.toBeInTheDocument()
+
+    await userEvent.click(within(actions).getByRole('button', { name: 'More actions' }))
+    const menu = await screen.findByRole('menu', { name: 'More actions' })
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Release', 'Reassign…'])
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Release' }))
+
+    await waitFor(() => expect(api.commands()).toEqual([`${tasksPath}/${taskId}/release`]))
+  })
+
+  it('keeps one command as a button beside the Decision group, with no More actions menu', async () => {
+    stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands: ['claim'] } }] })
+
+    renderPage()
+
+    await screen.findByTestId('field-value-title')
+    const actions = screen.getByTestId('page-actions')
+    expect(
+      within(within(actions).getByRole('group', { name: 'Decision' }))
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Approve', 'Return', 'Reject'])
+    expect(within(actions).getByRole('button', { name: 'Claim' })).toBeInTheDocument()
+    expect(within(actions).queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
   it('shows one outcome as a plain button', async () => {
@@ -630,15 +654,12 @@ describe('TaskPage', () => {
   })
 
   it('shows Claim, Release and Reassign exactly as the commands list them', async () => {
-    for (const [commands, buttons] of [
-      [[], []],
-      [['claim'], ['Claim']],
-      [['release'], ['Release']],
-      [['reassign'], ['Reassign…']],
-      [
-        ['claim', 'release', 'reassign'],
-        ['Claim', 'Release', 'Reassign…'],
-      ],
+    for (const [commands, buttons, entries] of [
+      [[], [], []],
+      [['claim'], ['Claim'], []],
+      [['release'], ['Release'], []],
+      [['reassign'], ['Reassign…'], []],
+      [['claim', 'release', 'reassign'], [], ['Release', 'Claim', 'Reassign…']],
     ] as const) {
       stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands } }] })
       const { unmount } = renderPage()
@@ -647,7 +668,12 @@ describe('TaskPage', () => {
       expect(screen.queryByRole('button', { name: 'Claim' }) !== null).toBe(buttons.includes('Claim' as never))
       expect(screen.queryByRole('button', { name: 'Release' }) !== null).toBe(buttons.includes('Release' as never))
       expect(screen.queryByRole('button', { name: 'Reassign…' }) !== null).toBe(buttons.includes('Reassign…' as never))
-      expect(screen.getAllByRole('button')).toHaveLength(buttons.length + 3)
+      // The three outcomes, and the More actions button when the commands fold into it.
+      expect(screen.getAllByRole('button')).toHaveLength(buttons.length + 3 + (entries.length > 0 ? 1 : 0))
+      if (entries.length > 0) {
+        await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
+        expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual(entries)
+      }
       unmount()
     }
   })

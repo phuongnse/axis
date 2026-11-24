@@ -100,9 +100,10 @@ form of its step over the subject record and a button for each outcome.
 - **Facts.** The first part of the page is two facts, one to a row: Record ("Bản ghi", the inbox's column
   name), which is the subject record as a link, see [opening things](actions-and-controls.md#opening-things), and Due,
   when the step has a `dueIn`. Neither is a read-only field of the form below, because the form belongs to the step.
-- **Actions on the heading.** Release, Claim and Reassign… are secondary buttons on the heading's right.
-  The outcomes follow them as one group named Decision ("Quyết định", `shell.task.outcomes`), see
-  [buttons](actions-and-controls.md#buttons). A group of one is a plain `main` button.
+- **Actions on the heading.** The outcomes come first, as one group named Decision ("Quyết định",
+  `shell.task.outcomes`), see [buttons](actions-and-controls.md#buttons). A group of one is a plain `main` button.
+  Release, Claim and Reassign… follow it as secondary buttons. With three or more actions in all, and two or more of
+  those commands, the commands fold into one More actions menu, see [menus](actions-and-controls.md#menus).
 - **Saving.** A change to the form saves through the [save bar](studio-resource-form.md#save-bar), which
   sends the changed values and the record's `version` to [saving a task](task-api.md#saving-a-task). That leaves the
   task open, and the page shows the saved record as the form's new start, so the bar goes away and a later outcome sends

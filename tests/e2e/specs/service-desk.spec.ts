@@ -160,9 +160,14 @@ test("lead claims a triage task so lead-2 no longer lists it, then reassigns it 
   await useSession(page, "lead");
   await openTask(page, title, "Triage ticket");
   await page.getByRole("button", { name: "Claim", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Release", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Reassign…", exact: true })).toBeVisible();
+  // The outcomes stay on the heading, so Release and Reassign… fold into its More actions menu.
+  const heading = page.getByTestId("page-actions");
+  await heading.getByRole("button", { name: "More actions", exact: true }).click();
+  const more = page.getByRole("menu", { name: "More actions", exact: true });
+  await expect(more.getByRole("menuitem", { name: "Release", exact: true })).toBeVisible();
+  await expect(more.getByRole("menuitem", { name: "Reassign…", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Claim", exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   // The claim hides the task from the other lead.
   await useSession(page, "lead-2");
@@ -190,7 +195,11 @@ test("lead claims a triage task so lead-2 no longer lists it, then reassigns it 
   }).toPass({ timeout: 30_000 });
   await expect(row.getByText(/^Claimed by .+ \(you\)$/)).toBeVisible();
   await row.getByRole("link", { name: "Triage ticket", exact: true }).click();
-  await page.getByRole("button", { name: "Reassign…", exact: true }).click();
+  await page.getByTestId("page-actions").getByRole("button", { name: "More actions", exact: true }).click();
+  await page
+    .getByRole("menu", { name: "More actions", exact: true })
+    .getByRole("menuitem", { name: "Reassign…", exact: true })
+    .click();
 
   const dialog = await waitForDialog(page);
   await dialog.getByRole("radio", { name: "Person", exact: true }).check();
