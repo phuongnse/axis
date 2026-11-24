@@ -1,8 +1,9 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
+import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { ContentInsetContext } from './contentInsetContext'
 import { spacingTokens } from './designTokens'
-import { PageActions, PageLayout } from './PageLayout'
+import { PageActions, PageLayout, PageName } from './PageLayout'
 import { ThemeModeProvider } from './theme'
 
 describe('PageLayout', () => {
@@ -135,5 +136,40 @@ describe('PageLayout', () => {
 
     expect(screen.getByRole('button', { name: 'Activate…' })).toBeInTheDocument()
     expect(within(screen.getByTestId('page-actions')).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('names the heading through PageName, with its line, and gives the title back when it unmounts', () => {
+    function Named({ show }: { show: boolean }) {
+      return show ? <PageName name="Buy paper" line="Note" /> : null
+    }
+    function Page() {
+      const [show, setShow] = useState(true)
+      return (
+        <ThemeModeProvider>
+          <PageLayout title="Purchase requests">
+            <button type="button" onClick={() => setShow(false)}>
+              Hide name
+            </button>
+            <Named show={show} />
+          </PageLayout>
+        </ThemeModeProvider>
+      )
+    }
+    render(<Page />)
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Buy paper' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-heading')).getByText('Note')).toBeInTheDocument()
+
+    act(() => screen.getByRole('button', { name: 'Hide name' }).click())
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Purchase requests' })).toBeInTheDocument()
+    expect(screen.queryByText('Note')).not.toBeInTheDocument()
+  })
+
+  it('draws nothing and names no heading outside a page', () => {
+    render(<PageName name="Buy paper" line="Note" />)
+
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    expect(screen.queryByText('Note')).not.toBeInTheDocument()
   })
 })

@@ -281,7 +281,10 @@ function SitePage({
   return (
     <PageLayout title={t(page.titleKey)}>
       <RecordList value={recordListFor(trail, page.name)}>
-        <WidgetTree widgets={page.widgets} renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} />} />
+        <WidgetTree
+          widgets={page.widgets}
+          renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} namesPage={widget === recordPageDetail} />}
+        />
       </RecordList>
     </PageLayout>
   )
