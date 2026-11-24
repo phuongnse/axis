@@ -1037,7 +1037,6 @@
   "shell.studio.module.resetElement": "Đặt lại theo mô-đun",
   "shell.studio.module.resetElementName": "Đặt lại theo mô-đun {name}",
   "shell.studio.id": "ID",
-  "shell.studio.file": "Tệp",
   "shell.studio.loadFailed": "Không tải được Studio.",
   "shell.studio.forbidden.title": "Không mở được Studio",
   "shell.studio.forbidden.message": "Bạn cần vai trò tác giả để dùng Studio.",
