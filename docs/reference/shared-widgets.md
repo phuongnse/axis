@@ -20,8 +20,8 @@ one.
 - **A shared widget keeps no space around itself**. It draws no margin outside
   itself, and the screen that places it gives the space, so the widget sits in a card's gap as in a
   form's layout.
-- **Ant Design through its documented API** _(planned for M35)_. Axis uses Ant Design only through its
-  documented props, tokens and class names, so an upgrade of Ant Design does not break a screen.
+- **Ant Design through its documented API**. Axis uses Ant Design only through its documented props, tokens
+  and semantic `classNames` and `styles`, never its `.ant-` class names, so an upgrade of Ant Design does not break a screen.
 - **Every button is an `AxisButton`**. `AxisButton.tsx` is the one file that draws Ant Design's `Button`,
   so `axis/no-antd-button` holds with no disable comment.
 
@@ -171,3 +171,6 @@ Each name with a capital letter that a row without a planned marker names is exp
 Design's names and the rows that name a server path are left out. Each `Axis` widget that the SPA exports
 is named in the table. The same test refuses a `<ul>` that is neither styled by `useBulletList` nor a plain list
 with `listStyle: 'none'`. It reads the source text, so it does not see a list built with `createElement`.
+The same test refuses a `.ant-` selector in any SPA source file outside the test files and `web/src/test/`, with no
+allow-list. Test files may still find elements by Ant Design's classes, because they read its markup and do not style
+it. It reads each line of source text, so it does not see a class name built from parts.

@@ -268,7 +268,9 @@ What an agent did is recorded, but never the content it read or wrote.
   and none when it answers an accept that is already queued or running or reads one.
 - **Consent revocation.** A [revoke](user-administration.md#outside-mcp-clients) writes an audit record in the tenant
   database and one in the platform database, see [audit actions](audit-records-and-sequence-counters.md#audit-actions).
-- **Consent** _(planned for M35)_. A consent that a person gives writes an audit record in the realm and a platform audit
-  record in Axis.
+- **Consent** _(planned for M35)_. A consent that a person gives writes a platform audit record in Axis.
+- **Consent in the realm.** The realm stores no consent event, because Axis does not turn on the realm's stored
+  events. Keycloak records a consent given on its consent page only as a detail of its sign-in event, not as an
+  event of its own.
 - **Logs.** The server logs each call's tool, client id and outcome, and the
   [log inventory](log-inventory.md#security-events) lists the event.
