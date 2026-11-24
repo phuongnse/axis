@@ -3,6 +3,7 @@ import { Flex } from 'antd'
 import type { ReactNode } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { BodyView } from './BodyView'
+import { changeLook } from './changeTint'
 import { CopyableId } from './CopyableId'
 import { EventTime } from './EventTime'
 import { EmptyState } from './EmptyState'
@@ -144,14 +145,10 @@ function valueText(t: Translate, value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value)
 }
 
-/** The tint of a state colour, which the design tokens give as a seed, as a fill under a line of text. */
-function tint(seed: string): string {
-  return `color-mix(in srgb, ${seed} 16%, transparent)`
-}
-
 /**
  * A changed field as a diff: the value before on a "−" line on the `danger` tint and the value after on a "+" line on the
- * `success` tint. Both lines are hidden from a screen reader, which reads "Changed from X to Y" instead.
+ * `success` tint. Each mark is coloured, and its value stays in the text colour. Both lines are hidden from a screen
+ * reader, which reads "Changed from X to Y" instead.
  */
 function ChangeDiff({ change }: { change: RunChange }) {
   const t = useText()
@@ -159,11 +156,17 @@ function ChangeDiff({ change }: { change: RunChange }) {
   const before = valueText(t, change.before)
   const after = valueText(t, change.after)
   const line = { padding: `0 ${spacing.xs}px`, overflowWrap: 'anywhere' as const }
+  const removed = changeLook('removed', colour)
+  const added = changeLook('added', colour)
   return (
     <div>
       <span style={visuallyHidden}>{fillText(t('shell.inspector.run.changedFrom'), { before, after })}</span>
-      <div aria-hidden style={{ ...line, background: tint(colour.danger) }}>{`− ${before}`}</div>
-      <div aria-hidden style={{ ...line, background: tint(colour.success) }}>{`+ ${after}`}</div>
+      <div aria-hidden style={{ ...line, background: removed.tint }}>
+        <span style={{ color: removed.markColour }}>{removed.mark}</span> {before}
+      </div>
+      <div aria-hidden style={{ ...line, background: added.tint }}>
+        <span style={{ color: added.markColour }}>{added.mark}</span> {after}
+      </div>
     </div>
   )
 }
