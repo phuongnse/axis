@@ -70,7 +70,7 @@ their own controls where they expect them.
   from under the header to the footer. One shows at a time, so opening one, such as the problems panel or the Ask AI
   request panel, closes the other. It holds details or tools for what is chosen, while the page stays in use. A part of
   what the page edits opens in the panel, and a short task that stands alone is a dialog, as
-  [opening things](actions-and-controls.md#opening-things) says. A handle on its edge, a `separator` that takes the
+  [opening things](actions-and-controls.md#opening-things) says. Its handle is the one [handle on a rule](#layout). It takes the
   arrow keys, Home and End, sets its width from `sidePanel` to half the shell, and the browser keeps that width, so
   every side panel opens at the width last chosen. The handle is there above narrow width only, see [narrow width](frontend.md#narrow-width). Its title can carry a `status`, such as a `StatusTag`, and a line under it. Its head
   stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
@@ -159,7 +159,7 @@ their own controls where they expect them.
 - **The layout follows the work**. A region puts what to act on first, then the input, the action and the
   result. An action sits after what it acts on, at the foot of its region when the input can be long, and the result
   comes after it.
-- **A handle on a rule** _(planned, #5129)_. Every size handle, the side panel's included, is one handle: a grip of two bars
+- **A handle on a rule**. Every size handle, the side panel's included, is one handle: a grip of two bars
   in `border` at the middle of its rule, lying over the rule, and the rule and the grip turn `primary` under the
   pointer or a drag. `ResizeHandle` draws it.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area.
