@@ -170,9 +170,25 @@ readOnly: true
 {{- end }}
 {{- end }}
 
+{{/*
+The settings of the key service of every host that reads the installation key. Renders nothing without
+keyService.kind. Call with the root context or a dict that holds the Values.
+*/}}
+{{- define "axis.keyServiceEnv" -}}
+{{- with .Values.keyService.kind -}}
+- name: KeyService__Kind
+  value: {{ . | quote }}
+- name: KeyService__KeyId
+  value: {{ required "keyService.keyId is required with keyService.kind: the AWS KMS key that unwraps the installation key" $.Values.keyService.keyId | quote }}
+{{- end -}}
+{{- end }}
+
 {{/* The environment settings that server and worker share. Call with the root context. */}}
 {{- define "axis.hostEnv" -}}
 {{ include "axis.tenancyEnv" . }}
+{{- with include "axis.keyServiceEnv" . }}
+{{ . }}
+{{- end }}
 - name: Extensions__Path
   value: /extensions
 - name: Modules__Path

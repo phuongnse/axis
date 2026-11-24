@@ -116,7 +116,18 @@ public sealed class KeyServiceTests : IDisposable
     {
         var exception = Assert.Throws<InvalidOperationException>(() => KeyService.Load(Configure(("KeyService:Kind", "vault-of-secrets"), ("KeyService:KeyFile", "x"))));
 
-        Assert.Equal("The setting KeyService:Kind must be file.", exception.Message);
+        Assert.Equal("The setting KeyService:Kind must be file or aws-kms.", exception.Message);
+        Assert.DoesNotContain("vault-of-secrets", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    public void The_aws_kms_kind_without_a_key_id_names_that_setting(string? keyId)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => KeyService.Load(Configure(("KeyService:Kind", "aws-kms"), ("KeyService:KeyId", keyId))));
+
+        Assert.Equal("The setting KeyService:KeyId is required.", exception.Message);
     }
 
     [Fact]

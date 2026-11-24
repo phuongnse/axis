@@ -1,10 +1,14 @@
+using System.Net;
 using System.Security.Cryptography;
+using System.Text;
 using Axis.Admin;
 using Axis.Tenancy.Keys;
 using Microsoft.Extensions.Configuration;
 
 namespace Axis.Integration.Tests;
 
+// The AWS settings below are read by the process, so the class runs alone.
+[Collection(AwsEnvironment.Name)]
 public sealed class AdminKeyWrapTests : IDisposable
 {
     private readonly string _folder = Directory.CreateTempSubdirectory("axis-key-wrap-tests-").FullName;
@@ -49,6 +53,63 @@ public sealed class AdminKeyWrapTests : IDisposable
 
         Assert.Equal(0, exit);
         Assert.Equal(pem, KeyService.Load(configuration)!.Unwrap(KeyService.AgentHostKey, "Ai:HostKeyFile", output.ToString()).Reveal());
+    }
+
+    [Fact]
+    public async Task Wrap_at_aws_kms_that_refuses_exits_1_and_names_the_key_id_setting_and_holds_no_key_or_message()
+    {
+        const string keyId = "arn:aws:kms:eu-west-1:111122223333:key/0a1b2c3d-4e5f-6789-abcd-ef0123456789";
+        using var listener = new HttpListener();
+        var port = Random.Shared.Next(20000, 60000);
+        listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        listener.Start();
+        var served = Task.Run(async () =>
+        {
+            var context = await listener.GetContextAsync();
+            var body = Encoding.UTF8.GetBytes("""{"__type":"AccessDeniedException","message":"User: arn:aws:sts::123:assumed-role/marker-role is not authorized"}""");
+            context.Response.StatusCode = 400;
+            context.Response.ContentType = "application/x-amz-json-1.1";
+            context.Response.Headers["x-amzn-ErrorType"] = "AccessDeniedException";
+            await context.Response.OutputStream.WriteAsync(body, CancellationToken);
+            context.Response.Close();
+        }, CancellationToken);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["KeyService:Kind"] = "aws-kms",
+            ["KeyService:KeyId"] = keyId,
+        }).Build();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var settings = new Dictionary<string, string?>
+        {
+            ["AWS_ENDPOINT_URL_KMS"] = $"http://127.0.0.1:{port}",
+            ["AWS_ACCESS_KEY_ID"] = "test",
+            ["AWS_SECRET_ACCESS_KEY"] = "test",
+            ["AWS_MAX_ATTEMPTS"] = "1",
+        };
+        var before = settings.ToDictionary(setting => setting.Key, setting => Environment.GetEnvironmentVariable(setting.Key));
+        int exit;
+        try
+        {
+            foreach (var setting in settings)
+            {
+                Environment.SetEnvironmentVariable(setting.Key, setting.Value);
+            }
+
+            exit = await AdminCommands.RunAsync(["platform", "key", "wrap", "--purpose", KeyService.InstallationKey], configuration, new StringReader("key-text-marker"), output, error, CancellationToken);
+        }
+        finally
+        {
+            foreach (var setting in before)
+            {
+                Environment.SetEnvironmentVariable(setting.Key, setting.Value);
+            }
+        }
+
+        await served;
+        Assert.Equal(1, exit);
+        Assert.Equal("", output.ToString());
+        Assert.Equal("The key does not wrap at the key of KeyService:KeyId (AccessDeniedException)." + Environment.NewLine, error.ToString());
     }
 
     [Fact]
@@ -131,4 +192,11 @@ public sealed class AdminKeyWrapTests : IDisposable
 
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
     }
+}
+
+/// <summary>The collection of the tests that set the environment variables of the AWS SDK, which the whole process reads.</summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class AwsEnvironment
+{
+    public const string Name = "AWS environment";
 }
