@@ -383,7 +383,7 @@ describe('StudioChanges folded', () => {
     const buyer: LiveFile = { ...files[1], titles: null, by: [revision('c', null, 'Axis')] }
     renderWith(
       [buyer],
-      { application: 'PurchaseRequests', authors: (file: LiveFile) => changeAuthors(file.by, 'author', new Map()) },
+      { application: 'PurchaseRequests', authors: (file: LiveFile) => changeAuthors(file.by, new Map()) },
       true,
     )
 
