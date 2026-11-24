@@ -4,7 +4,7 @@ using Axis.Tenancy.Keys;
 namespace Axis.Agent;
 
 /// <summary>
-/// The key pair of the agent host, read from <c>Ai:HostKeyFile</c>, an EC P-256 private key as PEM. A value that is sealed with the public
+/// The key pair of the agent host, read from <c>Ai:HostKeyFile</c>, an EC P-256 private key as PEM, or wrapped by the key service. A value that is sealed with the public
 /// half, see <see cref="Hpke"/>, opens only here: the server and the installation key hold no private half. The agent host publishes the
 /// public half and the key id, the RFC 7638 thumbprint, and never the private half. See
 /// <c>docs/reference/keys-and-data-protection.md#cryptographic-inventory</c>.
@@ -28,9 +28,14 @@ public sealed class AgentHostKey : IDisposable
     /// <summary>The public key as the uncompressed point, 65 bytes: <c>0x04 || X || Y</c>.</summary>
     public byte[] PublicKey { get; }
 
-    /// <summary>Reads the key file. The messages name the setting and never the path.</summary>
-    /// <exception cref="InvalidOperationException">The file cannot be read or does not hold an EC P-256 private key.</exception>
-    public static AgentHostKey Load(string file)
+    /// <summary>
+    /// Reads the key file. With a <paramref name="keyService"/>, the file holds the wrapped private key and not the PEM, and the key service
+    /// unwraps it first. The messages name the setting and never the path or a value.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The file cannot be read, does not unwrap with the key service, or does not hold an EC P-256 private key.
+    /// </exception>
+    public static AgentHostKey Load(string file, IKeyService? keyService)
     {
         string pem;
         try
@@ -41,6 +46,11 @@ public sealed class AgentHostKey : IDisposable
         {
             // The exception is not kept: its message holds the path.
             throw new InvalidOperationException($"'{AiSettings.HostKeyFileSetting}' names a file that cannot be read.");
+        }
+
+        if (keyService is not null)
+        {
+            pem = keyService.Unwrap(KeyService.AgentHostKey, AiSettings.HostKeyFileSetting, pem).Reveal();
         }
 
         var key = ECDiffieHellman.Create();

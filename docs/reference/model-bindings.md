@@ -50,7 +50,7 @@ The agent host reads these settings:
 | `Ai:RequestTokenBudget`              | Tokens per request, 2,000,000 by default, see [budgets](authoring-requests.md#budgets)                 |
 | `Ai:RequestTimeout`                  | Time per request after the plan's approval, 30 minutes by default, see [budgets](authoring-requests.md#budgets) |
 | `Ai:ScriptedAnswersFile`             | A JSON file of recorded answers, each shaped as a Messages API response. With it, every binding replays them in order. Development and Testing only |
-| `Ai:HostKeyFile`                     | A file that holds the agent host's own private key, an EC P-256 key in PEM form. Optional, and read only with `Ai:DefaultBinding` set. See [AI settings](host-settings.md#ai-settings) |
+| `Ai:HostKeyFile`                     | A file that holds the agent host's own private key, an EC P-256 key in PEM form, or with `KeyService:Kind` set the wrapped key that `platform key wrap --purpose agent-host-key` prints. Optional, and read only with `Ai:DefaultBinding` set. See [AI settings](host-settings.md#ai-settings) |
 
 - **Bad values.** An unknown kind, a missing model, a key file that cannot be read, a
   `MaxOutputTokens` that is not a whole number of at least 1, a default or review binding that names

@@ -75,6 +75,9 @@ internal static partial class AdminCommands
 
     public const string SmtpPasswordSetting = "AXIS_SMTP_PASSWORD";
 
+    /// <summary>The option of <c>tenant backup</c> and <c>tenant restore</c> that names the backup key file.</summary>
+    internal const string BackupKeyFileOption = "--backup-key-file";
+
     public const string PathSetting = "PATH";
 
     public const string StudioApplicationsPathSetting = "Studio:ApplicationsPath";
@@ -111,6 +114,7 @@ internal static partial class AdminCommands
                tenant host remove <id> <host>
                tenant host move <host> --to <id>
                platform rekey
+               platform key wrap --purpose installation-key|agent-host-key
                cell operator invite <email>
                cell operator client add <name>
                cell backup
@@ -227,6 +231,7 @@ internal static partial class AdminCommands
         new("migrate", AuditMark.OnePerTenant, run => MigrateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("platform rekey", AuditMark.OnePerRun, run => RekeyAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("platform key wrap", AuditMark.None, KeyWrapAsync),
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
         new("cell operator client add", AuditMark.OnePerRun, CellOperatorClient.AddAsync),
         new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
@@ -251,6 +256,43 @@ internal static partial class AdminCommands
 
         run.Output.WriteLine(typeof(AdminCommands).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
         return Task.FromResult(0);
+    }
+
+    // Touches no tenant and no database, like version. The host checks the unwrapped key at start, so the command does not check the input.
+    private static async Task<int> KeyWrapAsync(AdminRun run)
+    {
+        if (run.Args.Length != 5 || run.Args[3] != "--purpose" || run.Args[4] is not (KeyService.InstallationKey or KeyService.AgentHostKey))
+        {
+            run.Error.WriteLine(Usage);
+            return 2;
+        }
+
+        IKeyService? keyService;
+        try
+        {
+            keyService = KeyService.Load(run.Configuration);
+        }
+        catch (InvalidOperationException exception)
+        {
+            run.Error.WriteLine(exception.Message);
+            return 2;
+        }
+
+        if (keyService is null)
+        {
+            run.Error.WriteLine($"The setting {KeyService.KindSetting} is required.");
+            return 2;
+        }
+
+        var key = (await run.Input.ReadToEndAsync(run.CancellationToken)).TrimEnd('\r', '\n');
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            run.Error.WriteLine("The key is required on standard input.");
+            return 2;
+        }
+
+        run.Output.WriteLine(keyService.Wrap(run.Args[4], key));
+        return 0;
     }
 
     private static async Task<int> CreateAsync(
@@ -776,7 +818,7 @@ internal static partial class AdminCommands
         }
         else
         {
-            backupKey = BackupKeyFile.Read(request.BackupKeyFile!, out problem);
+            backupKey = KeyFile.Read(request.BackupKeyFile!, out problem, BackupKeyFileOption);
             if (backupKey is null)
             {
                 error.WriteLine(problem);
@@ -912,7 +954,7 @@ internal static partial class AdminCommands
         }
         else
         {
-            backupKey = BackupKeyFile.Read(request.BackupKeyFile!, out problem);
+            backupKey = KeyFile.Read(request.BackupKeyFile!, out problem, BackupKeyFileOption);
             if (backupKey is null)
             {
                 error.WriteLine(problem);
@@ -983,7 +1025,7 @@ internal static partial class AdminCommands
                 case "--tenant" when id is null:
                     id = value;
                     break;
-                case BackupKeyFile.Option when keyFile is null:
+                case BackupKeyFileOption when keyFile is null:
                     keyFile = value;
                     break;
                 case "--from" when from is null:
@@ -1019,7 +1061,7 @@ internal static partial class AdminCommands
                 case "--out" when file is null:
                     file = args[i + 1];
                     break;
-                case BackupKeyFile.Option when keyFile is null:
+                case BackupKeyFileOption when keyFile is null:
                     keyFile = args[i + 1];
                     break;
                 default:

@@ -1,19 +1,20 @@
-namespace Axis.Admin;
+using Axis.Tenancy.Platform;
+
+namespace Axis.Tenancy.Keys;
 
 /// <summary>
-/// The backup key of <c>tenant backup</c> and <c>tenant restore</c>: 32 bytes in base64 in a file, never on the command line or in a setting.
-/// The operator keeps it outside the installation. A message never holds the content of the file.
-/// The cell's backup key, <c>Cell:BackupKeyFile</c>, has the same form, and a message then names that setting.
+/// A key file: 32 bytes in base64 in a file, never on the command line or in a setting. It is the form of the backup key of
+/// <c>tenant backup</c> and <c>tenant restore</c>, of the cell's backup key, <c>Cell:BackupKeyFile</c>, and of the key file of the key
+/// service, <c>KeyService:KeyFile</c>. The operator keeps it outside the installation. A message names where the path came from, for
+/// example the setting, and never holds the path or the content of the file.
 /// </summary>
-internal static class BackupKeyFile
+public static class KeyFile
 {
-    public const string Option = "--backup-key-file";
-
     // A key in base64 is 44 characters. More than this is not a key.
     private const long MaxFileBytes = 4096;
 
     /// <summary>Returns the key, or null with the reason in <paramref name="problem"/> when the file cannot be read or does not hold a key.</summary>
-    public static byte[]? Read(string path, out string problem, string source = Option)
+    public static byte[]? Read(string path, out string problem, string source)
     {
         string text;
         try
@@ -34,15 +35,15 @@ internal static class BackupKeyFile
             return null;
         }
 
-        var buffer = new byte[BackupArchive.KeySize + 4];
-        if (!Convert.TryFromBase64String(text, buffer, out var length) || length != BackupArchive.KeySize)
+        var buffer = new byte[TenantSecretCipher.KeySize + 4];
+        if (!Convert.TryFromBase64String(text, buffer, out var length) || length != TenantSecretCipher.KeySize)
         {
             problem = Malformed(source);
             return null;
         }
 
         problem = "";
-        return buffer[..BackupArchive.KeySize];
+        return buffer[..TenantSecretCipher.KeySize];
     }
 
     private static string Unreadable(string source) => $"The {source} file cannot be read.";
