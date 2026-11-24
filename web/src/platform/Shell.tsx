@@ -218,7 +218,10 @@ export function Shell({
                 onClick={() => setCollapsed(!collapsed)}
               />
             )}
-            <Link to={home} style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, minWidth: 0 }}>
+            <Link
+              to={home}
+              style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, minWidth: 0, textDecoration: 'none' }}
+            >
               <SiteMark title={t(titleKey)} />
               <Typography.Text strong ellipsis>
                 {t(titleKey)}
