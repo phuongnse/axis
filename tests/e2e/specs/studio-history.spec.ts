@@ -95,12 +95,9 @@ test.describe("Studio shows the history of an application and undoes a revision"
       page.getByRole("link", { name: "Back to History", exact: true }),
     ).toHaveCount(0);
     await expect(change).toHaveAttribute("data-file", roleFile);
-    await expect(change.getByTestId("json-diff-before")).toContainText(
-      "role.employee.first",
-    );
-    await expect(change.getByTestId("json-diff-after")).toContainText(
-      "role.employee.second",
-    );
+    const diff = change.getByRole("textbox");
+    await expect(diff).toContainText("role.employee.first");
+    await expect(diff).toContainText("role.employee.second");
 
     await openHistory(page);
     await rows

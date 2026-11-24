@@ -1,10 +1,11 @@
 import { Flex, Typography } from 'antd'
-import { lazy, Suspense, useContext, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useContext, useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { AxisButton } from '../platform/AxisButton'
-import { CodeBlock } from '../platform/CodeBlock'
+import { changeLook } from '../platform/changeTint'
 import { EmptyDash } from '../platform/EmptyValue'
 import { FilledText } from '../platform/FilledText'
+import { FocusRingStyle } from '../platform/FocusRingStyle'
+import { FoldButton } from '../platform/FoldButton'
 import { fillText } from '../platform/fillText'
 import { keyedListsOf, layerMarks } from '../platform/layerMarks'
 import {
@@ -20,9 +21,11 @@ import { studioRequestAddress } from '../platform/studioAddress'
 import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { visuallyHidden } from '../platform/visuallyHidden'
 import { PlatformContext } from './context'
 import { fileLanguage } from './fileLanguage'
 import { LayerMarkLabel } from './LayerMarkViews'
+import { lineCounts } from './lineDiff'
 
 const CodeEditor = lazy(() => import('./CodeEditor'))
 
@@ -45,33 +48,6 @@ function parsedJson(text: string | null): unknown {
   } catch {
     return null
   }
-}
-
-/** One side of a diff: its title over the JSON text, or over the em dash where the file does not exist. */
-function Side({ testId, title, text }: { testId: string; title: string; text: string | null }) {
-  const { colour, spacing } = useDesignTokens()
-  return (
-    <Flex vertical gap={spacing.xs} style={{ minWidth: 0 }}>
-      <Typography.Text style={{ color: colour.textMuted }}>{title}</Typography.Text>
-      <CodeBlock testId={testId} text={text === null ? null : prettyJson(text)} />
-    </Flex>
-  )
-}
-
-/**
- * The JSON of one file before and after a change, side by side, each indented. A side where the file does not exist is
- * null and shows the em dash. It does not mark the changed lines. Shared widgets are in
- * docs/reference/shared-widgets.md#which-widget.
- */
-export function JsonDiff({ before, after }: { before: string | null; after: string | null }) {
-  const t = useText()
-  const { spacing } = useDesignTokens()
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing.md }}>
-      <Side testId="json-diff-before" title={t('shell.studio.history.before')} text={before} />
-      <Side testId="json-diff-after" title={t('shell.studio.history.after')} text={after} />
-    </div>
-  )
 }
 
 /**
@@ -144,10 +120,52 @@ function LayerMarks({ module }: { module: AuthoringRequestLayerChange }) {
 }
 
 /**
- * One changed file: its name, its kind, its change and, when `folded`, a Show the diff link that opens its diff. A layer
- * file is named by the module resource it changes and shows that resource's JSON and its marks. A package file shows
- * the line diff of `CodeEditor`, and a resource shows its JSON, see docs/reference/studio-packages.md#diffs. `changedBy`
- * is the line of who changed the file, or null.
+ * The lines a file added and removed, as "+8" in the added colour and "−3" in the removed colour, each left out when it
+ * is zero. The marks and colours are those of the line diff, from `changeLook`. Assistive technology reads them in
+ * full, such as "8 lines added, 3 lines removed", joined in the locale's list format.
+ */
+function LineCounts({ added, removed }: { added: number; removed: number }) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const spoken = [
+    added > 0 &&
+      fillText(t(added === 1 ? 'shell.studio.changes.linesAdded.one' : 'shell.studio.changes.linesAdded.many'), {
+        count: `${added}`,
+      }),
+    removed > 0 &&
+      fillText(t(removed === 1 ? 'shell.studio.changes.linesRemoved.one' : 'shell.studio.changes.linesRemoved.many'), {
+        count: `${removed}`,
+      }),
+  ].filter((part): part is string => part !== false)
+  const addedLook = changeLook('added', colour)
+  const removedLook = changeLook('removed', colour)
+  return (
+    <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
+      {added > 0 && (
+        <Typography.Text aria-hidden style={{ color: addedLook.markColour }}>
+          {addedLook.mark}
+          {added}
+        </Typography.Text>
+      )}
+      {removed > 0 && (
+        <Typography.Text aria-hidden style={{ color: removedLook.markColour }}>
+          {removedLook.mark}
+          {removed}
+        </Typography.Text>
+      )}
+      <span style={visuallyHidden}>{new Intl.ListFormat(locale, { type: 'unit', style: 'long' }).format(spoken)}</span>
+    </Flex>
+  )
+}
+
+/**
+ * One changed file as a block, see docs/reference/ai-authoring-in-studio.md#revisions: a border and a header with the
+ * file's {@link FoldButton}, its name, its kind, its change and its line counts, then who changed it and the marks of a
+ * layer file, then the file's line diff of `CodeEditor`. The diff is drawn while the file is folded, so the counts stay
+ * true, and it is hidden. The block is open at first unless `folded`. A layer file is named by the module resource it
+ * changes, and a resource shows its indented JSON as a package file shows its text. `changedBy` is the line of who
+ * changed the file, or null. Shared widgets are in docs/reference/shared-widgets.md#which-widget.
  */
 function ChangeFile({
   row,
@@ -161,13 +179,32 @@ function ChangeFile({
   changedBy: ReactNode
 }) {
   const t = useText()
-  const { colour } = useDesignTokens()
-  const [open, setOpen] = useState(false)
+  const { colour, radius, spacing } = useDesignTokens()
+  const [open, setOpen] = useState(!folded)
+  const bodyId = useId()
   const module = file?.module
+  const packageText = row.packageFile && module === undefined
+  const side = (text: string | null) => (text === null ? '' : packageText ? text : prettyJson(text))
+  const original = side(module ? module.before : (file?.before ?? null))
+  const value = side(module ? module.after : (file?.after ?? null))
+  const language = packageText ? fileLanguage(row.name) : 'json'
+  const { added, removed } = lineCounts(original, value)
   return (
-    <section data-testid="studio-changes-file" data-file={file?.file}>
-      <Flex vertical gap="small">
-        <Flex wrap gap="small" align="baseline">
+    <section
+      data-testid="studio-changes-file"
+      data-file={file?.file}
+      data-diff-file
+      style={{ border: `1px solid ${colour.borderSubtle}`, borderRadius: radius.base, overflow: 'hidden' }}
+    >
+      <Flex vertical gap="small" style={{ padding: `${spacing.sm}px ${spacing.md}px` }}>
+        <Flex wrap gap="small" align="center">
+          <FoldButton
+            open={open}
+            onToggle={() => setOpen((current) => !current)}
+            names={{ show: 'shell.studio.changes.showDiffName', hide: 'shell.studio.changes.hideDiffName' }}
+            values={{ name: row.name }}
+            controls={bodyId}
+          />
           <Typography.Text strong>{row.name}</Typography.Text>
           <Typography.Text style={{ color: colour.textMuted }}>
             {row.kind !== null ? (
@@ -179,56 +216,29 @@ function ChangeFile({
             )}
           </Typography.Text>
           <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
-          {folded && (
-            <AxisButton
-              role="secondary"
-              aria-expanded={open}
-              aria-label={fillText(
-                t(open ? 'shell.studio.changes.hideDiffName' : 'shell.studio.changes.showDiffName'),
-                {
-                  name: row.name,
-                },
-              )}
-              onClick={() => setOpen((current) => !current)}
-            >
-              {t(open ? 'shell.studio.changes.hideDiff' : 'shell.studio.changes.showDiff')}
-            </AxisButton>
-          )}
+          <LineCounts added={added} removed={removed} />
         </Flex>
         {changedBy}
         {module !== undefined && <LayerMarks module={module} />}
-        {(!folded || open) &&
-          (row.packageFile && module === undefined ? (
-            <Suspense fallback={null}>
-              <CodeEditor
-                label={row.name}
-                value={file?.after ?? ''}
-                original={file?.before ?? ''}
-                language={fileLanguage(row.name)}
-                readOnly
-                grow
-              />
-            </Suspense>
-          ) : (
-            <JsonDiff
-              before={module ? module.before : (file?.before ?? null)}
-              after={module ? module.after : (file?.after ?? null)}
-            />
-          ))}
       </Flex>
+      <div id={bodyId} hidden={!open}>
+        <Suspense fallback={null}>
+          <CodeEditor label={row.name} value={value} original={original} language={language} readOnly grow />
+        </Suspense>
+      </div>
     </section>
   )
 }
 
 /**
- * The files a revision or a draft changed, sorted by name: each shows its name, its kind (the em dash when it has none)
- * and Added, Changed or Removed, and under them its JSON before and after as a {@link JsonDiff}. A package file shows
- * the line diff of `CodeEditor` instead, and sorts last by its path. `resources` are the
- * application's resources, which name a file's kind and title. With `folded`, each file starts closed behind Show the
- * diff, and a layer file is named by its module resource, with the layer's marks under it. With `changedBy`, the publish
- * page's files also show "Changed by" under their header, from `authors` of each file. See
- * docs/reference/shared-widgets.md#which-widget, docs/reference/ai-authoring-in-studio.md#revisions and
- * docs/reference/studio.md#publishing.
+ * The files a revision, a request's draft or the publish page changed, sorted by name, a package file last by its path.
+ * Each is a block of {@link ChangeFile}: a header with a fold, its name, its kind (the em dash when it has none), its
+ * change and its line counts over the line diff of `CodeEditor`, a resource's JSON included, open at first unless
+ * `folded`, as the publish page folds them. `resources` are the application's resources, which name a file's kind and
+ * title. A layer file is named by its module resource, with the layer's marks under its header. With `changedBy`, the
+ * publish page's files also show "Changed by" under their header, from `authors` of each file. A block draws one focus
+ * ring while its diff has focus. See docs/reference/shared-widgets.md#which-widget,
+ * docs/reference/ai-authoring-in-studio.md#revisions and docs/reference/studio.md#publishing.
  */
 export function StudioChanges<File extends StudioChangedFile>({
   files,
@@ -254,6 +264,7 @@ export function StudioChanges<File extends StudioChangedFile>({
   const byKey = new Map(files.map((file) => [`${file.change}:${file.file}`, file]))
   return (
     <Flex vertical gap="middle">
+      <FocusRingStyle selector="[data-diff-file]:has(.cm-editor:focus-within)" />
       {changeRows(changes, resources, locale, t).map((row) => {
         const file = byKey.get(row.key)
         const authors = file && changedBy ? changedBy.authors(file) : []

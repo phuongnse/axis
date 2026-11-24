@@ -146,7 +146,7 @@ empty, and its branch or outcome stays. A transition left naming a missing step 
 graph draws no edge for it. The designer never invents a step or a transition, and one Undo reverses each
 removal.
 
-- **A step** is removed by Delete in its card's "…" menu, or by Delete or Backspace in the canvas.
+- **A step** is removed by Delete in its block's "…" menu, or by Delete or Backspace in the canvas.
   Removing the selected step clears the selection.
 - **An edge.** With an edge selected, the panel shows a Remove line button above the step's panel,
   and Delete or Backspace in the canvas clears that transition instead of removing the step.
@@ -157,7 +157,7 @@ removal.
 
 ## Step panel
 
-Selecting a node opens the step's card of the Form tab beside the canvas, with a "…" menu that holds Move up,
+Selecting a node opens the step's block of the Form tab beside the canvas, with a "…" menu that holds Move up,
 Move down and Delete, with Delete last after a divider. A read-only tab shows no menu. Each move is one change of `steps`, so one Undo reverses it,
 and an edit in the panel redraws the graph. With no step selected, the panel says "Select a step on the canvas."
 The panel is drawn in [`SidePanel`](shell.md#layout), titled Step, with no close button, and it gives way while the

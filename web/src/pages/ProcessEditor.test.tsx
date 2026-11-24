@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import { setAt } from '../platform/jsonPatch'
 import type { StudioNames } from '../platform/studio'
@@ -324,7 +325,7 @@ afterEach(() => {
 describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
   beforeEach(() => localStorage.setItem('axis.themeMode', mode))
 
-  it('renders inside the theme root with a card per step and the Add step choice', () => {
+  it('renders inside the theme root with a block per step and the Add step choice', () => {
     renderEditor()
 
     const editor = screen.getByTestId('studio-process-editor')
@@ -1036,7 +1037,7 @@ const complete = {
 }
 
 describe('ProcessEditor fields', () => {
-  /** What each field is, as the step card or the form draws it: where it sits, what it is and its path. */
+  /** What each field is, as the step block or the form draws it: where it sits, what it is and its path. */
   const single: [string, 'textbox' | 'combobox' | 'switch', string][] = [
     ['studio-field-/name', 'textbox', 'name'],
     ['studio-field-/entity', 'combobox', 'entity'],
@@ -1439,5 +1440,41 @@ describe('ProcessEditor lists', () => {
         english['shell.studio.process.noEscalations'],
       ),
     ).toBeNull()
+  })
+})
+
+describe('ProcessEditor blocks', () => {
+  const rule = `1px solid ${designTokensFor('light').colour.borderSubtle}`
+
+  it('draws each step as a block under its title row, parted from the next by a rule, with no card', () => {
+    renderEditor()
+
+    expect(document.querySelector('.ant-card')).toBeNull()
+    const first = screen.getByTestId('studio-step-0')
+    const second = screen.getByTestId('studio-step-1')
+    for (const block of [first, second]) {
+      const heading = within(block).getByRole('heading', { level: 3 })
+      expect(heading.closest('section')!.firstElementChild).toHaveStyle({ borderBottom: rule })
+    }
+    expect(first.previousElementSibling).toBeNull()
+    expect(second.previousElementSibling).toHaveAttribute('role', 'separator')
+  })
+
+  it('sets apart each escalation by spacing, with no box round it', () => {
+    renderEditor(complete)
+
+    expect(screen.getByTestId('studio-field-/steps/0/escalations/0').style.border).toBe('')
+  })
+
+  it('leaves the step type select as wide as its field, with no minimum width of its own', () => {
+    renderEditor()
+
+    for (const index of [0, 1]) {
+      const root = within(screen.getByTestId(`studio-field-/steps/${index}/type`))
+        .getByRole('combobox')
+        .closest('.ant-select')
+      expect(root).toHaveStyle({ width: '100%' })
+      expect((root as HTMLElement).style.minWidth).toBe('')
+    }
   })
 })

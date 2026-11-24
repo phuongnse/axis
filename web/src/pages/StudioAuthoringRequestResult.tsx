@@ -214,7 +214,7 @@ export function StudioAuthoringRequestResult({
       {files.length > 0 && (
         <Flex vertical gap={spacing.xs}>
           <Typography.Text strong>{t('shell.studio.aiRequest.changes')}</Typography.Text>
-          <StudioChanges files={files} resources={[]} folded />
+          <StudioChanges files={files} resources={[]} />
         </Flex>
       )}
       {isAuthor && request.state === 'ready' && previewHost !== null && request.draft !== null && (

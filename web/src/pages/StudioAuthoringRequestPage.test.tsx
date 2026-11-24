@@ -1322,14 +1322,13 @@ describe('StudioAuthoringRequestPage Result item', () => {
     expect(screen.queryByRole('button', { name: 'Approve plan' })).not.toBeInTheDocument()
   })
 
-  it('lists each resource of the diff folded, and names a layer by its module resource with its marks', async () => {
+  it('lists each resource of the diff open, and names a layer by its module resource with its marks', async () => {
     const server = serverOf(request({ state: 'ready', author: 'u1', steps: [checkStep(passedChecks, 'passed')] }))
     vi.stubGlobal('fetch', server.fetch)
     renderPage({ userId: 'u1' })
 
     const files = await screen.findAllByTestId('studio-changes-file')
     expect(files).toHaveLength(2)
-    expect(screen.queryByTestId('json-diff-after')).not.toBeInTheDocument()
 
     const layer = files.find((file) => file.dataset.file === 'customizations/purchase-request.json')!
     expect(within(layer).getByText('PurchaseRequest')).toBeVisible()
@@ -1340,11 +1339,16 @@ describe('StudioAuthoringRequestPage Result item', () => {
     expect(within(layer).getByRole('note', { name: 'notes, removed by this application' })).toHaveTextContent('Removed')
     expect(within(layer).queryByRole('button', { name: /Reset/ })).not.toBeInTheDocument()
 
-    await userEvent.click(within(layer).getByRole('button', { name: 'Show the diff of PurchaseRequest' }))
-    expect(within(layer).getByTestId('json-diff-after')).toHaveTextContent('"supplier"')
+    expect(within(layer).getByRole('button', { name: 'Hide changes to PurchaseRequest', expanded: true })).toBeVisible()
+    expect(await within(layer).findByRole('textbox', { name: 'PurchaseRequest' })).toBeVisible()
+    await waitFor(() =>
+      expect(Array.from(layer.querySelectorAll('.cm-changedLine')).map((line) => line.textContent)).toContainEqual(
+        expect.stringContaining('"supplier"'),
+      ),
+    )
   })
 
-  it('shows a changed package file folded, and its Show the diff draws its line diff', async () => {
+  it('shows a changed package file open, drawing its line diff', async () => {
     const packageFile = {
       file: 'packages/approval-rules/adapter.py',
       change: 'changed' as const,
@@ -1365,15 +1369,10 @@ describe('StudioAuthoringRequestPage Result item', () => {
     const files = await screen.findAllByTestId('studio-changes-file')
     const section = files.find((file) => file.dataset.file === packageFile.file)!
     expect(within(section).getByText('Package file')).toBeVisible()
-    expect(within(section).queryByRole('textbox')).not.toBeInTheDocument()
 
-    await userEvent.click(
-      within(section).getByRole('button', { name: 'Show the diff of packages/approval-rules/adapter.py' }),
-    )
     expect(await within(section).findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })).toBeVisible()
     await waitFor(() => expect(section.querySelector('.cm-deletedLine')).toHaveTextContent('return 1000'))
     expect(section.querySelector('.cm-changedLine')).toHaveTextContent('return 5000')
-    expect(within(section).queryByTestId('json-diff-after')).not.toBeInTheDocument()
   })
 
   it("links each scenario's name to its Studio address in the checks, and leaves a skipped scenario's name as text", async () => {

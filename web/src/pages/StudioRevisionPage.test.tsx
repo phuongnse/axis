@@ -110,7 +110,12 @@ describe('StudioRevisionPage', () => {
     expect(editor).toBeVisible()
     await waitFor(() => expect(section.querySelector('.cm-deletedLine')).toHaveTextContent('return 1000'))
     expect(section.querySelector('.cm-changedLine')).toHaveTextContent('return 5000')
-    expect(within(section).queryByTestId('json-diff-before')).toBeNull()
+    expect(
+      within(section).getByRole('button', {
+        name: 'Hide changes to packages/approval-rules/adapter.py',
+        expanded: true,
+      }),
+    ).toBeVisible()
   })
 
   it('shows a revision the server made as System, in plain text, and leaves out Through without a client', async () => {

@@ -11,7 +11,7 @@ import { useText } from '../platform/texts'
 import { useFieldTexts } from './fieldTexts'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
-import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { PartBoundary, SectionPart, SectionParts } from '../platform/SectionParts'
 import { KeyInput, KeyValueRows, ScenarioStep } from './ScenarioStep'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -47,7 +47,6 @@ function StubCard({
                 <Select
                   virtual={false}
                   value={source ?? null}
-                  style={{ minWidth: 200 }}
                   options={[
                     { value: 'connector', label: t('shell.studio.scenario.connector') },
                     { value: 'operation', label: t('shell.studio.scenario.package') },
@@ -78,7 +77,6 @@ function StubCard({
                       virtual={false}
                       showSearch
                       value={typeof connector.operation === 'string' ? connector.operation : null}
-                      style={{ minWidth: 200 }}
                       options={operationNames.map((operation) => ({ value: operation, label: operation }))}
                       onChange={(next: string) => onChange(`${pointer}/connector/operation`, next)}
                     />
@@ -101,7 +99,6 @@ function StubCard({
                 <Select
                   virtual={false}
                   value={result ?? null}
-                  style={{ minWidth: 200 }}
                   options={[
                     { value: 'output', label: t('shell.studio.scenario.output') },
                     { value: 'failed', label: t('shell.studio.scenario.failed') },
@@ -228,7 +225,6 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
                         <Select
                           virtual={false}
                           mode="multiple"
-                          style={{ minWidth: 240 }}
                           value={roles}
                           options={[...new Set([...roleNames, ...roles])].map((role) => ({ value: role, label: role }))}
                           onChange={(next: string[]) => onChange(pointer, next)}
@@ -279,9 +275,13 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
           'steps',
           <>
             {steps.length === 0 && <EmptyState text={t('shell.studio.scenario.noSteps')} />}
-            {steps.map((_, index) => (
-              <ScenarioStep key={index} steps={steps} index={index} users={userNames} onChange={onChange} />
-            ))}
+            <PartBoundary>
+              <SectionParts>
+                {steps.map((_, index) => (
+                  <ScenarioStep key={index} steps={steps} index={index} users={userNames} onChange={onChange} />
+                ))}
+              </SectionParts>
+            </PartBoundary>
           </>,
           componentDisabled ? undefined : (
             <AxisButton

@@ -70,7 +70,7 @@ export function menuPadding(menu: HTMLElement): Record<string, string> {
 
 /**
  * Opens the "…" menu of the one Actions button in `scope` and returns it once it is shown. Give a scope that holds one
- * such button, such as a step card's own wrapper, since a card's rows have their own menus.
+ * such button, such as a step block's own wrapper, since a block's rows have their own menus.
  */
 export async function openRowMenu(scope: HTMLElement): Promise<HTMLElement> {
   await userEvent.click(within(scope).getByRole('button', { name: 'Actions' }))

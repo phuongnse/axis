@@ -148,7 +148,7 @@ resource's JSON.
   [publishing](studio.md#publishing).
 - **The same rules.** The markers and the order follow those of a resource's diff, and the file's kind reads
   Package file.
-- **The block** _(planned for M35, #5153)_. The file is a block like a resource's, and its line diff fills it.
+- **The block**. The file is a block like a resource's, and its line diff fills it.
 - **The line diff.** A package file's diff is the one line diff that
   [a file's diff](ai-authoring-in-studio.md#revisions) describes, coloured by the file's language.
 - **The API.** No route is new. The [revision diff](authoring-revisions.md#diff), the

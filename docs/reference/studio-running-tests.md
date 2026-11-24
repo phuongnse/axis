@@ -18,7 +18,7 @@ Studio runs the application's [test scenarios](test-scenarios.md) through the
   does. Each scenario of the request's `scenarios` field shows its tag in a column of its own: Passed (`success`),
   Failed (`danger`) or Skipped (`muted`). Then come its name, its kind and its time. A failure reads as one
   sentence, "Failed at step N: <message>", in the text colour. Steps count from 1, as the scenario editor's step
-  cards do. The name is the only link, with its kind muted after it. A failure opens at the item's `path`, a pass
+  blocks do. The name is the only link, with its kind muted after it. A failure opens at the item's `path`, a pass
   at its top.
 - **No empty pass.** While the request is queued or running, the list shows a note instead of rows, so
   an empty list never reads as a pass. A failed run with no results says that no scenario ran and

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { fillText } from '../platform/fillText'
+import { designTokensFor } from '../platform/designTokens'
 import { setAt } from '../platform/jsonPatch'
 import type { StudioNames } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
@@ -767,7 +768,7 @@ const stubOperation = { operation: 'billing/Refund', outcome: 'failed' }
 const withStub = (stub: Record<string, unknown>) => ({ ...scenario([fixtures.advanceTime]), stubs: [stub] })
 const onlyStep = (step: Step) => scenario([step])
 
-/** The raw names of the step properties and of their parts, which no control of a step card may be named by. */
+/** The raw names of the step properties and of their parts, which no control of a step block may be named by. */
 const rawPropertyNames = [
   ...stepPropertyNames,
   'assignee kind',
@@ -1001,5 +1002,37 @@ describe('ScenarioEditor empty lists', () => {
   ])('has %s in English and Vietnamese', (key) => {
     expect(english[key]).toBeTruthy()
     expect(vietnamese[key]).toBeTruthy()
+  })
+})
+
+describe('ScenarioEditor blocks', () => {
+  const rule = `1px solid ${designTokensFor('light').colour.borderSubtle}`
+
+  it('draws each step as a block under its title row, parted from the next by a rule, with no card', () => {
+    renderEditor(scenario([fixtures.advanceTime, fixtures.advanceTime]))
+
+    expect(document.querySelector('.ant-card')).toBeNull()
+    const steps = screen.getAllByTestId('studio-scenario-step')
+    expect(steps).toHaveLength(2)
+    for (const step of steps) {
+      const heading = within(step).getByRole('heading', { level: 3 })
+      expect(heading.closest('section')!.firstElementChild).toHaveStyle({ borderBottom: rule })
+    }
+    expect(steps[0].previousElementSibling).toBeNull()
+    expect(steps[1].previousElementSibling).toHaveAttribute('role', 'separator')
+  })
+
+  it('leaves the step type select and the users roles select as wide as their fields', () => {
+    renderEditor(scenario([fixtures.advanceTime]))
+
+    const selects = [
+      within(screen.getByTestId('studio-field-/steps/0/type')).getByRole('combobox'),
+      within(screen.getByTestId('studio-field-/users/author')).getByRole('combobox'),
+    ]
+    for (const select of selects) {
+      const root = select.closest('.ant-select') as HTMLElement
+      expect(root).toHaveStyle({ width: '100%' })
+      expect(root.style.minWidth).toBe('')
+    }
   })
 })

@@ -22,7 +22,8 @@ the second view of the same draft.
 - **Cells.** A cell edit goes into the draft, and Save sends one JSON Patch for the open resource only.
   Clearing a cell saves an empty string and keeps the key, because every locale holds the same keys
   (`AXC0027`).
-- **Add key.** The row below the table takes a key and a text for each locale, and writes the key to
+- **Add key.** The row below the table takes a key and a text for each locale. The boxes share the row's width
+  equally, and Add key sits under them. It writes the key to
   every locale at once through the [text write route](authoring-text-writes.md). The key cannot be
   empty, cannot contain `/`, and cannot already be in the table. The editor takes the open file's new
   version from the answer and adds the key to its loaded copy and its draft, so unsaved cell edits stay

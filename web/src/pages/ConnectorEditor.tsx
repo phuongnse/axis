@@ -1,18 +1,21 @@
-import { Card, ConfigProvider, Flex, Input, Select } from 'antd'
-import { useContext, type ReactNode } from 'react'
+import { ConfigProvider, Flex, Input, Select } from 'antd'
+import { useContext, useId, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { RowActions } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
+import { fillText } from '../platform/fillText'
+import { PaneHeader } from '../platform/PaneHeader'
 import { StudioBindingsContext } from '../platform/studioCatalog'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { WarningLine } from '../platform/WarningLine'
 import { BindingSelect } from './CatalogControls'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
-import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { PartBoundary, SectionPart, SectionParts } from '../platform/SectionParts'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -185,7 +188,6 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
                 <AxisField {...fieldTexts(t, 'auth.type')}>
                   <Select
                     virtual={false}
-                    style={{ minWidth: 240 }}
                     allowClear
                     value={authType}
                     options={authTypes.map((type) => ({ value: type, label: type }))}
@@ -216,19 +218,23 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
           'operations',
           <div data-testid="studio-field-/operations">
             <Flex vertical gap="small">
-              {operations.map((operation, index) => (
-                <Operation
-                  key={index}
-                  index={index}
-                  operation={isContent(operation) ? operation : {}}
-                  siblings={operations.flatMap((other, position) =>
-                    position !== index && isContent(other) && typeof other.name === 'string' && other.name !== ''
-                      ? [other.name]
-                      : [],
-                  )}
-                  onChange={onChange}
-                />
-              ))}
+              <PartBoundary>
+                <SectionParts>
+                  {operations.map((operation, index) => (
+                    <Operation
+                      key={index}
+                      index={index}
+                      operation={isContent(operation) ? operation : {}}
+                      siblings={operations.flatMap((other, position) =>
+                        position !== index && isContent(other) && typeof other.name === 'string' && other.name !== ''
+                          ? [other.name]
+                          : [],
+                      )}
+                      onChange={onChange}
+                    />
+                  ))}
+                </SectionParts>
+              </PartBoundary>
               {operations.length === 0 && <EmptyState text={t('shell.studio.connector.noOperations')} />}
             </Flex>
           </div>,
@@ -264,11 +270,33 @@ function Operation({
     Array.isArray(operation.input) &&
     operation.input.some((row) => !isContent(row) || row.in === undefined || row.in === 'body')
   const { componentDisabled } = ConfigProvider.useConfig()
+  const { spacing } = useDesignTokens()
+  const headingId = useId()
 
   return (
-    <Card size="small" data-testid={`studio-operation-${index}`}>
-      <Flex gap="small" align="flex-start">
-        <Flex vertical gap="small" style={{ flex: 1 }}>
+    <SectionPart testId={`studio-operation-${index}`}>
+      <section aria-labelledby={headingId}>
+        <PaneHeader
+          level={3}
+          inset={0}
+          id={headingId}
+          title={text(operation.name) || fillText(t('shell.studio.connector.operation'), { number: index + 1 })}
+          actions={
+            componentDisabled ? undefined : (
+              <RowActions
+                actions={[
+                  {
+                    key: 'remove',
+                    labelKey: 'shell.studio.connector.removeOperation',
+                    meaning: 'remove',
+                    onClick: () => onChange(pointer, undefined),
+                  },
+                ]}
+              />
+            )
+          }
+        />
+        <Flex vertical gap="small" style={{ paddingTop: spacing.sm }}>
           <div data-testid={`studio-field-${pointer}/name`}>
             <AxisField {...fieldTexts(t, 'operations.name')} required>
               <Input
@@ -281,7 +309,6 @@ function Operation({
             <AxisField {...fieldTexts(t, 'operations.method')} required>
               <Select
                 virtual={false}
-                style={{ minWidth: 240 }}
                 value={typeof operation.method === 'string' ? operation.method : undefined}
                 options={methods.map((method) => ({ value: method, label: method }))}
                 onChange={(next: string) => onChange(`${pointer}/method`, next)}
@@ -325,20 +352,8 @@ function Operation({
             onChange={onChange}
           />
         </Flex>
-        {componentDisabled ? null : (
-          <RowActions
-            actions={[
-              {
-                key: 'remove',
-                labelKey: 'shell.studio.connector.removeOperation',
-                meaning: 'remove',
-                onClick: () => onChange(pointer, undefined),
-              },
-            ]}
-          />
-        )}
-      </Flex>
-    </Card>
+      </section>
+    </SectionPart>
   )
 }
 
@@ -428,7 +443,6 @@ function FieldRows({
                     <AxisField {...fieldTexts(t, `${path}.type`)} required>
                       <Select
                         virtual={false}
-                        style={{ minWidth: 140 }}
                         value={typeof field.type === 'string' ? field.type : undefined}
                         options={(kind === 'input' ? inputTypes : fieldTypes).map((type) => ({
                           value: type,
@@ -443,7 +457,6 @@ function FieldRows({
                       <AxisField {...fieldTexts(t, `${path}.in`)}>
                         <Select
                           virtual={false}
-                          style={{ minWidth: 120 }}
                           value={typeof field.in === 'string' ? field.in : 'body'}
                           options={placements.map((placement) => ({ value: placement, label: placement }))}
                           // Body is the default, so choosing it removes the key.
@@ -550,7 +563,6 @@ function NestedFields({
                     <AxisField {...fieldTexts(t, `${path}.type`)} required>
                       <Select
                         virtual={false}
-                        style={{ minWidth: 140 }}
                         value={typeof field.type === 'string' ? field.type : undefined}
                         options={types.map((type) => ({ value: type, label: type }))}
                         onChange={(next: string) => changeFieldType(onChange, rowPointer, field, next, 'nested')}

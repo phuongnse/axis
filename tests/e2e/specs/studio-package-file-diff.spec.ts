@@ -44,6 +44,14 @@ test.describe('the publish page draws a changed package file as a line diff', ()
 
     await page.goto('/studio?app=PurchaseRequests&view=publish')
 
+    // The publish page folds its files at first, so the adapter's diff opens with its fold button.
+    const show = page.getByRole('button', { name: 'Show changes to packages/approval-rules/adapter.py', exact: true })
+    await expect(show).toHaveAttribute('aria-expanded', 'false')
+    await show.click()
+    await expect(
+      page.getByRole('button', { name: 'Hide changes to packages/approval-rules/adapter.py', exact: true }),
+    ).toHaveAttribute('aria-expanded', 'true')
+
     const adapter = page.getByRole('textbox', { name: 'packages/approval-rules/adapter.py', exact: true })
     await expect(adapter).toBeVisible()
     await expect(adapter.getByText('return 1000', { exact: true })).toBeVisible()
