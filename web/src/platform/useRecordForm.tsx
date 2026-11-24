@@ -1,6 +1,16 @@
 import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
 import { Form, Input, Space } from 'antd'
-import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { ChildCollectionTable } from './ChildCollectionTable'
@@ -28,6 +38,7 @@ import { ReadOnlyValue } from './ReadOnlyValue'
 import { OpenRecordButton, RecordLink } from './RecordLink'
 import { ReferenceLookup } from './ReferenceLookup'
 import { ReferencesInput } from './ReferencesInput'
+import { requiredMark } from './requiredMark'
 import { PartBoundary, SectionPart, SectionParts } from './SectionParts'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
@@ -447,6 +458,22 @@ export function useRecordForm(
     setLabels((previous) => ({ ...previous, [field.name]: rowLabels }))
   }
   const labelOf = (field: FieldMetadata) => (field.labelKey ? t(field.labelKey) : field.name)
+  // A field's label and help are drawn the same on its form item and on a child collection's toolbar.
+  const labelText = (field: FieldMetadata) => (
+    <span style={{ fontWeight: 500, color: colour.textMuted }}>{labelOf(field)}</span>
+  )
+  const helpText = (text: string, id: string | undefined, style?: CSSProperties) => (
+    <div id={id} style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted, ...style }}>
+      {text}
+    </div>
+  )
+  // An editable child collection's label, required mark and help, on the left of its table's toolbar.
+  const toolbarTitle = (field: FieldMetadata, required: boolean, helpId: string | undefined) => (
+    <div>
+      <div>{requiredMark(labelText(field), { required })}</div>
+      {field.helpKey && helpText(t(field.helpKey), helpId)}
+    </div>
+  )
 
   const pick = (field: FieldMetadata, record: RecordItem) => {
     const display = field.target?.displayField
@@ -599,6 +626,7 @@ export function useRecordForm(
           <ChildCollectionTable
             readOnly={readOnly}
             field={field}
+            title={toolbarTitle(field, required, helpId)}
             rows={rowsOf(value)}
             labels={rowLabelsOf(labels[field.name])}
             onChange={(rows, rowLabels) => setRows(field, rows, rowLabels)}
@@ -656,10 +684,12 @@ export function useRecordForm(
               const required = stateOf(field.name)?.required ?? field.required
               const helpId = field.helpKey ? `${field.name}-help` : undefined
               const control = input(field, lockedOf(entry), required, helpId, errors !== undefined)
+              // An editable child collection's label and help move to its table's toolbar, see `toolbarTitle`.
+              const onToolbar = field.type === 'child-collection' && !lockedOf(entry)
               const item = (
                 <Form.Item
                   key={field.name}
-                  label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{labelOf(field)}</span>}
+                  label={onToolbar ? undefined : labelText(field)}
                   // A child collection and a read-only value have no input for the label to point to.
                   htmlFor={field.type === 'child-collection' || asText(field, lockedOf(entry)) ? undefined : field.name}
                   required={required}
@@ -672,21 +702,10 @@ export function useRecordForm(
                     )
                   }
                 >
-                  {field.helpKey && (
+                  {field.helpKey &&
+                    !onToolbar &&
                     // The label has Ant Design's 8px padding below it, so this pulls the help 4px under it.
-                    <div
-                      id={helpId}
-                      style={{
-                        fontSize: 12,
-                        lineHeight: '20px',
-                        color: colour.textMuted,
-                        marginTop: -4,
-                        marginBottom: spacing.xs,
-                      }}
-                    >
-                      {t(field.helpKey)}
-                    </div>
-                  )}
+                    helpText(t(field.helpKey), helpId, { marginTop: -4, marginBottom: spacing.xs })}
                   {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
                 </Form.Item>
               )

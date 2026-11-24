@@ -107,6 +107,17 @@ const linesWidget: EntityWidgetMetadata = {
   },
 }
 
+// The lines of a note, required and with help, so the toolbar shows the label, the required mark and the help.
+const helpedLinesWidget: EntityWidgetMetadata = {
+  ...linesWidget,
+  entity: {
+    ...linesWidget.entity,
+    fields: linesWidget.entity.fields.map((entry) =>
+      entry.name === 'lines' ? { ...entry, required: true, helpKey: 'note.linesHelp' } : entry,
+    ),
+  },
+}
+
 // A note whose lines each name a category, a reference cell in a child collection.
 const lineCategoryWidget: EntityWidgetMetadata = {
   ...noteWidget,
@@ -396,6 +407,7 @@ const texts = {
   'note.category': 'Category',
   'note.software': 'Software',
   'note.lines': 'Lines',
+  'note.linesHelp': 'One line per item.',
   'noteLine.description': 'Description',
   'noteLine.quantity': 'Quantity',
   'noteLine.code': 'Line code',
@@ -1554,6 +1566,31 @@ describe('FormWidget', () => {
 
     await waitFor(() => expect(requests()).toHaveLength(2))
     expect(requests()[1].body).toBe('{"version":1,"values":{"title":"Buy paper!"}}')
+  })
+
+  it('shows an editable child collection label, required mark and help on its toolbar, not above its table', () => {
+    stubFetch()
+    renderForm(null, helpedLinesWidget)
+
+    const title = within(screen.getByTestId('axis-table-title'))
+    expect(title.getByText('Lines')).toBeInTheDocument()
+    expect(title.getByText('*')).toHaveAttribute('aria-hidden', 'true')
+    expect(title.getByText('One line per item.')).toHaveAttribute('id', 'lines-help')
+    expect(screen.getAllByText('Lines')).toHaveLength(1)
+    expect(screen.getByTestId('field-column-lines').querySelector('.ant-form-item-label')).toBeNull()
+    // The title and Add row sit in the same toolbar, so they share one row.
+    const toolbar = screen.getByTestId('axis-table-title').closest('.ant-flex')?.parentElement
+    expect(toolbar).toContainElement(screen.getByRole('button', { name: 'Add row' }))
+  })
+
+  it('shows a read-only child collection label above its table, with no toolbar', async () => {
+    stubFetch({ status: 200, body: sectionsJson(1) })
+    renderForm(noteId, sectionsWidget)
+
+    await screen.findByTestId('cell-lines-0-description')
+    expect(screen.getByTestId('field-column-lines').querySelector('.ant-form-item-label')).toHaveTextContent('Lines')
+    expect(screen.queryByTestId('axis-table-title')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
   })
 
   it('shows a child collection reference cell as a search icon button with no visible text', async () => {
