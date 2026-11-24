@@ -267,16 +267,21 @@ function largeRequestScenario(name: string, approver: string, minAmount: number,
 async function expectReadyDiff(scope: Page | Locator) {
   await expect(scope.getByTestId('studio-ai-request-checks')).toContainText('Passed')
 
-  // The name is matched in its case, because the text key `approvalStep.approver.director` in the texts would match it too.
-  const step = scope.getByTestId('studio-changes-file').filter({ hasText: /ApprovalStep/ })
+  // A block is found by its fold button, because an open diff puts every file's JSON in the page, and another file's
+  // JSON may name ApprovalStep too. The button is found from the page, as a filter's `has` is relative to the block.
+  const page = 'page' in scope ? scope.page() : scope
+  const block = (name: string) =>
+    scope
+      .getByTestId('studio-changes-file')
+      .filter({ has: page.getByRole('button', { name: `Hide changes to ${name}`, exact: true }) })
+  const step = block('ApprovalStep')
   await expect(step).toHaveCount(1)
   await expect(step.getByRole('note', { name: 'approver, changed by this application', exact: true })).toHaveText(
     'Changed',
   )
-  await step.getByRole('button', { name: 'Show the diff of ApprovalStep', exact: true }).click()
-  await expect(step.getByTestId('json-diff-after')).toContainText('"director"')
+  await expect(step.getByRole('textbox')).toContainText('"director"')
 
-  await expect(scope.getByTestId('studio-changes-file').filter({ hasText: scenarioName })).toHaveCount(1)
+  await expect(block(scenarioName)).toHaveCount(1)
 }
 
 /**

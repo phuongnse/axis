@@ -147,6 +147,7 @@ export function StudioPublishPage({
             <StudioChanges
               files={changes.diff.resources}
               resources={resources}
+              folded
               changedBy={{
                 application,
                 authors: (file) => changeAuthors(file.by, userId, changes.requestNames),
