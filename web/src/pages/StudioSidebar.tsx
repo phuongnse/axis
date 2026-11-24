@@ -1,8 +1,9 @@
-import { Dropdown, type MenuProps } from 'antd'
+import { Dropdown } from 'antd'
 import { useContext, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { Chevron } from '../platform/Chevron'
 import { useShellSidebar } from '../platform/shellSidebarContext'
+import { menuOf, type AxisAction } from '../platform/menuActions'
 import { ShellNavigation, type ShellNavigationNode } from '../platform/ShellNavigation'
 import { SiteMark } from '../platform/SiteMark'
 import { type StudioApplication, studioAppTitle } from '../platform/studio'
@@ -44,13 +45,17 @@ export function StudioSidebar({
   const [creating, setCreating] = useState(false)
   const current = apps.find((app) => app.name === application)
   const title = current ? studioAppTitle(current, locale) : application
-  const items: NonNullable<MenuProps['items']> = apps.map((app) => ({
+  // Each application is a choice, and the open one is marked. New application… is an action after a divider.
+  const actions: AxisAction[] = apps.map((app) => ({
     key: `app:${app.name}`,
     label: studioAppTitle(app, locale),
+    selected: app.name === application,
+    onClick: () => onPick(app.name),
   }))
   if (canCreate) {
-    items.push({ type: 'divider', key: 'divider' }, { key: 'new', label: t('shell.studio.newApplication.button') })
+    actions.push({ key: 'new', labelKey: 'shell.studio.newApplication.button', onClick: () => setCreating(true) })
   }
+  const menu = menuOf(actions, t)
 
   return (
     <>
@@ -64,21 +69,7 @@ export function StudioSidebar({
           borderBottom: `1px solid ${colour.borderSubtle}`,
         }}
       >
-        <Dropdown
-          trigger={['click']}
-          menu={{
-            items,
-            selectable: true,
-            selectedKeys: [`app:${application}`],
-            onClick: ({ key }) => {
-              if (key === 'new') {
-                setCreating(true)
-              } else {
-                onPick(key.slice('app:'.length))
-              }
-            },
-          }}
-        >
+        <Dropdown trigger={['click']} menu={menu}>
           <AxisButton
             role="subtle"
             block

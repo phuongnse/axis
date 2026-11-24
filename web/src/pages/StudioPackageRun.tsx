@@ -437,7 +437,7 @@ export function StudioPackageRun({
                   <ChoiceActions
                     list={list}
                     actions={[
-                      { key: 'manage', label: t('shell.studio.packages.run.manage'), onClick: () => setManaging(true) },
+                      { key: 'manage', labelKey: 'shell.studio.packages.run.manage', onClick: () => setManaging(true) },
                     ]}
                     close={() => setSelectOpen(false)}
                   />

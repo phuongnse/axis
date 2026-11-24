@@ -104,6 +104,11 @@ widget names a role, never an Ant Design button type.
 Menus mark the current choice the same way everywhere, and keep their actions apart from their
 choices.
 
+- **One builder.** Every menu of actions or choices is built by `menuOf` from one action type, `AxisAction`,
+  in `web/src/platform/menuActions.tsx`. A row's actions, an action row's fold, a split button's menu and a
+  menu of choices take the same actions. A choice with no address is a checked radio entry. A choice with an
+  address is a link, marked `aria-current="page"` when it is the current page. The shell's navigation tree lists
+  pages, not actions or choices, so it is not one of these menus, see [layout](shell.md#layout).
 - **Selected and current states.** The selected tab, the active menu entry and the current page of a
   pagination use `primaryText`, and destructive menu entries use `dangerText`.
 - **A marked choice on the selected tint.** A menu that marks a choice, such as the open application in
@@ -114,7 +119,8 @@ choices.
   and Studio's application switcher, ends in a caret, which `AxisButton`'s `caret` option draws. An
   icon-only trigger has none.
 - **Actions come after the choices.** In a menu that holds both, such as the
-  application menu, the choices come first and an action, such as New application…, follows them.
+  application menu, the choices come first and an action, such as New application…, follows them behind one
+  divider.
 - **A select's own actions end its list**. Creating or managing a select's choices, such as New
   application… or Manage saved inputs…, comes after the choices and a divider, in the look of the list's own items,
   as actions come after the choices in a menu. `ChoiceActions` draws them.

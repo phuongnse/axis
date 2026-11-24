@@ -7,7 +7,7 @@ import { Chevron } from '../platform/Chevron'
 import { fillText } from '../platform/fillText'
 import type { CommandResult } from '../platform/inspection'
 import { sortByName } from '../platform/listOrder'
-import { menuOf, type MenuAction } from '../platform/menuActions'
+import { menuOf, type AxisAction } from '../platform/menuActions'
 import { PaneHeader } from '../platform/PaneHeader'
 import { QuotaRefusedError } from '../platform/quota'
 import { ReasonDialog } from '../platform/ReasonDialog'
@@ -371,32 +371,32 @@ export function StudioPackageExplorer({
   }
 
   const parentOf = (node: Entry) => (node.isFolder ? node.path : dirnameOf(node.path))
-  const actionsFor = (node: Entry): MenuAction[] => {
-    const copyPath: MenuAction = {
+  const actionsFor = (node: Entry): AxisAction[] => {
+    const copyPath: AxisAction = {
       key: 'copyPath',
-      label: t('shell.studio.packages.copyPath'),
+      labelKey: 'shell.studio.packages.copyPath',
       onClick: () => void copy(`packages/${row.id}/${node.path}`),
     }
     return canDevelop
       ? [
           {
             key: 'newFile',
-            label: t('shell.studio.packages.newFile'),
+            labelKey: 'shell.studio.packages.newFile',
             onClick: () => setDialog({ kind: 'file', parent: parentOf(node) }),
           },
           {
             key: 'newFolder',
-            label: t('shell.studio.packages.newFolder'),
+            labelKey: 'shell.studio.packages.newFolder',
             onClick: () => setDialog({ kind: 'folder', parent: parentOf(node) }),
           },
           {
             key: 'rename',
-            label: t('shell.studio.packages.rename'),
+            labelKey: 'shell.studio.packages.rename',
             onClick: () => setDialog({ kind: 'rename', node }),
           },
           {
             key: 'delete',
-            label: t('shell.studio.packages.delete'),
+            labelKey: 'shell.studio.packages.delete',
             destructive: true,
             onClick: () => setDeleting(node),
           },
@@ -419,15 +419,15 @@ export function StudioPackageExplorer({
     }
   }
 
-  const newActions: MenuAction[] = [
+  const newActions: AxisAction[] = [
     {
       key: 'newFile',
-      label: t('shell.studio.packages.newFile'),
+      labelKey: 'shell.studio.packages.newFile',
       onClick: () => setDialog({ kind: 'file', parent: '' }),
     },
     {
       key: 'newFolder',
-      label: t('shell.studio.packages.newFolder'),
+      labelKey: 'shell.studio.packages.newFolder',
       onClick: () => setDialog({ kind: 'folder', parent: '' }),
     },
   ]
@@ -467,7 +467,7 @@ export function StudioPackageExplorer({
                 trigger={['click']}
                 autoFocus
                 destroyOnHidden
-                menu={{ items: menuOf(newActions), 'aria-label': t('shell.studio.packages.new') }}
+                menu={{ ...menuOf(newActions, t), 'aria-label': t('shell.studio.packages.new') }}
               >
                 <AxisButton role="subtle" nameKey="shell.studio.packages.new" icon={<PlusOutlined />} />
               </Dropdown>
@@ -519,7 +519,7 @@ export function StudioPackageExplorer({
                     }
                   }}
                   menu={{
-                    items: menuOf(actionsFor(node)),
+                    ...menuOf(actionsFor(node), t),
                     // The menu sits in a portal, whose clicks reach the tree's row through React and would select or toggle it.
                     onClick: ({ domEvent }) => domEvent.stopPropagation(),
                     'aria-label': fillText(t('shell.studio.packages.nodeMenu'), { name: node.name }),

@@ -32,7 +32,7 @@ import { paginationItems } from './pagination'
 import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
 import { TableFilterButton, TableFilterChips, type FilterColumn } from './TableFilter'
 import { TableColumnsButton } from './TableColumns'
-import { menuOf } from './menuActions'
+import { actionText, menuOf, type AxisAction } from './menuActions'
 import { TableViewsButton } from './TableViews'
 import { shownColumns, type TableQuery, type TableSort } from './tableQuery'
 import { makeRoom, type ColumnPriority } from './tableRoom'
@@ -105,29 +105,6 @@ export interface AxisTableView {
   paging?: boolean
 }
 
-/**
- * An action on one row. One with an `icon` is an icon button whose name is its tooltip and accessible name, as the
- * platform gives an icon only to an action whose meaning it knows. One an author configured keeps its text.
- */
-export interface AxisRowAction {
-  key: string
-  /** The text key of its name. */
-  labelKey: string
-  icon?: ReactNode
-  destructive?: boolean
-  /**
-   * A known meaning. `remove` is a known Remove or Delete, which `RowActions` draws as the trash icon in `dangerText`,
-   * named by its tooltip, see docs/reference/actions-and-controls.md#tables.
-   */
-  meaning?: 'remove'
-  disabled?: boolean
-  /** Appended to the accessible name of an icon button only, such as a row number. The tooltip stays the name. */
-  nameSuffix?: string
-  onClick: () => void
-  /** Attributes for the button, such as the canvas's selection. */
-  attributes?: object
-}
-
 /** An action on the selected rows, see docs/reference/actions-and-controls.md#tables. It is a text button. */
 export interface AxisBulkAction<T> {
   key: string
@@ -183,7 +160,7 @@ export interface AxisTableProps<T> {
    * The actions of a row. `configured` is how many an author configured, the same for every row, so every row has one
    * layout. `actions` gives the ones a row shows, or `null` for none.
    */
-  rowActions?: { configured: number; actions: (row: T) => AxisRowAction[] | null }
+  rowActions?: { configured: number; actions: (row: T) => AxisAction[] | null }
   /**
    * The actions on the selected rows. Rows show checkboxes, and a selection shows the "N selected" bar, only when the
    * table has one.
@@ -927,7 +904,7 @@ function MovedCells({
  * `meaning: 'remove'`, is the trash icon in `dangerText` and a red entry in a menu. It is exported for a list that is
  * not a table, see docs/reference/actions-and-controls.md#tables.
  */
-export function RowActions({ actions, fold = false }: { actions: AxisRowAction[] | null; fold?: boolean }) {
+export function RowActions({ actions, fold = false }: { actions: AxisAction[] | null; fold?: boolean }) {
   const t = useText()
   const narrow = useNarrowWidth()
   if (actions === null || actions.length === 0) {
@@ -943,7 +920,7 @@ export function RowActions({ actions, fold = false }: { actions: AxisRowAction[]
         trigger={['click']}
         autoFocus
         menu={{
-          items: menuOf(shown.map((action) => ({ ...action, label: t(action.labelKey) }))),
+          ...menuOf(shown, t),
           'aria-label': t('shell.table.rowActions'),
         }}
       >
@@ -959,7 +936,7 @@ export function RowActions({ actions, fold = false }: { actions: AxisRowAction[]
             key={action.key}
             role="subtle"
             size="small"
-            nameKey={action.labelKey}
+            nameKey={action.labelKey!}
             destructive={action.destructive}
             icon={action.icon}
             nameSuffix={action.nameSuffix}
@@ -977,7 +954,7 @@ export function RowActions({ actions, fold = false }: { actions: AxisRowAction[]
             onClick={action.onClick}
             {...action.attributes}
           >
-            {t(action.labelKey)}
+            {actionText(action, t)}
           </AxisButton>
         ),
       )}

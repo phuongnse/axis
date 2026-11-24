@@ -13,6 +13,7 @@ import { type ReactNode, useMemo } from 'react'
 import { ReferencePicker } from '../pages/ReferencePicker'
 import { AxisButton } from './AxisButton'
 import { runStateTone, type RunState } from './inspection'
+import { menuOf } from './menuActions'
 import type { GraphStep } from './ProcessGraph'
 import { toneIconColours } from './statusTones'
 import { useText } from './texts'
@@ -107,11 +108,13 @@ export function ProcessGraphControls({
             <Dropdown
               trigger={['click']}
               menu={{
-                items: [
-                  { key: 'svg', label: t('shell.inspector.graph.downloadSvg') },
-                  { key: 'png', label: t('shell.inspector.graph.downloadPng') },
-                ],
-                onClick: ({ key }) => onDownload(key as 'svg' | 'png'),
+                ...menuOf(
+                  [
+                    { key: 'svg', labelKey: 'shell.inspector.graph.downloadSvg', onClick: () => onDownload('svg') },
+                    { key: 'png', labelKey: 'shell.inspector.graph.downloadPng', onClick: () => onDownload('png') },
+                  ],
+                  t,
+                ),
                 'aria-label': t('shell.inspector.graph.download'),
               }}
             >

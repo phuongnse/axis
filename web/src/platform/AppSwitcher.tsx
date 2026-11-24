@@ -1,9 +1,10 @@
 import { AppstoreOutlined } from '@ant-design/icons'
-import { Dropdown, type MenuProps } from 'antd'
+import { Dropdown } from 'antd'
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { useLocation } from 'react-router'
 import { AxisButton } from './AxisButton'
 import { fetchCurrentUser, type CurrentUser } from './currentUser'
+import { menuOf, type AxisAction } from './menuActions'
 import { fetchSites, siteTitle, type SiteListItem } from './site'
 import { useText } from './texts'
 import { siteAddress } from './siteLinks'
@@ -50,51 +51,50 @@ export function AppSwitcher({ locale }: { locale: string }) {
     return null
   }
 
-  const selectedKeys: string[] = []
-  const entry = (key: string, address: string, text: string) => {
-    const current = isCurrent(address, pathname)
-    if (current) {
-      selectedKeys.push(key)
-    }
+  const sitesEntries: AxisAction[] = sites.map((site) => {
+    const address = siteAddress(site.path)
     return {
-      key,
-      label: (
-        <Link to={address} aria-current={current ? 'page' : undefined}>
-          {text}
-        </Link>
-      ),
+      key: `site:${site.path}`,
+      label: siteTitle(site, locale),
+      href: address,
+      groupKey: 'shell.appSwitcher.sites',
+      selected: isCurrent(address, pathname),
     }
+  })
+  const tools: AxisAction[] = []
+  const tool = (key: string, labelKey: string, address: string) => {
+    tools.push({
+      key,
+      labelKey,
+      href: address,
+      groupKey: 'shell.appSwitcher.tools',
+      selected: isCurrent(address, pathname),
+    })
   }
-  const tools: NonNullable<MenuProps['items']> = []
   if (user.studio) {
-    tools.push(entry('studio', '/studio', t('shell.appSwitcher.studio')))
+    tool('studio', 'shell.appSwitcher.studio', '/studio')
   }
   if (user.console) {
-    tools.push(entry('console', '/console', t('shell.appSwitcher.console')))
+    tool('console', 'shell.appSwitcher.console', '/console')
   }
   if (user.users) {
-    tools.push(entry('users', '/users', t('shell.appSwitcher.users')))
+    tool('users', 'shell.appSwitcher.users', '/users')
   }
   if (user.billingUrl) {
     // An outside link, so it is never the current page.
-    tools.push({ key: 'billing', label: <a href={user.billingUrl}>{t('shell.appSwitcher.billing')}</a> })
-  }
-  const items: NonNullable<MenuProps['items']> = []
-  if (sites.length > 0) {
-    items.push({
-      type: 'group',
-      key: 'sites',
-      label: t('shell.appSwitcher.sites'),
-      children: sites.map((site) => entry(`site:${site.path}`, siteAddress(site.path), siteTitle(site, locale))),
+    tools.push({
+      key: 'billing',
+      labelKey: 'shell.appSwitcher.billing',
+      href: user.billingUrl,
+      groupKey: 'shell.appSwitcher.tools',
+      selected: false,
     })
   }
-  if (tools.length > 0) {
-    items.push({ type: 'group', key: 'tools', label: t('shell.appSwitcher.tools'), children: tools })
-  }
+  const menu = menuOf([...sitesEntries, ...tools], t)
   const label = t('shell.appSwitcher.label')
 
   return (
-    <Dropdown trigger={['click']} menu={{ items, selectable: true, selectedKeys, 'aria-label': label }}>
+    <Dropdown trigger={['click']} menu={{ ...menu, 'aria-label': label }}>
       <AxisButton role="subtle" nameKey="shell.appSwitcher.label" icon={<AppstoreOutlined />} />
     </Dropdown>
   )

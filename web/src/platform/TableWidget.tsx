@@ -3,7 +3,8 @@ import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { AxisButton } from './AxisButton'
-import { AxisTable, type AxisColumn, type AxisRowAction } from './AxisTable'
+import { AxisTable, type AxisColumn } from './AxisTable'
+import { menuOf, type AxisAction } from './menuActions'
 import { DialogFooter } from './DialogFooter'
 import { useCanvasActions } from './canvasActions'
 import { EmptyDash } from './EmptyValue'
@@ -560,12 +561,12 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
   // The row's actions other than the one its identifying cell opens. A start action runs for the row, a delete asks
   // first, a navigate action opens its page or is dropped when its path is unknown, and an action whose visibleWhen
   // is not plainly true is dropped. A group row has no id and no actions.
-  const actionsOf = (record: TableRow): AxisRowAction[] | null => {
+  const actionsOf = (record: TableRow): AxisAction[] | null => {
     if (record.id === null) {
       return null
     }
     const scope = { id: record.id, values: record.values }
-    return otherIndexes.flatMap((index): AxisRowAction[] => {
+    return otherIndexes.flatMap((index): AxisAction[] => {
       const action = rowActions[index]
       const base = {
         key: String(index),
@@ -672,11 +673,21 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
               <Dropdown
                 trigger={['click']}
                 menu={{
-                  items: [
-                    { key: 'csv', label: t('shell.table.exportCsv') },
-                    { key: 'xlsx', label: t('shell.table.exportXlsx') },
-                  ],
-                  onClick: ({ key }) => !canvas.active && void runExport(key as ExportFormat),
+                  ...menuOf(
+                    [
+                      {
+                        key: 'csv',
+                        labelKey: 'shell.table.exportCsv',
+                        onClick: () => !canvas.active && void runExport('csv'),
+                      },
+                      {
+                        key: 'xlsx',
+                        labelKey: 'shell.table.exportXlsx',
+                        onClick: () => !canvas.active && void runExport('xlsx'),
+                      },
+                    ],
+                    t,
+                  ),
                 }}
               >
                 <AxisButton role="secondary" loading={exporting}>

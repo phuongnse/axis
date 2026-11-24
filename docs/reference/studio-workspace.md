@@ -25,10 +25,11 @@ An open application takes the shell's sidebar for its own navigation, in place o
 sidebar entries.
 
 The sidebar starts with the application's row, at the height of the band beside it, so their lines
-meet. The row is a menu of every application, with the open one marked, and New application… after
-them. It has no entry back to the list, because Studio in the header's app switcher leads there. The
-row and the band stay in place while the page scrolls, and only the sidebar's entries scroll, under
-the row. How the sidebar and the page scroll is in [layout](shell.md#layout).
+meet. The row is a menu of every application, with the open one marked as a checked choice, and
+New application… after them, behind a divider. It has no entry back to the list, because Studio in the
+header's app switcher leads there. The row and the band stay in place while the page scrolls, and only
+the sidebar's entries scroll, under the row. How the sidebar and the page scroll is in
+[layout](shell.md#layout).
 
 Under the row come Overview, Releases, History, AI requests and Settings, which concern the whole application.
 AI requests shows only to a person who may ask AI, see its bullet below.

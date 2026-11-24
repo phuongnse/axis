@@ -301,7 +301,9 @@ Sign-in itself is in [sign-in and the session](security.md#sign-in-and-the-sessi
   the identity provider's session itself and the browser goes to `/?signedOut`. Only when that fails
   does the browser go to the identity provider's sign-out page.
 - **Account menu.** Its menu holds Your account (`shell.account.title`), which opens the
-  [account page](platform-pages.md#tabs), and Sign out, as [signed in](#account-button) says.
+  [account page](platform-pages.md#tabs), and Sign out, as [signed in](#account-button) says. Your account is
+  drawn selected, on the selected tint, and marked `aria-current="page"` while the account page is open. Sign out
+  follows a divider.
 - **The Legal group** _(planned, #5065)_. Between Your account and Sign out, each part set off by a divider, the menu holds a
   group named Legal, `shell.legal.label`. It holds Privacy and Terms when the site or its tenant sets them, then
   Licences, always, as the language and theme menu groups its choices. Its links and labels are the

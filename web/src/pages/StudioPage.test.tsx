@@ -925,10 +925,10 @@ describe('StudioPage', () => {
     await userEvent.click(await screen.findByTestId('studio-application-row'))
 
     for (const title of ['Purchase requests', 'Leave requests', 'Inventory']) {
-      expect(await screen.findByRole('menuitem', { name: title })).toBeInTheDocument()
+      expect(await screen.findByRole('menuitemradio', { name: title })).toBeInTheDocument()
     }
-    expect(screen.getByRole('menuitem', { name: 'Purchase requests' })).toHaveClass('ant-dropdown-menu-item-selected')
-    expect(screen.getByRole('menuitem', { name: 'Leave requests' })).not.toHaveClass('ant-dropdown-menu-item-selected')
+    expect(screen.getByRole('menuitemradio', { name: 'Purchase requests' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: 'Leave requests' })).toHaveAttribute('aria-checked', 'false')
   })
 
   it('lists only the applications and New application… in the row menu, with no All applications', async () => {
@@ -942,7 +942,7 @@ describe('StudioPage', () => {
     await userEvent.click(await screen.findByTestId('studio-application-row'))
     await screen.findByRole('menuitem', { name: 'New application…' })
 
-    const items = screen.getAllByRole('menuitem').filter((item) => item.classList.contains('ant-dropdown-menu-item'))
+    const items = [...document.querySelectorAll<HTMLElement>('.ant-dropdown-menu-item')]
     expect(items.map((item) => item.textContent)).toEqual([
       'Purchase requests',
       'Leave requests',
@@ -1059,7 +1059,7 @@ describe('StudioPage', () => {
     renderPage()
 
     await userEvent.click(await screen.findByTestId('studio-application-row'))
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Leave requests' }))
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Leave requests' }))
 
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=LeaveRequests$/)
     warn.mockRestore()

@@ -124,17 +124,17 @@ function ItemLine<T>({
           </AxisButton>
           <AxisSplitButton
             nameSuffix={itemName}
-            action={{ key: 'overwrite', label: t(texts.overwrite), onClick: () => setMode('overwrite') }}
+            action={{ key: 'overwrite', labelKey: texts.overwrite, onClick: () => setMode('overwrite') }}
             menu={[
               {
                 key: 'rename',
-                label: t(texts.rename),
+                labelKey: texts.rename,
                 onClick: () => {
                   setName(itemName)
                   setMode('rename')
                 },
               },
-              { key: 'delete', label: t(texts.delete), destructive: true, onClick: () => setMode('delete') },
+              { key: 'delete', labelKey: texts.delete, destructive: true, onClick: () => setMode('delete') },
             ]}
           />
         </Flex>

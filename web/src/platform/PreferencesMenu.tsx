@@ -1,6 +1,7 @@
 import { SettingOutlined } from '@ant-design/icons'
-import { Dropdown, type MenuProps } from 'antd'
+import { Dropdown } from 'antd'
 import { AxisButton } from './AxisButton'
+import { menuOf } from './menuActions'
 import { useText } from './texts'
 import { useThemeMode, type ThemeChoice } from './themeMode'
 
@@ -22,40 +23,34 @@ export function PreferencesMenu({
   const t = useText()
   const { choice, choose } = useThemeMode()
 
-  function option(key: string, label: string, current: boolean) {
-    return { key, label, role: 'menuitemradio', 'aria-checked': current }
-  }
-
-  const items = [
-    {
-      type: 'group',
-      key: 'locale',
-      label: t('shell.locale.label'),
-      children: locales.map((tag) => option(`locale:${tag}`, t(`shell.locale.${tag}`), tag === locale)),
-    },
-    {
-      type: 'group',
-      key: 'theme',
-      label: t('shell.theme.label'),
-      children: choices.map((candidate) =>
-        option(`theme:${candidate}`, t(`shell.theme.${candidate}`), candidate === choice),
-      ),
-    },
-  ] as MenuProps['items']
-  const selectedKeys = [`locale:${locale}`, `theme:${choice}`]
+  // Each language and each theme is a choice in its own group. Picking the current one changes nothing.
+  const menu = menuOf(
+    [
+      ...locales.map((tag) => ({
+        key: `locale:${tag}`,
+        labelKey: `shell.locale.${tag}`,
+        groupKey: 'shell.locale.label',
+        selected: tag === locale,
+        onClick: () => {
+          if (tag !== locale) onLocaleChange(tag)
+        },
+      })),
+      ...choices.map((candidate) => ({
+        key: `theme:${candidate}`,
+        labelKey: `shell.theme.${candidate}`,
+        groupKey: 'shell.theme.label',
+        selected: candidate === choice,
+        onClick: () => {
+          if (candidate !== choice) choose(candidate)
+        },
+      })),
+    ],
+    t,
+  )
   const label = t('shell.preferences.label')
 
-  function pick({ key }: { key: string }) {
-    const [kind, value] = key.split(':')
-    if (kind === 'locale' && value !== locale) {
-      onLocaleChange(value)
-    } else if (kind === 'theme' && value !== choice) {
-      choose(value as ThemeChoice)
-    }
-  }
-
   return (
-    <Dropdown trigger={['click']} menu={{ items, selectable: true, selectedKeys, onClick: pick, 'aria-label': label }}>
+    <Dropdown trigger={['click']} menu={{ ...menu, 'aria-label': label }}>
       <AxisButton role="subtle" nameKey="shell.preferences.label" icon={<SettingOutlined />} />
     </Dropdown>
   )

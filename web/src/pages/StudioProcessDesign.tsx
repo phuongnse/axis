@@ -7,6 +7,7 @@ import { SidePanel } from '../platform/SidePanel'
 import { fillText } from '../platform/fillText'
 import { graphImageName } from '../platform/graphImage'
 import { markOf } from '../platform/layerMarks'
+import { menuOf } from '../platform/menuActions'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -296,13 +297,16 @@ export default function StudioProcessDesign({
                 style={{ position: 'absolute', left: pending.point.x, top: pending.point.y, zIndex: 10 }}
               >
                 <Menu
+                  {...menuOf(
+                    connectChoices(steps[pending.source]).map((choice, index) => ({
+                      key: String(index),
+                      label: choiceLabel(steps[pending.source], choice, t),
+                      onClick: () => apply(pending.source, pending.target, choice),
+                    })),
+                    t,
+                  )}
                   selectable={false}
                   style={{ minWidth: 160, border: `1px solid ${colour.border}` }}
-                  items={connectChoices(steps[pending.source]).map((choice, index) => ({
-                    key: String(index),
-                    label: choiceLabel(steps[pending.source], choice, t),
-                    onClick: () => apply(pending.source, pending.target, choice),
-                  }))}
                 />
               </div>
             ) : null}
