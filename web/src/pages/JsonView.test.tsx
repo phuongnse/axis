@@ -10,14 +10,12 @@ import { withAntdStyles } from '../test/antdStyles'
 import JsonView, { type JsonViewHandle } from './JsonView'
 import { jsonViewHeight, minHeight } from './jsonViewHeight'
 
-const findTexts = { field: 'Find in JSON', count: '{current} of {count}', none: 'No matches' }
-
 function renderView(value: string, onChange = vi.fn()) {
   const handle = createRef<JsonViewHandle>()
   const view = (text: string) => (
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <JsonView label="JSON" value={text} onChange={onChange} findTexts={findTexts} ref={handle} />
+        <JsonView label="JSON" value={text} onChange={onChange} ref={handle} />
       </TextProvider>
     </ThemeModeProvider>
   )
