@@ -157,7 +157,7 @@ wrong form show the not-found page, and the instance is not requested.
     the `danger` tint, and the value after on a "+" line on the `success` tint, read as "Changed from X to Y". An
     event it raised, as Event raised and Event fields, which only a `raiseEvent` step raises. The people it
     notified, as Notified, Channels and Subject. A record it created.
-    - **Coloured marks** _(planned for M37, #3991)_. The "−" is in `dangerText` and the "+" in `successText`, as a
+    - **Coloured marks**. The "−" is in `dangerText` and the "+" in `successText`, as a
       file's line diff marks them, see [revisions](ai-authoring-in-studio.md#revisions).
 
   A step that makes nothing has no Output tab.
