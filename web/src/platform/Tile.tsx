@@ -55,6 +55,9 @@ export function Tile({
     gap: spacing.sm,
     minWidth: 0,
     color: colour.text,
+    // A tile that is a link stands for a thing, not a sentence, so it is never underlined,
+    // see docs/reference/actions-and-controls.md#opening-things.
+    textDecoration: 'none',
     ...(bordered && {
       padding: spacing.md,
       background: colour.surface,

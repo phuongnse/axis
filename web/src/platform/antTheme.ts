@@ -58,6 +58,10 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       colorLink: colour.primaryText,
       colorLinkHover: colour.primaryText,
       colorLinkActive: colour.primaryText,
+      // A link is underlined on hover, and running text underlines it always,
+      // see docs/reference/actions-and-controls.md#opening-things.
+      linkDecoration: 'none',
+      linkHoverDecoration: 'underline',
       // Keyboard focus: a solid 2px ring. Ant Design draws input focus as a control outline and other focus as an outline.
       colorPrimaryBorder: colour.focusRing,
       lineWidthFocus: 2,
@@ -224,10 +228,19 @@ export const fieldInputClass = 'axis-field-input'
 export const textButtonClass = 'axis-text-button'
 
 /**
+ * The class `FilledText` puts on a sentence with parts in it. Its links are underlined, see
+ * docs/reference/actions-and-controls.md#opening-things.
+ */
+export const runningTextClass = 'axis-running-text'
+
+/**
  * The CSS every Axis form and message shares, rendered once beside each provider's ConfigProvider. The input inside an
  * `AxisField`'s `fieldInputClass` wrapper fills the field's width, and a select joined with its action fills it together
  * with the action, see docs/reference/shell.md#layout. A text button that `AxisButton` draws, such as a subtle button,
  * takes the light fill on keyboard focus that it takes on hover, see docs/reference/actions-and-controls.md#buttons.
+ * A link is underlined on hover, underlined always in running text, and never in a menu, see
+ * docs/reference/actions-and-controls.md#opening-things. Each later rule has the same or higher specificity than the
+ * ones before it, so a browser and the test that reads the rules agree.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
   const hoverFill = theme.getDesignToken(antThemeFor(mode, page)).colorBgTextHover
@@ -236,6 +249,12 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
     // see docs/reference/shell.md#layout.
     `.${fieldClass} .${fieldInputClass} > * { width: 100%; }`,
     `.${textButtonClass}:not(:disabled):focus-visible { background: ${hoverFill}; }`,
+    // A link stands alone without an underline, until the pointer is over it. A menu's entries and a button with an
+    // address are never underlined, see docs/reference/actions-and-controls.md#opening-things.
+    `a[href] { text-decoration: none; }`,
+    `a[href]:hover { text-decoration: underline; }`,
+    `.${runningTextClass} a[href], .${runningTextClass} a[href]:hover { text-decoration: underline; }`,
+    `[role="menu"] a[href]:hover { text-decoration: none; }`,
   ].join('\n')
 }
 
