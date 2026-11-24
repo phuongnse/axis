@@ -337,12 +337,10 @@ icon is hidden from assistive technology, which reads the word. Each item keeps 
 
 ### What changes
 
-[`StudioChanges`](shared-widgets.md#which-widget) draws the request's diff folded. Each resource is a block under its
-name, its kind and its change. The block starts closed behind **Show the diff** and opens to its JSON diff, see
-[revisions](#revisions).
+[`StudioChanges`](shared-widgets.md#which-widget) draws the request's diff, as [revisions](#revisions) describes its files.
 
-- **Line counts and summary** _(planned for M35)_. Each block shows its line counts, such as "+8 −3", and the summary its
-  request wrote under it.
+- **Open at first** _(planned for M35, #5153)_. A request's files open at first, since its author decides on them. The
+  Accept bar stays at the foot of the window.
 - The name is no link, because the resource in the application is the version before the draft.
 - A layer file is named by the module resource it changes, with the layer applied. The elements the layer added,
   changed or removed are listed under the name, each with its mark. A mark has the accessible name that the
@@ -443,28 +441,48 @@ changed what and can undo it.
   paged on the server, [20 revisions at a time](authoring-revisions.md#list), with Search, Filter, Columns,
   Refresh, a sort on Who, When and Through and a pager with a page size. All of them live in the address. A revision's summary opens its diff as a page of
   its own, at `&view=history&revision=<id>`, with History still marked in the sidebar. The page shows
-  each resource the revision changed with **Added**, **Changed** or **Removed**, and its JSON before
-  and after side by side. A loaded revision has no link back, because the sidebar's marked History
+  each resource the revision changed with **Added**, **Changed** or **Removed**. A loaded revision has no link back, because the sidebar's marked History
   entry and the browser's Back lead back. A revision that does not exist shows one line with a link to History.
-- **One diff** _(planned for M35)_. Every diff in Studio is one changes view, whether it is a revision's,
-  a request's draft or the publish page's. Each file is a block with its own border. Its header holds a fold
-  button, named "Hide changes" or "Show changes" with the file's name, then the resource's name in bold, its
-  kind, whether it was Added, Changed or Removed, and its line counts, such as "+8 −3", which assistive
-  technology reads in full. A resource that only a draft adds takes the name its change carries. The file's
-  summary in words comes under the header, then its diff. A file is open at first, unless its page folds it.
-  The publish page folds its files at first.
-- **A file's diff** _(planned for M35)_. The JSON is shown as one column of lines with line numbers. An added
-  line is on an added tint with a mark in the gutter, a removed line on a removed tint with its own mark, and
-  the changed words of a line on a deeper tint. The JSON is coloured as the code editor colours it. A run of
-  unchanged lines beyond three lines of context folds to "Show `<n>` unchanged lines". An added file is all
-  added, and a removed file is all removed. The view is read-only.
+- **One diff** _(planned for M35, #5153)_. Every Studio diff, a revision's, a request's draft and the publish
+  page's, shows each changed file as a block with a `borderSubtle` border and the base radius. The block's
+  header holds the fold, a `Chevron` icon button that points right when the file is folded and down when it is
+  open. The button is named "Show changes to <name>" or "Hide changes to <name>". Then come the file's name in
+  bold, its kind in `textMuted`, and its change. A package's file reads "Package file", or "Tệp của gói mở rộng" in
+  Vietnamese. A resource that only a draft adds takes the name its change carries. The header ends with the
+  file's line counts: "+7" in `successText` and "−2" in `dangerText`, which assistive technology reads in full as
+  "7 lines added, 2 lines removed". Under the header come who changed the file, then the file's summary in words,
+  then its diff. The diff fills the block, with no frame of its own, and is drawn while the file is folded, so the
+  header keeps its counts. A revision's and a request's files open at first. The publish page folds its files at
+  first, as it lists many.
+- **Focus** _(planned for M35, #5153)_. The diff draws no focus ring of its own. Its block draws one `focusRing`
+  ring round the whole file while the diff has focus, from a click or the keyboard alike, as an editable region's
+  focus shows.
+- **A file's diff** _(planned for M37, #3991)_. A file shows as one column in Studio's one code editor,
+  `CodeEditor`, read-only and coloured by the file's language. It is as tall as its text and scrolls only
+  sideways, so a wheel over it scrolls the page, as [scroll areas](actions-and-controls.md#scroll-areas) says. It
+  marks no current line.
+- **Removed and added lines** _(planned for M37, #3991)_. A removed line sits on the `danger` tint, after a "−" in
+  `dangerText`, with its code in the text colour, because a language's colours fall below 4.5:1 on that tint in
+  light mode. An added line sits on the `success` tint, after a "+" in `successText`, with its code in its
+  language's colours. A run's changed field uses the same tints and marks.
+- **Changed words** _(planned for M37, #3991)_. In a line whose words changed in part, the changed words are
+  underlined with a thin line in `successText` or `dangerText`. A line added or removed whole has no underline, and
+  nor does a line whose only change is its spaces, such as the indent of a bracket that the diff kept.
+- **Line numbers** _(planned for M37, #3991)_. A changed file numbers its lines in two columns, one for the text
+  before and one for the text after. An unchanged line has both numbers, a removed line the first and an added
+  line the second. A file added or removed whole has one column of numbers. The last line break of a file makes no row.
+- **Unchanged lines fold** _(planned for M37, #3991)_. A run of 4 or more unchanged lines folds to one row, "Show
+  `<n>` unchanged lines", or "Xem `<n>` dòng không đổi" in Vietnamese. The row is in `primaryText` on `canvas` and
+  underlines on hover. The fold keeps 3 lines on each side of a change, and a click or the keyboard opens it.
+- **A resource's JSON** _(planned for M35, #5153)_. A resource's JSON, indented, shows in the same line diff as a
+  package file.
 - **Undo.** Each revision but the start of history, which the server names on every page and under any
   filter, has **Undo**, under the rules of
   [undo](revisions-and-drafts.md#undo). It runs at once, and the undo is itself a revision that can
   be undone. A revision that cannot be undone alone names the later revisions that block it, each with
   its summary, author and time, and nothing is undone.
-- **Publishing.** The publish page lists every file that differs from the live release, under "`<n>` files
-  changed since the live release". Each file shows "Changed by" and each person who changed it since the release,
+- **Publishing.** The publish page lists every file that differs from the live release, as the blocks of
+  [One diff](#revisions). Each file shows "Changed by" and each person who changed it since the release,
   in the order of their first change. An AI request is "the AI request “`<name>`”", a
   link to its page, with the request's name as [the heading](#the-heading) gives it. A change the server recorded reads System, as it does in History. An AI request that cannot
   be read names the person who accepted it instead. A file that no revision changed since the release has no

@@ -584,6 +584,13 @@
       "vi": "Vẫn chấp nhận",
       "status": "proposed",
       "note": "The action that accepts a draft while an open blocking finding remains."
+    },
+    {
+      "concept": "Package file",
+      "en": "package file",
+      "vi": "tệp của gói mở rộng",
+      "status": "proposed",
+      "note": "The kind of a file in an application's package folder, shown in a diff. The package is \"gói mở rộng\", as the extension package term says."
     }
   ]
 }
