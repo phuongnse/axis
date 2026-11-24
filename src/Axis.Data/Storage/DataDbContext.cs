@@ -39,6 +39,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
 
     public DbSet<McpClientRow> McpClients => Set<McpClientRow>();
 
+    public DbSet<McpConsentRow> McpConsents => Set<McpConsentRow>();
+
     public DbSet<PackageRunnerRow> PackageRunners => Set<PackageRunnerRow>();
 
     public DbSet<GivenRoleRow> GivenRoles => Set<GivenRoleRow>();
@@ -190,6 +192,15 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             client.Property(c => c.ClientId).HasColumnName("client_id").ValueGeneratedNever();
             client.Property(c => c.LastUsedAt).HasColumnName("last_used_at");
             client.Property(c => c.RevokedAt).HasColumnName("revoked_at");
+        });
+
+        modelBuilder.Entity<McpConsentRow>(consent =>
+        {
+            consent.ToTable("mcp_consents");
+            consent.HasKey(c => new { c.ClientId, c.UserId }).HasName("pk_mcp_consents");
+            consent.Property(c => c.ClientId).HasColumnName("client_id").IsRequired().ValueGeneratedNever();
+            consent.Property(c => c.UserId).HasColumnName("user_id").IsRequired().ValueGeneratedNever();
+            consent.Property(c => c.RecordedAt).HasColumnName("recorded_at").IsRequired();
         });
 
         modelBuilder.Entity<PackageRunnerRow>(runner =>

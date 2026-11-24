@@ -23,7 +23,8 @@ namespace Axis.Integration.Tests;
 /// and the realm refuses a registration of a confidential client, of the implicit or password flow, of an <c>http</c> redirect address that is not a loopback address
 /// and of a scope other than <c>axis:authoring</c> and the realm's default scopes. The tenant's <c>Ai:OutsideClients</c> switch decides who may register and who gets a token:
 /// under <c>none</c> registration answers <c>403</c> and every outside client is off, under <c>allowList</c> only the listed clients are on, under <c>all</c> registration is open,
-/// and the clients of Axis stay on under every value.
+/// and the clients of Axis stay on under every value. A client's first <c>/mcp</c> call for a person after the consent writes one platform audit record
+/// and a call with a token of <c>axis-agent</c> writes none (<c>docs/reference/mcp-server.md#audit</c>).
 /// </summary>
 public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
@@ -96,7 +97,7 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
     }
 
     [Fact]
-    public async Task A_client_registered_dynamically_is_public_requires_consent_and_opens_an_mcp_session()
+    public async Task A_client_registered_dynamically_is_public_requires_consent_and_opens_an_mcp_session_and_its_two_calls_write_one_consent_record()
     {
         var (realm, secret) = await NewRealmAsync();
 
@@ -121,9 +122,14 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
         var tokens = await SignInAsync(realm, secret, registeredId, LoopbackRedirectUri, onConsent: name => consentFor = name);
 
         Assert.Equal(DraftHelper, consentFor);
-        var response = await InitializeMcpAsync(realm, tokens.Tokens.GetProperty("access_token").GetString());
+        var access = tokens.Tokens.GetProperty("access_token").GetString()!;
+        await using var server = await StartMcpAsync(realm, administrator: false);
+        var response = await server.InitializeAsync(access);
+        var again = await server.InitializeAsync(access);
         Assert.True(response.Status == HttpStatusCode.OK, response.Body);
         Assert.False(string.IsNullOrEmpty(response.SessionId));
+        Assert.True(again.Status == HttpStatusCode.OK, again.Body);
+        Assert.Equal([$"{Subject(access)} client:{registeredId}"], await ConsentRecordsAsync(server));
     }
 
     [Fact]
@@ -147,12 +153,14 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
         await using var server = await StartMcpAsync(realm, administrator: true);
         var before = await server.InitializeAsync(access);
         Assert.True(before.Status == HttpStatusCode.OK, before.Body);
+        Assert.Equal([$"{userId} client:{registeredId}"], await ConsentRecordsAsync(server));
 
         var revoked = await server.PostAsAdministratorAsync($"/api/tenant/connected-apps/{Uri.EscapeDataString(registeredId)}/revoke");
 
         Assert.Equal(HttpStatusCode.NoContent, revoked);
         var after = await server.InitializeAsync(access);
         Assert.Equal(HttpStatusCode.Unauthorized, after.Status);
+        Assert.Single(await ConsentRecordsAsync(server));
         var refreshed = await RefreshAsync(realm, refresh, registeredId);
         Assert.Equal(HttpStatusCode.BadRequest, refreshed.Status);
         Assert.False(refreshed.Body.TryGetProperty("access_token", out _));
@@ -177,6 +185,13 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
             1L,
             await PostgreSqlServer.AdminScalarAsync(
                 server.Platform, "SELECT count(*) FROM platform.audit_records WHERE command = 'tenant connected-app revoke'", CancellationToken));
+
+        // The person consents again, and the client's next call is recorded as a new consent.
+        await WaitForNextAuthenticatorPeriodAsync();
+        var again = (await SignInAsync(realm, secret, registeredId, LoopbackRedirectUri)).Tokens.GetProperty("access_token").GetString()!;
+        var consented = await server.InitializeAsync(again);
+        Assert.True(consented.Status == HttpStatusCode.OK, consented.Body);
+        Assert.Equal(2, (await ConsentRecordsAsync(server)).Count);
     }
 
     [Fact]
@@ -469,9 +484,11 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
         var access = exchanged.Body.GetProperty("access_token").GetString()!;
         Assert.Equal(Subject(subject), Subject(access));
         Assert.Equal([McpUrl], Audiences(access));
-        var response = await InitializeMcpAsync(realm, access);
+        await using var server = await StartMcpAsync(realm, administrator: false);
+        var response = await server.InitializeAsync(access);
         Assert.True(response.Status == HttpStatusCode.OK, response.Body);
         Assert.False(string.IsNullOrEmpty(response.SessionId));
+        Assert.Empty(await ConsentRecordsAsync(server));
     }
 
     [Fact]
@@ -763,6 +780,32 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
         using var response = await _http.PostAsJsonAsync(
             new Uri(_baseAddress, $"realms/{realm}/clients-registrations/openid-connect"), registration, CancellationToken);
         return (response.StatusCode, await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken));
+    }
+
+    /// <summary>The platform audit records of a consent on the server's platform database, each as the actor, a space and what changed.</summary>
+    private static async Task<List<string>> ConsentRecordsAsync(McpServer server) =>
+        [.. ((string)(await PostgreSqlServer.AdminScalarAsync(
+            server.Platform,
+            """
+            SELECT coalesce(string_agg(actor || ' ' || array_to_string(changed, ','), '|' ORDER BY occurred_at), '')
+            FROM platform.audit_records WHERE command = 'tenant connected-app consent'
+            """,
+            CancellationToken))!).Split('|', StringSplitOptions.RemoveEmptyEntries)];
+
+    // The realm refuses a code it has seen, and a token issued in the same second as a revoke is refused, so the next sign-in waits for a new 30-second period.
+    private static async Task WaitForNextAuthenticatorPeriodAsync()
+    {
+        var period = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30;
+        while (true)
+        {
+            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            if (now / 30 > period && now % 30 < 27)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500), CancellationToken);
+        }
     }
 
     private async Task<McpInitialize> InitializeMcpAsync(string realm, string? accessToken)
