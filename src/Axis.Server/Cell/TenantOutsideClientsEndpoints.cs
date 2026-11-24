@@ -45,6 +45,8 @@ internal static partial class TenantOutsideClientsEndpoints
 
     internal const string RevokeCommand = "tenant connected-app revoke";
 
+    internal const string ConsentCommand = "tenant connected-app consent";
+
     public static void MapTenantOutsideClientsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/tenant/outside-clients", ReadAsync);

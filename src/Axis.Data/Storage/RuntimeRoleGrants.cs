@@ -50,6 +50,7 @@ public static class RuntimeRoleGrants
         "pending_computed_fields",
         "sessions",
         "mcp_clients",
+        "mcp_consents",
         "package_runners",
         "given_roles",
         "table_views",

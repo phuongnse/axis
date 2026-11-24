@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Axis.Administration;
 using Axis.Core.Tenancy;
 using Axis.Data.Storage;
 using Axis.Server.CellApi;
@@ -390,11 +391,30 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
                 {
                     var connection = await context.HttpContext.RequestServices.GetRequiredService<TenantDatabase>()
                         .GetConnectionAsync(context.HttpContext.RequestAborted);
-                    use = await McpClients.ReadAsync(connection, clientId, context.HttpContext.RequestAborted);
+                    use = await McpClients.ReadAsync(connection, clientId, callerId, context.HttpContext.RequestAborted);
                     if (use.RevokedAt is { } revokedAt && token.IssuedAt <= revokedAt.UtcDateTime)
                     {
                         Refuse(context, "The client's consent was revoked after the token was issued.");
                         return;
+                    }
+
+                    // The first call of a client for a person after the consent writes its platform audit record, see docs/reference/mcp-server.md#audit.
+                    if (!use.ConsentRecorded && !string.Equals(clientId, RealmAgentClient.ClientId, StringComparison.Ordinal))
+                    {
+                        await using var transaction = await connection.BeginTransactionAsync(context.HttpContext.RequestAborted);
+                        if (await McpClients.ClaimConsentAsync(transaction, clientId, callerId, context.HttpContext.RequestAborted))
+                        {
+                            await using var platform = context.HttpContext.RequestServices.GetRequiredService<CellPlatformWriter>().Open();
+                            await PlatformAuditRecords.WriteAsync(
+                                platform,
+                                TenantOutsideClientsEndpoints.ConsentCommand,
+                                tenantId,
+                                [$"client:{clientId}"],
+                                callerId,
+                                context.HttpContext.RequestAborted);
+                        }
+
+                        await transaction.CommitAsync(context.HttpContext.RequestAborted);
                     }
                 }
 

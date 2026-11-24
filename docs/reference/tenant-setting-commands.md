@@ -473,7 +473,7 @@ apart from every tenant, and nothing can change them.
   provisioning job or a request, and is empty for a command run from the command line.
 - **Who writes.** `Axis.Admin` writes records over `ConnectionStrings:PlatformSchema`. The server writes
   the records of the provisioning API's routes over a connection of the schema role that it opens for
-  that write alone. The read-only role of the server and the worker gets no `SELECT` on the table, so
+  that write alone, and the MCP server's token check writes the consent record the same way. The read-only role of the server and the worker gets no `SELECT` on the table, so
   neither host reads it.
 - **Every command is marked.** The dispatcher of `Axis.Admin` reads a table of commands, and each is
   marked as writing one record per tenant, one per run or none. A command without a mark fails a test.
@@ -552,3 +552,7 @@ The publisher and the server also write records for the operator's work in a cel
   the consents are deleted, with the administrator as actor and `consent` in `changed`, never a client id. A revoke that
   fails at the identity provider writes none, and the repeat that finishes it writes one. See
   [outside MCP clients](user-administration.md#outside-mcp-clients).
+- **Connected app consents.** The first `/mcp` call of a client for a person after the person consents writes
+  `tenant connected-app consent`, with the person as actor and `client:<clientId>` in `changed`, which the revoke record
+  does not hold. A later call writes none until a revoke. A write that fails fails the call, and the next call writes the
+  record. See [audit](mcp-server.md#audit).

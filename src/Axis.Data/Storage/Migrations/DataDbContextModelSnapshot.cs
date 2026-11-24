@@ -289,6 +289,26 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("mcp_clients", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.McpConsentRow", b =>
+                {
+                    b.Property<string>("ClientId")
+                        .HasColumnType("text")
+                        .HasColumnName("client_id");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.HasKey("ClientId", "UserId")
+                        .HasName("pk_mcp_consents");
+
+                    b.ToTable("mcp_consents", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.NotificationPreferenceRow", b =>
                 {
                     b.Property<string>("UserId")
