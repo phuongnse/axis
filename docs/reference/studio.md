@@ -238,7 +238,7 @@ its end.
   the first release." or, with nothing to publish, "Everything is live, so there is nothing to publish." Under it,
   "The release" holds Label, up to 100 characters, with the help "A short name for the release, such as Spring
   update.", and Note, up to 2,000, with the help "What changed and why, for whoever reads the release list."
-- **The changed files.** After "The release", the page lists the files that differ from the [live release](authoring-revisions.md#live-diff), or none with no live release or no revision history.
+- **The changes' part** _(planned for M35, #5153)_. After "The release", the page lists the files that differ from the [live release](authoring-revisions.md#live-diff), as the blocks of [one diff](ai-authoring-in-studio.md#revisions), folded at first, with Changed by under each block's header. The part has one heading whatever the number of files, "Changes since the live release" or "Thay đổi so với phiên bản đang chạy". The release's fields and the changes are parts of one `SectionParts` column, so a `borderSubtle` rule parts them. With no live release or no revision history, the part lists no file.
 - **The action bar** says "Goes live as release `<n>`" and holds Cancel and Publish. `<n>` is the number of an
   earlier release with the folder's content hash, else the highest number plus one, or 1, see
   [release history](authoring-publishing.md#release-history). Publish sends the request with only the filled
