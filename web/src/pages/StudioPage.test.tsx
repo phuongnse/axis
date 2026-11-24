@@ -2045,11 +2045,23 @@ describe('StudioPage publishing', () => {
       ])
       expect(within(section).getAllByText('Package file')).toHaveLength(3)
 
+      // The publish page folds each file at first, with its diff in the page but hidden.
+      for (const file of files) {
+        expect(within(file).getByRole('button', { name: /^Show changes to /, expanded: false })).toBeVisible()
+        expect(within(file).queryByRole('textbox')).not.toBeInTheDocument()
+      }
+
       const adapter = files[2]
+      await userEvent.click(
+        within(adapter).getByRole('button', { name: 'Show changes to packages/approval-rules/adapter.py' }),
+      )
       expect(await within(adapter).findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })).toBeVisible()
       await waitFor(() => expect(adapter.querySelector('.cm-deletedLine')).toHaveTextContent('return 1000'))
       expect(adapter.querySelector('.cm-changedLine')).toHaveTextContent('return 5000')
-      expect(within(files[0]).getByTestId('json-diff-after')).toHaveTextContent('"label": "second"')
+
+      const approver = files[0]
+      await userEvent.click(within(approver).getByRole('button', { name: 'Show changes to Approver' }))
+      expect(await within(approver).findByRole('textbox', { name: 'Approver' })).toBeVisible()
     })
 
     it('names the person who accepted an AI request that cannot be read', async () => {

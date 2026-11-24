@@ -1,6 +1,6 @@
 // A file's line diff, see docs/reference/ai-authoring-in-studio.md#revisions and docs/reference/studio-packages.md#diffs.
-import { getChunks, getOriginalDoc, uncollapseUnchanged, unifiedMergeView, type Chunk } from '@codemirror/merge'
-import { Prec, RangeSetBuilder, type Extension } from '@codemirror/state'
+import { Chunk, getChunks, getOriginalDoc, uncollapseUnchanged, unifiedMergeView } from '@codemirror/merge'
+import { Prec, RangeSetBuilder, Text, type Extension } from '@codemirror/state'
 import {
   Decoration,
   EditorView,
@@ -31,6 +31,49 @@ export function diffShape(original: string, value: string): DiffShape {
     return 'added'
   }
   return diffText(value) === '' ? 'removed' : 'changed'
+}
+
+/** The number of lines of a diff text, which is 0 for the empty text. */
+function lineCountOf(text: string): number {
+  return text === '' ? 0 : text.split('\n').length
+}
+
+/** The lines of `doc` that a chunk spans from `from` to `to`, which is 0 where the chunk has no text on that side. */
+function chunkLines(doc: Text, from: number, to: number): number {
+  if (from === to) {
+    return 0
+  }
+  // A chunk ends with its last line's break, so the start of the next line is no line of its own.
+  const text = doc.sliceString(from, to)
+  const lines = text.split('\n').length
+  return text.endsWith('\n') ? lines - 1 : lines
+}
+
+/**
+ * The lines added and the lines removed by a change from the text before, `original`, to the text after, `value`: the
+ * numbers in a file's header, counted on the same diff as {@link lineDiff} draws. A file added or removed whole counts
+ * each of its lines, see docs/reference/ai-authoring-in-studio.md#revisions.
+ */
+export function lineCounts(original: string, value: string): { added: number; removed: number } {
+  const before = diffText(original)
+  const after = diffText(value)
+  switch (diffShape(original, value)) {
+    case 'added':
+      return { added: lineCountOf(after), removed: 0 }
+    case 'removed':
+      return { added: 0, removed: lineCountOf(before) }
+    case 'changed': {
+      const textBefore = Text.of(before.split('\n'))
+      const textAfter = Text.of(after.split('\n'))
+      let added = 0
+      let removed = 0
+      for (const chunk of Chunk.build(textBefore, textAfter)) {
+        removed += chunkLines(textBefore, chunk.fromA, chunk.toA)
+        added += chunkLines(textAfter, chunk.fromB, chunk.toB)
+      }
+      return { added, removed }
+    }
+  }
 }
 
 /**
@@ -288,6 +331,9 @@ function diffTheme(tokens: DesignTokens): Extension {
   })
   return Prec.high(
     EditorView.theme({
+      // The diff draws no focus ring of its own: its file's block draws one, see
+      // docs/reference/ai-authoring-in-studio.md#revisions. The rule names `.cm-editor` too, so it wins over the code editor's.
+      '&.cm-editor.cm-focused': { outline: 'none' },
       // The rules that set what the merge view's own theme sets name `.cm-editor` too, so they win whichever theme loads first.
       // Each line of a diff keeps room for its mark, so the code of every line starts at the same place.
       '&.cm-merge-b .cm-line, .cm-deletedLine': {

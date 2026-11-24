@@ -662,6 +662,13 @@ describe('CodeEditor', () => {
       })
     })
 
+    it('draws no focus outline of its own, as its file block draws one', async () => {
+      diff('alpha', 'beta')
+      await drawn()
+
+      expect(ruleEndingIn('.cm-editor.cm-focused', 'outline')).toBe('none')
+    })
+
     it("shows a new text before as the merge view's own change", async () => {
       const { rerender } = diff(partly.original, partly.value)
       await drawn()

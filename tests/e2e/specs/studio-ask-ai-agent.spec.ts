@@ -308,12 +308,13 @@ test('a request whose compile check fails in every fix round ends Failed, with w
     await expect(checks).toContainText('It does not compile')
     await expect(page.getByTestId('studio-ai-request-review')).toHaveCount(0)
 
-    // The draft's diff lists the entity the work wrote, folded until its author asks for the diff.
-    const written = page.getByTestId('studio-changes-file').filter({ hasText: 'CostCentre' })
+    // The draft's diff lists the entity the work wrote, open at first. The block is found by its fold button, as the
+    // JSON of another file may name the entity too.
+    const written = page.getByTestId('studio-changes-file').filter({
+      has: page.getByRole('button', { name: 'Hide changes to CostCentre', exact: true }),
+    })
     await expect(written).toHaveCount(1)
-    await expect(written.getByTestId('json-diff-after')).toHaveCount(0)
-    await written.getByRole('button', { name: 'Show the diff of CostCentre', exact: true }).click()
-    await expect(written.getByTestId('json-diff-after')).toContainText('"CostCentre"')
+    await expect(written.getByRole('textbox')).toContainText('"CostCentre"')
   } finally {
     await page.close()
   }
@@ -480,7 +481,9 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
     await expect(item('Plan').getByRole('img', { name: 'Done', exact: true })).toBeVisible()
     await expect(item('Result').getByRole('img', { name: 'Waiting', exact: true })).toBeVisible()
     // The diff lists the module's Department once, with the field the layer added marked.
-    const changed = page.getByTestId('studio-changes-file').filter({ hasText: 'Department' })
+    const changed = page.getByTestId('studio-changes-file').filter({
+      has: page.getByRole('button', { name: 'Hide changes to Department', exact: true }),
+    })
     await expect(changed).toHaveCount(1)
     await expect(
       changed.getByRole('note', {
@@ -503,7 +506,9 @@ test('another author sees the ready request and its diff, and whose accept it wa
   try {
     await page.goto(readyRequestUrl)
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready')
-    const changed = page.getByTestId('studio-changes-file').filter({ hasText: 'Department' })
+    const changed = page.getByTestId('studio-changes-file').filter({
+      has: page.getByRole('button', { name: 'Hide changes to Department', exact: true }),
+    })
     await expect(changed).toHaveCount(1)
     await expect(
       changed.getByRole('note', {
@@ -612,7 +617,9 @@ test('the author accepts the ready layer change, sees Accepted and finds its rev
     await page.goto(readyRequestUrl)
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready')
     await expect(page.getByText('Checks and review passed', { exact: true })).toBeVisible()
-    const changed = page.getByTestId('studio-changes-file').filter({ hasText: 'Department' })
+    const changed = page.getByTestId('studio-changes-file').filter({
+      has: page.getByRole('button', { name: 'Hide changes to Department', exact: true }),
+    })
     await expect(
       changed.getByRole('note', {
         name: 'costCentre, added by this application',

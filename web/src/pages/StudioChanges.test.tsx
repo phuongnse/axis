@@ -10,12 +10,11 @@ import {
   type StudioRevisionChange,
 } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
+import { designTokensFor } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioChanges, type StudioChangedFile } from './StudioChanges'
 
 const texts = {
-  'shell.studio.history.before': 'Before',
-  'shell.studio.history.after': 'After',
   'shell.studio.overview.change.added': 'Added',
   'shell.studio.overview.change.changed': 'Changed',
   'shell.studio.overview.change.removed': 'Removed',
@@ -26,10 +25,12 @@ const texts = {
   'shell.studio.contract.addedName': '{name}, added by this application',
   'shell.studio.module.changedName': '{name}, changed by this application',
   'shell.studio.module.removedName': '{name}, removed by this application',
-  'shell.studio.changes.showDiff': 'Show the diff',
-  'shell.studio.changes.hideDiff': 'Hide the diff',
-  'shell.studio.changes.showDiffName': 'Show the diff of {name}',
-  'shell.studio.changes.hideDiffName': 'Hide the diff of {name}',
+  'shell.studio.changes.showDiffName': 'Show changes to {name}',
+  'shell.studio.changes.hideDiffName': 'Hide changes to {name}',
+  'shell.studio.changes.linesAdded.one': '1 line added',
+  'shell.studio.changes.linesAdded.many': '{count} lines added',
+  'shell.studio.changes.linesRemoved.one': '1 line removed',
+  'shell.studio.changes.linesRemoved.many': '{count} lines removed',
   'shell.studio.releases.system': 'System',
   'shell.studio.changes.changedBy': 'Changed by {authors}',
   'shell.studio.changes.you': 'you',
@@ -62,7 +63,7 @@ const files: StudioRevisionChange[] = [
     change: 'removed',
     id: null,
     kind: null,
-    name: 'Old',
+    name: 'notes/old.json',
     before: '{"gone":true}',
     after: null,
   },
@@ -176,38 +177,92 @@ function fileSection(file: string): HTMLElement {
 }
 
 describe('StudioChanges', () => {
-  it('shows each file with its name, kind, change and its JSON before and after', () => {
+  const { colour, radius } = designTokensFor('light')
+
+  it('shows each file with its name, kind, change and its JSON as a line diff', async () => {
     renderChanges()
 
     expect(screen.getAllByTestId('studio-changes-file')).toHaveLength(3)
 
-    const added = within(fileSection('roles/approver.json'))
-    expect(added.getByText('Approver')).toBeVisible()
-    expect(added.getByText('Role')).toBeVisible()
-    expect(added.getByText('Added')).toBeVisible()
-    expect(added.getByTestId('json-diff-before')).toHaveTextContent('—')
-    expect(added.getByTestId('json-diff-after')).toHaveTextContent('"name": "Approver"')
+    const added = fileSection('roles/approver.json')
+    expect(within(added).getByText('Approver')).toBeVisible()
+    expect(within(added).getByText('Role')).toBeVisible()
+    expect(within(added).getByText('Added')).toBeVisible()
+    expect(await within(added).findByRole('textbox', { name: 'Approver' })).toBeVisible()
+    expect(added.querySelector('.cm-removedFile')).toBeNull()
+    expect(added.querySelector('.cm-changedLine')).toHaveTextContent('{')
+    expect(added).toHaveTextContent('"name": "Approver"')
 
-    const changed = within(fileSection('roles/buyer.json'))
-    expect(changed.getByText('Buyer')).toBeVisible()
-    expect(changed.getByText('Role')).toBeVisible()
-    expect(changed.getByText('Changed')).toBeVisible()
-    expect(changed.getByTestId('json-diff-before')).toHaveTextContent('"label": "first"')
-    expect(changed.getByTestId('json-diff-after')).toHaveTextContent('"label": "second"')
+    const changed = fileSection('roles/buyer.json')
+    expect(within(changed).getByText('Buyer')).toBeVisible()
+    expect(within(changed).getByText('Role')).toBeVisible()
+    expect(within(changed).getByText('Changed')).toBeVisible()
+    expect(await within(changed).findByRole('textbox', { name: 'Buyer' })).toBeVisible()
+    await waitFor(() => expect(changed.querySelector('.cm-deletedLine')).toHaveTextContent('"label": "first"'))
+    expect(changed.querySelector('.cm-changedLine')).toHaveTextContent('"label": "second"')
 
-    const removed = within(fileSection('notes/old.json'))
-    expect(removed.getByText('Removed')).toBeVisible()
-    expect(removed.getByTestId('json-diff-before')).toHaveTextContent('"gone": true')
-    expect(removed.getByTestId('json-diff-after')).toHaveTextContent('—')
+    const removed = fileSection('notes/old.json')
+    expect(within(removed).getByText('Removed')).toBeVisible()
+    expect(await within(removed).findByRole('textbox', { name: 'notes/old.json' })).toBeVisible()
+    expect(removed.querySelector('.cm-removedFile')).not.toBeNull()
+    expect(removed).toHaveTextContent('"gone": true')
+  })
+
+  it('draws no side-by-side JSON', async () => {
+    renderChanges()
+
+    await within(fileSection('roles/buyer.json')).findByRole('textbox', { name: 'Buyer' })
+    expect(screen.queryByTestId('json-diff-before')).toBeNull()
+    expect(screen.queryByTestId('json-diff-after')).toBeNull()
   })
 
   it('shows the em dash as the kind of a file that has none', () => {
     renderChanges()
 
-    const removed = fileSection('notes/old.json')
-    expect(removed).toHaveTextContent(/^.*—.*Removed/)
-    expect(within(removed).getByText('Before')).toBeVisible()
-    expect(within(removed).getByText('After')).toBeVisible()
+    expect(fileSection('notes/old.json')).toHaveTextContent(/—.*Removed/)
+  })
+
+  it('draws each file as a bordered block, open at first, with its line counts in a header', async () => {
+    const before = 'keep\nold1\nold2\nold3\nend\n'
+    const after = 'keep\nnew1\nnew2\nnew3\nnew4\nnew5\nnew6\nnew7\nnew8\nend\n'
+    renderChanges([{ ...packageFiles[0], before, after }])
+
+    const section = fileSection('packages/approval-rules/adapter.py')
+    expect(section).toHaveStyle({ border: `1px solid ${colour.borderSubtle}`, borderRadius: `${radius.base}px` })
+    expect(
+      within(section).getByRole('button', {
+        name: 'Hide changes to packages/approval-rules/adapter.py',
+        expanded: true,
+      }),
+    ).toBeVisible()
+    expect(within(section).getByText('+8')).toBeVisible()
+    expect(within(section).getByText('−3')).toBeVisible()
+    expect(within(section).getByText('8 lines added, 3 lines removed')).toBeInTheDocument()
+    await within(section).findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })
+    await waitFor(() => expect(section.querySelectorAll('.cm-deletedLine')).toHaveLength(3))
+    expect(section.querySelectorAll('.cm-changedLine')).toHaveLength(8)
+  })
+
+  it('shows no count of zero: a file added whole has no removed count', async () => {
+    renderChanges([packageFiles[1]])
+
+    const section = fileSection('packages/approval-rules/new.py')
+    expect(within(section).getByText('+2')).toBeVisible()
+    expect(within(section).queryByText(/−/)).toBeNull()
+    expect(within(section).getByText('2 lines added')).toBeInTheDocument()
+    await within(section).findByRole('textbox', { name: 'packages/approval-rules/new.py' })
+  })
+
+  it('draws the focus ring round the block while its diff has focus, and the editor draws none', async () => {
+    const { container } = renderChanges([packageFiles[0]])
+
+    await screen.findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })
+    const style = Array.from(container.querySelectorAll('style'))
+      .map((element) => element.textContent)
+      .join('\n')
+    expect(style).toContain(
+      `[data-diff-file]:has(.cm-editor:focus-within) { outline: 2px solid ${colour.focusRing}; outline-offset: 2px; }`,
+    )
   })
 
   it('shows no Changed by line without the option', () => {
@@ -266,17 +321,26 @@ describe('StudioChanges with Changed by', () => {
 })
 
 describe('StudioChanges folded', () => {
-  it('starts each file closed, and opens its JSON when Show the diff is used', async () => {
+  it('starts each file closed, and opens its line diff when Show changes is used', async () => {
     renderChanges(files, { folded: true })
 
     const removed = fileSection('notes/old.json')
-    expect(within(removed).queryByTestId('json-diff-before')).not.toBeInTheDocument()
-    const show = within(removed).getByRole('button', { name: 'Show the diff of notes/old.json', expanded: false })
+    expect(within(removed).queryByRole('textbox')).not.toBeInTheDocument()
+    const show = within(removed).getByRole('button', { name: 'Show changes to notes/old.json', expanded: false })
     await userEvent.click(show)
-    expect(within(removed).getByTestId('json-diff-before')).toHaveTextContent('"gone": true')
+    expect(await within(removed).findByRole('textbox', { name: 'notes/old.json' })).toBeVisible()
+    expect(removed).toHaveTextContent('"gone": true')
     expect(
-      within(removed).getByRole('button', { name: 'Hide the diff of notes/old.json', expanded: true }),
+      within(removed).getByRole('button', { name: 'Hide changes to notes/old.json', expanded: true }),
     ).toBeVisible()
+  })
+
+  it('keeps the diff in the page, hidden, and shows the counts while folded', async () => {
+    renderChanges([files[2]], { folded: true })
+
+    const removed = fileSection('notes/old.json')
+    expect(within(removed).getByText('−3')).toBeVisible()
+    expect(await within(removed).findByRole('textbox', { name: 'notes/old.json', hidden: true })).not.toBeVisible()
   })
 
   it('shows the module resource a layer file changes, named by it, with its marks and no reset', async () => {
@@ -295,9 +359,22 @@ describe('StudioChanges folded', () => {
     )
     expect(within(section).queryByRole('button', { name: /Reset/ })).not.toBeInTheDocument()
 
-    await userEvent.click(within(section).getByRole('button', { name: 'Show the diff of PurchaseRequest' }))
-    expect(within(section).getByTestId('json-diff-after')).toHaveTextContent('"supplier"')
-    expect(within(section).getByTestId('json-diff-after')).not.toHaveTextContent('"target"')
+    await userEvent.click(within(section).getByRole('button', { name: 'Show changes to PurchaseRequest' }))
+    const editor = await within(section).findByRole('textbox', { name: 'PurchaseRequest' })
+    expect(editor).toBeVisible()
+    expect(section).toHaveTextContent('"supplier"')
+    expect(section).not.toHaveTextContent('"target"')
+  })
+
+  it('shows Changed by under the header of a folded file', () => {
+    const buyer: LiveFile = { ...files[1], titles: null, by: [revision('c', null, 'Axis')] }
+    renderWith(
+      [buyer],
+      { application: 'PurchaseRequests', authors: (file: LiveFile) => changeAuthors(file.by, 'author', new Map()) },
+      true,
+    )
+
+    expect(within(fileSection('roles/buyer.json')).getByTestId('studio-changes-by')).toBeVisible()
   })
 })
 
@@ -312,7 +389,6 @@ describe('StudioChanges package files', () => {
     expect(within(changed).getByText('Changed')).toBeVisible()
     await waitFor(() => expect(changed.querySelector('.cm-deletedLine')).toHaveTextContent('return 1000'))
     expect(changed.querySelector('.cm-changedLine')).toHaveTextContent('return 5000')
-    expect(within(changed).queryByTestId('json-diff-before')).toBeNull()
 
     const added = fileSection('packages/approval-rules/new.py')
     expect(await within(added).findByRole('textbox', { name: 'packages/approval-rules/new.py' })).toBeVisible()
@@ -320,17 +396,15 @@ describe('StudioChanges package files', () => {
     expect(added.querySelectorAll('.cm-changedLine')).toHaveLength(2)
     expect(added.querySelector('.cm-changedLine')).toHaveTextContent('def fresh():')
     expect(added.querySelector('.cm-removedFile')).toBeNull()
-    expect(within(added).queryByTestId('json-diff-before')).toBeNull()
 
     const removed = fileSection('packages/approval-rules/old.py')
     expect(await within(removed).findByRole('textbox', { name: 'packages/approval-rules/old.py' })).toBeVisible()
     expect(within(removed).getByText('Removed')).toBeVisible()
     expect(removed.querySelector('.cm-removedFile')).not.toBeNull()
     expect(removed.querySelector('.cm-changedLine')).toHaveTextContent('def gone():')
-    expect(within(removed).queryByTestId('json-diff-before')).toBeNull()
   })
 
-  it('keeps a resource on its JSON, and puts the package files after the resources, sorted by path', async () => {
+  it('draws a resource as a line diff too, and puts the package files after the resources, sorted by path', async () => {
     renderChanges([packageFiles[2], packageFiles[0], files[1], packageFiles[1]])
 
     expect(screen.getAllByTestId('studio-changes-file').map((section) => section.dataset.file)).toEqual([
@@ -339,21 +413,21 @@ describe('StudioChanges package files', () => {
       'packages/approval-rules/new.py',
       'packages/approval-rules/old.py',
     ])
-    expect(within(fileSection('roles/buyer.json')).getByTestId('json-diff-before')).toHaveTextContent(
-      '"label": "first"',
+    await waitFor(() =>
+      expect(fileSection('roles/buyer.json').querySelector('.cm-deletedLine')).toHaveTextContent('"label": "first"'),
     )
     await within(fileSection('packages/approval-rules/old.py')).findByRole('textbox', {
       name: 'packages/approval-rules/old.py',
     })
   })
 
-  it('shows a package file behind Show the diff when folded, as it shows a resource', async () => {
+  it('shows a package file behind Show changes when folded, as it shows a resource', async () => {
     renderChanges([packageFiles[0]], { folded: true })
 
     const section = fileSection('packages/approval-rules/adapter.py')
     expect(within(section).queryByRole('textbox')).not.toBeInTheDocument()
     await userEvent.click(
-      within(section).getByRole('button', { name: 'Show the diff of packages/approval-rules/adapter.py' }),
+      within(section).getByRole('button', { name: 'Show changes to packages/approval-rules/adapter.py' }),
     )
     expect(await within(section).findByRole('textbox', { name: 'packages/approval-rules/adapter.py' })).toBeVisible()
   })
