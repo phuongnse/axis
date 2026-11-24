@@ -271,8 +271,8 @@ The task API tells the inbox and the task page which actions to offer, and these
 
 The [task inbox widget](task-inbox-widget.md) and the task page use these fields:
 
-- The inbox shows an "Overdue" tag beside the due date of an `overdue` task, and a "Claimed by you"
-  tag on a row whose `claimedBy` is set.
+- The inbox shows an "Overdue" tag beside the due date of an `overdue` task, and a "Claimed by" tag,
+  with the reader's name and "(you)", on a row whose `claimedBy` is set.
 - **At risk** _(planned for M39)_. The inbox and the task page show an "At risk" tag for an `atRisk` task,
   see [task inbox widget](task-inbox-widget.md#task-inbox-widget).
 - The task page shows the "Overdue" tag. It shows Claim and Release when `commands` lists them, and

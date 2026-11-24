@@ -170,9 +170,7 @@ export function Shell({
   const hasAccount = account !== undefined
   const preferences = <PreferencesMenu locales={locales} locale={locale} onLocaleChange={onLocaleChange} />
 
-  const bell = notifications && (
-    <NotificationBell path={notifications.path} sitePath={notifications.sitePath} locale={locale} />
-  )
+  const bell = notifications && <NotificationBell path={notifications.path} sitePath={notifications.sitePath} />
 
   const setOpen = (next: boolean) => setOpenOn(next ? { pathname, narrow } : null)
 

@@ -807,7 +807,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       const changed = page.getByTestId('studio-changes-file')
       await expect(changed).toHaveCount(1)
       await expect(changed).toHaveAttribute('data-file', 'texts/en.json')
-      await expect(changed.getByTestId('studio-changes-by')).toHaveText('Changed by you')
+      await expect(changed.getByTestId('studio-changes-by')).toHaveText(/^Changed by .+ \(you\)$/)
       await confirmPublish(page, label)
       await expect(page).toHaveURL(/view=releases/)
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 120_000 })

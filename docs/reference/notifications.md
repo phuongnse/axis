@@ -222,7 +222,9 @@ A bell in the header shows the signed-in user's unread count and opens their not
   with no count. A polite live region announces a change of the count.
 - **Icon button** _(planned for M35)_. The bell is an icon button, and its unread count is drawn by `CountBadge`, the [shared widget](shared-widgets.md#which-widget) for a count. Its accessible name is the one given in Name above.
 - **Panel.** The bell opens a panel that lists the notifications newest first, 10 to a page, each with
-  its subject, body and time. Unread rows are marked, and a Mark all read button sits at the top.
+  its subject, body and time. The time is drawn by `EventTime`, so it shows how long ago the notification
+  arrived, see [shown values](frontend.md#shown-values). Unread rows are marked, and a Mark all read button
+  sits at the top.
 - **Popover** _(planned for M35)_. The bell opens a popover list of the notifications, newest first. Its filters are All, Unread and Needs action, and Needs action lists the `action` notifications not yet done. Two buttons sit on it: Mark all read and Clear all.
 - **Rows.** A row opens its page, if it has one, with its parameters and marks the notification read.
   A row without a page, such as a quota notice, only marks it read.

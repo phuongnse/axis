@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { formatValue } from './formatValue'
 import { NotificationBell } from './NotificationBell'
 import { notificationAddress, type NotificationItem, type NotificationPage } from './notifications'
 import { TextProvider } from './TextProvider'
@@ -64,7 +65,7 @@ function Location() {
   return <div data-testid="location">{location.pathname + location.search}</div>
 }
 
-function renderBell(texts: Record<string, string> = platformEnglish, locale = 'en') {
+function renderBell(texts: Record<string, string> = platformEnglish) {
   return render(
     <MemoryRouter initialEntries={['/e2e/notes']}>
       <ConfigProvider theme={{ token: { motion: false } }}>
@@ -75,7 +76,7 @@ function renderBell(texts: Record<string, string> = platformEnglish, locale = 'e
                 path="*"
                 element={
                   <>
-                    <NotificationBell path={path} sitePath="e2e" locale={locale} />
+                    <NotificationBell path={path} sitePath="e2e" />
                     <Location />
                   </>
                 }
@@ -105,7 +106,7 @@ describe('NotificationBell', () => {
 
   it('names the bell in Vietnamese with the unread count', async () => {
     stubServer(() => json(page([withPage], 2)))
-    renderBell(platformVietnamese, 'vi')
+    renderBell(platformVietnamese)
 
     expect(await screen.findByRole('button', { name: 'Thông báo, 2 chưa đọc' })).toBeInTheDocument()
   })
@@ -142,6 +143,36 @@ describe('NotificationBell', () => {
     expect(within(dialog).getByText('Unread')).toBeInTheDocument()
     const lists = fetchMock.mock.calls.map(([url]) => url).filter((url) => url.startsWith(path))
     expect(lists).toEqual([`${path}?page=1&pageSize=10`, `${path}?page=1&pageSize=10`])
+  })
+
+  it('shows how long ago each row arrived, with its exact time as the tooltip, and its date and time after a week', async () => {
+    const older: NotificationItem = {
+      ...withoutPage,
+      id: '44444444-4444-4444-8444-444444444444',
+      createdAt: '2026-10-10T08:30:00Z',
+    }
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-10-26T08:35:00Z'))
+      stubServer(() => json(page([withPage, older], 2)))
+      renderBell()
+      const user = userEvent.setup()
+
+      await user.click(await screen.findByRole('button', { name: 'Notifications, 2 unread' }))
+
+      const dialog = await screen.findByRole('dialog')
+      const recent = dialog.querySelector(`time[datetime="${withPage.createdAt}"]`)
+      expect(recent).toHaveTextContent('5 minutes ago')
+      const exact = formatValue(
+        { name: 'time', type: 'date-time' },
+        older.createdAt,
+        {},
+        { locale: 'en', text: (key) => key },
+      )
+      expect(dialog.querySelector(`time[datetime="${older.createdAt}"]`)).toHaveTextContent(exact)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('posts read-all with the CSRF header and clears the count', async () => {

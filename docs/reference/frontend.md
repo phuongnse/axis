@@ -152,7 +152,7 @@ A value reads the same in every widget: in an input, a read-only field, a table 
   KPI's dash carries a visually hidden `shell.kpi.empty` ("No value") for assistive technology. Words go where fields
   are read one by one, and a dash where values are read at a glance or compared. What tells an empty value from a
   typed one is the styling, in which no value is ever drawn, never the words.
-- **When something happened** _(planned, #5132)_. A record in time, such as a timeline's run, a history's entry or a
+- **When something happened**. A record in time, such as a timeline's run, a history's entry or a
   notification, reads within a week as how long ago, in the locale's words, such as "5 minutes ago". Its exact date and
   time is its tooltip, read after the words, and the words move on once a minute. After a week it reads its date and
   time, as above. A date or a time that is data, such as a field, a due date or an instance's Started, keeps its format.

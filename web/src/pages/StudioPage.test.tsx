@@ -1981,7 +1981,9 @@ describe('StudioPage publishing', () => {
       const buyer = within(section)
         .getAllByTestId('studio-changes-file')
         .find((file) => file.dataset.file === 'roles/buyer.json')!
-      expect(within(buyer).getByTestId('studio-changes-by')).toHaveTextContent(/^Changed by you$/)
+      await waitFor(() =>
+        expect(within(buyer).getByTestId('studio-changes-by')).toHaveTextContent(/^Changed by Ana \(you\)$/),
+      )
       const approver = within(section)
         .getAllByTestId('studio-changes-file')
         .find((file) => file.dataset.file === 'roles/approver.json')!

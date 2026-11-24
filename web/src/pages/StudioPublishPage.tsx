@@ -68,7 +68,6 @@ export function StudioPublishPage({
   history,
   busy,
   application,
-  userId,
   resources,
   onPublish,
   onLeave,
@@ -76,7 +75,6 @@ export function StudioPublishPage({
   history: StudioReleases | 'failed' | undefined
   busy: boolean
   application: string
-  userId: string | null
   resources: StudioResourceItem[]
   onPublish: (details: PublishDetails) => void
   onLeave: () => void
@@ -149,7 +147,7 @@ export function StudioPublishPage({
               resources={resources}
               changedBy={{
                 application,
-                authors: (file) => changeAuthors(file.by, userId, changes.requestNames),
+                authors: (file) => changeAuthors(file.by, changes.requestNames),
               }}
             />
           </SectionPart>

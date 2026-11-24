@@ -79,7 +79,7 @@ const texts = {
   'shell.tasks.subject': 'Record',
   'shell.tasks.dueAt': 'Due',
   'shell.tasks.overdue': 'Overdue',
-  'shell.tasks.claimedByYou': 'Claimed by you',
+  'shell.tasks.claimedBy': 'Claimed by {name}',
   'shell.tasks.empty': 'No open tasks.',
   'shell.tasks.loadFailed': 'The tasks could not be loaded.',
   'noteReview.task': 'Review the note',
@@ -88,22 +88,28 @@ const texts = {
 // The platform texts give the toolbar its English names, such as Search and Refresh.
 const catalogs = [{ texts: { ...platformEnglish, ...texts }, fallbackTexts: { ...platformEnglish, ...texts } }]
 
+/** The signed-in user, who is the claimer of the claimed rows. */
+const reader = { id: 'maria', displayName: 'Maria Nguyen', roles: [], users: false }
+
 /**
- * Stubs `fetch` with the task API and the texts of the tasks' release, and returns the requested
- * URLs. The release texts answer `releaseTexts` with `releaseStatus`.
+ * Stubs `fetch` with the task API, the signed-in user and the texts of the tasks' release, and returns the requested
+ * URLs, without the user's. The release texts answer `releaseTexts` with `releaseStatus`.
  */
 function stubTasks(
   body = taskPage,
   status = 200,
   { releaseTexts = {}, releaseStatus = 200 }: { releaseTexts?: Record<string, string>; releaseStatus?: number } = {},
 ) {
-  const fetchMock = vi.fn(async (input: string) =>
-    input.includes('/texts/')
+  const fetchMock = vi.fn(async (input: string) => {
+    if (input === '/api/me') {
+      return new Response(JSON.stringify(reader), { status: 200 })
+    }
+    return input.includes('/texts/')
       ? new Response(JSON.stringify({ locale: 'en', texts: releaseTexts }), { status: releaseStatus })
-      : new Response(body, { status }),
-  )
+      : new Response(body, { status })
+  })
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([url]) => url)
+  return () => fetchMock.mock.calls.map(([url]) => url).filter((url) => url !== '/api/me')
 }
 
 function CurrentSearch() {
@@ -131,7 +137,7 @@ function renderWidget(search = '', outerCatalogs: TextCatalog[] = catalogs, reco
 }
 
 describe('TaskInboxWidget', () => {
-  it('tags only the overdue row as overdue and only the claimed row as claimed by you', async () => {
+  it('tags only the overdue row as overdue and only the claimed row as claimed by the reader', async () => {
     const [review, approve] = (JSON.parse(taskPage) as { items: Record<string, unknown>[] }).items
     stubTasks(
       JSON.stringify({
@@ -151,10 +157,11 @@ describe('TaskInboxWidget', () => {
     const [first, second] = screen.getAllByRole('row').slice(1)
     expect(within(first).getByText('Overdue')).toBeInTheDocument()
     expect(within(first).getByText('Overdue').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
-    expect(within(first).getByText('Claimed by you')).toBeInTheDocument()
-    expect(within(first).getByText('Claimed by you').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
+    await waitFor(() =>
+      expect(first.querySelector('[data-tone="neutral"]')).toHaveTextContent(/^Claimed by Maria Nguyen \(you\)$/),
+    )
     expect(within(second).queryByText('Overdue')).not.toBeInTheDocument()
-    expect(within(second).queryByText('Claimed by you')).not.toBeInTheDocument()
+    expect(second.querySelector('[data-tone="neutral"]')).toBeNull()
   })
 
   it('lists the tasks in the order of the task API, each linking to its address under the inbox page', async () => {

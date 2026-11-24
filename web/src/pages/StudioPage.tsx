@@ -631,7 +631,6 @@ function StudioWorkspace() {
                     history={history}
                     busy={requestBusy || reconnecting}
                     application={application!}
-                    userId={userId}
                     resources={resources}
                     onPublish={(details) => publishing.current?.publish(details)}
                     onLeave={leavePublish}

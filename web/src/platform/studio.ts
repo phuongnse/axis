@@ -2374,22 +2374,18 @@ export function revisionAuthor(revision: StudioRevision, t: (key: string) => str
   return revision.userId === null ? t('shell.studio.releases.system') : revision.author
 }
 
-/** Who changed a file since the live release: the reader, a person by name, the server, or an AI request, see changeAuthors. */
+/** Who changed a file since the live release: a person by name, the server, or an AI request, see changeAuthors. */
 export type StudioChangeAuthor =
-  | { type: 'you' }
-  | { type: 'person'; name: string }
-  | { type: 'system' }
-  | { type: 'request'; id: string; name: string }
+  { type: 'person'; id: string; name: string } | { type: 'system' } | { type: 'request'; id: string; name: string }
 
 /**
  * Who changed a file, in the order of their first change, each named once. `by` is newest first, so the walk starts at its
  * end. A revision with an AI request whose name is in `requestNames` names that request, and any other names the person
- * who made it: "System" for a revision the server made, "you" for the reader, else the person's name.
- * See docs/reference/ai-authoring-in-studio.md#revisions.
+ * who made it: "System" for a revision the server made, else the person by name, who may be the reader, see
+ * docs/reference/ai-authoring-in-studio.md#revisions.
  */
 export function changeAuthors(
   by: StudioLiveRevision[],
-  userId: string | null,
   requestNames: ReadonlyMap<string, string>,
 ): StudioChangeAuthor[] {
   const seen = new Set<string>()
@@ -2404,12 +2400,9 @@ export function changeAuthors(
     } else if (revision.userId === null) {
       key = 'system'
       author = { type: 'system' }
-    } else if (revision.userId === userId) {
-      key = 'you'
-      author = { type: 'you' }
     } else {
       key = `user:${revision.userId}`
-      author = { type: 'person', name: revision.author }
+      author = { type: 'person', id: revision.userId, name: revision.author }
     }
     if (!seen.has(key)) {
       seen.add(key)

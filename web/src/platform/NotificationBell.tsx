@@ -6,8 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Announcement } from './Announcement'
 import { EmptyState } from './EmptyState'
+import { EventTime } from './EventTime'
 import { fillText } from './fillText'
-import { formatValue } from './formatValue'
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -29,17 +29,17 @@ interface NotificationBellProps {
   path: string
   /** The path of the site, which a notification's page opens in. */
   sitePath: string
-  locale: string
 }
 
 /**
  * The notification bell in the header of an application site, and of the platform site for an administrator.
- * It shows the signed-in user's unread count and opens a panel with the notifications, newest first, 10 to
- * a page. A row opens its page, if it has one, and marks the notification read. The count reloads when the bell mounts, on every navigation, when the
- * panel opens and after any mark read. The bell renders nothing until the first load succeeds, and after a
- * failed load while the panel is closed. It never shows the sign-in prompt.
+ * It shows the signed-in user's unread count and opens a panel with the notifications, newest first, 10 to a page. A row
+ * opens its page, if it has one, and marks the notification read. Each row shows how long ago it arrived through
+ * `EventTime`, and its exact date and time as the tooltip, see docs/reference/frontend.md#shown-values. The count reloads
+ * when the bell mounts, on every navigation, when the panel opens and after any mark read. The bell renders nothing until
+ * the first load succeeds, and after a failed load while the panel is closed. It never shows the sign-in prompt.
  */
-export function NotificationBell({ path, sitePath, locale }: NotificationBellProps) {
+export function NotificationBell({ path, sitePath }: NotificationBellProps) {
   const t = useText()
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -171,7 +171,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
                       </Flex>
                       <div>{item.body}</div>
                       <Typography.Text type="secondary">
-                        {formatValue({ name: 'createdAt', type: 'date-time' }, item.createdAt, {}, { locale, text: t })}
+                        <EventTime value={item.createdAt} />
                       </Typography.Text>
                     </button>
                   </li>

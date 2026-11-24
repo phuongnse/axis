@@ -307,7 +307,7 @@ for (const [name, widget] of Object.entries(previews)) {
           withData.getByText("Overdue", { exact: true }),
         ).toBeVisible();
         await expect(
-          withData.getByText("Claimed by you", { exact: true }),
+          withData.getByText("Claimed by Alex Morgan (you)", { exact: true }),
         ).toBeVisible();
       }
       if (name === "processInspector") {
