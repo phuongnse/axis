@@ -803,7 +803,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(page.getByRole('heading', { name: 'Publish this application', exact: true })).toBeVisible()
       await expect(page.getByText(`Goes live as release ${maxNumber + 1}`, { exact: true })).toBeVisible()
       // The hand save is the only change since the live release, and the author made it.
-      await expect(page.getByRole('heading', { name: '1 file changed since the live release', exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Changes since the live release', exact: true })).toBeVisible()
       const changed = page.getByTestId('studio-changes-file')
       await expect(changed).toHaveCount(1)
       await expect(changed).toHaveAttribute('data-file', 'texts/en.json')
