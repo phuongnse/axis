@@ -19,6 +19,9 @@ no shortcut of its own.
   client, and has no other way into a tenant. It never opens a tenant database for an application's
   resources, and never reads a record. It opens its session on the tenant's first host, at
   `https://<host>/mcp`, with the author's access token, and follows no redirect.
+  It reads every page of an output that it parses itself, `list_applications` included, and joins the
+  parts, as [limits](mcp-server.md#limits) describes. It treats an output that does not end within 64
+  pages as a tool error. The model's own tool calls get each page as the server answers it.
 - **Its own state.** It reads its tenants as the worker does, see [AI settings](host-settings.md#ai-settings),
   and reads the request tables below in each tenant database with the tenant's runtime role. It refuses a
   tenant whose role can change the schema. It writes claims, steps and tokens there with the same role.
@@ -251,8 +254,10 @@ the checks, an independent review and fix rounds.
   check of its own: the MCP server refuses each package write and the model gets the refusal as a tool
   error. A request that writes no package needs no developer role.
 - **Checking runs every scenario.** The step makes no model call. It calls `validate_draft` on the request's
-  draft. When no diagnostic is an `error`, it calls `run_scenarios` with no names, so the run covers the
-  application's scenarios and every module scenario, contract scenarios included, and asks for the run's
+  draft. It reads every page of `validate_draft` and of `list_package_files` and joins them before it reads
+  the diagnostics and the packages. When no diagnostic is an `error`, it calls `run_scenarios` with no
+  names, so the run covers the application's scenarios and every module scenario, contract scenarios
+  included, and asks for the run's
   status until it ends. A warning is kept and does not fail the compile. Before the scenarios, the step
   tests the packages. It reads every page of `diff_draft` for the files under `packages/<id>/`, keeps the
   packages that still have files in the draft, according to `list_package_files`, and calls `test_package`

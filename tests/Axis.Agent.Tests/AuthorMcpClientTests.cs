@@ -195,4 +195,100 @@ public sealed class AuthorMcpClientTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => NewClient(noSession).Client.ListToolsAsync(CancellationToken));
         await Assert.ThrowsAsync<InvalidOperationException>(() => NewClient(otherVersion).Client.ListToolsAsync(CancellationToken));
     }
+
+    private static string PageAnswer(int id, string part, string? cursor) =>
+        new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = id,
+            ["result"] = new JsonObject
+            {
+                ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "page" }),
+                ["structuredContent"] = new JsonObject { ["part"] = part, ["cursor"] = cursor },
+                ["isError"] = false,
+            },
+        }.ToJsonString();
+
+    [Fact]
+    public async Task ReadTool_joins_the_pages_of_an_output_and_sends_each_cursor_with_the_same_input()
+    {
+        var handler = OpenedSession(new RecordingHandler())
+            .Answer(HttpStatusCode.OK, PageAnswer(2, """{"items":[1,""", "c1"))
+            .Answer(HttpStatusCode.OK, PageAnswer(3, "2,", "c2"))
+            .Answer(HttpStatusCode.OK, PageAnswer(4, "3]}", null));
+        var (client, _) = NewClient(handler);
+        var input = new JsonObject { ["application"] = "PurchaseRequests" };
+
+        var result = await client.ReadToolAsync("list_resources", input, CancellationToken);
+
+        Assert.False(result.IsError);
+        Assert.Equal("""{"items":[1,2,3]}""", result.Text);
+        Assert.Equal(3, result.StructuredContent!["items"]!.AsArray().Count);
+        var calls = handler.Requests.Skip(2).Select(request => JsonNode.Parse(request.Body)!["params"]!["arguments"]!).ToList();
+        Assert.Equal(["""{"application":"PurchaseRequests"}""", """{"application":"PurchaseRequests","cursor":"c1"}""", """{"application":"PurchaseRequests","cursor":"c2"}"""], calls.Select(call => call.ToJsonString()));
+        Assert.Null(input["cursor"]);
+    }
+
+    [Fact]
+    public async Task ReadTool_answers_an_output_that_is_not_paged_as_it_is_and_calls_once()
+    {
+        var handler = OpenedSession(new RecordingHandler())
+            .Answer(HttpStatusCode.OK, """{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"x"}],"structuredContent":{"part":"a","cursor":null,"other":1},"isError":false}}""");
+        var (client, _) = NewClient(handler);
+
+        var result = await client.ReadToolAsync("list_resources", null, CancellationToken);
+
+        Assert.False(result.IsError);
+        Assert.Equal("a", result.StructuredContent!["part"]!.GetValue<string>());
+        Assert.Equal(3, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task ReadTool_stops_a_page_loop_that_never_ends_after_the_most_pages_as_a_tool_error()
+    {
+        var handler = OpenedSession(new RecordingHandler());
+        for (var page = 0; page < AuthorMcpClient.MaxPages + 1; page++)
+        {
+            handler.Answer(HttpStatusCode.OK, PageAnswer(2 + page, "[", "c"));
+        }
+
+        var (client, _) = NewClient(handler);
+
+        var result = await client.ReadToolAsync("validate_draft", new JsonObject(), CancellationToken);
+
+        Assert.True(result.IsError);
+        Assert.Null(result.StructuredContent);
+        Assert.Equal(AuthorMcpClient.MaxPages, handler.Requests.Count(request => JsonNode.Parse(request.Body)!["method"]!.GetValue<string>() == "tools/call"));
+    }
+
+    [Fact]
+    public async Task ReadTool_answers_a_tool_error_on_a_later_page_as_it_is()
+    {
+        var handler = OpenedSession(new RecordingHandler())
+            .Answer(HttpStatusCode.OK, PageAnswer(2, "[", "c1"))
+            .Answer(HttpStatusCode.OK, """{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"The cursor is not one this output gave."}],"isError":true}}""");
+        var (client, _) = NewClient(handler);
+
+        var result = await client.ReadToolAsync("validate_draft", null, CancellationToken);
+
+        Assert.True(result.IsError);
+        Assert.Equal("The cursor is not one this output gave.", result.Text);
+    }
+
+    [Fact]
+    public async Task ReadTool_answers_a_tool_error_when_the_parts_do_not_join_into_JSON_or_a_later_answer_is_not_a_page()
+    {
+        var notJson = OpenedSession(new RecordingHandler())
+            .Answer(HttpStatusCode.OK, PageAnswer(2, "[", "c1"))
+            .Answer(HttpStatusCode.OK, PageAnswer(3, "nope", null));
+        var notPage = OpenedSession(new RecordingHandler())
+            .Answer(HttpStatusCode.OK, PageAnswer(2, "[", "c1"))
+            .Answer(HttpStatusCode.OK, """{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"x"}],"structuredContent":{"items":[]},"isError":false}}""");
+
+        var first = await NewClient(notJson).Client.ReadToolAsync("validate_draft", null, CancellationToken);
+        var second = await NewClient(notPage).Client.ReadToolAsync("validate_draft", null, CancellationToken);
+
+        Assert.True(first.IsError);
+        Assert.True(second.IsError);
+    }
 }

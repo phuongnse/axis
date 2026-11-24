@@ -101,10 +101,11 @@ internal static class ModelLoop
                 tool["description"]?.GetValue<string>() ?? "",
                 JsonSerializer.SerializeToElement(tool["inputSchema"])))];
 
-    // The request stores the application's id, and the tools take its name, so the step finds the name in the author's list of applications.
+    // The request stores the application's id, and the tools take its name, so the step finds the name in the author's list of applications,
+    // read from every page, see docs/reference/authoring-requests.md#the-agent-host.
     internal static async Task<string?> FindApplicationNameAsync(AuthoringStepContext context, CancellationToken cancellationToken)
     {
-        var listed = await context.Mcp.CallToolAsync("list_applications", null, cancellationToken);
+        var listed = await context.Mcp.ReadToolAsync("list_applications", null, cancellationToken);
         if (listed.IsError || listed.StructuredContent?["items"] is not JsonArray items)
         {
             return null;
