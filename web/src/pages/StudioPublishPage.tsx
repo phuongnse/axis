@@ -57,11 +57,13 @@ async function loadPublishChanges(application: string, signal: AbortSignal): Pro
  * The publish page, `&view=publish`, see docs/reference/studio.md#publishing. Its heading has one line: the release
  * the publish replaces, the first release, or that everything is live, found in `history`, which is `undefined` while
  * it loads and `'failed'` when it did not. Without the history it shows no line and no release number, and Publish
- * stays on, as the old dialog did. "The release" holds the Label and the Note. Under it, unless everything is live or
- * nothing is live yet, the page lists the files that differ from the live release, each with "Changed by", as
- * docs/reference/ai-authoring-in-studio.md#revisions describes. The action bar at the foot says which
- * number the publish gets, unless everything is live, and holds Cancel and Publish. Publish is off while `busy`, while
- * the history or the changed files load and when the folder already is the live release. Publish calls `onPublish` with the trimmed values, then `onLeave`, which
+ * stays on, as the old dialog did. "The release" holds the Label and the Note. "The release" and the changes are parts
+ * of one `SectionParts` column, so a rule parts them. Unless everything is live or nothing is live yet, the changes part
+ * lists the files that differ from the live release, each with "Changed by", as
+ * docs/reference/ai-authoring-in-studio.md#revisions describes. It has one heading whatever the number of files, see
+ * docs/reference/studio.md#publishing. The action bar at the foot says which number the publish gets, unless everything
+ * is live, and holds Cancel and Publish. Publish is off while `busy`, while the history or the changed files load and
+ * when the folder already is the live release. Publish calls `onPublish` with the trimmed values, then `onLeave`, which
  * Cancel calls alone.
  */
 export function StudioPublishPage({
@@ -118,32 +120,26 @@ export function StudioPublishPage({
 
   return (
     <PageLayout title={t('shell.studio.publish.title')} line={line}>
-      <AxisFieldGroup title={t('shell.studio.publish.release')} help="">
-        <Flex vertical gap="middle">
-          <AxisField label={t('shell.studio.publish.label')} help={t('shell.studio.publish.labelHelp')}>
-            <Input maxLength={100} value={label} onChange={(event) => setLabel(event.target.value)} />
-          </AxisField>
-          <AxisField label={t('shell.studio.publish.note')} help={t('shell.studio.publish.noteHelp')}>
-            <Input.TextArea
-              maxLength={2000}
-              autoSize={{ minRows: 3, maxRows: 8 }}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
-          </AxisField>
-        </Flex>
-      </AxisFieldGroup>
-      {changes !== null && changes.diff.resources.length > 0 && (
-        <SectionParts>
-          <SectionPart
-            testName="publish-changes"
-            heading={{
-              title:
-                changes.diff.resources.length === 1
-                  ? t('shell.studio.publish.changes.one')
-                  : fillText(t('shell.studio.publish.changes.many'), { count: changes.diff.resources.length }),
-            }}
-          >
+      <SectionParts>
+        <SectionPart testName="publish-release">
+          <AxisFieldGroup title={t('shell.studio.publish.release')} help="">
+            <Flex vertical gap="middle">
+              <AxisField label={t('shell.studio.publish.label')} help={t('shell.studio.publish.labelHelp')}>
+                <Input maxLength={100} value={label} onChange={(event) => setLabel(event.target.value)} />
+              </AxisField>
+              <AxisField label={t('shell.studio.publish.note')} help={t('shell.studio.publish.noteHelp')}>
+                <Input.TextArea
+                  maxLength={2000}
+                  autoSize={{ minRows: 3, maxRows: 8 }}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                />
+              </AxisField>
+            </Flex>
+          </AxisFieldGroup>
+        </SectionPart>
+        {changes !== null && changes.diff.resources.length > 0 && (
+          <SectionPart testName="publish-changes" heading={{ title: t('shell.studio.publish.changes') }}>
             <StudioChanges
               files={changes.diff.resources}
               resources={resources}
@@ -154,8 +150,8 @@ export function StudioPublishPage({
               }}
             />
           </SectionPart>
-        </SectionParts>
-      )}
+        )}
+      </SectionParts>
       <ActionBar
         start={
           loaded === null || allLive ? undefined : (
