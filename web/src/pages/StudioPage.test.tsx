@@ -1959,7 +1959,7 @@ describe('StudioPage publishing', () => {
     const sectionOf = () => screen.getByTestId('studio-section-publish-changes')
     const liveDiff = (resources: unknown[]) => () => json({ release: 3, resources, cursor: null })
 
-    it('lists the files that differ from the live release with who changed each, under a count', async () => {
+    it('lists the files that differ from the live release with who changed each, under one heading', async () => {
       const fetchMock = stubPublishing(
         publisher,
         [],
@@ -1970,14 +1970,15 @@ describe('StudioPage publishing', () => {
             revision('a2', 'author', 'Ana', 'r1'),
             revision('a1', 'u2', 'Sam Lee'),
           ]),
+          liveFile('roles/clerk.json', 'changed', 'Clerk', []),
         ]),
         { r1: () => json({ id: 'r1', text: 'Add a field. Then a test.' }) },
       )
       renderPage('/studio?app=PurchaseRequests&view=publish')
 
-      expect(await screen.findByRole('heading', { name: '2 files changed since the live release' })).toBeVisible()
+      expect(await screen.findByRole('heading', { name: 'Changes since the live release' })).toBeVisible()
       const section = sectionOf()
-      expect(within(section).getAllByTestId('studio-changes-file')).toHaveLength(2)
+      expect(within(section).getAllByTestId('studio-changes-file')).toHaveLength(3)
       const buyer = within(section)
         .getAllByTestId('studio-changes-file')
         .find((file) => file.dataset.file === 'roles/buyer.json')!
@@ -2035,7 +2036,7 @@ describe('StudioPage publishing', () => {
       )
       renderPage('/studio?app=PurchaseRequests&view=publish')
 
-      expect(await screen.findByRole('heading', { name: '5 files changed since the live release' })).toBeVisible()
+      expect(await screen.findByRole('heading', { name: 'Changes since the live release' })).toBeVisible()
       const section = sectionOf()
       const files = within(section).getAllByTestId('studio-changes-file')
       expect(files.map((file) => file.dataset.file)).toEqual([
@@ -2066,6 +2067,25 @@ describe('StudioPage publishing', () => {
       expect(await within(approver).findByRole('textbox', { name: 'Approver' })).toBeVisible()
     })
 
+    it('parts the release from the changes with a rule', async () => {
+      stubPublishing(
+        publisher,
+        [],
+        { folderContentHash: 'hash-4', active: true },
+        liveDiff([liveFile('roles/buyer.json', 'changed', 'Buyer', [revision('b', 'author', 'Ana')])]),
+      )
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(await screen.findByRole('heading', { name: 'Changes since the live release' })).toBeVisible()
+      const release = screen.getByTestId('studio-section-publish-release')
+      expect(within(release).getByRole('group', { name: 'The release' })).toBeVisible()
+      // The release is the first part, so it draws no rule. The changes draw one between them.
+      expect(release.previousElementSibling).toBeNull()
+      const rule = sectionOf().previousElementSibling
+      expect(rule).toHaveAttribute('role', 'separator')
+      expect(rule?.previousElementSibling).toBe(release)
+    })
+
     it('names the person who accepted an AI request that cannot be read', async () => {
       stubPublishing(
         publisher,
@@ -2076,7 +2096,7 @@ describe('StudioPage publishing', () => {
       )
       renderPage('/studio?app=PurchaseRequests&view=publish')
 
-      expect(await screen.findByRole('heading', { name: '1 file changed since the live release' })).toBeVisible()
+      expect(await screen.findByRole('heading', { name: 'Changes since the live release' })).toBeVisible()
       const change = within(sectionOf()).getByTestId('studio-changes-by')
       expect(change).toHaveTextContent(/^Changed by Sam Lee$/)
       expect(within(change).queryByRole('link')).toBeNull()
@@ -2090,6 +2110,10 @@ describe('StudioPage publishing', () => {
         await screen.findByText('Nothing is live yet. Everything below goes live as the first release.'),
       ).toBeVisible()
       expect(screen.queryByTestId('studio-section-publish-changes')).toBeNull()
+      // The release part stays on its own, with no rule above it.
+      const release = screen.getByTestId('studio-section-publish-release')
+      expect(within(release).getByRole('group', { name: 'The release' })).toBeVisible()
+      expect(release.previousElementSibling).toBeNull()
       expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/releases/live/diff'))).toBe(false)
     })
 
@@ -2130,7 +2154,7 @@ describe('StudioPage publishing', () => {
         }),
       )
 
-      expect(await screen.findByRole('heading', { name: '1 file changed since the live release' })).toBeVisible()
+      expect(await screen.findByRole('heading', { name: 'Changes since the live release' })).toBeVisible()
       expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
     })
   })
