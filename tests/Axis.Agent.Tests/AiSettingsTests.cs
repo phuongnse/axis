@@ -224,6 +224,30 @@ public sealed class AiSettingsTests : IDisposable
         Assert.Equal("The setting Ai:HostKeyFile does not unwrap with the key of KeyService:KeyFile.", plain.Message);
     }
 
+    [Fact]
+    public void Outside_development_and_testing_a_host_key_file_without_a_key_service_stops_the_start_and_development_accepts_it()
+    {
+        using var pair = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        var file = Path.Combine(_folder, "plain-host-key.pem");
+        File.WriteAllText(file, pair.ExportPkcs8PrivateKeyPem());
+        var values = new Dictionary<string, string?>
+        {
+            ["Ai:Bindings:main:Kind"] = "anthropic",
+            ["Ai:Bindings:main:Model"] = ModelId,
+            ["Ai:DefaultBinding"] = "main",
+            ["Ai:HostKeyFile"] = file,
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=unused",
+        };
+
+        var refused = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddAxisAgent(Configure(values), new TestEnvironment("Production")));
+        var services = new ServiceCollection().AddAxisAgent(Configure(values), new TestEnvironment("Development"));
+
+        Assert.Equal("The setting KeyService:Kind is required outside Development and Testing.", refused.Message);
+        Assert.DoesNotContain(file, refused.ToString(), StringComparison.Ordinal);
+        Assert.Contains(services, service => service.ServiceType == typeof(AgentHostKey));
+    }
+
     private IKeyService KeyServiceOf(string keyFileBase64, string name = "key-service-key")
     {
         var path = Path.Combine(_folder, name);

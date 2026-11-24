@@ -234,8 +234,9 @@ restore-check CronJob have the admin role. Only those two, besides the identity 
 
 ### The key service
 
-With `keyService.kind` set to `aws-kms`, the hosts unwrap the installation key and the agent host's private key at AWS KMS, see
-[key policy](keys-and-data-protection.md#key-policy). Make the wrapped values with `platform key wrap`, run with
+Set `keyService.kind` to `aws-kms` in production. The hosts then unwrap the installation key and the agent host's private key at AWS KMS, see
+[key policy](keys-and-data-protection.md#key-policy). With it empty the chart still renders, but a host outside Development and Testing
+stops at start, naming `KeyService:Kind`, so a production install always sets it. Make the wrapped values with `platform key wrap`, run with
 `KeyService__Kind=aws-kms` and `KeyService__KeyId` under an AWS identity that may call KMS Encrypt. Store the installation key's
 output in the `platformSecretKey` Secret, and the agent host key's output in the file that the agent host reads as `Ai:HostKeyFile`.
 The chart sets no `Ai:HostKeyFile`, so you mount that file and set the setting yourself.
@@ -287,7 +288,7 @@ The values of the chart, with their defaults:
 | `ai.defaultBinding` | `""` | Server only. A value renders `Ai__DefaultBinding`, which turns on `studioAi`. The chart sets no `Ai:Bindings` on the agent host, so configure them yourself. |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
-| `keyService.kind`, `keyService.keyId` | empty | The key service of the hosts, see [the key service](#the-key-service). `kind` is empty or `aws-kms`. With a kind, `KeyService__Kind` and `KeyService__KeyId` render on the server, the worker, the agent host, the publisher, the migrate Job and both cell CronJobs, which are the pods that mount `platformSecretKey`. Rendering fails with a message that names `keyService.keyId` when `kind` is set and `keyId` is empty. Empty renders neither. |
+| `keyService.kind`, `keyService.keyId` | empty | The key service of the hosts, see [the key service](#the-key-service). `kind` is `aws-kms`, and production requires it. With a kind, `KeyService__Kind` and `KeyService__KeyId` render on the server, the worker, the agent host, the publisher, the migrate Job and both cell CronJobs, which are the pods that mount `platformSecretKey`. Rendering fails with a message that names `keyService.keyId` when `kind` is set and `keyId` is empty. Empty renders neither, and the hosts then stop at start. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
 | `cell.*` | empty | `Cell__*` on the server, the worker and the publisher, one variable for each value that is set: `id`, `region`, `tenantDomain`, `internalDomain` (required with `backup.bucket`, because the scratch tenant of the restore check lives under it), `tenantCap`, `consoleHost`, `consoleAllowedNetworks` (a list), `internalUrl`, `operatorRealm`, `operatorRole` and `backupKeyFile`. Empty is a self-hosted installation. With `cell.id` set the hosts need `cell.region` and `cell.tenantDomain`, see [cell settings](host-settings.md#cell-settings). The migrate Job gets none. The `Cell__RuntimeDatabaseHost` and `Cell__RuntimeDatabasePort` pair comes from `cell.pgbouncer` and goes to the server and the worker only. |
 | `backup.bucket` | empty | In a cell, setting it renders the cell backup CronJob and the cell restore-check CronJob, see [jobs](#jobs). It is `Cell__BackupStorage__Bucket`. Empty, or outside a cell, renders neither. |

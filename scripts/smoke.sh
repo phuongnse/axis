@@ -5,13 +5,15 @@
 # - compose: scripts/compose.test.mjs builds the image and runs the Compose stack on free ports.
 # - images: scripts/images.test.mjs checks the production images axis-server, axis-worker, axis-agent, axis-admin,
 #   axis-controlplane and axis-package-host-dotnet, -node and -python, runs the hosts read-only against a throwaway
-#   PostgreSQL that serves TLS, with SSL Mode=VerifyFull in their connection strings, starts the control plane with one
+#   PostgreSQL that serves TLS, with SSL Mode=VerifyFull in their connection strings and a wrapped installation key with a key
+#   file, starts the control plane with one
 #   cell from the settings and file paths that its Helm chart renders, and builds the test package of each
 #   language in its package host image.
 # - onprem: scripts/onprem.test.mjs installs deploy/compose/compose.yaml from the production images as
 #   docs/reference/installation-on-premises.md says, against a test PostgreSQL over TLS and the example's own identity
 #   provider, which the TLS proxy serves on a host of its own. Every
-#   connection string sets SSL Mode=VerifyFull, and the test checks that every Axis connection uses TLS. It
+#   connection string sets SSL Mode=VerifyFull, and the test checks that every Axis connection uses TLS. The setup writes a key file and
+#   wraps the installation key with `platform key wrap`, because production hosts need a key service. It
 #   creates two tenants, activates the leave request sample, checks each tenant's site and sign-in, suspend
 #   and resume, and an unknown host. It checks each package host's read-only root, limits, environment and network. It builds
 #   the sample packages payment-references and payment-terms in their package host images, and gives tenant one the

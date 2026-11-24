@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Axis.Tenancy.Keys;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Axis.Tenancy.Platform;
 
@@ -42,7 +43,8 @@ public sealed class TenantSecretCipher
     /// <summary>
     /// Reads <c>Platform:SecretKey</c> and the optional <c>Platform:PreviousSecretKey</c>. A blank previous key counts as not
     /// set. With <c>KeyService:Kind</c> set, each setting holds a wrapped key, which the key service unwraps before the checks below. A
-    /// message never contains a value or a path.
+    /// message never contains a value or a path. This overload does not require a key service, so only a test calls it. A host calls
+    /// <see cref="Load(IConfiguration, IHostEnvironment)"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Platform:SecretKey</c> is missing, either setting is set and is not base64 or is not 32 bytes, the key service settings are
@@ -53,6 +55,20 @@ public sealed class TenantSecretCipher
         ArgumentNullException.ThrowIfNull(configuration);
 
         return Load(configuration, KeyService.Load(configuration));
+    }
+
+    /// <summary>
+    /// Loads the keys like <see cref="Load(IConfiguration)"/> for a host, and refuses a blank <c>KeyService:Kind</c> outside Development and
+    /// Testing, see <c>docs/reference/keys-and-data-protection.md#key-policy</c>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// <c>KeyService:Kind</c> is blank outside Development and Testing, or <see cref="Load(IConfiguration)"/> throws.
+    /// </exception>
+    public static TenantSecretCipher Load(IConfiguration configuration, IHostEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        return Load(configuration, KeyService.Load(configuration, environment));
     }
 
     /// <summary>Loads the keys with a given key service, so a test can stand in for the one that <c>KeyService:Kind</c> picks.</summary>

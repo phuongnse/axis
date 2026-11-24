@@ -39,7 +39,7 @@ public static class WorkerServiceCollectionExtensions
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:IdlePollCeiling</c> is below <c>Worker:PollInterval</c>, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or <c>Data:TenantPoolIdleLifetime</c> is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
-    /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Isolation</c> is not <c>process</c> or <c>inProcess</c> or is <c>inProcess</c> outside Development, <c>Extensions:Runners:Dotnet</c>, <c>Extensions:Runners:Node</c>, <c>Extensions:Runners:Python</c> or <c>Extensions:Runners:Application</c> is not a <c>host:port</c>, <c>Extensions:ApplicationPackages</c> is not <c>true</c> or <c>false</c>, <c>Extensions:Runners:Application</c> is not set while <c>Extensions:ApplicationPackages</c> is <c>true</c>, <c>Extensions:Runners:ProxyPort</c> is not a whole number from 0 to 65535, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
+    /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>KeyService:Kind</c> is blank under <c>directory</c> outside Development and Testing, <c>Extensions:Isolation</c> is not <c>process</c> or <c>inProcess</c> or is <c>inProcess</c> outside Development, <c>Extensions:Runners:Dotnet</c>, <c>Extensions:Runners:Node</c>, <c>Extensions:Runners:Python</c> or <c>Extensions:Runners:Application</c> is not a <c>host:port</c>, <c>Extensions:ApplicationPackages</c> is not <c>true</c> or <c>false</c>, <c>Extensions:Runners:Application</c> is not set while <c>Extensions:ApplicationPackages</c> is <c>true</c>, <c>Extensions:Runners:ProxyPort</c> is not a whole number from 0 to 65535, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
@@ -119,7 +119,7 @@ public static class WorkerServiceCollectionExtensions
             // Read first, so a bad value stops the start even when the database is not there.
             var refreshInterval = TenancySettings.RefreshInterval(configuration);
 
-            var cipher = TenantSecretCipher.Load(configuration);
+            var cipher = TenantSecretCipher.Load(configuration, environment);
             services.AddSingleton(cipher);
 
             // The worker reads the directory when it runs, retries until a read works, and reads it again every

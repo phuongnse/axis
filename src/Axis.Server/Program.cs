@@ -114,7 +114,7 @@ builder.Services.AddSingleton(new CellTenantDatabases(TenantDatabaseTls.From(pla
 // A download of a tenant export streams the ZIP from this storage. Without the settings the server starts and only a download answers 503.
 builder.Services.AddSingleton(new CellExportStorage(Axis.Administration.CellBackupStorage.Read(builder.Configuration, Axis.Administration.CellBackupStorage.ExportSection, out _)));
 
-var cipher = TenantSecretCipher.Load(builder.Configuration);
+var cipher = TenantSecretCipher.Load(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton(cipher);
 var platformMigration = new PlatformMigrationOptions(platformSchemaConnectionString, readerRole);
 

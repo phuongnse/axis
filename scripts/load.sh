@@ -44,7 +44,7 @@ for target in axis-server axis-worker axis-admin; do
 done
 
 rm -rf "$folder"
-node scripts/lib/load-stack.mjs "$folder"
+node scripts/lib/load-stack.mjs "$folder" "axis-admin:$version"
 dotnet run --project tests/Axis.LoadData -c Release -- "$folder/apps/load" --seed "$seed"
 # The containers read the application as another user.
 chmod -R a+rX "$folder/apps"

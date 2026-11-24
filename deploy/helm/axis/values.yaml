@@ -94,9 +94,10 @@ migrate:
   parallel: 1
   resources: {}
 
-# The key service that unwraps the installation key and the agent host's private key at start. Empty
-# keeps plain keys. Set kind to "aws-kms" and keyId to the AWS KMS key, a key id, an alias or an ARN,
-# to send KeyService__Kind and KeyService__KeyId to every host that reads the installation key. The
+# The key service that unwraps the installation key and the agent host's private key at start. Production
+# requires it, because a host outside Development and Testing stops at start without one, and the chart
+# still renders when it is empty. Set kind to "aws-kms" and keyId to the AWS KMS key, a key id, an alias or
+# an ARN, to send KeyService__Kind and KeyService__KeyId to every host that reads the installation key. The
 # secrets.platformSecretKey Secret and the agent host's key file then hold the wrapped values that
 # `platform key wrap` prints. The chart gives each pod no service account of its own yet, so grant
 # KMS to the identity the pods run under.

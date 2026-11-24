@@ -1,6 +1,8 @@
 using Axis.Configuration.Packages;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
+using Axis.Server.Tests;
+using Axis.Tenancy.Platform;
 using Axis.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -358,6 +360,47 @@ public sealed class WorkerOptionsTests
     }
 
     [Fact]
+    public void Under_directory_a_production_worker_without_a_key_service_stops_at_startup_naming_the_kind_setting()
+    {
+        var builder = WorkerBuilder(source: "directory", secretKey: Convert.ToBase64String(new byte[32]));
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["KeyService:Kind"] = null,
+            ["Platform:SecretKey"] = TestPlatform.SecretKey,
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("KeyService:Kind", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(TestPlatform.SecretKey, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Under_directory_a_production_worker_with_a_key_service_and_a_plain_key_stops_at_startup_naming_the_key_setting()
+    {
+        var builder = WorkerBuilder(source: "directory", secretKey: Convert.ToBase64String(new byte[32]));
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Platform:SecretKey"] = TestPlatform.SecretKey });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("Platform:SecretKey", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(TestPlatform.SecretKey, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Under_directory_a_development_worker_is_built_with_a_plain_key_and_no_key_service()
+    {
+        var builder = WorkerBuilder(source: "directory", secretKey: Convert.ToBase64String(new byte[32]), environment: "Development");
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["KeyService:Kind"] = null,
+            ["Platform:SecretKey"] = TestPlatform.SecretKey,
+        });
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+    }
+
+    [Fact]
     public void Under_directory_without_a_platform_connection_the_worker_stops_at_startup_naming_the_setting()
     {
         var builder = WorkerBuilder(source: "directory", secretKey: Convert.ToBase64String(new byte[32]), platform: null);
@@ -499,10 +542,15 @@ public sealed class WorkerOptionsTests
         string environment = "Production")
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = environment, DisableDefaults = true });
+
+        // A production worker refuses a plain key and no key service, so the key is wrapped by a file key service. The tests of those
+        // refusals set the settings themselves.
+        var keyService = TestKeyService.WrappedKeySettings(secretKey ?? TestPlatform.SecretKey);
+        keyService[TenantSecretCipher.KeySetting] = secretKey is null ? null : keyService[TenantSecretCipher.KeySetting];
+        builder.Configuration.AddInMemoryCollection(keyService);
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Tenancy:Source"] = source,
-            ["Platform:SecretKey"] = secretKey,
             ["ConnectionStrings:Platform"] = platform,
             ["Tenants:a:Hosts:0"] = "a.example.test",
 
