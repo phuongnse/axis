@@ -461,8 +461,9 @@ keys. It can be rotated without signing anyone out.
 ### Wrapped keys
 
 With a key service set, a host holds the installation key as a wrapped value. The key service is a key file of 32 random
-bytes in base64, `KeyService:KeyFile`, and `KeyService:Kind` is `file`, see [host settings](host-settings.md#tenancy-settings).
-`platform key wrap` makes the wrapped value from the plain key.
+bytes in base64, `KeyService:KeyFile`, with `KeyService:Kind` set to `file`, or an AWS KMS key, `KeyService:KeyId`, with
+`KeyService:Kind` set to `aws-kms`, see [host settings](host-settings.md#tenancy-settings). `platform key wrap` makes the wrapped
+value from the plain key.
 
 ```text
 platform key wrap --purpose installation-key|agent-host-key
@@ -472,14 +473,17 @@ platform key wrap --purpose installation-key|agent-host-key
   value in base64, and one line break, to standard output. The key never goes on the command line. For the installation key,
   the input is its base64 and the output is the value of `Platform:SecretKey` or `Platform:PreviousSecretKey`. For the agent
   host's key, the input is the PEM of its private key and the output is the content of the file that `Ai:HostKeyFile` names.
-- **Purpose.** A wrapped value is bound to its purpose, `installation-key` or `agent-host-key`, and to the key file. A host
-  that reads it for the other purpose or with another key file stops at start.
+- **Purpose.** A wrapped value is bound to its purpose, `installation-key` or `agent-host-key`, and to the key file or the KMS
+  key. A host that reads it for the other purpose or with another key file or KMS key stops at start. With `aws-kms` the command
+  calls KMS Encrypt with the encryption context `axis:purpose`, under the AWS identity of the person who runs it, and the
+  output is the base64 of the ciphertext.
 - **No check of the key.** The command does not check that the input is a valid key. The host checks the unwrapped key at
   start, as it checks a plain key.
-- **Settings.** `KeyService:Kind` and `KeyService:KeyFile`. The command needs no database, no admin role and no
-  `Tenancy:Source`.
+- **Settings.** `KeyService:Kind` with `KeyService:KeyFile` or `KeyService:KeyId`. The command needs no database, no admin role
+  and no `Tenancy:Source`.
 - **Exit codes.** `0` when the value is written. `2` when the usage is wrong, the purpose is not one of the two, the key service
-  settings are missing or wrong, or standard input holds no key. A message names the setting and never a value or a path.
+  settings are missing or wrong, or standard input holds no key. `1` when KMS refuses or fails the call, with a message that names
+  `KeyService:KeyId` and the KMS error code. A message names the setting and never a value, a path or the key id.
 - **Audit record.** None. The command touches no tenant and no database.
 
 ## Platform audit records

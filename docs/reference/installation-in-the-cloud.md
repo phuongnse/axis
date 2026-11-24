@@ -232,6 +232,20 @@ restore-check CronJob have the admin role. Only those two, besides the identity 
 `IdentityProvider__AdminClientSecret`, and only the two CronJobs get the storage credentials. The cell backup CronJob alone gets
 `identityCredentialsConnection`.
 
+### The key service
+
+With `keyService.kind` set to `aws-kms`, the hosts unwrap the installation key and the agent host's private key at AWS KMS, see
+[key policy](keys-and-data-protection.md#key-policy). Make the wrapped values with `platform key wrap`, run with
+`KeyService__Kind=aws-kms` and `KeyService__KeyId` under an AWS identity that may call KMS Encrypt. Store the installation key's
+output in the `platformSecretKey` Secret, and the agent host key's output in the file that the agent host reads as `Ai:HostKeyFile`.
+The chart sets no `Ai:HostKeyFile`, so you mount that file and set the setting yourself.
+
+Each host calls KMS Decrypt under its own AWS identity, which the AWS SDK finds through its default credential chain, such as an
+IAM role for a service account. Write the KMS key policy so that only each host's identity may decrypt, with the encryption
+context `axis:purpose` set to the key's purpose. CloudTrail then logs every unwrap. The chart gives no pod a service account of its
+own except the publisher in a cell, so all other pods run under the default service account of the namespace and share one AWS
+identity.
+
 ### Values
 
 The values of the chart, with their defaults:
@@ -273,6 +287,7 @@ The values of the chart, with their defaults:
 | `ai.defaultBinding` | `""` | Server only. A value renders `Ai__DefaultBinding`, which turns on `studioAi`. The chart sets no `Ai:Bindings` on the agent host, so configure them yourself. |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
+| `keyService.kind`, `keyService.keyId` | empty | The key service of the hosts, see [the key service](#the-key-service). `kind` is empty or `aws-kms`. With a kind, `KeyService__Kind` and `KeyService__KeyId` render on the server, the worker, the agent host, the publisher, the migrate Job and both cell CronJobs, which are the pods that mount `platformSecretKey`. Rendering fails with a message that names `keyService.keyId` when `kind` is set and `keyId` is empty. Empty renders neither. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
 | `cell.*` | empty | `Cell__*` on the server, the worker and the publisher, one variable for each value that is set: `id`, `region`, `tenantDomain`, `internalDomain` (required with `backup.bucket`, because the scratch tenant of the restore check lives under it), `tenantCap`, `consoleHost`, `consoleAllowedNetworks` (a list), `internalUrl`, `operatorRealm`, `operatorRole` and `backupKeyFile`. Empty is a self-hosted installation. With `cell.id` set the hosts need `cell.region` and `cell.tenantDomain`, see [cell settings](host-settings.md#cell-settings). The migrate Job gets none. The `Cell__RuntimeDatabaseHost` and `Cell__RuntimeDatabasePort` pair comes from `cell.pgbouncer` and goes to the server and the worker only. |
 | `backup.bucket` | empty | In a cell, setting it renders the cell backup CronJob and the cell restore-check CronJob, see [jobs](#jobs). It is `Cell__BackupStorage__Bucket`. Empty, or outside a cell, renders neither. |
@@ -348,7 +363,7 @@ restore check. It has no Job for tenants and releases.
 `scripts/lint.sh` runs `helm lint --strict` and validates the rendered manifests against the Kubernetes schemas and the pinned cert-manager
 and PrometheusRule schemas with kubeconform. It renders the Axis chart with the application package host and the alerts off and on. `scripts/helm.test.mjs` renders the chart
 and checks the rules of this section: the probes and HTTPS endpoints, the objects that render and that do not render inside and outside a
-cell, that the PrometheusRule renders only with `alerts.enabled` and holds the rule file, which pod gets which secret and setting, that secrets are files and never env entries, that a secret value in a reference is rejected,
+cell, that the PrometheusRule renders only with `alerts.enabled` and holds the rule file, which pod gets which secret and setting, that the key service settings render on every pod that mounts the installation key and nowhere else, that secrets are files and never env entries, that a secret value in a reference is rejected,
 and that rendering fails, naming the value, without each required value. `scripts/test.sh` runs the alert rules through `promtool test rules`. `scripts/setup.sh` installs the pinned Helm, kubeconform, promtool,
 Kubernetes schemas and cert-manager and PrometheusRule schemas into `~/.cache/axis-tools`, and downloads any schema file that a cached folder lacks. Axis has
 no test against a live cluster, so no test runs PgBouncer, the identity provider or a package host, or checks that a cluster enforces its

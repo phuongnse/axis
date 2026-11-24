@@ -291,7 +291,18 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        run.Output.WriteLine(keyService.Wrap(run.Args[4], key));
+        string wrapped;
+        try
+        {
+            wrapped = keyService.Wrap(run.Args[4], key);
+        }
+        catch (InvalidOperationException exception)
+        {
+            run.Error.WriteLine(exception.Message);
+            return 1;
+        }
+
+        run.Output.WriteLine(wrapped);
         return 0;
     }
 

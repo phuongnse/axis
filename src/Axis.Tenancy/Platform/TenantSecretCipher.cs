@@ -52,7 +52,14 @@ public sealed class TenantSecretCipher
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var keyService = KeyService.Load(configuration);
+        return Load(configuration, KeyService.Load(configuration));
+    }
+
+    /// <summary>Loads the keys with a given key service, so a test can stand in for the one that <c>KeyService:Kind</c> picks.</summary>
+    internal static TenantSecretCipher Load(IConfiguration configuration, IKeyService? keyService)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
         var key = ReadKey(configuration, KeySetting, keyService)!;
         var previousKey = ReadKey(configuration, PreviousKeySetting, keyService);
         return new TenantSecretCipher(key, previousKey);
