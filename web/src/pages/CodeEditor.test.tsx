@@ -13,6 +13,7 @@ import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import type { ThemeMode } from '../platform/themeMode'
 import { withAntdStyles } from '../test/antdStyles'
+import { winningRule } from '../test/cssRules'
 import CodeEditor, { type CodeEditorHandle, type CodeEditorProps } from './CodeEditor'
 import { jsonViewHeight } from './jsonViewHeight'
 
@@ -83,20 +84,6 @@ function selectedMatchBackground() {
     .filter(Boolean)
   match.remove()
   return backgrounds.at(-1)
-}
-
-/**
- * The value that wins in the cascade for a property of an element of the editor: the last rule that matches and sets it.
- * jsdom's computed style drops the editor's rules, so the test reads the rules, as `selectedMatchBackground` does.
- */
-function winningRule(element: Element, property: string) {
-  const rules = Array.from(document.styleSheets).flatMap((sheet) => Array.from(sheet.cssRules))
-  const styleRules = rules.filter((rule): rule is CSSStyleRule => 'selectorText' in rule)
-  return styleRules
-    .filter((rule) => element.matches(rule.selectorText))
-    .map((rule) => rule.style.getPropertyValue(property))
-    .filter(Boolean)
-    .at(-1)
 }
 
 describe('CodeEditor', () => {

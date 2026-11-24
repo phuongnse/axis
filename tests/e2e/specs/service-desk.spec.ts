@@ -159,13 +159,16 @@ test("lead claims a triage task so lead-2 no longer lists it, then reassigns it 
 
   await useSession(page, "lead");
   await openTask(page, title, "Triage ticket");
-  await page.getByRole("button", { name: "Claim", exact: true }).click();
-  // The outcomes stay on the heading, so Release and Reassign… fold into its More actions menu.
+  // The outcomes stay on the heading, so Claim, Release and Reassign… fold into its More actions menu.
   const heading = page.getByTestId("page-actions");
-  await heading.getByRole("button", { name: "More actions", exact: true }).click();
   const more = page.getByRole("menu", { name: "More actions", exact: true });
+  await heading.getByRole("button", { name: "More actions", exact: true }).click();
+  await more.getByRole("menuitem", { name: "Claim", exact: true }).click();
+  // After the claim the menu holds Release and Reassign…, and no Claim in the menu or on the page.
+  await heading.getByRole("button", { name: "More actions", exact: true }).click();
   await expect(more.getByRole("menuitem", { name: "Release", exact: true })).toBeVisible();
   await expect(more.getByRole("menuitem", { name: "Reassign…", exact: true })).toBeVisible();
+  await expect(more.getByRole("menuitem", { name: "Claim", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Claim", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
