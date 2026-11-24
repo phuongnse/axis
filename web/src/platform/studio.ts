@@ -2,6 +2,7 @@ import { apiFetch } from './api'
 import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
 import { type ModuleKind, moduleKinds } from './moduleKinds'
+import { packageFileOf } from './studioAddress'
 import { QuotaRefusedError, quotaRefusalTitle } from './quota'
 import { sortByName } from './listOrder'
 import type { StatusTone } from './statusTones'
@@ -2445,18 +2446,23 @@ export function nextReleaseNumber(history: StudioReleases): number {
   return same?.number ?? Math.max(0, ...history.items.map((item) => item.number)) + 1
 }
 
-/** A row of the change list: its name, its kind when it has one, and the resource it opens, which a removed file lacks. */
+/**
+ * A row of the change list: its name, its kind when it has one, and the resource it opens, which a removed file lacks. A
+ * package file has no kind of its own, so `packageFile` tells it apart, see docs/reference/studio-packages.md#diffs.
+ */
 export interface StudioChangeRow {
   key: string
   name: string
   kind: string | null
+  packageFile: boolean
   change: StudioReleaseChange['change']
   resourceId: string | null
 }
 
 /**
  * The rows of the change list, in the sidebar's kind order and then by name. The manifest is named Settings and comes
- * first. A file the folder list lacks, or a removed file of a kind Studio does not name, is named by its path.
+ * first. A file the folder list lacks, or a removed file of a kind Studio does not name, is named by its path. A package
+ * file comes last, sorted by its path, and is named by its path too, see docs/reference/studio-packages.md#diffs.
  */
 export function changeRows(
   changes: readonly StudioReleaseChange[],
@@ -2480,18 +2486,34 @@ function changeRow(
   t: (key: string) => string,
 ): { order: number; row: StudioChangeRow } {
   const key = `${change.change}:${change.path}`
+  if (packageFileOf(change.path) !== null) {
+    return {
+      order: sidebarRank(null),
+      row: { key, name: change.path, kind: null, packageFile: true, change: change.change, resourceId: null },
+    }
+  }
   const item = change.change === 'removed' ? undefined : items.find((candidate) => candidate.file === change.path)
   const kind = item?.kind ?? change.kind
   const resourceId = item?.id ?? null
   if (kind === 'application') {
     return {
       order: -1,
-      row: { key, name: t('shell.studio.nav.settings'), kind: null, change: change.change, resourceId },
+      row: {
+        key,
+        name: t('shell.studio.nav.settings'),
+        kind: null,
+        packageFile: false,
+        change: change.change,
+        resourceId,
+      },
     }
   }
   const order = sidebarRank(kind)
   if (kind === null) {
-    return { order, row: { key, name: change.path, kind: null, change: change.change, resourceId: null } }
+    return {
+      order,
+      row: { key, name: change.path, kind: null, packageFile: false, change: change.change, resourceId: null },
+    }
   }
   const titled: StudioResourceItem = item ?? {
     id: '',
@@ -2503,7 +2525,10 @@ function changeRow(
     titles: change.titles ?? {},
     locale: change.locale,
   }
-  return { order, row: { key, name: resourceTitle(titled, locale, t), kind, change: change.change, resourceId } }
+  return {
+    order,
+    row: { key, name: resourceTitle(titled, locale, t), kind, packageFile: false, change: change.change, resourceId },
+  }
 }
 
 /** The resources whose name or id contains `search`, ignoring letter case and surrounding spaces. An empty search keeps all. */

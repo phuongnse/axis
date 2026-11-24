@@ -53,10 +53,19 @@ export function studioPackageAddress(application: string, packageId: string, fil
   })}`
 }
 
+/**
+ * The package and the path inside it of a folder file, `packages/<id>/<path>`, or null for any other file. A package file
+ * is told by its path alone, see docs/reference/studio-packages.md#diffs.
+ */
+export function packageFileOf(file: string): { packageId: string; path: string } | null {
+  const match = /^packages\/([^/]+)\/(.+)$/.exec(file)
+  return match ? { packageId: match[1], path: match[2] } : null
+}
+
 /** The address of a folder file at its line when it is a package's file, `packages/<id>/<path>`, and undefined otherwise. */
 export function studioFileAddress(application: string, file: string, line?: number): string | undefined {
-  const match = /^packages\/([^/]+)\/(.+)$/.exec(file)
-  return match ? studioPackageAddress(application, match[1], match[2], line) : undefined
+  const owner = packageFileOf(file)
+  return owner ? studioPackageAddress(application, owner.packageId, owner.path, line) : undefined
 }
 
 /** The views of a Studio application that have an address of their own, besides a resource, a kind and a package. */

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { moduleKinds } from './moduleKinds'
+import { packageFileOf } from './studioAddress'
 import { assignLocation } from './navigation'
 import { QuotaRefusedError } from './quota'
 import {
@@ -603,7 +604,14 @@ describe('changeRows', () => {
     )
 
     expect(rows).toEqual([
-      { key: 'changed:entities/zeta.json', name: 'Zeta', kind: 'entity', change: 'changed', resourceId: 'z' },
+      {
+        key: 'changed:entities/zeta.json',
+        name: 'Zeta',
+        kind: 'entity',
+        packageFile: false,
+        change: 'changed',
+        resourceId: 'z',
+      },
     ])
   })
 
@@ -616,7 +624,14 @@ describe('changeRows', () => {
     )
 
     expect(rows).toEqual([
-      { key: 'removed:entities/gone.json', name: 'Gone', kind: 'entity', change: 'removed', resourceId: null },
+      {
+        key: 'removed:entities/gone.json',
+        name: 'Gone',
+        kind: 'entity',
+        packageFile: false,
+        change: 'removed',
+        resourceId: null,
+      },
     ])
   })
 
@@ -630,6 +645,56 @@ describe('changeRows', () => {
 
     expect(rows.map((row) => row.name)).toEqual(['Zeta', 'notes/readme.md'])
     expect(rows[1]).toMatchObject({ kind: null, resourceId: null })
+  })
+
+  it('puts a package file last, named by its path and sorted by path, even when its text gives a kind', () => {
+    const rows = changeRows(
+      [
+        change({ path: 'packages/approval-rules/old.py', change: 'removed' }),
+        change({ path: 'packages/approval-rules/adapter.py', change: 'changed', kind: 'entity', name: 'Adapter' }),
+        change({ path: 'entities/zeta.json', change: 'added' }),
+        change({ path: 'packages/approval-rules/package.json', change: 'added' }),
+      ],
+      [resource('z', 'entity', 'Zeta', 'entities/zeta.json')],
+      'en',
+      t,
+    )
+
+    expect(rows.map((row) => row.name)).toEqual([
+      'Zeta',
+      'packages/approval-rules/adapter.py',
+      'packages/approval-rules/old.py',
+      'packages/approval-rules/package.json',
+    ])
+    expect(rows.map((row) => row.packageFile)).toEqual([false, true, true, true])
+    expect(rows[1]).toEqual({
+      key: 'changed:packages/approval-rules/adapter.py',
+      name: 'packages/approval-rules/adapter.py',
+      kind: null,
+      packageFile: true,
+      change: 'changed',
+      resourceId: null,
+    })
+  })
+})
+
+describe('packageFileOf', () => {
+  it('tells a package file by its packages/<id>/<path> path', () => {
+    expect(packageFileOf('packages/approval-rules/adapter.py')).toEqual({
+      packageId: 'approval-rules',
+      path: 'adapter.py',
+    })
+    expect(packageFileOf('packages/approval-rules/src/limits.ts')).toEqual({
+      packageId: 'approval-rules',
+      path: 'src/limits.ts',
+    })
+  })
+
+  it('returns null for any other path', () => {
+    expect(packageFileOf('entities/zeta.json')).toBeNull()
+    expect(packageFileOf('packages/approval-rules')).toBeNull()
+    expect(packageFileOf('packages/approval-rules/')).toBeNull()
+    expect(packageFileOf('notes/packages/a.py')).toBeNull()
   })
 })
 

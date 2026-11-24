@@ -2533,6 +2533,7 @@
   "shell.studio.changes.changedBy": "Changed by {authors}",
   "shell.studio.changes.you": "you",
   "shell.studio.changes.aiRequest": "the AI request “{name}”",
+  "shell.studio.changes.packageFile": "Package file",
   "shell.studio.request.queued": "Queued. Waiting for the publisher…",
   "shell.studio.request.running": "Running…",
   "shell.studio.request.validated": "Validated. The application has no errors.",

@@ -1,5 +1,5 @@
 import { Flex, Typography } from 'antd'
-import { useContext, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useContext, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { CodeBlock } from '../platform/CodeBlock'
@@ -21,7 +21,10 @@ import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { fileLanguage } from './fileLanguage'
 import { LayerMarkLabel } from './LayerMarkViews'
+
+const CodeEditor = lazy(() => import('./CodeEditor'))
 
 /** The JSON text of one side of a change, indented when it parses, and as it is when it does not. */
 function prettyJson(text: string): string {
@@ -141,9 +144,10 @@ function LayerMarks({ module }: { module: AuthoringRequestLayerChange }) {
 }
 
 /**
- * One changed file: its name, its kind, its change and, when `folded`, a Show the diff link that opens its JSON. A layer
- * file is named by the module resource it changes and shows that resource's JSON and its marks. `changedBy` is the line
- * of who changed the file, or null.
+ * One changed file: its name, its kind, its change and, when `folded`, a Show the diff link that opens its diff. A layer
+ * file is named by the module resource it changes and shows that resource's JSON and its marks. A package file shows
+ * the line diff of `CodeEditor`, and a resource shows its JSON, see docs/reference/studio-packages.md#diffs. `changedBy`
+ * is the line of who changed the file, or null.
  */
 function ChangeFile({
   row,
@@ -166,7 +170,13 @@ function ChangeFile({
         <Flex wrap gap="small" align="baseline">
           <Typography.Text strong>{row.name}</Typography.Text>
           <Typography.Text style={{ color: colour.textMuted }}>
-            {row.kind === null ? <EmptyDash /> : kindSingular(row.kind, t)}
+            {row.kind !== null ? (
+              kindSingular(row.kind, t)
+            ) : row.packageFile ? (
+              t('shell.studio.changes.packageFile')
+            ) : (
+              <EmptyDash />
+            )}
           </Typography.Text>
           <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
           {folded && (
@@ -187,12 +197,24 @@ function ChangeFile({
         </Flex>
         {changedBy}
         {module !== undefined && <LayerMarks module={module} />}
-        {(!folded || open) && (
-          <JsonDiff
-            before={module ? module.before : (file?.before ?? null)}
-            after={module ? module.after : (file?.after ?? null)}
-          />
-        )}
+        {(!folded || open) &&
+          (row.packageFile && module === undefined ? (
+            <Suspense fallback={null}>
+              <CodeEditor
+                label={row.name}
+                value={file?.after ?? ''}
+                original={file?.before ?? ''}
+                language={fileLanguage(row.name)}
+                readOnly
+                grow
+              />
+            </Suspense>
+          ) : (
+            <JsonDiff
+              before={module ? module.before : (file?.before ?? null)}
+              after={module ? module.after : (file?.after ?? null)}
+            />
+          ))}
       </Flex>
     </section>
   )
@@ -200,7 +222,8 @@ function ChangeFile({
 
 /**
  * The files a revision or a draft changed, sorted by name: each shows its name, its kind (the em dash when it has none)
- * and Added, Changed or Removed, and under them its JSON before and after as a {@link JsonDiff}. `resources` are the
+ * and Added, Changed or Removed, and under them its JSON before and after as a {@link JsonDiff}. A package file shows
+ * the line diff of `CodeEditor` instead, and sorts last by its path. `resources` are the
  * application's resources, which name a file's kind and title. With `folded`, each file starts closed behind Show the
  * diff, and a layer file is named by its module resource, with the layer's marks under it. With `changedBy`, the publish
  * page's files also show "Changed by" under their header, from `authors` of each file. See
