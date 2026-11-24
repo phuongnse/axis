@@ -285,16 +285,16 @@ panel, its undo and its drag and drop.
 
 ## Process editor
 
-The process editor's Form tab edits a process as a list of step cards, and the JSON view stays as the
+The process editor's Form tab edits a process as a list of step blocks, and the JSON view stays as the
 second view of the same draft. The [process designer](process-designer.md) edits the same draft as a
-graph, with the card of the selected step beside it, and describes the panels of the timer,
+graph, with the block of the selected step beside it, and describes the panels of the timer,
 sub-process and wait for event steps and of a task's deadline and escalations.
 
 - **The process.** The Form tab has the General, Subject and Steps [sections](studio-resource-form.md#sections),
   and each field has a [field text](studio-resource-form.md#fields).
 - **Lists.** The lists of a process's parameters, a decision's branches, a task's outcomes and escalations, and an
   operation's rows have Add on their title row as a secondary button. Each row's Remove is the trash icon, named by its
-  tooltip. Each step card's Move up, Move down and Delete are entries of its "…" menu, with Delete last after a divider, the
+  tooltip. Each step's Move up, Move down and Delete are entries of its "…" menu, with Delete last after a divider, the
   table's [row actions](actions-and-controls.md#tables). A task's deadline and a wait
   for event's timeout have Add or Remove on their group's title row, also as a secondary button, and Remove in the
   destructive tone, so it is outlined in `dangerText`. A read-only tab,
@@ -304,10 +304,10 @@ sub-process and wait for event steps and of a task's deadline and escalations.
   [Lists](#process-editor) bullet says. Switching replaces the draft in one change, so one undo brings it back: the
   other key is removed, and the new key, empty, takes its place in the file. See
   [processes without a subject](process-flow.md#processes-without-a-subject).
-- **Steps.** The steps show as cards in file order, each with the step's name and type. Each card has a "…"
-  menu with Move up, off on the first step, Move down, off on the last, and Delete, as the
-  [Lists](#process-editor) bullet says. Add step appends a step of the chosen type, with an empty name. A type change
-  works as the [step panel](process-designer.md#step-panel) says.
+- **Steps.** The steps show as blocks in file order. Each block has the step's name and type on a title row with
+  a rule under it, and a rule parts it from the next step. The title row's "…" menu has Move up, off on the first
+  step, Move down, off on the last, and Delete, as the [Lists](#process-editor) bullet says. Add step appends a step
+  of the chosen type, with an empty name. A type change works as the [step panel](process-designer.md#step-panel) says.
 - **Decision and end.** A decision shows its branches, each with a `when` expression and a target, and
   its `otherwise`. A branch is added and removed as the [Lists](#process-editor) bullet says, and a new one is
   named `branch1`, `branch2` and so on. An end step shows only its name and type.
@@ -319,7 +319,7 @@ sub-process and wait for event steps and of a task's deadline and escalations.
   The assignee has a User and Role switch: User shows the expression editor and Role a role picker, and
   a switch removes the other key, so the step never holds both. `dueIn` is a text box, and clearing it
   removes the key. The outcomes are rows of name, label and target step, added and removed as the
-  [Lists](#process-editor) bullet says. A key the card does not show stays as it is. A diagnostic path inside a
+  [Lists](#process-editor) bullet says. A key the block does not show stays as it is. A diagnostic path inside a
   task's label, assignee, form, `dueIn` or outcomes opens the Form tab at that field.
 - **Operation.** An `operation` step shows an operation choice, `updateRecord`, `callConnector`,
   `raiseEvent`, `createRecord`, `notify` or Package operation, above its transition. Changing the
@@ -344,7 +344,7 @@ sub-process and wait for event steps and of a task's deadline and escalations.
     names, but its `input` stays scalar rows.
   - `retry` is attempts and backoff, and clearing both removes `retry`.
 - **Without names.** While the application's names are not loaded, every picker is a name box. A key
-  that the step's operation forbids is not shown as rows: the card says to edit it in the JSON view,
+  that the step's operation forbids is not shown as rows: the block says to edit it in the JSON view,
   and a diagnostic path inside it opens the JSON view.
 
 ## Connector editor
@@ -363,11 +363,12 @@ Operations heading, and the JSON view stays as the second view of the same draft
   adds the keys it requires, with an empty name, and clearing the type removes `auth`. `oauth2` shows a
   Token URL, a URL binding, a Client ID and a Client secret, both secret bindings, and Scope and
   Audience boxes that remove their key when empty, see [OAuth2 auth](integration-resources.md#oauth2-auth).
-- **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from
+- **Operations.** A block per operation has a title row with its name, or "Operation N" while the name is empty,
+  and a rule under it. The block shows its method, path and `lookup`, which is picked from
   the connector's other operations. Its input and output fields are rows of name, type and required,
   one field to a line, and the schema's required keys carry the shared required mark. Add operation sits
   on the Operations heading. Each input, output and nested field list has its Add on its title row, as a
-  secondary button. Each operation's Delete operation is the trash icon at its top right, and each row's
+  secondary button. Each operation's Delete operation is the trash icon on its title row, and each row's
   Delete is the trash icon, which also removes the fields nested in the row. A read-only tab, such as while the JSON has
   an error, shows no Add and no Delete, as the Lists bullet of the [process editor](#process-editor) says.
   A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
@@ -427,7 +428,7 @@ stays as the second view of the same draft. Scenarios themselves are in [test sc
   languages, so a person sees "Moves time by" and not the property name `by`.
 - **Steps.** Each step has a type. Changing the type keeps the properties the new type takes and drops
   the others, and keys the editor does not show stay in the file. A step's Move up, Move down and Delete
-  are in its "…" menu on the card's title row. Move up is off on the first step and Move down on the last.
+  are in its "…" menu on the block's title row. Move up is off on the first step and Move down on the last.
   A read-only tab shows no menu.
 - **Rows.** A key and value list, such as an expected notification's values or a stub's output, has Add on
   its title row, and each row's Delete is the trash icon, named by its tooltip. Users and stubs show their

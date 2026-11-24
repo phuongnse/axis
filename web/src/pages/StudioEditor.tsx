@@ -196,7 +196,7 @@ export interface StudioEditorHandle {
  * and keeps a key it does not show, and a site's `signIn` is a list of rows that each pick one of the application's
  * identity providers, beside the generic form of the site's other properties. A page opens in the page editor, which shows its widgets as a tree with add, move and remove
  * and a panel for the selected widget, and keeps a key it does not show. A process opens in the process editor, which shows its
- * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
+ * steps as blocks, with the decision, end and task panels and a picker of the draft's step names for every transition.
  * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data, beside a palette
  * of the ten widget types and the same widget tree and panel as the Form tab. The two tabs share the selected widget, which is not written to the URL.
  * A label's texts are part of the draft: typing them is an unsaved change that Undo steps through, and Save writes each
@@ -213,7 +213,7 @@ export interface StudioEditorHandle {
  * Beside the canvas it has a palette of the entity's fields that no section lists and an outline of the draft's steps, sections and fields.
  * Its code loads when the tab first opens.
  * A page, a form or a process opens on its Design tab, and every other kind opens on Form. A path switches to the Form tab, or to JSON when the form cannot show it. A process's Design tab draws its steps and transitions as a graph, laid out again after every edit,
- * beside the card of the selected step. A click on a node or an edge selects a step, which is not written to the URL, and a path into a step selects it too.
+ * beside the block of the selected step. A click on a node or an edge selects a step, which is not written to the URL, and a path into a step selects it too.
  * A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
  * of a field of its entity and an expression, and its event as a picker with the event's `fields` as rows. When the server does not answer, the draft stays, and the resource loads
