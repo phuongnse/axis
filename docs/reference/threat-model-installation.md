@@ -208,7 +208,7 @@ Open threats, which no issue closes, see [threat model method](threat-model-meth
 - I31 (Elevation of privilege, High): an identity other than the host's own unwraps a host key or the installation key, or an unwrap is not logged. The test must show that only the host's own identity unwraps its key and that each unwrap is logged.
 - I32 (Information disclosure, Medium): a removed secret opens again from a copy or a backup. The test must show that a restored copy of a removed secret does not open.
 - I33 (Information disclosure, High): an AI key is sent to a host other than its provider's API host, or into a prompt. The test must show that the key reaches only the provider's API host and appears in no prompt.
-- I34 (Tampering, Medium): the browser seals with a public key that is not the host's. The test must show that the browser refuses a public key that the host does not vouch for.
+- I34 (Tampering, Medium): the browser seals with a public key that is not the host's. The test must show that the browser refuses a public key that the host does not vouch for. The browser [checks the key's suite, form and key id](keys-and-data-protection.md#the-agent-hosts-public-key), which does not close the threat: it stays open until a key service vouches for the key.
 - I35 (Repudiation, Low): adding, changing or removing a person's key writes no audit record. The test must show that each of the three writes one.
 
 Other categories do not apply to the key ring and the installation key. A changed key ring fails to start, see I12, and a rekey writes a record, see I3.
