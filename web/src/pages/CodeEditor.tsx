@@ -14,11 +14,12 @@ import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lin
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from 'react'
 import { useSelectedItemTint } from '../platform/antTheme'
 import { Chevron } from '../platform/Chevron'
+import { fillText } from '../platform/fillText'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { indentFolding, languageSupport, type FileLanguage } from './fileLanguage'
-import { findPanel, type FindTexts } from './jsonFindPanel'
+import { findCount, findField, findNone, findPanel } from './jsonFindPanel'
 import { useFillHeight } from './jsonViewHeight'
 
 /** Marks a change that came from the value, not from the author, so it is not reported as an edit. */
@@ -38,8 +39,6 @@ export interface CodeEditorProps {
   onChange?: (text: string) => void
   /** The language that colours, folds and indents the text, such as `fileLanguage(path)` of a file. */
   language: FileLanguage
-  /** The texts of the find bar. */
-  findTexts: FindTexts
   /** Refuses the author's edits. The cursor, find and `goTo` still work. */
   readOnly?: boolean
   /** Fills the window down to the shell footer, and stops its scroll at its end. Without it, the editor is as tall as its text. */
@@ -92,7 +91,6 @@ export default function CodeEditor({
   value,
   onChange,
   language,
-  findTexts,
   readOnly = false,
   fill = false,
   boundary,
@@ -122,7 +120,6 @@ export default function CodeEditor({
   const latest = useRef({
     onChange,
     value,
-    findTexts,
     theme,
     language,
     readOnly,
@@ -137,7 +134,6 @@ export default function CodeEditor({
     latest.current = {
       onChange,
       value,
-      findTexts,
       theme,
       language,
       readOnly,
@@ -176,7 +172,7 @@ export default function CodeEditor({
           compartments.readOnly.of(readOnlyExtension(initial.readOnly)),
           compartments.phrases.of(initial.phrases),
           history(),
-          search({ top: true, createPanel: findPanel(() => latest.current.findTexts) }),
+          search({ top: true, createPanel: findPanel }),
           // Go to line opens a dialog with CodeMirror's own English text, so the editor leaves it out.
           keymap.of([
             ...closeBracketsKeymap,
@@ -325,7 +321,11 @@ function readOnlyExtension(readOnly: boolean) {
     : []
 }
 
-/** CodeMirror's own English phrases that can reach the screen, in the texts of Axis, and the names of the fold marks. */
+/**
+ * CodeMirror's own English phrases that can reach the screen, in the texts of Axis, the names of the fold marks and the
+ * texts of the find bar, see docs/reference/shared-widgets.md#which-widget. The count's `{current}` and `{count}` become
+ * the `$1` and `$2` that CodeMirror fills in.
+ */
 function codeTexts(t: (key: string) => string): Record<string, string> {
   return {
     'Fold line': t('shell.studio.code.fold'),
@@ -336,6 +336,9 @@ function codeTexts(t: (key: string) => string): Record<string, string> {
     'Unfolded lines': t('shell.studio.code.unfolded'),
     to: t('shell.studio.code.to'),
     Completions: t('shell.studio.code.completions'),
+    [findField]: t('shell.studio.json.findField'),
+    [findCount]: fillText(t('shell.studio.json.findCount'), { current: '$1', count: '$2' }),
+    [findNone]: t('shell.studio.json.findNone'),
   }
 }
 

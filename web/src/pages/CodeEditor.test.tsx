@@ -5,6 +5,7 @@ import { ConfigProvider, theme } from 'antd'
 import { createRef, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { antThemeFor } from '../platform/antTheme'
 import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
@@ -14,32 +15,28 @@ import { withAntdStyles } from '../test/antdStyles'
 import CodeEditor, { type CodeEditorHandle, type CodeEditorProps } from './CodeEditor'
 import { jsonViewHeight } from './jsonViewHeight'
 
-const findTexts = { field: 'Find in code', count: '{current} of {count}', none: 'No matches' }
-
 interface RenderOptions {
   /** The mode the provider starts in, so a test does not depend on the stored or system choice. */
   initialMode?: ThemeMode
   /** Wraps the editor, for example in a nested ConfigProvider with page values. */
   wrap?: (editor: ReactNode) => ReactNode
+  /** The platform texts the editor reads, with English as the fallback. English when absent. */
+  texts?: Record<string, string>
 }
 
-function renderEditor(props: Partial<CodeEditorProps> = {}, { initialMode, wrap }: RenderOptions = {}) {
+function renderEditor(
+  props: Partial<CodeEditorProps> = {},
+  { initialMode, wrap, texts: initialTexts = platformEnglish }: RenderOptions = {},
+) {
   const handle = createRef<CodeEditorHandle>()
+  let texts = initialTexts
   const view = (extra: Partial<CodeEditorProps>) => {
     const editor = (
-      <CodeEditor
-        label="Code"
-        value={'one\ntwo\nthree'}
-        language="plain"
-        findTexts={findTexts}
-        ref={handle}
-        {...props}
-        {...extra}
-      />
+      <CodeEditor label="Code" value={'one\ntwo\nthree'} language="plain" ref={handle} {...props} {...extra} />
     )
     return (
       <ThemeModeProvider initialMode={initialMode}>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <TextProvider catalogs={[{ texts, fallbackTexts: platformEnglish }]} development={false}>
           <footer />
           {wrap ? wrap(editor) : editor}
         </TextProvider>
@@ -47,7 +44,15 @@ function renderEditor(props: Partial<CodeEditorProps> = {}, { initialMode, wrap 
     )
   }
   const { rerender } = render(view({}))
-  return { handle, rerender: (extra: Partial<CodeEditorProps>) => rerender(view(extra)) }
+  return {
+    handle,
+    rerender: (extra: Partial<CodeEditorProps>) => rerender(view(extra)),
+    /** Shows the editor in other texts, as a change of locale does. */
+    setTexts: (next: Record<string, string>) => {
+      texts = next
+      rerender(view({}))
+    },
+  }
 }
 
 const editorView = () => EditorView.findFromDOM(screen.getByRole('textbox', { name: 'Code' }))!
@@ -163,6 +168,53 @@ describe('CodeEditor', () => {
 
     expect(document.querySelector('.cm-foldGutter')).not.toBeNull()
     expect(editorView().state.phrase('Fold line')).toBe('Fold lines')
+  })
+
+  describe('the find bar', () => {
+    // The bar takes its texts from the editor's own texts, so an editor given no texts of its own shows the locale's.
+    describe.each([
+      { locale: 'English', texts: platformEnglish, field: 'Find in JSON', count: '1 of 2', none: 'No matches' },
+      {
+        locale: 'Vietnamese',
+        texts: platformVietnamese,
+        field: 'Tìm trong JSON',
+        count: '1/2',
+        none: 'Không tìm thấy',
+      },
+    ])('in $locale', ({ texts, field, count, none }) => {
+      function openFind() {
+        renderEditor({}, { texts })
+        fireEvent.keyDown(editorView().contentDOM, { key: 'f', ctrlKey: true })
+        return screen.getByRole('textbox', { name: field })
+      }
+
+      it('finds the field by its name and counts the matches', () => {
+        const input = openFind()
+
+        fireEvent.input(input, { target: { value: 'o' } })
+
+        expect(screen.getByRole('status')).toHaveTextContent(count)
+      })
+
+      it('says when nothing matches', () => {
+        const input = openFind()
+
+        fireEvent.input(input, { target: { value: 'zzz' } })
+
+        expect(screen.getByRole('status')).toHaveTextContent(none)
+      })
+    })
+
+    it('says a result in a new locale while the bar is open', () => {
+      const { setTexts } = renderEditor({}, { texts: platformEnglish })
+      fireEvent.keyDown(editorView().contentDOM, { key: 'f', ctrlKey: true })
+      fireEvent.input(screen.getByRole('textbox', { name: 'Find in JSON' }), { target: { value: 'zzz' } })
+      expect(screen.getByRole('status')).toHaveTextContent('No matches')
+
+      setTexts(platformVietnamese)
+
+      expect(screen.getByRole('status')).toHaveTextContent('Không tìm thấy')
+    })
   })
 
   describe('the fold marks', () => {
