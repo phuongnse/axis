@@ -537,7 +537,7 @@ The publisher and the server also write records for the operator's work in a cel
   `modelKey` in `changed`, never the key. A remove with no key writes none. See
   [the tenant's model key](user-administration.md#the-tenants-model-key).
 - **Outside clients.** `PUT /api/tenant/outside-clients` writes `tenant outside-clients set` in one transaction with the
-  change, with the administrator as actor and `outsideClients` and `allowedClients` in `changed`, never a client id. Each
+  change, with the administrator as actor and `outsideClients`, `allowedClients` and `clientDocumentDomains` in `changed`, never a client id or a domain. Each
   accepted `PUT` writes one, also when the values are unchanged. See
   [outside MCP clients](user-administration.md#outside-mcp-clients).
 - **Application packages.** `PUT /api/tenant/application-packages` writes `tenant application-packages set` in one

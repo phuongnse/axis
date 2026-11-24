@@ -120,6 +120,12 @@ public sealed class TenantRow
     public string[] AiAllowedClients { get; set; } = [];
 
     /// <summary>
+    /// The tenant setting <c>Ai:ClientDocumentDomains</c>: the exact DNS host names from which the realm may fetch an outside MCP client's
+    /// Client ID Metadata Document (<c>docs/reference/mcp-server.md#client-registration</c>). A new tenant has none.
+    /// </summary>
+    public string[] AiClientDocumentDomains { get; set; } = [];
+
+    /// <summary>
     /// The tenant's application packages switch, off by default. See <c>docs/reference/user-administration.md#application-packages</c>.
     /// </summary>
     public bool ApplicationPackages { get; set; }

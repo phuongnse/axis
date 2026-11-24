@@ -223,17 +223,17 @@ the users page.
 
 ### Outside MCP clients
 
-An administrator reads and replaces the tenant's switch for outside MCP clients, the settings `Ai:OutsideClients` and
-`Ai:AllowedClients`, see [client registration](mcp-server.md#client-registration) for what each mode means, and reads the
+An administrator reads and replaces the tenant's switch for outside MCP clients, the settings `Ai:OutsideClients`,
+`Ai:AllowedClients` and `Ai:ClientDocumentDomains`, see [client registration](mcp-server.md#client-registration) for what each mode means, and reads the
 outside clients that people consented to, and revokes everyone's consent to one outside client. The routes answer to an administrator with a browser session only, as the
 command routes do.
-The Connected apps tab of the [users page](platform-pages.md#connected-apps) reads and replaces both values through the
+The Connected apps tab of the [users page](platform-pages.md#connected-apps) reads and replaces the three values through the
 switch routes, and lists and revokes the consents through the connected apps routes.
 
 | Route                             | Body                                                                   | Answer                                                                            |
 | --------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `GET /api/tenant/outside-clients` | None                                                                   | `200` with `{ "outsideClients": "allowList", "allowedClients": ["<client id>"] }` |
-| `PUT /api/tenant/outside-clients` | `{ "outsideClients": "allowList", "allowedClients": ["<client id>"] }` | `204`                                                                             |
+| `GET /api/tenant/outside-clients` | None                                                                   | `200` with `{ "outsideClients": "allowList", "allowedClients": ["<client id>"], "clientDocumentDomains": ["<domain>"] }` |
+| `PUT /api/tenant/outside-clients` | `{ "outsideClients": "allowList", "allowedClients": ["<client id>"], "clientDocumentDomains": ["<domain>"] }` | `204`                                                                             |
 | `GET /api/tenant/connected-apps`  | None                                                                   | `200` with `{ "items": [{ "clientId", "name", "lastUsedAt", "people": [{ "userId", "displayName", "email", "consentedAt" }] }] }` |
 | `POST /api/tenant/connected-apps/{clientId}/revoke` | None                                                               | `204`                                                                             |
 
@@ -242,12 +242,17 @@ switch routes, and lists and revokes the consents through the connected apps rou
   realm details (`404`), and for `PUT` the body (`400`). The routes work on any host whose tenant has such a row, and the
   check runs before the body is read. For the connected apps routes the `404` also covers a tenant with no users client,
   and for the revoke, after that, a client id that is not an outside client of the realm.
-- **Replace.** `PUT` replaces both values. `outsideClients` is exactly `all`, `allowList` or `none`. A missing
+- **Replace.** `PUT` replaces the three values. `outsideClients` is exactly `all`, `allowList` or `none`. A missing
   `allowedClients` means an empty list, and the client ids are trimmed and made unique. The list is stored under every
-  mode, and the realm reads it only under `allowList`. A body that is missing or malformed, a mode that is not one of the
-  three and a blank client id answer `400` with a fixed title, and store nothing, write no record and send nothing to the
-  realm.
-- **Read.** `GET` answers the stored mode and the list.
+  mode, and the realm reads it only under `allowList`. A missing `clientDocumentDomains` also means an empty list. Each
+  domain is trimmed, lower-cased and made unique, and is stored under every mode. A domain is an exact DNS name of at
+  least two labels, such as `apps.example.com`, and the rule is the one that checks a tenant's own
+  [host](cells.md#hosts-and-certificates). `localhost` and every name that ends in `.localhost` are refused too. The realm does not read
+  the domains yet, see [client registration](mcp-server.md#client-registration). A body that is missing or malformed, a
+  mode that is not one of the three, a blank client id, and a domain that is blank, an IP address, a name of one label, a
+  loopback name, or has a scheme, a port, a path or a wildcard answer `400` with a fixed title, and store nothing, write
+  no record and send nothing to the realm.
+- **Read.** `GET` answers the stored mode and both lists.
 - **Connected apps.** `GET /api/tenant/connected-apps` lists each outside client that at least one person consented to,
   never one of Keycloak's own clients or a confidential client, whichever consents they hold. A person counts only
   when Keycloak gives a creation time for the consent, because Keycloak also lists a client that holds only an offline
@@ -272,7 +277,7 @@ switch routes, and lists and revokes the consents through the connected apps rou
   `502` with a fixed title and the stored change and its record stay. Repeating the `PUT` applies it. Two `PUT` requests
   at the same moment can leave the realm matching the earlier one until the next `PUT` or a rerun of `tenant create`.
 - **Audit.** Each accepted `PUT` writes one platform audit record, also when the values are unchanged, and the record
-  holds no client id, see [when a record is written](tenant-setting-commands.md#when-a-record-is-written). The change does
+  holds no client id and no domain, see [when a record is written](tenant-setting-commands.md#when-a-record-is-written). The change does
   not need a recent sign-in, and the storage quota never refuses it. A revoke writes the tenant audit record
   `mcp.consentRevoked`, see [audit](#audit), and, after the consents are deleted, the platform record
   `tenant connected-app revoke`, which names `consent` and holds no client id. The storage quota never refuses a revoke,

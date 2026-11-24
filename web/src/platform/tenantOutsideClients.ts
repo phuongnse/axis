@@ -1,9 +1,13 @@
 import { apiFetch } from './api'
 
-/** Which outside MCP clients may connect, and the client ids that may under `allowList`, as `GET /api/tenant/outside-clients` serves them. */
+/**
+ * Which outside MCP clients may connect, the client ids that may under `allowList` and the domains trusted for client metadata
+ * documents, as `GET /api/tenant/outside-clients` serves them.
+ */
 export interface TenantOutsideClients {
   outsideClients: 'all' | 'allowList' | 'none'
   allowedClients: string[]
+  clientDocumentDomains: string[]
 }
 
 /** Reads the setting. Any status but `200` gives `null`, and a status other than `404` or `403` is logged. */
@@ -19,7 +23,7 @@ export async function fetchTenantOutsideClients(signal?: AbortSignal): Promise<T
 }
 
 /**
- * Replaces both values. `ok` when the server answers `204`, and `notApplied` on `502`, where the server stored the
+ * Replaces the three values. `ok` when the server answers `204`, and `notApplied` on `502`, where the server stored the
  * change but the identity provider did not apply it, so saving again applies it. Any other answer is `failed`.
  */
 export async function setTenantOutsideClients(value: TenantOutsideClients): Promise<'ok' | 'notApplied' | 'failed'> {

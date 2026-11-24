@@ -325,9 +325,12 @@ tenant with no directory row. A `403` or `404` is not logged, and any other fail
   holds, with no new request.
 - **Client IDs.** Under "Allow list", an editable list of client IDs shows. A typed ID is added with Enter. The tab keeps
   the list when another mode is chosen and sends it under every mode, because the server stores it under every mode.
-- **Save.** The "Save" button sends both values with `PUT /api/tenant/outside-clients`, then reads
-  `GET /api/tenant/outside-clients` again, so the tab shows what the server stored, with the IDs trimmed and without
-  repeats. It then says "The setting was saved."
+- **Trusted domains.** Under "All", an editable list of the domains from which the identity provider may read an MCP
+  client's metadata document shows. A typed domain is added with Enter. The tab keeps the list when another mode is chosen
+  and sends it under every mode, because the server stores it under every mode.
+- **Save.** The "Save" button sends the three values with `PUT /api/tenant/outside-clients`, then reads
+  `GET /api/tenant/outside-clients` again, so the tab shows what the server stored, with the IDs and the domains trimmed
+  and without repeats. It then says "The setting was saved."
 - **A failed save.** The tab says "The setting was not saved." and keeps the edited values on screen. A `502` says "The
   setting was stored, but the identity provider did not apply it. Save again to apply it.", because the server keeps the
   stored change when the identity provider fails.

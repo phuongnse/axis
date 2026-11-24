@@ -646,6 +646,13 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnName("ai_allowed_clients")
                         .HasDefaultValueSql("'{}'::text[]");
 
+                    b.PrimitiveCollection<string[]>("AiClientDocumentDomains")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasColumnName("ai_client_document_domains")
+                        .HasDefaultValueSql("'{}'::text[]");
+
                     b.Property<string>("AiOutsideClients")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

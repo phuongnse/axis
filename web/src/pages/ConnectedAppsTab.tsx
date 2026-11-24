@@ -48,11 +48,29 @@ function peopleText(app: TenantConnectedApp): string | null {
 }
 
 /**
+ * The input of a free list of values that a person types and confirms with Enter, with blank entries dropped. It is a function
+ * and not a component, so the field around it can give the `Select` its id and description.
+ */
+function tagsSelect(value: string[], onChange: (next: string[]) => void) {
+  return (
+    <Select
+      mode="tags"
+      virtual={false}
+      open={false}
+      style={{ minWidth: 200 }}
+      value={value}
+      onChange={(next: string[]) => onChange(next.filter((entry) => entry.trim() !== ''))}
+    />
+  )
+}
+
+/**
  * The "Connected apps" tab of the users page, where an administrator chooses which outside MCP clients may connect:
- * All, Allow list or None, with the client ids of the list. The list shows only under Allow list, but Save sends it
- * under every mode, because the server stores it under every mode. Save sends both values with
- * `PUT /api/tenant/outside-clients`, then reads them again, so the tab shows what the server stored, with the ids trimmed
- * and without repeats. A failed save keeps the edited values on screen, and a `502` says that the change is stored and
+ * All, Allow list or None, with the client ids of the list and the domains trusted for client metadata documents. The
+ * client ids show only under Allow list and the domains only under All, but Save sends both lists under every mode,
+ * because the server stores them under every mode. Save sends the three values with
+ * `PUT /api/tenant/outside-clients`, then reads them again, so the tab shows what the server stored, with the ids and the
+ * domains trimmed and without repeats. A failed save keeps the edited values on screen, and a `502` says that the change is stored and
  * that saving again applies it. Each option has its own help. Below the choice, a table lists the apps that people consented to, read with
  * `GET /api/tenant/connected-apps`: the name, the client ID, the people who consented and the last use. The table
  * filters its own rows, kept in the address under `connectedApps.`, see docs/reference/actions-and-controls.md#tables.
@@ -68,6 +86,7 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
   const { locale } = usePlatform().current
   const [mode, setMode] = useState(initial.outsideClients)
   const [clients, setClients] = useState(initial.allowedClients)
+  const [domains, setDomains] = useState(initial.clientDocumentDomains)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice>()
   const [apps, setApps] = useState<TenantConnectedApp[]>()
@@ -124,12 +143,17 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
     setBusy(true)
     setNotice(undefined)
     try {
-      const result = await setTenantOutsideClients({ outsideClients: mode, allowedClients: clients })
+      const result = await setTenantOutsideClients({
+        outsideClients: mode,
+        allowedClients: clients,
+        clientDocumentDomains: domains,
+      })
       if (result === 'ok') {
         const stored = await fetchTenantOutsideClients()
         if (stored) {
           setMode(stored.outsideClients)
           setClients(stored.allowedClients)
+          setDomains(stored.clientDocumentDomains)
         }
         setNotice('saved')
       } else {
@@ -163,14 +187,12 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
       />
       {mode === 'allowList' && (
         <AxisField label={t('shell.users.connectedApps.clients')} help={t('shell.users.connectedApps.clientsHelp')}>
-          <Select
-            mode="tags"
-            virtual={false}
-            open={false}
-            style={{ minWidth: 200 }}
-            value={clients}
-            onChange={(next: string[]) => setClients(next.filter((id) => id.trim() !== ''))}
-          />
+          {tagsSelect(clients, setClients)}
+        </AxisField>
+      )}
+      {mode === 'all' && (
+        <AxisField label={t('shell.users.connectedApps.domains')} help={t('shell.users.connectedApps.domainsHelp')}>
+          {tagsSelect(domains, setDomains)}
         </AxisField>
       )}
       {notice && (
