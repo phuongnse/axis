@@ -1,8 +1,9 @@
 import { Flex, Input, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { focusFirstError } from '../platform/focusFirstError'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { StatusTag } from '../platform/StatusTag'
 import { recordPageSize } from '../platform/tableQuery'
@@ -36,7 +37,9 @@ function textOf(column: TextColumn, key: string): string {
  * search, ignoring letter case, and lives in the address as `search`. Filter is there too, on the key and on each
  * locale's text, where a missing or empty text is empty, and lives in the address as `filter`. The table pages, so a key past page 1 needs a
  * search. `onAdd` writes a new key in every locale and answers how that went. With a `layer`, each key that the
- * layer changed or added shows its mark and Reset to module after the key.
+ * layer changed or added shows its mark and Reset to module after the key. A key that Add key refuses marks New key in
+ * error, with the reason as its description, and focuses it, until the key is right, see
+ * docs/reference/actions-and-controls.md#fields.
  */
 export function TextTable({
   columns,
@@ -56,7 +59,11 @@ export function TextTable({
   const [newKey, setNewKey] = useState('')
   const [newTexts, setNewTexts] = useState<Record<string, string>>({})
   const [adding, setAdding] = useState(false)
+  const [keyError, setKeyError] = useState<string>()
+  const [refusals, setRefusals] = useState(0)
   const [problem, setProblem] = useState<string>()
+  const addRef = useRef<HTMLDivElement>(null)
+  const problemId = useId()
 
   const keys = [...new Set(columns.flatMap((column) => Object.keys(column.texts)))].sort()
   // One text field for the key and one for each locale's column. The ids are joined so that the fields stay stable between renders.
@@ -70,21 +77,33 @@ export function TextTable({
   )
   const { view, setView, saved } = useTableView(fields, recordPageSize, [], true, true, false, '', tableKey)
 
+  // The reason a key cannot be added, or undefined when it can.
+  function keyProblem(key: string): string | undefined {
+    const trimmed = key.trim()
+    if (trimmed === '' || trimmed.includes('/')) return t('shell.studio.texts.keyInvalid')
+    if (keys.includes(trimmed)) return t('shell.studio.texts.keyExists')
+    return undefined
+  }
+
+  // A refused Add key focuses the box in error, see docs/reference/actions-and-controls.md#fields.
+  useEffect(() => {
+    if (refusals > 0) focusFirstError(addRef.current)
+  }, [refusals])
+
   async function add() {
-    const key = newKey.trim()
-    if (key === '' || key.includes('/')) {
-      setProblem(t('shell.studio.texts.keyInvalid'))
+    const refused = keyProblem(newKey)
+    if (refused !== undefined) {
+      setKeyError(refused)
+      setProblem(undefined)
+      setRefusals((count) => count + 1)
       return
     }
-    if (keys.includes(key)) {
-      setProblem(t('shell.studio.texts.keyExists'))
-      return
-    }
+    setKeyError(undefined)
     setProblem(undefined)
     setAdding(true)
     try {
       const result = await onAdd(
-        key,
+        newKey.trim(),
         Object.fromEntries(columns.map((column) => [column.locale, newTexts[column.locale] ?? ''])),
       )
       if (result === 'added') {
@@ -158,16 +177,23 @@ export function TextTable({
           })),
         ]}
       />
-      <Flex vertical gap="small" data-testid="studio-text-add">
+      <Flex vertical gap="small" data-testid="studio-text-add" ref={addRef}>
         {/* The key and each locale share the row's width equally, and Add key sits under them, not beside a box. */}
         <Flex gap="small">
           <div style={{ flex: '1 1 0', minWidth: 0 }}>
             <Input
               aria-label={t('shell.studio.texts.newKey')}
+              aria-describedby={keyError ? problemId : undefined}
+              aria-invalid={keyError !== undefined || undefined}
               placeholder={t('shell.studio.texts.newKey')}
+              status={keyError ? 'error' : undefined}
               style={{ width: '100%' }}
               value={newKey}
-              onChange={(event) => setNewKey(event.target.value)}
+              onChange={(event) => {
+                setNewKey(event.target.value)
+                // The error stays while the key is wrong, and goes as soon as it is right.
+                if (keyError !== undefined) setKeyError(keyProblem(event.target.value))
+              }}
             />
           </div>
           {columns.map((column) => (
@@ -186,9 +212,9 @@ export function TextTable({
           <AxisButton role="secondary" loading={adding} disabled={adding} onClick={add}>
             {t('shell.studio.texts.addKey')}
           </AxisButton>
-          {problem && (
-            <Typography.Text type="danger" data-testid="studio-text-add-problem">
-              {problem}
+          {(keyError ?? problem) && (
+            <Typography.Text id={problemId} type="danger" data-testid="studio-text-add-problem">
+              {keyError ?? problem}
             </Typography.Text>
           )}
         </Flex>

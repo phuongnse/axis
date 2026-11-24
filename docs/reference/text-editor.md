@@ -27,4 +27,6 @@ the second view of the same draft.
   every locale at once through the [text write route](authoring-text-writes.md). The key cannot be
   empty, cannot contain `/`, and cannot already be in the table. The editor takes the open file's new
   version from the answer and adds the key to its loaded copy and its draft, so unsaved cell edits stay
-  and the next Save does not meet a stale version. The diagnostics and the names load again.
+  and the next Save does not meet a stale version. The diagnostics and the names load again. A key it refuses
+  marks the **New key** box in error, with the reason under Add key, and focuses it. The mark goes as soon as the
+  key is right, see [fields](actions-and-controls.md#fields).
