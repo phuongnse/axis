@@ -508,11 +508,6 @@ function Workspace({
       : unsavedCount === 1
         ? t('shell.studio.packages.unsavedOne')
         : fillText(t('shell.studio.packages.unsavedMany'), { count: unsavedCount })
-  const findTexts = {
-    field: t('shell.studio.json.findField'),
-    count: t('shell.studio.json.findCount'),
-    none: t('shell.studio.json.findNone'),
-  }
 
   return (
     <PageLayout
@@ -642,7 +637,6 @@ function Workspace({
                             fill
                             boundary={editorColumn}
                             onCursor={(next) => moveCursor(path, next)}
-                            findTexts={findTexts}
                           />
                         </Suspense>
                       </>

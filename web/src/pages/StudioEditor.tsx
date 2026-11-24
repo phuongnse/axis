@@ -1305,11 +1305,6 @@ export function StudioEditor({
                             boundary={rootRef}
                             kind={item.kind}
                             onProblems={setJsonProblems}
-                            findTexts={{
-                              field: t('shell.studio.json.findField'),
-                              count: t('shell.studio.json.findCount'),
-                              none: t('shell.studio.json.findNone'),
-                            }}
                           />
                         </Suspense>
                       ),
