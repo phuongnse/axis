@@ -138,7 +138,7 @@ resource's [Delete…](studio.md#delete).
 [a page that shows one thing](shell.md#page-header) says. Their line is the kind alone, such as Release or Revision, and a
 revision's author, time and client are the facts of the page's first part, see [facts as the first part](shell.md#page-header).
 
-**An open resource has no facts part** _(planned, #5137)_. Its line is its kind alone, such as Entity, and its view switch, Form,
+**An open resource has no facts part**. Its line is its kind alone, such as Entity, and its view switch, Form,
 JSON and Used by, comes right under its heading. Its id does not show, as Studio never shows an internal code, see
 [names](#names), and its file and path are none of the page's concern. No file or path shows anywhere on the page, the
 JSON view's title row included. A module's resource keeps one fact, the module it comes from, which is why it cannot be changed.

@@ -699,7 +699,7 @@ function StudioWorkspace() {
                     />
                   </PageLayout>
                 ) : selected ? (
-                  <div data-testid="studio-resource-details" style={{ minWidth: 0 }}>
+                  <div data-testid="studio-resource-details" data-file={selected.file} style={{ minWidth: 0 }}>
                     <PageLayout title={resourceTitle(selected, locale, t)} line={kindSingular(selected.kind, t)}>
                       {((canTest && selected.kind === 'scenario' && selected.name) ||
                         selected.kind !== 'application') && (
@@ -730,14 +730,6 @@ function StudioWorkspace() {
                         </PageActions>
                       )}
                       <SectionParts>
-                        <SectionPart testName="facts">
-                          <TermList
-                            terms={[
-                              { key: 'id', term: t('shell.studio.id'), value: selected.id },
-                              { key: 'file', term: t('shell.studio.file'), value: selected.file },
-                            ]}
-                          />
-                        </SectionPart>
                         <SectionPart testName="editor">
                           <StudioApplicationContext.Provider value={application!}>
                             <StudioNamesContext.Provider value={names ?? undefined}>
@@ -795,7 +787,6 @@ function StudioWorkspace() {
                         <SectionPart testName="facts">
                           <TermList
                             terms={[
-                              { key: 'id', term: t('shell.studio.id'), value: selectedModuleItem.id },
                               { key: 'module', term: t('shell.studio.module'), value: selectedModuleItem.module },
                             ]}
                           />

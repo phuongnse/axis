@@ -1037,7 +1037,6 @@
   "shell.studio.module.resetElement": "Reset to module",
   "shell.studio.module.resetElementName": "Reset to module {name}",
   "shell.studio.id": "ID",
-  "shell.studio.file": "File",
   "shell.studio.loadFailed": "Studio could not be loaded.",
   "shell.studio.forbidden.title": "Studio is not available",
   "shell.studio.forbidden.message": "You need the author role to use Studio.",

@@ -90,7 +90,7 @@ test.describe('Studio on a copy of its own', () => {
     await page.reload()
     await expect(page).toHaveURL(new RegExp(`/studio\\?app=PurchaseRequests&resource=${entity.id}$`))
     await expect(entitiesLink).toHaveAttribute('aria-current', 'page')
-    await expect(page.getByTestId('studio-resource-details')).toContainText('entities/purchase-request.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'entities/purchase-request.json')
     await expect(page.getByTestId('studio-band')).toBeVisible()
   })
 
@@ -211,7 +211,7 @@ test.describe('Studio on a copy of its own', () => {
       .click()
 
     await expect(page).toHaveURL(new RegExp(`resource=${entity.id}&path=`))
-    await expect(page.getByTestId('studio-resource-details')).toContainText('entities/purchase-request.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'entities/purchase-request.json')
   })
 
   test('an author picks a data source of a page from the names and the data source lists the page as used by', async ({

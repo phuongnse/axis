@@ -91,3 +91,23 @@ test("confirmDialog closes the dialog once its button has been clicked", { timeo
     await page.close();
   }
 });
+
+test("confirmDialog closes the dialog that holds its button while another dialog is open", { timeout: testTimeout }, async () => {
+  const page = await openPage();
+  try {
+    await page.evaluate(() => {
+      const drawer = document.createElement("div");
+      drawer.setAttribute("role", "dialog");
+      drawer.setAttribute("aria-label", "Drawer");
+      drawer.innerHTML = '<button type="button">Close</button>';
+      document.body.append(drawer);
+    });
+
+    await confirmDialog(page, "OK");
+
+    await expect(page.getByRole("dialog", { name: "Pick", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Drawer", exact: true })).toHaveCount(1);
+  } finally {
+    await page.close();
+  }
+});

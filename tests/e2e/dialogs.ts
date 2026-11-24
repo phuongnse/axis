@@ -10,10 +10,14 @@ export async function waitForDialog(page: Page, name?: string): Promise<Locator>
   const dialog = name === undefined ? page.getByRole('dialog') : page.getByRole('dialog', { name, exact: true })
   const label = name === undefined ? 'The dialog' : `The dialog "${name}"`
   await expect(dialog).toBeVisible({ timeout: 15_000 })
+  await waitUntilOpened(dialog, label)
+  return dialog
+}
+
+async function waitUntilOpened(dialog: Locator, label: string) {
   await expect
     .poll(() => dialog.evaluate(hasOpened), { message: `${label} finished opening`, timeout: 15_000 })
     .toBe(true)
-  return dialog
 }
 
 /**
@@ -39,10 +43,16 @@ async function hasOpened(element: Element): Promise<boolean> {
   return true
 }
 
-/** Clicks `button` in the open dialog until the dialog closes. A click that lands while the dialog is still opening is lost and the dialog stays open. */
+/**
+ * Clicks `button` in the dialog that holds it until that dialog closes. Another dialog may be open too, such as a field's
+ * drawer, so the dialog is found by its button and not as the only dialog. A click that lands while the dialog is still
+ * opening is lost and the dialog stays open.
+ */
 export async function confirmDialog(page: Page, button: string) {
   await expect(async () => {
-    const dialog = await waitForDialog(page)
+    const dialog = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: button, exact: true }) })
+    await expect(dialog).toBeVisible({ timeout: 15_000 })
+    await waitUntilOpened(dialog, `The dialog with "${button}"`)
     await dialog.getByRole('button', { name: button, exact: true }).click({ timeout: 5_000 })
     await expect(dialog).toBeHidden({ timeout: 5_000 })
   }).toPass({ timeout: 30_000 })

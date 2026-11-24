@@ -153,7 +153,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
       ['department-manager', 'role.departmentManager'],
     ] as const) {
       await createResource(page, 'role', name)
-      await expect(page.getByTestId('studio-resource-details')).toContainText(`roles/${name}.json`)
+      await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', `roles/${name}.json`)
       await expectForm(page)
       await writeLabel(page, 'studio-field-/label', { en: en[key] })
       await save(page)

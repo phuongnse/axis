@@ -96,7 +96,7 @@ test('the test controls do not show when the server has Studio:Tests off', async
 
     await openKind(page, 'scenario')
     await page.getByTestId(`studio-resource-${approvalBelowThreshold}`).click()
-    await expect(page.getByTestId('studio-resource-details')).toContainText('scenarios/approval-below-threshold.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'scenarios/approval-below-threshold.json')
     await expect(page.getByTestId('studio-run-scenario')).toHaveCount(0)
   } finally {
     await off.stop()
