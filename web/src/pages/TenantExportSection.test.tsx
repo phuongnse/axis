@@ -87,6 +87,11 @@ describe('TenantExportSection', () => {
     const section = await screen.findByRole('region', { name: 'Export data' })
     expect(within(section).getByRole('heading', { name: 'Export data', level: 2 })).toBeVisible()
     expect(within(section).getByText(warning)).toBeVisible()
+    expect(
+      within(section)
+        .getByText(warning)
+        .compareDocumentPosition(within(section).getByRole('button', { name: 'Start export…' })),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
 
     await userEvent.click(within(section).getByRole('button', { name: 'Start export…' }))
     const dialog = (await screen.findByText('Start the export?')).closest<HTMLElement>('[role="dialog"]')!
@@ -130,6 +135,21 @@ describe('TenantExportSection', () => {
 
     expect(await screen.findByRole('button', { name: 'Start export…' })).toBeVisible()
     expect(localStorage.getItem(storageKey)).toBeNull()
+  })
+
+  it('shows a download that has expired above the buttons, and offers to start again', async () => {
+    localStorage.setItem(storageKey, exportId)
+    let reads = 0
+    stubServer(true, () => (reads++ === 0 ? json(tenantExport('succeeded')) : new Response(null, { status: 404 })))
+    renderSection()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Download ZIP' }))
+
+    const notice = await screen.findByTestId('tenant-export-notice')
+    expect(notice).toHaveTextContent('The file was deleted after 7 days. Start a new export.')
+    expect(notice.compareDocumentPosition(screen.getByRole('button', { name: 'Start export…' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
   })
 
   it('says a failed export failed and offers to start again', async () => {

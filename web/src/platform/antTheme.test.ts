@@ -411,25 +411,48 @@ describe('theme values', () => {
     expect(antForms(sources)).toEqual([])
   })
 
-  /** The children of each AxisForm in a file, which end at its closing tag. A tag's own braces hide its `>` and `/>`. */
-  function formChildren(text: string): string[] {
-    const children: string[] = []
-    for (const match of text.matchAll(/<AxisForm[\s>]/g)) {
-      let depth = 0
-      let end = match.index + '<AxisForm'.length
-      for (; end < text.length; end++) {
-        if (text[end] === '{') {
-          depth++
-        } else if (text[end] === '}') {
-          depth--
-        } else if (text[end] === '>' && depth === 0) {
-          break
-        }
+  /** The index of the `>` that ends the tag whose text starts at `from`. A tag's own braces hide its `>` and `/>`. */
+  function tagEnd(text: string, from: number): number {
+    let depth = 0
+    let end = from
+    for (; end < text.length; end++) {
+      if (text[end] === '{') {
+        depth++
+      } else if (text[end] === '}') {
+        depth--
+      } else if (text[end] === '>' && depth === 0) {
+        break
       }
+    }
+    return end
+  }
+
+  /**
+   * The children of each element named `tag` in a file, which end at its own closing tag. An element nested inside
+   * another of the same name is matched to its own closing tag, not the first one. A self-closing element has none.
+   */
+  function elementChildren(text: string, tag: string): string[] {
+    const children: string[] = []
+    for (const match of text.matchAll(new RegExp(`<${tag}[\\s>]`, 'g'))) {
+      const end = tagEnd(text, match.index + tag.length + 1)
       if (text[end - 1] === '/') {
         continue
       }
-      const close = text.indexOf('</AxisForm>', end)
+      const tags = new RegExp(`<${tag}[\\s>]|</${tag}>`, 'g')
+      tags.lastIndex = end + 1
+      let depth = 1
+      let close = -1
+      for (let next = tags.exec(text); next !== null; next = tags.exec(text)) {
+        if (next[0].startsWith('</')) {
+          depth--
+          if (depth === 0) {
+            close = next.index
+            break
+          }
+        } else if (text[tagEnd(text, next.index + tag.length + 1) - 1] !== '/') {
+          depth++
+        }
+      }
       children.push(text.slice(end + 1, close === -1 ? undefined : close))
     }
     return children
@@ -438,7 +461,7 @@ describe('theme values', () => {
   /** The files that draw an AxisAlert among an AxisForm's children, instead of through its `message`. */
   function alertsInForms(files: Record<string, string>) {
     return Object.entries(files)
-      .filter(([, text]) => formChildren(text).some((children) => children.includes('<AxisAlert')))
+      .filter(([, text]) => elementChildren(text, 'AxisForm').some((children) => children.includes('<AxisAlert')))
       .map(([file]) => file)
   }
 
@@ -457,6 +480,73 @@ describe('theme values', () => {
       alertsInForms({
         '../pages/Sample.tsx':
           '<AxisForm message={e && <AxisAlert kind="error" message={e} />} onFinish={() => go()}>\n<AxisField/>\n</AxisForm>',
+      }),
+    ).toEqual([])
+  })
+
+  /**
+   * Whether children draw an AxisAlert at their top level, as a fragment's or a direct child, not inside another element
+   * such as a row. An AxisAlert that is a branch of `? :` stands in place of the content, so it does not count.
+   */
+  function drawsTopLevelAlert(children: string): boolean {
+    let depth = 0
+    for (const match of children.matchAll(/<(\/?)([A-Za-z][\w.]*)?/g)) {
+      const [, closing, name] = match
+      if (name === undefined) {
+        // A fragment's `<>` and `</>` count for nothing.
+        continue
+      }
+      if (closing) {
+        depth--
+        continue
+      }
+      if (name === 'AxisAlert' && depth === 0 && !/[?:][\s(]*$/.test(children.slice(0, match.index))) {
+        return true
+      }
+      if (children[tagEnd(children, match.index + 1 + name.length) - 1] !== '/') {
+        depth++
+      }
+    }
+    return false
+  }
+
+  /** The files that draw an AxisAlert in a SectionPart's children, instead of through its `message`. */
+  function alertsInSections(files: Record<string, string>) {
+    return Object.entries(files)
+      .filter(([, text]) => elementChildren(text, 'SectionPart').some(drawsTopLevelAlert))
+      .map(([file]) => file)
+  }
+
+  it("places every section's message through SectionPart's message, see docs/reference/actions-and-controls.md#messages", () => {
+    expect(alertsInSections(sources)).toEqual([])
+  })
+
+  it('names a section that draws an alert among its children, and not one whose message draws it', () => {
+    expect(
+      alertsInSections({
+        '../pages/Sample.tsx':
+          '<SectionPart testName="a">\n{e && <AxisAlert kind="error" message={e} />}\n<Fields/>\n</SectionPart>',
+      }),
+    ).toEqual(['../pages/Sample.tsx'])
+    expect(
+      alertsInSections({
+        '../pages/Sample.tsx':
+          '<SectionPart testName="a" message={e && <AxisAlert kind="error" message={e} />}>\n<Fields/>\n</SectionPart>',
+      }),
+    ).toEqual([])
+  })
+
+  it('lets a section draw an alert in place of its content as a branch of a ? : or inside a row', () => {
+    expect(
+      alertsInSections({
+        '../pages/Sample.tsx':
+          '<SectionPart testName="a">\n{failed ? (<AxisAlert kind="error" message={e} />) : (<List/>)}\n</SectionPart>',
+      }),
+    ).toEqual([])
+    expect(
+      alertsInSections({
+        '../pages/Sample.tsx':
+          '<SectionPart testName="a">\n<Row>{e && <AxisAlert kind="error" message={e} />}</Row>\n</SectionPart>',
       }),
     ).toEqual([])
   })

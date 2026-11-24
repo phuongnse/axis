@@ -101,6 +101,15 @@ export function TenantModelKeySection() {
 
   return (
     <ModelKeyShell
+      message={
+        failure && (
+          <AxisAlert
+            data-testid="tenant-model-key-notice"
+            kind="error"
+            message={t(`shell.users.modelKey.${failure}`)}
+          />
+        )
+      }
       dialogs={
         <>
           {dialog === 'set' && (
@@ -137,9 +146,6 @@ export function TenantModelKeySection() {
       ) : (
         <Typography.Text>{t('shell.users.modelKey.none')}</Typography.Text>
       )}
-      {failure && (
-        <AxisAlert data-testid="tenant-model-key-notice" kind="error" message={t(`shell.users.modelKey.${failure}`)} />
-      )}
       <Flex gap="small">
         <AxisButton role="secondary" onClick={() => open('set')}>
           {t(modelKey.set ? 'shell.users.modelKey.change' : 'shell.users.modelKey.set')}
@@ -154,11 +160,19 @@ export function TenantModelKeySection() {
   )
 }
 
-/** The part and its heading, which the loading, failed and loaded states share. */
-function ModelKeyShell({ children, dialogs }: { children: ReactNode; dialogs?: ReactNode }) {
+/** The part and its heading, which the loading, failed and loaded states share. Its message sits above its content. */
+function ModelKeyShell({
+  children,
+  message,
+  dialogs,
+}: {
+  children: ReactNode
+  message?: ReactNode
+  dialogs?: ReactNode
+}) {
   const t = useText()
   return (
-    <SectionPart testName="tenant-model-key" heading={{ title: t('shell.users.modelKey.title') }}>
+    <SectionPart testName="tenant-model-key" heading={{ title: t('shell.users.modelKey.title') }} message={message}>
       <Flex vertical gap="small">
         {children}
       </Flex>

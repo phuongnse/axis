@@ -13,7 +13,7 @@ import { useText } from '../platform/texts'
  * Save. It is off until a publisher turns it on. It is drawn by the shared yes-or-no field,
  * see docs/reference/actions-and-controls.md#fields. With `publisher` false the switch is disabled and its help ends
  * with that only a publisher can change it. A failed save puts the value back and shows an
- * error, and a failed load shows a warning in place of the switch.
+ * error, and a failed load shows a warning. Both sit above the switch, see docs/reference/actions-and-controls.md#messages.
  */
 export function StudioAutoAccept({ application, publisher }: { application: string; publisher: boolean }) {
   const t = useText()
@@ -54,7 +54,27 @@ export function StudioAutoAccept({ application, publisher }: { application: stri
   }
 
   return (
-    <SectionPart testName="autoAccept">
+    <SectionPart
+      testName="autoAccept"
+      message={
+        <>
+          {loadFailed && (
+            <AxisAlert
+              data-testid="studio-auto-accept-load-error"
+              kind="warning"
+              message={t('shell.studio.autoAccept.loadFailed')}
+            />
+          )}
+          {saveFailed && (
+            <AxisAlert
+              data-testid="studio-auto-accept-save-error"
+              kind="error"
+              message={t('shell.studio.autoAccept.saveFailed')}
+            />
+          )}
+        </>
+      }
+    >
       <Flex vertical gap="small" data-testid="studio-auto-accept">
         <AxisCheckboxField
           kind="switch"
@@ -69,20 +89,6 @@ export function StudioAutoAccept({ application, publisher }: { application: stri
           loading={saving}
           onChange={change}
         />
-        {loadFailed && (
-          <AxisAlert
-            data-testid="studio-auto-accept-load-error"
-            kind="warning"
-            message={t('shell.studio.autoAccept.loadFailed')}
-          />
-        )}
-        {saveFailed && (
-          <AxisAlert
-            data-testid="studio-auto-accept-save-error"
-            kind="error"
-            message={t('shell.studio.autoAccept.saveFailed')}
-          />
-        )}
       </Flex>
     </SectionPart>
   )

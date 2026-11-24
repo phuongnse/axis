@@ -1,5 +1,5 @@
 import { Flex, Typography } from 'antd'
-import { Children, createContext, isValidElement, useContext, useId, useState, type ReactNode } from 'react'
+import { Children, createContext, Fragment, isValidElement, useContext, useId, useState, type ReactNode } from 'react'
 import { TitleRowActions } from './AxisButton'
 import { ContentInsetContext } from './contentInsetContext'
 import { FoldButton } from './FoldButton'
@@ -44,6 +44,18 @@ export function SectionParts({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Whether a node draws anything. `false`, `null` and a fragment of nothing but those draw nothing, so `cond && <AxisAlert/>`
+ * with a false `cond` leaves no gap.
+ */
+function hasContent(node: ReactNode): boolean {
+  return Children.toArray(node).some((child) =>
+    isValidElement<{ children?: ReactNode }>(child) && child.type === Fragment
+      ? hasContent(child.props.children)
+      : true,
+  )
+}
+
+/**
  * The test id of a part, either the `testName` of `studio-section-<testName>` or a whole `testId` for a part that keeps
  * the test id it had as a card. One of the two is required.
  */
@@ -52,7 +64,9 @@ type SectionPartName = { testName: string; testId?: undefined } | { testId: stri
 /**
  * A part of a page or a Studio section, see docs/reference/shell.md#layout and docs/reference/studio-resource-form.md#sections:
  * an optional heading, its optional line and a slot for an action on the right of the heading, with no panel. A part with no
- * heading is its fields alone. It draws the `borderSubtle` rule above itself when `SectionParts` says a part comes before it.
+ * heading is its fields alone. Its `message`, if it has one, is drawn first in its body, under the heading and above the
+ * content, see docs/reference/actions-and-controls.md#messages. It draws the `borderSubtle` rule above itself when
+ * `SectionParts` says a part comes before it.
  * Its action is drawn through `TitleRowActions`, so each button keeps its role: a section's Add is a secondary button with its
  * border, and a `main` action keeps its border too, see docs/reference/actions-and-controls.md#buttons. Its rule reaches past the shell's content inset to the
  * page area's edges, and stays inside where the inset is 0, see docs/reference/shell.md#layout ('Parts a rule apart').
@@ -64,6 +78,7 @@ export function SectionPart({
   fold,
   action,
   busy,
+  message,
   children,
 }: SectionPartName & {
   /** The heading, and its line when it has one. None for the last section of unnamed properties. */
@@ -80,6 +95,8 @@ export function SectionPart({
   action?: ReactNode
   /** Sets `aria-busy` on the part while its body loads. */
   busy?: boolean
+  /** A message about the whole part, of any kind, drawn first in its body, see docs/reference/actions-and-controls.md#messages. */
+  message?: ReactNode
   /** A function child gets a slot on the right of the heading, for a list that draws its own Add… into it. */
   children: ReactNode | ((actionSlot: HTMLElement | null) => ReactNode)
 }) {
@@ -90,8 +107,17 @@ export function SectionPart({
   const bodyId = useId()
   const [slot, setSlot] = useState<HTMLElement | null>(null)
   const dataTestId = testId ?? `studio-section-${testName}`
+  // The message sits `spacing-md` above the content, and several messages `spacing-sm` apart.
+  const messageBlock = hasContent(message) && (
+    <Flex vertical gap={spacing.sm} style={{ marginBottom: spacing.md }}>
+      {message}
+    </Flex>
+  )
   const drawn = (
-    <RuleAbove.Provider value={false}>{typeof children === 'function' ? children(slot) : children}</RuleAbove.Provider>
+    <RuleAbove.Provider value={false}>
+      {messageBlock}
+      {typeof children === 'function' ? children(slot) : children}
+    </RuleAbove.Provider>
   )
   // A closed fold draws none of its body, so what is inside it loads nothing.
   const body = fold ? <div id={bodyId}>{fold.open && drawn}</div> : drawn

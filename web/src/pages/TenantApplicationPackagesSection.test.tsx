@@ -177,6 +177,10 @@ describe('TenantApplicationPackagesSection', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Turn on application packages?' })
     await user.click(within(dialog).getByRole('button', { name: 'Turn on' }))
 
-    expect(await screen.findByText('The change was not saved.')).toBeVisible()
+    const notice = await screen.findByText('The change was not saved.')
+    expect(notice).toBeVisible()
+    expect(notice.compareDocumentPosition(screen.getByRole('button', { name: 'Turn on…' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
   })
 })

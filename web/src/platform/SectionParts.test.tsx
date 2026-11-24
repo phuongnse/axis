@@ -70,6 +70,71 @@ describe('SectionPart', () => {
     expect(screen.queryByRole('region')).toBeNull()
   })
 
+  it('draws its message after the heading and before its content', () => {
+    renderSections(
+      <SectionPart
+        testName="notes"
+        heading={{ title: 'Notes' }}
+        message={<span data-testid="part-message">Not saved</span>}
+      >
+        <span data-testid="part-content">Fields</span>
+      </SectionPart>,
+    )
+
+    const heading = screen.getByRole('heading', { name: 'Notes' })
+    const message = screen.getByTestId('part-message')
+    const content = screen.getByTestId('part-content')
+    expect(heading.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(message.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(message.parentElement).toHaveStyle({ gap: `${designTokensFor('light').spacing.sm}px` })
+    expect(message.parentElement).toHaveStyle({ marginBottom: `${designTokensFor('light').spacing.md}px` })
+  })
+
+  it('draws its message first in its body when it has no heading', () => {
+    renderSections(
+      <SectionPart testName="rest" message={<span data-testid="part-message">Not saved</span>}>
+        <span data-testid="part-content">Fields</span>
+      </SectionPart>,
+    )
+
+    const message = screen.getByTestId('part-message')
+    expect(
+      message.compareDocumentPosition(screen.getByTestId('part-content')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(screen.getByTestId('studio-section-rest').firstElementChild).toBe(message.parentElement)
+  })
+
+  it('adds nothing between the heading and its content when it has no message or an empty one', () => {
+    renderSections(
+      <>
+        <SectionPart testName="none" heading={{ title: 'None' }}>
+          <span data-testid="content-none">Fields</span>
+        </SectionPart>
+        <SectionPart testName="false" heading={{ title: 'False' }} message={false}>
+          <span data-testid="content-false">Fields</span>
+        </SectionPart>
+        <SectionPart
+          testName="empty"
+          heading={{ title: 'Empty' }}
+          message={
+            <>
+              {false}
+              {null}
+            </>
+          }
+        >
+          <span data-testid="content-empty">Fields</span>
+        </SectionPart>
+      </>,
+    )
+
+    for (const name of ['none', 'false', 'empty']) {
+      const content = screen.getByTestId(`content-${name}`)
+      expect(content.previousElementSibling?.tagName).toBe('DIV')
+      expect(content.previousElementSibling?.querySelector('h2')).not.toBeNull()
+    }
+  })
+
   it('gives a part the test id it names in place of the section test id', () => {
     renderSections(
       <SectionPart testId="console-tenant" heading={{ title: 'Tenant' }}>

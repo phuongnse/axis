@@ -271,7 +271,13 @@ person reads it before the content it is about.
   rows. `failure` draws it in place of the rows, and the toolbar stays. See [tables](tables.md#tables).
 - **A field's and a row's message.** A field's message stays under its field, see [fields](#fields). A row's message
   stays in its row.
-- **A section, an AI request's step or a widget** _(planned, #5213)_. Each draws its message first, above its content.
+- **A section's or a widget's message.** It goes to `SectionPart`'s `message`, which draws it under the heading and
+  `spacing-md` above the content. A chart's note about more groups is one such message. A Vitest check refuses an
+  `AxisAlert` among a section's direct children, so no section draws its message after its content. A branch of
+  `? :` is allowed, as it stands in place of the content. [Which widget](shared-widgets.md#which-widget) names
+  `SectionPart`'s message.
+- **An AI request's step.** The Result step puts the accept's status or its conflict first in its body, above the
+  checks and the review.
 - **A Studio editor's save messages** _(planned, #4253)_. Where they sit is part of the save bar's review.
 - **The policy matrix's save messages** _(planned, #5058)_. Where they sit is part of the matrix's review.
 

@@ -198,38 +198,45 @@ export function AccountPage() {
                       </Flex>
                     </SectionPart>
                   )}
-                  <SectionPart testName="sessions" heading={{ title: t('shell.account.sessions.heading') }}>
+                  <SectionPart
+                    testName="sessions"
+                    heading={{ title: t('shell.account.sessions.heading') }}
+                    message={
+                      <>
+                        {loadFailed && (
+                          <AxisAlert
+                            data-testid="sessions-error"
+                            kind="error"
+                            message={t('shell.account.sessions.loadFailed')}
+                          />
+                        )}
+                        {endFailed && (
+                          <AxisAlert
+                            data-testid="sessions-end-error"
+                            kind="error"
+                            message={t('shell.account.sessions.endFailed')}
+                          />
+                        )}
+                        {sessions && !sessions.endAllowed && (
+                          <AxisAlert
+                            data-testid="sessions-reauthenticate"
+                            kind="info"
+                            message={t('shell.account.sessions.reauthenticate')}
+                            action={
+                              <AxisButton
+                                role="secondary"
+                                size="small"
+                                onClick={() => assignLocation(reauthenticateUrl('/account'))}
+                              >
+                                {t('shell.account.sessions.signInAgain')}
+                              </AxisButton>
+                            }
+                          />
+                        )}
+                      </>
+                    }
+                  >
                     <Flex vertical gap="small">
-                      {loadFailed && (
-                        <AxisAlert
-                          data-testid="sessions-error"
-                          kind="error"
-                          message={t('shell.account.sessions.loadFailed')}
-                        />
-                      )}
-                      {endFailed && (
-                        <AxisAlert
-                          data-testid="sessions-end-error"
-                          kind="error"
-                          message={t('shell.account.sessions.endFailed')}
-                        />
-                      )}
-                      {sessions && !sessions.endAllowed && (
-                        <AxisAlert
-                          data-testid="sessions-reauthenticate"
-                          kind="info"
-                          message={t('shell.account.sessions.reauthenticate')}
-                          action={
-                            <AxisButton
-                              role="secondary"
-                              size="small"
-                              onClick={() => assignLocation(reauthenticateUrl('/account'))}
-                            >
-                              {t('shell.account.sessions.signInAgain')}
-                            </AxisButton>
-                          }
-                        />
-                      )}
                       {sessions && (
                         <Flex vertical gap="small" align="flex-start">
                           <AxisButton

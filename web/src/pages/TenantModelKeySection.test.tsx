@@ -224,7 +224,11 @@ describe('TenantModelKeySection', () => {
     await user.type(within(dialog).getByLabelText(/^Key\*?$/), 'sk-test-1234567890')
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByText('The key was not saved.')).toBeVisible()
+    const notice = await screen.findByText('The key was not saved.')
+    expect(notice).toBeVisible()
+    expect(notice.compareDocumentPosition(screen.getByRole('button', { name: 'Set key…' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
   })
 
   it('sends DELETE only after the confirmation, then reads the key again', async () => {

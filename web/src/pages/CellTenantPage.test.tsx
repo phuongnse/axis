@@ -607,7 +607,12 @@ describe('CellTenantPage', () => {
     stubRoutes(ok(acme), fail(500))
     renderPage('/tenants/acme')
 
-    expect(await screen.findByTestId('cell-tenant-jobs-error')).toHaveTextContent('The jobs could not be loaded.')
+    const error = await screen.findByTestId('cell-tenant-jobs-error')
+    expect(error).toHaveTextContent('The jobs could not be loaded.')
+    expect(screen.getByTestId('studio-section-cell-tenant-jobs')).toContainElement(error)
+    expect(screen.getByRole('heading', { name: 'Jobs' }).compareDocumentPosition(error)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
     expect(await screen.findByTestId('cell-tenant')).toBeInTheDocument()
   })
 

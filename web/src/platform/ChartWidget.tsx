@@ -109,6 +109,8 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
     [rows, measures, t],
   )
 
+  // The note sits above the chart, and shows only with the chart, see docs/reference/actions-and-controls.md#messages.
+  const truncated = !loading && !failed && rows.length > 0 && state.totalCount > maxGroups
   let content
   if (loading) {
     content = t('shell.chart.loading')
@@ -120,9 +122,6 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
     content = (
       <>
         <Chart title={title} kind={kind} categories={categories} series={series} />
-        {state.totalCount > maxGroups && (
-          <AxisAlert data-testid="chart-truncated" kind="info" message={t('shell.chart.truncated')} />
-        )}
         <div style={visuallyHidden}>
           <table>
             <caption>{title}</caption>
@@ -161,7 +160,13 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
 
   return (
     <Tile testId="chart-widget" busy={loading} style={{ display: 'block' }}>
-      <SectionPart testId="chart-part" heading={{ title }}>
+      <SectionPart
+        testId="chart-part"
+        heading={{ title }}
+        message={
+          truncated && <AxisAlert data-testid="chart-truncated" kind="info" message={t('shell.chart.truncated')} />
+        }
+      >
         {content}
       </SectionPart>
     </Tile>

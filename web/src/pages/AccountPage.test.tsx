@@ -241,7 +241,10 @@ describe('AccountPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'End' }))
 
-    expect(await screen.findByText('The session could not be ended.')).toBeInTheDocument()
+    const notice = await screen.findByText('The session could not be ended.')
+    expect(notice.compareDocumentPosition(screen.getByRole('button', { name: 'End' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
   })
 
   it('disables End all other sessions when the current session is the only one', async () => {
