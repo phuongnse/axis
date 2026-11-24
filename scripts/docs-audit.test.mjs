@@ -454,16 +454,18 @@ describe('milestone issues', () => {
     assert.match(issues[0].body, /\[docs\/b\.md:9\]/)
   })
 
+  test('opens no milestone issue for planned markers of a milestone whose roadmap row reads Planned', () => {
+    const plannedMarkers = [
+      { file: 'docs/a.md', line: 3, milestone: 'M37' },
+      { file: 'docs/b.md', line: 9, milestone: 'M37' },
+    ]
+    const found = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'open', open_issues: 0 }], plannedMarkers)
+    assert.deepEqual(found, [])
+  })
+
   test('opens no milestone issue for planned markers of a milestone that still has an open issue', () => {
     const found = milestoneFindings(statuses, [{ title: 'M35 Shipping', state: 'open', open_issues: 2 }], markers)
     assert.deepEqual(issuesFrom([], [], 1, [], found), { issues: [], leftOut: [] })
-  })
-
-  test('opens no milestone issue for planned markers of a milestone whose roadmap row reads Planned, which is not broken down yet', () => {
-    const found = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'open', open_issues: 0 }], [
-      { file: 'docs/a.md', line: 3, milestone: 'M37' },
-    ])
-    assert.deepEqual(found, [])
   })
 
   test('opens a milestone issue for a milestone closed on GitHub while its roadmap row reads Planned', () => {
