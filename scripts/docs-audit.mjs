@@ -173,8 +173,11 @@ export function milestoneFindings(statuses, githubMilestones, markers) {
     if (!milestone) continue
     const status = statuses.get(milestone)
     const closed = state === 'closed' && status !== 'Done'
+    const expectedWithoutIssues = status === 'Planned'
     const named =
-      open_issues === 0 && status !== 'Planned' ? markers.filter((m) => m.milestone === milestone).map(({ file, line }) => ({ file, line })) : []
+      open_issues === 0 && !expectedWithoutIssues
+        ? markers.filter((m) => m.milestone === milestone).map(({ file, line }) => ({ file, line }))
+        : []
     if (closed || named.length) findings.push({ milestone, status, closed, markers: named })
   }
   return findings

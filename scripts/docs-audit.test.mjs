@@ -468,6 +468,16 @@ describe('milestone issues', () => {
     assert.deepEqual(issuesFrom([], [], 1, [], found), { issues: [], leftOut: [] })
   })
 
+  test('opens a milestone issue for a milestone closed on GitHub while its roadmap row reads Planned', () => {
+    const found = milestoneFindings(statuses, [{ title: 'M37 Next', state: 'closed', open_issues: 0 }], [])
+    const { issues } = issuesFrom([], [], 1, [], found)
+    assert.deepEqual(
+      issues.map((i) => i.title),
+      [titleOf('M37')],
+    )
+    assert.match(issues[0].body, /roadmap row says Planned/)
+  })
+
   test('leaves out a milestone that an open issue already covers by its marker, closed or named by markers', () => {
     const closed = milestoneFindings(statuses, [{ title: 'M35 Shipping', state: 'closed', open_issues: 0 }], [])
     const named = milestoneFindings(statuses, [{ title: 'M35 Shipping', state: 'open', open_issues: 0 }], markers)
