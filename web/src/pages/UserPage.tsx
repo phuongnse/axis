@@ -5,9 +5,11 @@ import { useParams } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { DialogFooter } from '../platform/DialogFooter'
 import { NotSet } from '../platform/EmptyValue'
+import { useCurrentUser } from '../platform/currentUser'
+import { OpenInStudioButton } from '../platform/OpenInStudioButton'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
-import { StudioLink } from '../platform/StudioLink'
+import { studioApplicationAddress } from '../platform/studioAddress'
 import { useText } from '../platform/texts'
 import { StatusTag } from '../platform/StatusTag'
 import { TermList } from '../platform/TermList'
@@ -42,17 +44,20 @@ interface Pending {
 type Problem = 'forbidden' | 'conflict' | 'loadFailed' | 'changeFailed'
 
 /**
- * The page of one user, opened from the name on the users page. Its title is the person's display name, with User as its
- * line, see docs/reference/shell.md#page-header. Its first part is the email as a fact. Below are the roles given to the person and the roles that can be given, one section for each active
- * application and one for the platform. A role the active release no longer declares is tagged. Give and Remove ask for
- * a confirmation, then call the role routes and load the roles again. A refusal shows its reason. The page loads
- * everything from the roles route, so a reload or a shared link shows it. A person without user administration sees that
- * the page is for administrators, and an unknown user shows the not-found page.
+ * The page of one user, opened from the name on the users page. Its title is the person's display name, with User as
+ * its line, see docs/reference/shell.md#page-header. Its first part is the email as a fact. Below are the roles given
+ * to the person and the roles that can be given, one section for each active application and one for the platform. A
+ * reader who may use Studio opens an active application in Studio, from the Open in Studio button on its section's
+ * heading. A role the active release no longer declares is tagged. Give and Remove ask for a confirmation, then call
+ * the role routes and load the roles again. A refusal shows its reason. The page loads everything from the roles route,
+ * so a reload or a shared link shows it. A person without user administration sees that the page is for administrators,
+ * and an unknown user shows the not-found page.
  */
 export function UserPage() {
   const t = useText()
   const { size } = useDesignTokens()
   const { id = '' } = useParams()
+  const me = useCurrentUser()
   const [roles, setRoles] = useState<UserRoles>()
   const [refusal, setRefusal] = useState<'forbidden' | 'notFound'>()
   const [problem, setProblem] = useState<Problem>()
@@ -139,14 +144,12 @@ export function UserPage() {
               <SectionPart
                 key={section.key}
                 testName={`user-roles-${section.key}`}
-                heading={{
-                  title:
-                    section.application === null ? (
-                      section.title
-                    ) : (
-                      <StudioLink application={section.application}>{section.title}</StudioLink>
-                    ),
-                }}
+                heading={{ title: section.title }}
+                action={
+                  section.application !== null && me?.studio ? (
+                    <OpenInStudioButton address={studioApplicationAddress(section.application)} />
+                  ) : undefined
+                }
               >
                 <Flex vertical gap="small">
                   {section.rows.map((row) => (

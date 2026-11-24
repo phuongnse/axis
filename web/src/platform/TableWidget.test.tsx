@@ -17,6 +17,7 @@ import { chooseOption, isSortableHeader, optionTexts, shownDropdown, tabTo } fro
 import { hostileMarkup } from '../test/hostile'
 import { clickInDialog, dialog, filterTexts, pick } from '../test/tableFilter'
 import { designTokensFor } from './designTokens'
+import { RecordPagesContext } from './recordPages'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
@@ -277,12 +278,19 @@ function search() {
   return screen.getByTestId('search').textContent
 }
 
-function renderWidget(search = '', widget: WidgetMetadata = noteWidget, pageValues?: Record<string, string>) {
+function renderWidget(
+  search = '',
+  widget: WidgetMetadata = noteWidget,
+  pageValues?: Record<string, string>,
+  recordPages?: Record<string, string>,
+) {
   return render(
     <MemoryRouter initialEntries={[`/e2e/notes${search}`]}>
-      <TextProvider catalogs={catalogs} development={false}>
-        <TableWidget sitePath="e2e" pageName="Requests" widget={widget} locale="en" pageValues={pageValues} />
-      </TextProvider>
+      <RecordPagesContext value={recordPages ? { sitePath: 'e2e', recordPages } : null}>
+        <TextProvider catalogs={catalogs} development={false}>
+          <TableWidget sitePath="e2e" pageName="Requests" widget={widget} locale="en" pageValues={pageValues} />
+        </TextProvider>
+      </RecordPagesContext>
       <CurrentLocation />
     </MemoryRouter>,
   )
@@ -474,6 +482,62 @@ describe('TableWidget', () => {
 
       await screen.findByText('Buy paper')
       expect(headerNames()).toEqual(['Title', 'Done', 'Category'])
+    })
+  })
+
+  describe('reference cells', () => {
+    const categoryPage = { Category: '/e2e/categories' }
+    const detail: NavigateAction = {
+      type: 'navigate',
+      page: 'TicketDetail',
+      labelKey: 'note.details',
+      parameters: { ticket: 'id' },
+      record: null,
+      opensForm: false,
+      paths: {},
+      visibleWhen: null,
+    }
+
+    it('links a reference to its record page, inline and with no padding, in a cell of the table line height', async () => {
+      stubRecords()
+      renderWidget('', noteWidget, undefined, categoryPage)
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      const link = within(row).getByRole('link', { name: 'Office' })
+      expect(link).toHaveAttribute('href', `/e2e/categories/${categoryId}`)
+      expect(getComputedStyle(link).display).toBe('inline')
+      expect(getComputedStyle(link).padding).toMatch(/^0(px)?$/)
+      expect(link.closest('td')).toHaveStyle({ lineHeight: `${designTokensFor('light').size.smallControl}px` })
+    })
+
+    it('shows a reference as plain text when its entity has no record page', async () => {
+      stubRecords()
+      renderWidget('', noteWidget, undefined, {})
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      expect(within(row).getByText('Office')).toBeInTheDocument()
+      expect(within(row).queryByRole('link')).not.toBeInTheDocument()
+    })
+
+    it('shows a reference as plain text outside a site, which has no record pages', async () => {
+      stubRecords()
+      renderWidget('', noteWidget)
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      expect(within(row).getByText('Office')).toBeInTheDocument()
+      expect(within(row).queryByRole('link')).not.toBeInTheDocument()
+    })
+
+    it('keeps the identifying cell as the row link, and links the references of the other cells', async () => {
+      stubRecords()
+      renderWidget('', { ...noteWidget, rowActions: [detail] }, undefined, categoryPage)
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+
+      expect(within(row).getByRole('link', { name: 'Buy paper' })).toHaveAttribute(
+        'href',
+        '/e2e/ticketdetail?ticket=' + noteId,
+      )
+      expect(within(row).getByRole('link', { name: 'Office' })).toHaveAttribute('href', `/e2e/categories/${categoryId}`)
     })
   })
 

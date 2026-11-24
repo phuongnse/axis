@@ -2,7 +2,7 @@ import { Flex, Tabs } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, useLinkClickHandler } from 'react-router'
+import { Link } from 'react-router'
 import { CopyableId } from './CopyableId'
 import { NotSet } from './EmptyValue'
 import { fillText } from './fillText'
@@ -25,6 +25,7 @@ import {
 import { InstanceHistory } from './InstanceHistory'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { PageActions, PageLayout } from './PageLayout'
+import { OpenInStudioButton } from './OpenInStudioButton'
 import { PersonName } from './PersonName'
 import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
@@ -360,7 +361,12 @@ export function InstanceDetailView({
     <div data-testid="inspector-instance">
       <PageActions>
         <Flex gap="small" align="center">
-          {instance.studio && <OpenInStudioButton studio={instance.studio} />}
+          {instance.studio && (
+            <OpenInStudioButton
+              address={studioResourceAddress(instance.studio.app, instance.studio.resource)}
+              data-testid="inspector-open-studio"
+            />
+          )}
           <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
         </Flex>
       </PageActions>
@@ -496,29 +502,5 @@ function InstanceCommands({ instance, instancesPath, onChanged }: InstanceComman
         </ReasonDialog>
       )}
     </>
-  )
-}
-
-interface OpenInStudioButtonProps {
-  studio: NonNullable<InstanceDetail['studio']>
-}
-
-/**
- * The button that opens the process in Studio, a named secondary button and never a link in the data, see
- * docs/reference/actions-and-controls.md#opening-things. It shows for a person who may author the application.
- */
-function OpenInStudioButton({ studio }: OpenInStudioButtonProps) {
-  const t = useText()
-  const address = studioResourceAddress(studio.app, studio.resource)
-  const go = useLinkClickHandler(address)
-  return (
-    <AxisButton
-      role="secondary"
-      data-testid="inspector-open-studio"
-      href={address}
-      onClick={(event) => go(event as never)}
-    >
-      {t('shell.inspector.openInStudio')}
-    </AxisButton>
   )
 }

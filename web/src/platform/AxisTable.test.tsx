@@ -1,5 +1,5 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Button } from 'antd'
 import { useState, type HTMLAttributes } from 'react'
@@ -64,6 +64,7 @@ const texts = {
   'row.open': 'Open',
   'row.close': 'Close',
   'row.revoke': 'Revoke',
+  'shell.studio.openInStudio': 'Open in Studio',
   'shell.empty.noData': 'No data yet.',
   ...filterTexts,
 }
@@ -78,21 +79,30 @@ const nameColumn: AxisColumn<Row> = { key: 'name', title: 'Name', dataIndex: 'na
 const noteColumn: AxisColumn<Row> = { key: 'note', title: 'Note', dataIndex: 'name', kind: 'freeText' }
 const amountColumn: AxisColumn<Row> = { key: 'amount', title: 'Amount', dataIndex: 'amount', kind: 'fixed' }
 
-function renderTable(props: Partial<AxisTableProps<Row>> = {}) {
+function renderTable(props: Partial<AxisTableProps<Row>> = {}, address = '/') {
   return render(
-    <TextProvider catalogs={catalogs} development={false}>
-      <AxisTable<Row>
-        columns={[nameColumn, amountColumn]}
-        rowKey={(row) => row.id}
-        dataSource={rows}
-        loading={false}
-        emptyText="Nothing here"
-        pagination={{ current: 1, pageSize: 20, total: rows.length, pageSizeOptions: [10, 20] }}
-        toolbar={{}}
-        {...props}
-      />
-    </TextProvider>,
+    <MemoryRouter initialEntries={[address]}>
+      <TextProvider catalogs={catalogs} development={false}>
+        <AxisTable<Row>
+          columns={[nameColumn, amountColumn]}
+          rowKey={(row) => row.id}
+          dataSource={rows}
+          loading={false}
+          emptyText="Nothing here"
+          pagination={{ current: 1, pageSize: 20, total: rows.length, pageSizeOptions: [10, 20] }}
+          toolbar={{}}
+          {...props}
+        />
+      </TextProvider>
+      <AddressProbe />
+    </MemoryRouter>,
   )
+}
+
+/** Shows the address the router is at, for the tests of a link that the router opens. */
+function AddressProbe() {
+  const { pathname, search } = useLocation()
+  return <output data-testid="address">{`${pathname}${search}`}</output>
 }
 
 const deleteAction: AxisAction = {
@@ -477,6 +487,25 @@ describe('AxisTable', () => {
       expect(revoke).toHaveClass('ant-btn-variant-text')
       expect(revoke).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
       expect(revoke.style.borderColor).toBe('')
+    })
+
+    it('draws an action with a path as a link button, which a plain click opens in the router', () => {
+      const studio: AxisAction = { key: 'studio', labelKey: 'shell.studio.openInStudio', href: '/studio?app=Leave' }
+      renderTable({ rowActions: actionsFor(studio) }, '/leave')
+
+      const row = screen.getByRole('row', { name: /Buy paper/ })
+      expect(within(row).getByRole('link', { name: 'Open in Studio' })).toHaveAttribute('href', '/studio?app=Leave')
+      expect(fireEvent.click(within(row).getByRole('link', { name: 'Open in Studio' }))).toBe(false)
+      expect(screen.getByTestId('address')).toHaveTextContent('/studio?app=Leave')
+    })
+
+    it('leaves a Ctrl+click on an action with a path to the browser, which opens a new tab', () => {
+      const studio: AxisAction = { key: 'studio', labelKey: 'shell.studio.openInStudio', href: '/studio?app=Leave' }
+      renderTable({ rowActions: actionsFor(studio) }, '/leave')
+
+      const row = screen.getByRole('row', { name: /Buy paper/ })
+      expect(fireEvent.click(within(row).getByRole('link', { name: 'Open in Studio' }), { ctrlKey: true })).toBe(true)
+      expect(screen.getByTestId('address')).toHaveTextContent('/leave')
     })
 
     it('appends the name suffix of an icon action to its accessible name only', async () => {
