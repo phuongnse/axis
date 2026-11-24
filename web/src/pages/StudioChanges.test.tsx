@@ -2,7 +2,7 @@ import { ConfigProvider } from 'antd'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   changeAuthors,
   type StudioChangeAuthor,
@@ -33,7 +33,7 @@ const texts = {
   'shell.studio.changes.linesRemoved.many': '{count} lines removed',
   'shell.studio.releases.system': 'System',
   'shell.studio.changes.changedBy': 'Changed by {authors}',
-  'shell.studio.changes.you': 'you',
+  'shell.person.you': '(you)',
   'shell.studio.changes.aiRequest': 'the AI request “{name}”',
   'shell.studio.changes.packageFile': 'Package file',
 }
@@ -274,13 +274,24 @@ describe('StudioChanges', () => {
 
 describe('StudioChanges with Changed by', () => {
   const application = 'PurchaseRequests'
-  // The reader is `author`, so a revision by `author` is "you".
+  // The reader is `author`, Ana, so a revision by `author` is "Ana (you)".
   const changedBy = (names: Map<string, string>) => ({
     application,
-    authors: (file: LiveFile) => changeAuthors(file.by, 'author', names),
+    authors: (file: LiveFile) => changeAuthors(file.by, names),
   })
 
-  it('names the reader, each person and the AI request in the order of first change, the request as a link', () => {
+  beforeEach(() => {
+    // PersonName asks who the reader is, so the reader's name is "Ana (you)" and every other name is plain.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async (_input: string) =>
+          new Response(JSON.stringify({ id: 'author', displayName: 'Ana', roles: [], users: false }), { status: 200 }),
+      ),
+    )
+  })
+
+  it('names the reader, each person and the AI request in the order of first change, the request as a link', async () => {
     // Newest first: the accept, then Sam Lee twice, then the reader, so the reader made the first change.
     const by = [
       revision('c', 'author', 'Ana', 'r1'),
@@ -292,19 +303,21 @@ describe('StudioChanges with Changed by', () => {
     renderWith([buyer], changedBy(new Map([['r1', 'Add a field.']])))
 
     const line = within(fileSection('roles/buyer.json')).getByTestId('studio-changes-by')
-    expect(line).toHaveTextContent('Changed by you, Sam Lee, and the AI request “Add a field.”')
+    await waitFor(() =>
+      expect(line).toHaveTextContent('Changed by Ana (you), Sam Lee, and the AI request “Add a field.”'),
+    )
     expect(within(line).getByRole('link', { name: 'the AI request “Add a field.”' })).toHaveAttribute(
       'href',
       '/studio?app=PurchaseRequests&view=requests&request=r1',
     )
   })
 
-  it('names the person who accepted a request whose name is not known', () => {
+  it('names the person who accepted a request whose name is not known', async () => {
     const buyer: LiveFile = { ...files[1], titles: null, by: [revision('c', 'author', 'Ana', 'r1')] }
     renderWith([buyer], changedBy(new Map()))
 
     const line = within(fileSection('roles/buyer.json')).getByTestId('studio-changes-by')
-    expect(line).toHaveTextContent(/^Changed by you$/)
+    await waitFor(() => expect(line).toHaveTextContent(/^Changed by Ana \(you\)$/))
     expect(within(line).queryByRole('link')).toBeNull()
   })
 

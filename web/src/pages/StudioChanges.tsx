@@ -8,6 +8,7 @@ import { FocusRingStyle } from '../platform/FocusRingStyle'
 import { FoldButton } from '../platform/FoldButton'
 import { fillText } from '../platform/fillText'
 import { keyedListsOf, layerMarks } from '../platform/layerMarks'
+import { PersonName } from '../platform/PersonName'
 import {
   type AuthoringRequestLayerChange,
   changeRows,
@@ -61,19 +62,18 @@ export type StudioChangedFile = StudioRevisionChange & {
 
 /**
  * The line "Changed by" with each person who changed a file, in the order of their first change, each as a
- * {@link StudioChangeAuthor}. The reader is "you", a server revision is "System", and an AI request is a link to its page.
+ * {@link StudioChangeAuthor}. A person is drawn by `PersonName`, so the reader is followed by "(you)", a server revision
+ * is "System", and an AI request is a link to its page.
  */
 function ChangedBy({ application, authors }: { application: string; authors: StudioChangeAuthor[] }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const nodes: ReactNode[] = authors.map((author) => {
     switch (author.type) {
-      case 'you':
-        return t('shell.studio.changes.you')
       case 'system':
         return t('shell.studio.releases.system')
       case 'person':
-        return author.name
+        return <PersonName key={author.id} id={author.id} name={author.name} />
       case 'request':
         return (
           <Link key={author.id} to={studioRequestAddress(application, author.id)}>

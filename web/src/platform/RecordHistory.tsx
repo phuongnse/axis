@@ -1,11 +1,13 @@
 import { Flex, Pagination, Space, Spin, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { EmptyState } from './EmptyState'
+import { EventTime } from './EventTime'
 import { historySummary } from './historySummary'
 import { inspectTarget } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
+import { PersonName } from './PersonName'
 import { paginationItems } from './pagination'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
 import { SectionPart } from './SectionParts'
@@ -22,7 +24,7 @@ interface RecordHistoryProps {
   recordId: string
   /** The entity's fields, to show the labels of the fields an entry names. */
   fields: readonly FieldMetadata[]
-  /** The UI locale, for showing each entry's time. */
+  /** The UI locale, for the summary of each entry. */
   locale: string
 }
 
@@ -41,10 +43,13 @@ function textOr(t: (key: string) => string, key: string, fallback: string): stri
   return text === key ? fallback : text
 }
 
-/** Who did what an entry records: the user's name, System, Anonymous, or the raw actor id. */
-function actorOf({ actor, actorName }: HistoryItem, t: (key: string) => string): string {
+/**
+ * Who did what an entry records: a person by name through `PersonName`, System, Anonymous, or the raw actor id, see
+ * docs/reference/actions-and-controls.md#text ("A person by name").
+ */
+function actorOf({ actor, actorName }: HistoryItem, t: (key: string) => string): ReactNode {
   if (actorName !== null) {
-    return actorName
+    return <PersonName id={actor} name={actorName} />
   }
   if (actor === 'system') {
     return t('shell.history.system')
@@ -83,7 +88,6 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   const wantsLinks = state.result?.items.some((item) => typeof item.inspectPath === 'string') ?? false
   const inspectors = useInspectorPages(sitePath, pages, wantsLinks)
 
-  const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
   const items = state.result?.items ?? []
   const totalCount = state.result?.totalCount ?? 0
 
@@ -115,7 +119,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
                       </Typography.Text>
                       <Typography.Text>{actorOf(item, t)}</Typography.Text>
                       <Typography.Text type="secondary">
-                        <time dateTime={item.occurredAt}>{time.format(new Date(item.occurredAt))}</time>
+                        <EventTime value={item.occurredAt} />
                       </Typography.Text>
                       {target !== null && inspectorPage !== undefined && (
                         <Link

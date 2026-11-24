@@ -3,8 +3,11 @@ import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
+import { FilledText } from './FilledText'
 import { formatValue } from './formatValue'
+import { useCurrentUser } from './currentUser'
 import type { WidgetMetadata } from './site'
+import { PersonName } from './PersonName'
 import { RecordLink } from './RecordLink'
 import { StatusTag } from './StatusTag'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
@@ -48,6 +51,24 @@ const noParameters: readonly string[] = []
 const dueAtField = { name: 'dueAt', type: 'date-time' } as const
 
 /**
+ * The "Claimed by" tag of a claimed row, with the signed-in person's name through `PersonName`, so the reader's own name
+ * is followed by "(you)". The task list returns a claimed task only to its claimer, so the tag draws only when the
+ * signed-in user is `claimer`, and nothing while the user loads.
+ */
+function ClaimedTag({ claimer }: { claimer: string }) {
+  const t = useText()
+  const me = useCurrentUser()
+  if (me?.id !== claimer) {
+    return null
+  }
+  return (
+    <StatusTag tone="neutral">
+      <FilledText text={t('shell.tasks.claimedBy')} parts={{ name: <PersonName id={me.id} name={me.displayName} /> }} />
+    </StatusTag>
+  )
+}
+
+/**
  * Lists the signed-in user's open tasks in the task API's order until the view sorts them, paged on the server. The table
  * has Search, Filter on Subject and Due, Columns, a sort on Subject and Due, Refresh and paging, see
  * docs/reference/actions-and-controls.md#tables. The view lives in the URL as `search`, `filter`, `columns`, `sort`, `page`
@@ -57,9 +78,9 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * order: due date first, with no due date last. A failed load shows under the toolbar, so the view can be changed to get the
  * rows back. With nobody signed in, the task API's 401 shows the sign-in prompt.
  *
- * An overdue task shows an "Overdue" tag beside its due date, and a task the user claimed shows a
- * "Claimed by you" tag beside its label. The Record column is a link to the subject's record page, see `RecordLink`, and
- * shows the muted dash when the subject has no label.
+ * An overdue task shows an "Overdue" tag beside its due date, and a task the user claimed shows a "Claimed by" tag with
+ * the user's name beside its label, see `ClaimedTag`. The Record column is a link to the subject's record page, see
+ * `RecordLink`, and shows the muted dash when the subject has no label.
  *
  * A row's label comes from the texts of the release its task started on, then the site texts and
  * the platform texts. The table stays loading until the texts of every release on the page have
@@ -128,11 +149,10 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
           const label = releaseCatalog
             ? resolveText(task.labelKey, [releaseCatalog, ...catalogs], development)
             : t(task.labelKey)
-          // The task list returns a claimed task only to its claimer, so a claimer here is the signed-in user.
           return (
             <Space size="small">
               <Link to={`${taskPath}/${task.id}`}>{label}</Link>
-              {task.claimedBy !== null && <StatusTag tone="neutral">{t('shell.tasks.claimedByYou')}</StatusTag>}
+              {task.claimedBy !== null && <ClaimedTag claimer={task.claimedBy} />}
             </Space>
           )
         },

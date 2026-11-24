@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider } from 'antd'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isBlurred } from '../test/antd'
 import { RecordHistory } from './RecordHistory'
 import type { HistoryItem } from './records'
@@ -45,6 +45,7 @@ const texts: Record<string, string> = {
   'shell.history.outcome': 'Outcome: {outcome}',
   'shell.history.step': 'Step: {step}',
   'shell.history.openInstance': 'Open process',
+  'shell.person.you': '(you)',
   'shell.history.action.record.created': 'Created',
   'shell.history.action.record.updated': 'Updated',
   'shell.history.action.process.started': 'Process started',
@@ -76,14 +77,32 @@ function page(items: HistoryItem[], number = 1, totalCount = items.length) {
   return JSON.stringify({ items, page: number, pageSize: 20, totalCount })
 }
 
-/** Stubs `fetch` with answers in order, and returns the URLs requested. */
+/** The signed-in reader, whose entries read "(you)". */
+const reader = { id: 'maria', displayName: 'Ann', roles: [], users: false }
+
+/** `GET /api/me` answers the reader, or 401 with nobody signed in. It is not one of the answers of a stub, and no URL lists it. */
+function meAnswer(signedIn: object | null): Response {
+  return signedIn === null
+    ? new Response('{}', { status: 401 })
+    : new Response(JSON.stringify(signedIn), { status: 200, headers: { 'Content-Type': 'application/json' } })
+}
+
+/** Stubs `fetch` with answers in order, and returns the URLs requested, with nobody signed in. */
 function stubFetch(...answers: { status: number; body: string }[]) {
-  const fetchMock = vi.fn(async (_input: string) => {
+  return stubFetchAs(null, ...answers)
+}
+
+/** Stubs `fetch` with answers in order, with `signedIn` as the reader, and returns the URLs requested. */
+function stubFetchAs(signedIn: object | null, ...answers: { status: number; body: string }[]) {
+  const fetchMock = vi.fn(async (input: string) => {
+    if (input === '/api/me') {
+      return meAnswer(signedIn)
+    }
     const answer = answers.shift() ?? { status: 500, body: '{}' }
     return new Response(answer.body, { status: answer.status })
   })
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([url]) => url)
+  return () => fetchMock.mock.calls.map(([url]) => url).filter((url) => url !== '/api/me')
 }
 
 const navigation = ['Requests', 'Approvals', 'Audit']
@@ -143,6 +162,9 @@ function pageBody(name: string, process: string | null, nested = false) {
 /** Stubs `fetch` by URL: the history answers `history`, and a page answers its metadata or a 404. */
 function stubRoutes(history: string, pages: Record<string, string | null>) {
   const fetchMock = vi.fn(async (input: string) => {
+    if (input === '/api/me') {
+      return meAnswer(null)
+    }
     if (input.includes('/history?')) {
       return new Response(history, { status: 200 })
     }
@@ -151,7 +173,7 @@ function stubRoutes(history: string, pages: Record<string, string | null>) {
     return body ? new Response(body, { status: 200 }) : new Response('{}', { status: 404 })
   })
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([url]) => url)
+  return () => fetchMock.mock.calls.map(([url]) => url).filter((url) => url !== '/api/me')
 }
 
 /** The paging button titled `title`, once the spin area around it is no longer blurred. */
@@ -164,7 +186,13 @@ function pageButton(title: string): Promise<HTMLElement> {
 }
 
 describe('RecordHistory', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('lists the entries in the order the server gives, newest first, with their action, actor and time', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-06T02:15:00Z'))
     const requests = stubFetch({
       status: 200,
       body: page([
@@ -188,19 +216,31 @@ describe('RecordHistory', () => {
       'Created',
     ])
     expect(entries[0]).toHaveTextContent('Maria Manager')
+    expect(entries[0]).not.toHaveTextContent('(you)')
     expect(within(entries[0]).getByText('Changed: Comment')).toBeInTheDocument()
     expect(within(entries[0]).getByText('Outcome: approve')).toBeInTheDocument()
     expect(entries[0].querySelector('time')).toHaveAttribute('datetime', '2026-10-06T02:10:00Z')
-    expect(entries[0].querySelector('time')?.textContent).toBe(
-      new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'medium' }).format(
-        new Date('2026-10-06T02:10:00Z'),
-      ),
-    )
+    // Five minutes after the entry, the time reads as how long ago, see EventTime.
+    expect(entries[0].querySelector('time')).toHaveTextContent('5 minutes ago')
     expect(entries[1]).toHaveTextContent('System')
     expect(entries[1]).toHaveTextContent('Step: decide')
     expect(entries[2]).toHaveTextContent('gone')
     expect(entries[3]).toHaveTextContent('Anonymous')
     expect(requests()).toEqual([`${recordsPath}/${recordId}/history?page=1&pageSize=20`])
+  })
+
+  it("names the reader's own entry '(you)' and no other person", async () => {
+    stubFetchAs(reader, {
+      status: 200,
+      body: page([item('record.created'), item('record.updated', { actor: 'lee', actorName: 'Lee Tran' })]),
+    })
+
+    renderHistory()
+
+    const entries = await screen.findAllByTestId('history-entry')
+    await waitFor(() => expect(entries[0]).toHaveTextContent('Maria Manager (you)'))
+    expect(entries[1]).toHaveTextContent('Lee Tran')
+    expect(entries[1]).not.toHaveTextContent('(you)')
   })
 
   it('shows an action without a text as it is', async () => {

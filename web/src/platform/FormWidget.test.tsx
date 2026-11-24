@@ -443,6 +443,10 @@ let stateAnswers: (string | Promise<string>)[] = []
  */
 function stubFetch(...answers: Answer[]) {
   const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
+    // The history names its entries' people through `GET /api/me`, which is not one of the answers, with nobody signed in.
+    if (input === '/api/me') {
+      return new Response('{}', { status: 401 })
+    }
     if (input.includes('/history?')) {
       return new Response(historyJson, { status: 200 })
     }
@@ -458,7 +462,7 @@ function stubFetch(...answers: Answer[]) {
   vi.stubGlobal('fetch', fetchMock)
   return () =>
     fetchMock.mock.calls
-      .filter(([url]) => !url.includes('/history?') && !url.endsWith('/state'))
+      .filter(([url]) => !url.includes('/history?') && !url.endsWith('/state') && url !== '/api/me')
       .map(([url, init]) => ({ url, method: init?.method ?? 'GET', body: init?.body }))
 }
 

@@ -415,9 +415,11 @@ A new record has no history.
   and paging states stay.
 - **Entry.** Each entry shows its action, who did it, its time and a short summary. The action is a
   platform text, such as "Updated" or "Task decided", and an action without a text shows as it is.
-- **Who.** Who did it is the `actorName` the history answers. Without one, it is "System" for
-  `system`, "Anonymous" for `anonymous`, or else the raw user id.
-- **Time.** The time uses the user's locale, with the medium date and time styles.
+- **Who.** Who did it is the `actorName` the history answers, drawn by `PersonName`, so the reader's own
+  entries are followed by "(you)". Without one, it is "System" for `system`, "Anonymous" for `anonymous`, or
+  else the raw user id.
+- **Time.** The time is drawn by `EventTime`: how long ago within a week, such as "5 minutes ago", and the
+  date and time from a week on, see [shown values](frontend.md#shown-values).
 - **Summary.** The summary is built from the details: the labels of the fields it names, then the task
   outcome, then the step. An entry whose details name none of them has no summary. Outcome and step
   names show as declared, such as `approve`. Comments are never shown, because audit records never hold

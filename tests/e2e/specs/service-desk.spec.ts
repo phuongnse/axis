@@ -188,7 +188,7 @@ test("lead claims a triage task so lead-2 no longer lists it, then reassigns it 
     await page.goto("/service-desk/mytasks?pageSize=100");
     await expect(row).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
-  await expect(row.getByText("Claimed by you", { exact: true })).toBeVisible();
+  await expect(row.getByText(/^Claimed by .+ \(you\)$/)).toBeVisible();
   await row.getByRole("link", { name: "Triage ticket", exact: true }).click();
   await page.getByRole("button", { name: "Reassign…", exact: true }).click();
 
