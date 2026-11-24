@@ -226,6 +226,7 @@ describe('TenantModelKeySection', () => {
 
     const notice = await screen.findByText('The key was not saved.')
     expect(notice).toBeVisible()
+    expect(notice.compareDocumentPosition(screen.getByText('No key is set.'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(notice.compareDocumentPosition(screen.getByRole('button', { name: 'Set key…' }))).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     )

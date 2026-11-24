@@ -152,6 +152,23 @@ describe('TenantExportSection', () => {
     )
   })
 
+  it('shows a download that could not be fetched above the ready text and the download button', async () => {
+    localStorage.setItem(storageKey, exportId)
+    let reads = 0
+    stubServer(true, () => (reads++ === 0 ? json(tenantExport('succeeded')) : new Response(null, { status: 500 })))
+    renderSection()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Download ZIP' }))
+
+    const notice = await screen.findByTestId('tenant-export-notice')
+    expect(notice).toHaveTextContent('The file could not be downloaded.')
+    expect(notice.compareDocumentPosition(screen.getByTestId('tenant-export-ready'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    // The button's name is read while it is still loading, so its label is found by its text.
+    expect(notice.compareDocumentPosition(screen.getByText('Download ZIP'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
   it('says a failed export failed and offers to start again', async () => {
     localStorage.setItem(storageKey, exportId)
     stubServer(true, () => json(tenantExport('failed')))

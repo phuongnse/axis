@@ -179,6 +179,9 @@ describe('TenantApplicationPackagesSection', () => {
 
     const notice = await screen.findByText('The change was not saved.')
     expect(notice).toBeVisible()
+    expect(notice.compareDocumentPosition(screen.getByText('Application packages are off.'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
     expect(notice.compareDocumentPosition(screen.getByRole('button', { name: 'Turn on…' }))).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
