@@ -116,6 +116,22 @@ export function processTitle(t: (key: string) => string, titleKey: string, name:
   return text === titleKey ? name : text
 }
 
+/**
+ * The words of a step's event in the reader's language: the text of its label where the release texts have the key, else
+ * the event's name, or `undefined` for a step that names no event. A catalog without the key answers the key itself, see
+ * docs/reference/process-inspector-widget.md#instance-page.
+ */
+export function eventText(t: (key: string) => string, step: GraphStep | undefined): string | undefined {
+  const labelKey = step?.eventLabelKey
+  if (labelKey) {
+    const text = t(labelKey)
+    if (text !== labelKey) {
+      return text
+    }
+  }
+  return step?.event ?? undefined
+}
+
 /** The states of a process call, see docs/reference/process-inspection.md#instance-detail. */
 export const callStates = ['pending', 'sending', 'unknown', 'succeeded', 'failed', 'cancelled'] as const
 
@@ -263,8 +279,9 @@ export interface GraphTransition {
 }
 
 /**
- * A step of the graph. `labelKey` is the key of the step's label, or `null` when it has none. `event` is a `waitEvent`
- * step's event name, and `eventLabelKey` the key of the event's label, which is always `null` today.
+ * A step of the graph. `labelKey` is the key of the step's label, or `null` when it has none. `event` is the name of the
+ * event a `waitEvent` step waits for or a `raiseEvent` step raises, and `eventLabelKey` the key of that event's label, or
+ * `null` when it has none. Both are `null` for any other step.
  */
 export interface GraphStep {
   name: string

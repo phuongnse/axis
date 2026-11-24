@@ -1,6 +1,7 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Tests;
 
@@ -67,6 +68,31 @@ public sealed class EventCompilerTests
 
         Assert.Empty(result.Diagnostics);
         Assert.Empty(Assert.Single(result.Model!.Events).Fields);
+    }
+
+    [Fact]
+    public void An_event_label_with_no_text_in_any_locale_is_a_missing_text()
+    {
+        using var folder = Folder().With("events/note-closed.json", LabelledEvent("NoteClosed", "Note", "events.noteClosed"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MissingTextKey, "events/note-closed.json", "/label/textKey"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_event_label_whose_key_a_locale_has_compiles_into_the_model()
+    {
+        using var folder = Folder()
+            .With("events/note-closed.json", LabelledEvent("NoteClosed", "Note", "events.noteClosed"))
+            .With("texts/en.json", EventTexts);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(new TextReference("events.noteClosed"), Assert.Single(result.Model!.Events).Label);
     }
 
     [Fact]
@@ -168,6 +194,16 @@ public sealed class EventCompilerTests
     private static string Event(string name, string entity, string fields, string id = EventId) => $$"""
         { "id": "{{id}}", "kind": "event", "name": "{{name}}", "formatVersion": 1, "entity": "{{entity}}",
           "fields": {{fields}} }
+        """;
+
+    private const string EventTexts = """
+        { "id": "5c1e7a2b-3d4f-4a6b-8c9d-0e1f2a3b4c60", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+          "texts": { "events.noteClosed": "Note closed" } }
+        """;
+
+    private static string LabelledEvent(string name, string entity, string textKey) => $$"""
+        { "id": "{{EventId}}", "kind": "event", "name": "{{name}}", "formatVersion": 1, "entity": "{{entity}}",
+          "label": { "textKey": "{{textKey}}" }, "fields": [] }
         """;
 
     private static TemporaryFolder Folder() =>

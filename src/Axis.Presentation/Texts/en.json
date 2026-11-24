@@ -1558,6 +1558,8 @@
   "shell.studio.field.sequence.format.help": "The pattern of each number, where n is the number and yyyy the year.",
   "shell.studio.field.event.name": "Name",
   "shell.studio.field.event.name.help": "The name that identifies the event in the file and in Studio.",
+  "shell.studio.field.event.label": "Label",
+  "shell.studio.field.event.label.help": "The text people see for this event on a process's page, in each language of the application.",
   "shell.studio.field.event.description": "Description",
   "shell.studio.field.event.description.help": "What the event is for, in each language of the application.",
   "shell.studio.field.event.entity": "Entity",

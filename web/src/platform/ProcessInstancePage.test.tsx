@@ -344,6 +344,44 @@ function detailLooping() {
   })
 }
 
+/** The instance waiting for the event `OrderShipped` at its only wait, whose event has the label key `eventLabelKey`, or none. */
+function detailWaitingForEvent(eventLabelKey: string | null) {
+  const detail = JSON.parse(detailText) as Record<string, unknown>
+  return JSON.stringify({
+    ...detail,
+    state: 'waiting',
+    step: 'waitShipped',
+    tasks: [],
+    calls: [],
+    graph: {
+      start: 'waitShipped',
+      steps: [
+        {
+          name: 'waitShipped',
+          type: 'waitEvent',
+          labelKey: null,
+          event: 'OrderShipped',
+          eventLabelKey,
+          transitions: [{ next: 'done', on: null, branch: null, labelKey: null, after: null }],
+        },
+        { name: 'done', type: 'end', labelKey: null, event: null, eventLabelKey: null, transitions: [] },
+      ],
+    },
+    path: [
+      {
+        step: 'waitShipped',
+        startedAt: '2026-10-10T02:05:00.123456Z',
+        finishedAt: null,
+        decision: null,
+        output: null,
+        error: null,
+        problem: null,
+        traceId: null,
+      },
+    ],
+  })
+}
+
 /** The instance of `detailWithRelatives`, which has no subject, with `patch` laid over it. */
 function detailWithData(patch: Record<string, unknown>) {
   return JSON.stringify({ ...(JSON.parse(detailWithRelatives()) as Record<string, unknown>), ...patch })
@@ -800,6 +838,44 @@ describe('ProcessInstancePage', () => {
     const approval = await screen.findByTestId('rf__node-managerApproval', undefined, { timeout: 5000 })
     expect(within(approval).getByText('Approval by the manager')).toBeInTheDocument()
     expect(within(screen.getByTestId('rf__node-done')).getByText('done')).toBeInTheDocument()
+  })
+
+  it('names a waited event on the diagram by its label from the release texts', async () => {
+    stubApi({
+      detail: { status: 200, body: detailWaitingForEvent('events.orderShipped') },
+      releaseTexts: {
+        status: 200,
+        body: JSON.stringify({ locale: 'en', texts: { 'events.orderShipped': 'Order shipped' } }),
+      },
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('Order shipped')).toBeInTheDocument()
+    expect(screen.queryByText('OrderShipped')).not.toBeInTheDocument()
+  })
+
+  it('names a waited event by its label in History and in Waits for', async () => {
+    stubApi({
+      detail: { status: 200, body: detailWaitingForEvent('events.orderShipped') },
+      releaseTexts: {
+        status: 200,
+        body: JSON.stringify({ locale: 'en', texts: { 'events.orderShipped': 'Order shipped' } }),
+      },
+    })
+
+    renderPage('?tab=history&step=waitShipped')
+
+    expect(await screen.findByRole('row', { name: /Waits for Order shipped\./ })).toBeInTheDocument()
+    expect((await stepPanel()).getByText('Order shipped')).toBeVisible()
+  })
+
+  it('names a waited event by its name in Waits for when its event has no label', async () => {
+    stubApi({ detail: { status: 200, body: detailWaitingForEvent(null) } })
+
+    renderPage('?step=waitShipped')
+
+    expect((await stepPanel()).getByText('OrderShipped')).toBeVisible()
   })
 
   it('keeps the heading and shows the not-found line with no command on a 404', async () => {
@@ -1590,6 +1666,16 @@ function detailForRun({ calls, made }: { calls?: unknown[]; made?: Record<string
   return JSON.stringify(detail)
 }
 
+/** The run of `detailForRun` at `registerPurchase`, which raised the event `OrderPlaced` with the label key `eventLabelKey`, or none. */
+function detailRaisingEvent(eventLabelKey: string | null) {
+  const detail = JSON.parse(detailForRun({ calls: [], made: { event: { name: 'OrderPlaced', fields: [] } } })) as {
+    graph: { steps: Record<string, unknown>[] }
+  }
+  const step = detail.graph.steps.find((candidate) => candidate.name === 'registerPurchase')!
+  Object.assign(step, { event: 'OrderPlaced', eventLabelKey })
+  return JSON.stringify(detail)
+}
+
 async function stepPanel() {
   return within(await screen.findByTestId('inspector-step-run'))
 }
@@ -1881,6 +1967,23 @@ describe('ProcessInstancePage step run panel', () => {
     const note = panel.getByText('note').closest('div')!
     expect(within(note).getByText('Hidden')).toBeVisible()
     expect(within(note).queryByText(/Changed from/)).not.toBeInTheDocument()
+  })
+
+  it('names a raised event by its label from the release texts', async () => {
+    stubApi({
+      detail: { status: 200, body: detailRaisingEvent('events.orderPlaced') },
+      releaseTexts: {
+        status: 200,
+        body: JSON.stringify({ locale: 'en', texts: { 'events.orderPlaced': 'Order placed' } }),
+      },
+    })
+
+    renderPage('?step=registerPurchase&stepTab=output')
+
+    const panel = await stepPanel()
+    expect(panel.getByText('Event raised')).toBeVisible()
+    expect(panel.getByText('Order placed')).toBeVisible()
+    expect(panel.queryByText('OrderPlaced')).not.toBeInTheDocument()
   })
 
   it('shows the event a run raised, the people it notified and the record it created', async () => {

@@ -1558,6 +1558,8 @@
   "shell.studio.field.sequence.format.help": "Mẫu của mỗi số, với n là số và yyyy là năm.",
   "shell.studio.field.event.name": "Tên",
   "shell.studio.field.event.name.help": "Tên xác định sự kiện trong tệp và trong Studio.",
+  "shell.studio.field.event.label": "Tên hiển thị",
+  "shell.studio.field.event.label.help": "Tên người dùng thấy cho sự kiện này trên trang của lượt chạy quy trình, bằng từng ngôn ngữ của ứng dụng.",
   "shell.studio.field.event.description": "Mô tả",
   "shell.studio.field.event.description.help": "Sự kiện dùng để làm gì, bằng từng ngôn ngữ của ứng dụng.",
   "shell.studio.field.event.entity": "Đối tượng",

@@ -24,7 +24,7 @@ public sealed class ProcessGraphTests
             ],
         };
 
-        var graph = ProcessInspectionEndpoints.Graph(model);
+        var graph = ProcessInspectionEndpoints.Graph(model, []);
 
         Assert.Equal("fulfil", graph.Start);
         Assert.Equal(
@@ -54,7 +54,7 @@ public sealed class ProcessGraphTests
             ],
         };
 
-        var graph = ProcessInspectionEndpoints.Graph(model);
+        var graph = ProcessInspectionEndpoints.Graph(model, []);
 
         Assert.Equal(
             [
@@ -85,7 +85,7 @@ public sealed class ProcessGraphTests
             Steps = [new WaitEventStepModel("wait", "OrderPlaced", null, null, "done"), new EndStepModel("done")],
         };
 
-        var graph = ProcessInspectionEndpoints.Graph(model);
+        var graph = ProcessInspectionEndpoints.Graph(model, []);
 
         Assert.Equal([new ProcessGraphTransition("done", null, null, null, null)], graph.Steps[0].Transitions);
     }
@@ -108,11 +108,52 @@ public sealed class ProcessGraphTests
             ],
         };
 
-        var graph = ProcessInspectionEndpoints.Graph(model);
+        var graph = ProcessInspectionEndpoints.Graph(model, []);
 
         Assert.Equal(["step.pause", "step.wait", "step.done"], graph.Steps.Select(step => step.LabelKey));
         Assert.Null(graph.Steps[1].EventLabelKey);
     }
+
+    [Fact]
+    public void A_wait_event_and_a_raise_event_step_give_the_event_name_and_the_key_of_its_label()
+    {
+        var model = new ProcessModel
+        {
+            Id = Guid.Parse("77777777-7777-4777-8777-777777777706"),
+            Name = "OrderReview",
+            Title = new TextReference("order.title"),
+            File = "processes/order-review.json",
+            Start = "wait",
+            Steps =
+            [
+                new WaitEventStepModel("wait", "ordershipped", null, null, "raise"),
+                new RaiseEventStepModel("raise", "OrderPlaced", [], "done"),
+                new EndStepModel("done"),
+            ],
+        };
+        var events = new List<EventModel> { Event("OrderShipped", "events.shipped"), Event("OrderPlaced", null) };
+
+        var graph = ProcessInspectionEndpoints.Graph(model, events);
+
+        Assert.Equal(
+            [
+                new ProcessGraphStep("wait", "waitEvent", null, "ordershipped", "events.shipped", [new ProcessGraphTransition("raise", null, null, null, null)]),
+                new ProcessGraphStep("raise", "operation", null, "OrderPlaced", null, [new ProcessGraphTransition("done", null, null, null, null)]),
+                new ProcessGraphStep("done", "end", null, null, null, []),
+            ],
+            graph.Steps,
+            new GraphStepComparer());
+    }
+
+    private static EventModel Event(string name, string? labelKey) => new()
+    {
+        Id = Guid.Parse("77777777-7777-4777-8777-777777777710"),
+        Name = name,
+        Label = labelKey is null ? null : new TextReference(labelKey),
+        File = $"events/{name.ToLowerInvariant()}.json",
+        Entity = new EntityReference(Guid.Parse("77777777-7777-4777-8777-777777777711"), "Order"),
+        Fields = [],
+    };
 
     // The records hold lists, which a record compares by reference, so the steps are compared by their parts.
     private sealed class GraphStepComparer : IEqualityComparer<ProcessGraphStep>

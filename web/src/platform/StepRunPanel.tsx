@@ -7,6 +7,7 @@ import { NotSet } from './EmptyValue'
 import { fillText } from './fillText'
 import { formatDuration, formatValue } from './formatValue'
 import {
+  eventText,
   processTitle,
   runParts,
   runProblem,
@@ -305,7 +306,7 @@ function RunOverview({ instance, runs, run, stepLabel, inspectors, sitePath, loc
     terms.push({
       key: 'waitsFor',
       term: t('shell.inspector.run.waitsFor'),
-      value: graphStep.event ?? <NotSet />,
+      value: eventText(t, graphStep) ?? <NotSet />,
     })
     const timeout = graphStep.transitions.find((transition) => transition.on === 'timeout')
     if (waiting && instance.timerDueAt !== null && timeout !== undefined) {
