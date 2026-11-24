@@ -260,7 +260,7 @@ describe('ConsolePage', () => {
     renderPage()
 
     const view = await screen.findByTestId('console-tenant')
-    expect(fetchMock.mock.calls[0]).toEqual(['/api/console/tenant', expect.anything()])
+    expect(fetchMock.mock.calls).toContainEqual(['/api/console/tenant', expect.anything()])
     expect(within(view).getByText('Active')).toBeVisible()
     expect(within(view).getByText('Active').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
     for (const title of ['Application', 'Live release', 'Activated']) {
@@ -273,19 +273,23 @@ describe('ConsolePage', () => {
     expect(screen.queryByTestId('console-forbidden')).toBeNull()
   })
 
-  it("opens an application and its release in Studio from the tenant's table for a reader who may use Studio", async () => {
+  it("names the tenant's applications and releases as plain text, and opens each application in Studio from its row for a reader who may use Studio", async () => {
     stubServer((url) => (url === '/api/me' ? json({ id: 'op', studio: true }) : tenantAndFailedWork(url)))
     renderPage()
 
     const view = await screen.findByTestId('console-tenant')
-    expect(await within(view).findByRole('link', { name: 'Leave' })).toHaveAttribute('href', '/studio?app=Leave')
-    expect(within(view).getByRole('link', { name: '#3 Spring' })).toHaveAttribute(
+    expect(await within(view).findByText('#3 Spring')).toBeVisible()
+    expect(within(view).queryByRole('link', { name: 'Leave' })).toBeNull()
+    expect(within(view).queryByRole('link', { name: '#3 Spring' })).toBeNull()
+    const leave = within(view).getByText('Leave').closest('tr')!
+    expect(within(leave).getByRole('link', { name: 'Open in Studio' })).toHaveAttribute('href', '/studio?app=Leave')
+    const purchasing = within(view).getByText('Purchasing').closest('tr')!
+    expect(within(purchasing).getByRole('link', { name: 'Open in Studio' })).toHaveAttribute(
       'href',
-      '/studio?app=Leave&view=release&release=3',
+      '/studio?app=Purchasing',
     )
-    expect(within(view).getByRole('link', { name: 'Purchasing' })).toHaveAttribute('href', '/studio?app=Purchasing')
-    // An application with no release has no release page to open.
-    expect(within(within(view).getByText('Purchasing').closest('tr')!).getAllByRole('link')).toHaveLength(1)
+    // Only the application's own action links to Studio, one for each application.
+    expect(within(view).getAllByRole('link')).toHaveLength(2)
   })
 
   it("shows the tenant's application and release as plain text for a reader who may not use Studio", async () => {
@@ -298,6 +302,7 @@ describe('ConsolePage', () => {
     expect(await within(view).findByText('#3 Spring')).toBeVisible()
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.anything()))
     expect(within(view).queryByRole('link')).toBeNull()
+    expect(within(view).queryByRole('button', { name: 'Open in Studio' })).toBeNull()
   })
 
   it('narrows the tenant applications by a filter in the address, and hides the others', async () => {

@@ -20,8 +20,10 @@ import {
   type CSSProperties,
   type HTMLAttributes,
   type Key,
+  type MouseEvent,
   type ReactNode,
 } from 'react'
+import { useLinkClickHandler } from 'react-router'
 import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { EmptyDash } from './EmptyValue'
@@ -892,8 +894,9 @@ function MovedCells({
  * A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. A row folds from three actions
  * on, and at narrow width from two on, so a menu never holds one entry. `fold` folds a row with two or more actions, as
  * `AxisTable` asks for a table set up for three or more, so a menu never holds one entry either. A known Remove,
- * `meaning: 'remove'`, is the trash icon in `dangerText` and a red entry in a menu. It is exported for a list that is
- * not a table, see docs/reference/actions-and-controls.md#tables.
+ * `meaning: 'remove'`, is the trash icon in `dangerText` and a red entry in a menu. An action with an `href` is drawn
+ * as a link button, which opens a path in the router. It is exported for a list that is not a table, see
+ * docs/reference/actions-and-controls.md#tables.
  */
 export function RowActions({ actions, fold = false }: { actions: AxisAction[] | null; fold?: boolean }) {
   const t = useText()
@@ -921,34 +924,68 @@ export function RowActions({ actions, fold = false }: { actions: AxisAction[] | 
   }
   return (
     <Flex gap="small">
-      {shown.map((action) =>
-        action.icon ? (
-          <AxisButton
-            key={action.key}
-            role="subtle"
-            size="small"
-            nameKey={action.labelKey!}
-            destructive={action.destructive}
-            icon={action.icon}
-            nameSuffix={action.nameSuffix}
-            disabled={action.disabled}
-            onClick={action.onClick}
-            {...action.attributes}
-          />
-        ) : (
-          <AxisButton
-            key={action.key}
-            role="subtle"
-            size="small"
-            destructive={action.destructive}
-            disabled={action.disabled}
-            onClick={action.onClick}
-            {...action.attributes}
-          >
-            {actionText(action, t)}
-          </AxisButton>
-        ),
-      )}
+      {shown.map((action) => (
+        <RowActionButton key={action.key} action={action} />
+      ))}
     </Flex>
+  )
+}
+
+/**
+ * One row action as a button. An action with a path in `href` is a router link, so a plain click opens it in place and
+ * Ctrl+click opens a new tab, see docs/reference/actions-and-controls.md#opening-things.
+ */
+function RowActionButton({ action }: { action: AxisAction }) {
+  if (action.href?.startsWith('/')) {
+    return <RouterRowAction action={action} />
+  }
+  return <RowButton action={action} href={action.href} onClick={action.onClick} />
+}
+
+/** A row action whose `href` is a path in the site. The router opens it on a plain click, see `RowActionButton`. */
+function RouterRowAction({ action }: { action: AxisAction }) {
+  const go = useLinkClickHandler(action.href!)
+  return <RowButton action={action} href={action.href} onClick={(event) => go(event as never)} />
+}
+
+/** The button of one row action: an icon button named by its text, or a subtle text button. */
+function RowButton({
+  action,
+  href,
+  onClick,
+}: {
+  action: AxisAction
+  href?: string
+  onClick?: (event: MouseEvent<HTMLButtonElement | HTMLAnchorElement>) => void
+}) {
+  const t = useText()
+  if (action.icon) {
+    return (
+      <AxisButton
+        role="subtle"
+        size="small"
+        nameKey={action.labelKey!}
+        destructive={action.destructive}
+        icon={action.icon}
+        nameSuffix={action.nameSuffix}
+        disabled={action.disabled}
+        href={href}
+        onClick={onClick}
+        {...action.attributes}
+      />
+    )
+  }
+  return (
+    <AxisButton
+      role="subtle"
+      size="small"
+      destructive={action.destructive}
+      disabled={action.disabled}
+      href={href}
+      onClick={onClick}
+      {...action.attributes}
+    >
+      {actionText(action, t)}
+    </AxisButton>
   )
 }

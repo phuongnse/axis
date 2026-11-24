@@ -235,21 +235,23 @@ describe('ConsolePublishing', () => {
     expect(within(rows[1]!).queryByTestId('release-relaxed-point')).toBeNull()
   })
 
-  it('names the people of the history, linking them to the user page for an administrator, and opens a release in Studio', async () => {
+  it('names the people of the history, linking them to the user page for an administrator, and opens each release in Studio from its row', async () => {
     stubServer((url) => (url === '/api/me' ? answer({ id: 'admin', users: true, studio: true }) : answer(leave)))
     renderView()
 
     const releases = await screen.findByTestId('console-publishing-releases')
     expect(await within(releases).findByRole('link', { name: 'Rita Reader' })).toHaveAttribute('href', '/users/u1')
-    // The newest row of release 2 is the active one, and the system's and the operator's activations stay plain words.
-    expect(within(releases).getAllByRole('link', { name: '#2' })[0]).toHaveAttribute(
-      'href',
+    // The release numbers are plain text, and each row opens its release in Studio.
+    expect(within(releases).getAllByText('#2')).toHaveLength(2)
+    expect(within(releases).getByText('#1')).toBeVisible()
+    expect(within(releases).queryByRole('link', { name: '#2' })).toBeNull()
+    expect(within(releases).queryByRole('link', { name: '#1' })).toBeNull()
+    const openLinks = within(releases).getAllByRole('link', { name: 'Open in Studio' })
+    expect(openLinks.map((link) => link.getAttribute('href'))).toEqual([
       '/studio?app=Leave&view=release&release=2',
-    )
-    expect(within(releases).getByRole('link', { name: '#1' })).toHaveAttribute(
-      'href',
       '/studio?app=Leave&view=release&release=1',
-    )
+      '/studio?app=Leave&view=release&release=2',
+    ])
     expect(within(releases).getByText('System')).toBeVisible()
     expect(within(releases).getByText('The platform operator')).toBeVisible()
     expect(within(releases).queryByRole('link', { name: 'System' })).toBeNull()
@@ -268,6 +270,7 @@ describe('ConsolePublishing', () => {
     expect(within(view).getByText('Rita Reader')).toBeVisible()
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/me', expect.anything()))
     expect(within(view).queryByRole('link')).toBeNull()
+    expect(within(view).queryByRole('button', { name: 'Open in Studio' })).toBeNull()
     expect(calls).toHaveLength(1)
   })
 

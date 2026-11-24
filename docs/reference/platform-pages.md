@@ -188,9 +188,9 @@ one for the platform, where the administrator gives and removes them. Their text
   display name, with User as its line, and its first part is the email as a fact, or "Not set" when the person has none. It loads the name, the email and
   the roles from the roles route, so a reload or a shared link shows it. A `403` shows that the page is for
   administrators, and a `404` shows the not-found page.
-- **Applications.** The title of an application's section opens that application in Studio for a reader who may use
-  Studio, through `StudioLink`. The platform's section, and the section of an application that is not active, stay
-  plain text.
+- **Applications.** The title of an application's section is plain text. A reader who may use Studio has an Open in
+  Studio button on the section's heading, through `OpenInStudioButton`, which opens that application in Studio. The
+  platform's section, and the section of an application that is not active, have no button.
 - **Tags.** Each role shows the "Given" `StatusTag` in `neutral` when the person has it. A given role that is not
   declared any more has a "Not declared" `StatusTag` in `attention`, and its section lists it even when its
   application is not active.

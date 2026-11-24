@@ -37,6 +37,7 @@ import type {
 } from './site'
 import { useSiteTableKey } from './tableChoices'
 import { siteAddress } from './siteLinks'
+import { RecordLink } from './RecordLink'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -192,13 +193,14 @@ function ResolvedOpenLink({
  * other failure a generic one. The canvas draws the button and exports nothing. A toolbar action to a form page
  * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
  * a button whose expressions the SPA cannot work out is hidden. The identifying column, which is the entity's
- * display field when the table shows it and otherwise the first column, comes first. The first `navigate` row
- * action is the link of its cell, with a real address, so Ctrl+click opens a new tab. An address that needs a
- * reference path is read when the row draws, so the link has its `href` before any click. The cell is plain text
- * when `visibleWhen` hides the action, and shows the action's label when the cell is empty. A file
- * column keeps its download link, so then no action is the link. The other row actions show in the row, a delete
- * as a trash icon. Three or more configured ones fold a row into one "Actions" menu, and below 992 px a row with two or
- * more does, so a row with one action shows it as a button. The toolbar always shows. Its right side has a Refresh
+ * display field when the table shows it and otherwise the first column, comes first. The first `navigate` row action is
+ * the link of its cell, with a real address, so Ctrl+click opens a new tab. An address that needs a reference path is
+ * read when the row draws, so the link has its `href` before any click. The cell is plain text when `visibleWhen` hides
+ * the action, and shows the action's label when the cell is empty. A file column keeps its download link, so then no
+ * action is the link. A `reference` cell is a link to its record's page, in every column where the row's link does not
+ * hold it, and plain text where the entity has no record page. The other row actions show in the row, a delete as a
+ * trash icon. Three or more configured ones fold a row into one "Actions" menu, and below 992 px a row with two or more
+ * does, so a row with one action shows it as a button. The toolbar always shows. Its right side has a Refresh
  * button that loads the current page of rows again, then Import, Export and the toolbar actions, with the first toolbar
  * action last. The table is drawn on `AxisTable`, which owns the
  * toolbar order, the column widths, the 40 px rows, the folding of row actions, the paging and the em dash of an empty
@@ -553,6 +555,17 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
           return <FileLink field={field} value={value as FileValue} />
         }
         const text = formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
+        // A reference links to its record's page, unless the identifying cell's link opens the row.
+        if (field.type === 'reference' && typeof value === 'string' && (column !== 0 || openIndex < 0)) {
+          const label = record.labels[field.name]
+          return (
+            <RecordLink
+              entity={field.target?.entity ?? ''}
+              id={value}
+              label={typeof label === 'string' ? label : null}
+            />
+          )
+        }
         return column === 0 ? openLink(text, text, record) : text
       },
     }))

@@ -247,22 +247,29 @@ describe('UserPage', () => {
     expect(await screen.findByTestId('not-found')).toBeVisible()
   })
 
-  it("links an active application's section title to it in Studio for a reader who may use Studio", async () => {
+  it("shows an active application's section title as plain text, with an Open in Studio button on its heading for a reader who may use Studio", async () => {
     stubRoles(undefined, undefined, { studio: true })
     const page = await openAnn()
 
-    const link = await within(page).findByRole('link', { name: 'Purchasing' })
-    expect(link).toHaveAttribute('href', '/studio?app=Purchasing')
-    expect(within(page).queryByRole('link', { name: 'Platform' })).not.toBeInTheDocument()
+    const section = within(await within(page).findByRole('region', { name: 'Purchasing' }))
+    expect(section.getByRole('heading', { name: 'Purchasing' })).toBeVisible()
+    expect(within(page).queryByRole('link', { name: 'Purchasing' })).not.toBeInTheDocument()
+    // The button has an address, so it is a link element, which Ctrl+click opens in a new tab.
+    expect(section.getByRole('link', { name: 'Open in Studio' })).toHaveAttribute('href', '/studio?app=Purchasing')
+    // The platform's section has no application to open, so it has no button.
+    const platform = within(page).getByRole('region', { name: 'Platform' })
+    expect(within(platform).queryByRole('link', { name: 'Open in Studio' })).not.toBeInTheDocument()
+    expect(within(page).getAllByRole('link', { name: 'Open in Studio' })).toHaveLength(1)
   })
 
-  it('leaves the section titles plain text for a reader who may not use Studio', async () => {
+  it('leaves the section titles plain text, with no Open in Studio button, for a reader who may not use Studio', async () => {
     const fetchMock = stubRoles(undefined, undefined, { studio: false })
     const page = await openAnn()
 
     expect(await within(page).findByRole('heading', { name: 'Purchasing' })).toBeVisible()
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.anything()))
     expect(within(page).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(page).queryByRole('link', { name: 'Open in Studio' })).not.toBeInTheDocument()
   })
 
   it('leaves the section of an application that is not active plain text, even for a reader who may use Studio', async () => {
@@ -274,5 +281,9 @@ describe('UserPage', () => {
 
     expect(await within(page).findByRole('heading', { name: gone })).toBeVisible()
     expect(within(page).queryByRole('link', { name: gone })).not.toBeInTheDocument()
+    // The active application keeps its button, and the section of this one has none.
+    expect(
+      within(within(page).getByRole('region', { name: gone })).queryByRole('link', { name: 'Open in Studio' }),
+    ).not.toBeInTheDocument()
   })
 })

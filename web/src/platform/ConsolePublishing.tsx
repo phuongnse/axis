@@ -2,6 +2,7 @@ import { Flex, Select, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
+import { useCurrentUser } from './currentUser'
 import {
   fetchConsolePublishing,
   type ConsoleApplication,
@@ -14,7 +15,7 @@ import { ReleaseOffStandard } from './ReleaseOffStandard'
 import { ReleasePublisher } from './ReleasePublisher'
 import { SectionPart } from './SectionParts'
 import { StatusTag, type StatusTone } from './StatusTag'
-import { StudioLink } from './StudioLink'
+import { studioReleaseAddress } from './studioAddress'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useText } from './texts'
 import { useTableView } from './useTableView'
@@ -74,6 +75,7 @@ function formatTime(value: string | null, locale: string) {
 export function ConsolePublishing({ applications, locale }: ConsolePublishingProps) {
   const t = useText()
   const [application, setApplication] = useState<string | undefined>(applications[0]?.id)
+  const me = useCurrentUser()
   const { view, setView, saved } = useTableView(
     requestFields,
     recordPageSize,
@@ -134,11 +136,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         title: t('shell.console.publishing.number'),
         render: (_value, row) => (
           <Flex gap="small" align="center">
-            {applicationName === undefined ? (
-              <span>{`#${row.number}`}</span>
-            ) : (
-              <StudioLink application={applicationName} release={row.number}>{`#${row.number}`}</StudioLink>
-            )}
+            <span>{`#${row.number}`}</span>
             {row === activeRow && <StatusTag tone="neutral">{t('shell.console.publishing.active')}</StatusTag>}
           </Flex>
         ),
@@ -175,8 +173,23 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
           row.offStandard ? <ReleaseOffStandard relaxed={row.relaxed} locale={locale} /> : null,
       },
     ],
-    [activeRow, applicationName, locale, t],
+    [activeRow, locale, t],
   )
+
+  // A reader who may use Studio opens a release's page there, see docs/reference/operator-console.md#views.
+  const releaseRowActions =
+    me?.studio && applicationName !== undefined
+      ? {
+          configured: 1,
+          actions: (row: ConsoleReleaseItem) => [
+            {
+              key: 'studio',
+              labelKey: 'shell.studio.openInStudio',
+              href: studioReleaseAddress(applicationName, row.number),
+            },
+          ],
+        }
+      : undefined
 
   // Kind and target have no order a person uses, so their headers do not sort. The other columns sort on the server.
   const requestColumns = useMemo<AxisColumn<ConsolePublishRequest>[]>(
@@ -263,6 +276,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
             testId="console-publishing-releases"
             rowKey={(row) => `${row.releaseId}/${row.activatedAt}`}
             columns={releaseColumns}
+            rowActions={releaseRowActions}
             dataSource={load.publishing?.releases}
             loading={loading}
             emptyText={t('shell.console.publishing.empty')}

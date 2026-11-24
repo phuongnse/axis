@@ -3,13 +3,14 @@ import dayjs from 'dayjs'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { AxisTable } from '../platform/AxisTable'
+import { useCurrentUser } from '../platform/currentUser'
 import { fetchConsoleTenant, type ConsoleApplication, type ConsoleTenant } from '../platform/console'
 import { ConsolePublishing } from '../platform/ConsolePublishing'
 import { ConsoleWebhookDeliveries } from '../platform/ConsoleWebhookDeliveries'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { StatusTag } from '../platform/StatusTag'
-import { StudioLink } from '../platform/StudioLink'
+import { studioApplicationAddress } from '../platform/studioAddress'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
@@ -50,6 +51,7 @@ export function ConsolePage() {
   const t = useText()
   const platform = usePlatform()
   const { locale } = platform.current
+  const me = useCurrentUser()
   const [tenant, setTenant] = useState<ConsoleTenant>()
   const [forbidden, setForbidden] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -112,21 +114,14 @@ export function ConsolePage() {
                     kind: 'freeText',
                     title: t('shell.console.tenant.application'),
                     dataIndex: 'name',
-                    render: (_value, row) => <StudioLink application={row.name}>{row.name}</StudioLink>,
+                    render: (_value, row) => row.name,
                     filter: { kind: 'text', value: (row) => row.name },
                   },
                   {
                     key: 'release',
                     kind: 'freeText',
                     title: t('shell.console.tenant.release'),
-                    render: (_value, row) =>
-                      row.releaseNumber === null ? (
-                        releaseText(row)
-                      ) : (
-                        <StudioLink application={row.name} release={row.releaseNumber}>
-                          {releaseText(row)}
-                        </StudioLink>
-                      ),
+                    render: (_value, row) => releaseText(row),
                     filter: { kind: 'text', value: releaseText },
                   },
                   {
@@ -137,6 +132,22 @@ export function ConsolePage() {
                     filter: { kind: 'date', value: (row) => dayjs(row.activatedAt).format('YYYY-MM-DD') },
                   },
                 ]}
+                // A reader who may use Studio opens the application there, see
+                // docs/reference/operator-console.md#views.
+                rowActions={
+                  me?.studio
+                    ? {
+                        configured: 1,
+                        actions: (row) => [
+                          {
+                            key: 'studio',
+                            labelKey: 'shell.studio.openInStudio',
+                            href: studioApplicationAddress(row.name),
+                          },
+                        ],
+                      }
+                    : undefined
+                }
               />
             </Flex>
           </SectionPart>

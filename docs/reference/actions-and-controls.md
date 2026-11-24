@@ -43,7 +43,7 @@ widget names a role, never an Ant Design button type.
   title row's tools stay subtle. `TitleRowActions` draws a title row's actions in their own roles.
 - **One size to a group** _(planned, #5062)_. The usual size is the default, and the small size is for tables and dense rows.
   A group has one size.
-- **An inline link** _(planned, #5131)_. A link inside a value, such as a reference in a table cell, takes the height of a
+- **An inline link**. A link inside a value, such as a reference in a table cell, takes the height of a
   line of text and no padding.
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
   in the fill colours `primary` and `danger`, which fail contrast on a dark surface, so Axis writes
@@ -464,7 +464,8 @@ be kept right.
   From three actions on, or at narrow width from two on, they fold into one "…" menu of text entries. A table
   set up for three or more actions folds each row that has two or more. A row with one action shows it as a
   button, even at narrow width. A known Remove or Delete is the trash icon in `dangerText`, named by a tooltip.
-  See [menus](#menus).
+  An action that opens another site, such as Open in Studio, is a text button with a real address, so Ctrl+click
+  opens it in a new tab. See [menus](#menus).
 - **A known action is its icon wherever its row is**. A row's Remove or Delete that is a button is the
   trash icon in `dangerText`, named by a tooltip, in a list's row as in a table's.
 - **A column of row controls has no header text** _(planned, #5087)_. The column of a row's "…" or icon buttons, and the
@@ -571,13 +572,15 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   [Studio's route and address](studio.md#route-and-address).
 - **A reference reads as words.** A resource's name and its muted kind are inline text, so a reference
   follows the words before it on their line and wraps as words do.
-- **A link in a value opens in the same site** _(planned, #5131)_. A reference in a value is an inline link only when the
+- **A link in a value opens in the same site**. A reference in a value is an inline link only when the
   thing it names opens in the same site, such as a record, an instance, a sub-process or a step's run. A thing in
   another site, such as Studio, opens only from a button named for it, such as Open in Studio. So a call's connector
   and operation are plain text.
-- **Studio's and the platform's references**. A user, a tenant, an application or a release that a Studio
-  or platform page names is a link to its page where the reader may open it, and plain text otherwise. A Studio
-  reference picker whose chosen resource exists has an Open button joined to it, which opens that resource in Studio.
+- **Studio's and the platform's references**. A user or a tenant that a Studio or platform page names is a link to
+  its page where the reader may open it, and plain text otherwise. On a page outside Studio, such as the console
+  or the user page, an application or a release is not a link in a value: a reader who may use Studio opens it from
+  an Open in Studio button, and anyone else sees plain text. A Studio reference picker whose chosen resource exists
+  has an Open button joined to it, which opens that resource in Studio.
 
 ## Dialogs
 
