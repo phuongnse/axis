@@ -490,7 +490,7 @@ describe('StudioPage', () => {
     }
   })
 
-  it('shows the details of a resource and keeps it in the address without its kind', async () => {
+  it('shows an open resource with its kind as the line and no facts part', async () => {
     stubServer()
     renderPage('/studio?app=PurchaseRequests&kind=entity')
 
@@ -498,16 +498,15 @@ describe('StudioPage', () => {
 
     const details = screen.getByTestId('studio-resource-details')
     expect(details).toHaveTextContent('PurchaseRequest')
-    expect(details).toHaveTextContent('Entity')
-    expect(details).toHaveTextContent(entityId)
-    expect(details).toHaveTextContent('entities/purchase-request.json')
-    // The kind is the line of the heading, and the id and the file are the page's first part.
+    // The kind is the line of the heading. The id and the file are not shown, and no part lists them.
     expect(within(screen.getByTestId('page-heading')).getByText('Entity')).toBeInTheDocument()
-    const facts = within(screen.getByTestId('studio-section-facts'))
-    expect(facts.getByText('ID', { selector: 'dt' })).toBeInTheDocument()
-    expect(facts.getByText(entityId, { selector: 'dd' })).toBeInTheDocument()
-    expect(facts.getByText('entities/purchase-request.json', { selector: 'dd' })).toBeInTheDocument()
-    expect(facts.queryByText('Kind')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('studio-section-facts')).not.toBeInTheDocument()
+    expect(within(details).queryByText('ID', { selector: 'dt' })).not.toBeInTheDocument()
+    expect(within(details).queryByText('File', { selector: 'dt' })).not.toBeInTheDocument()
+    expect(details).not.toHaveTextContent(entityId)
+    expect(details).not.toHaveTextContent('entities/purchase-request.json')
+    // The file is kept in an attribute that is never shown, so the tests can check which resource opened.
+    expect(details).toHaveAttribute('data-file', 'entities/purchase-request.json')
     expect(screen.getByTestId('location')).toHaveTextContent(`/studio?app=PurchaseRequests&resource=${entityId}`)
     expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
   })
@@ -517,7 +516,7 @@ describe('StudioPage', () => {
     renderPage(`/studio?app=PurchaseRequests&resource=${formId}`)
 
     await waitFor(() =>
-      expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('forms/purchase-request.json'),
+      expect(screen.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'forms/purchase-request.json'),
     )
   })
 
@@ -633,14 +632,14 @@ describe('StudioPage', () => {
     expect(within(panel).queryByText(/Path:/)).not.toBeInTheDocument()
   })
 
-  it('selects the resource of a clicked diagnostic and shows its file', async () => {
+  it('selects the resource of a clicked diagnostic and opens its file', async () => {
     stubServer()
     renderPage()
 
     const panel = await openProblems()
     await userEvent.click(await within(panel).findByRole('link', { name: 'PurchaseRequest' }))
 
-    expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
+    expect(screen.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'entities/purchase-request.json')
     expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}`)
   })
 
@@ -716,7 +715,8 @@ describe('StudioPage', () => {
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}&path=%2Ffields%2F0%2Ftype`)
 
     const details = await screen.findByTestId('studio-resource-details')
-    expect(within(details).getByText('entities/purchase-request.json')).toBeInTheDocument()
+    expect(details).toHaveAttribute('data-file', 'entities/purchase-request.json')
+    expect(details).not.toHaveTextContent('entities/purchase-request.json')
     expect(within(details).queryByText('Path')).not.toBeInTheDocument()
     expect(details).not.toHaveTextContent('/fields/0/type')
   })
@@ -779,7 +779,7 @@ describe('StudioPage', () => {
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
 
     expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
-    expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
+    expect(screen.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'entities/purchase-request.json')
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
   })
@@ -1314,11 +1314,14 @@ describe('StudioPage', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { level: 1, name: 'organization/Employee' })).toBeNull()
-    // The module is a fact of the page's first part, not part of the heading.
+    // The kind is the line of the heading. The module is a fact of the page's first part, not part of the heading.
+    expect(within(screen.getByTestId('page-heading')).getByText('Entity')).toBeInTheDocument()
     expect(screen.getByTestId('page-heading')).not.toHaveTextContent('organization')
-    expect(
-      within(screen.getByTestId('studio-section-facts')).getByText('organization', { selector: 'dd' }),
-    ).toBeVisible()
+    const facts = within(screen.getByTestId('studio-section-facts'))
+    expect(facts.getByText('Module', { selector: 'dt' })).toBeInTheDocument()
+    expect(facts.getByText('organization', { selector: 'dd' })).toBeVisible()
+    expect(facts.queryByText('ID', { selector: 'dt' })).not.toBeInTheDocument()
+    expect(facts.queryByText('File', { selector: 'dt' })).not.toBeInTheDocument()
   })
 
   it('scrolls the form field of the path in the address into view', async () => {

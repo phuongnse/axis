@@ -67,7 +67,7 @@ test.describe('Studio edits a scenario in the typed editor', () => {
 
     await createResource(page, 'scenario', 'ApprovalFlow')
     await expect(page).toHaveURL(/resource=/)
-    await expect(page.getByTestId('studio-resource-details')).toContainText('scenarios/approval-flow.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'scenarios/approval-flow.json')
     await expect(page.getByTestId('studio-scenario')).toBeVisible()
     scenarioURL = page.url()
 

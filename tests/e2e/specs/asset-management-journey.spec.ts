@@ -353,11 +353,11 @@ test.describe('the author builds the asset management application with Studio on
     await expect(starter.getByRole('link')).toHaveCount(0)
 
     await createResource(page, 'text', 'en')
-    await expect(page.getByTestId('studio-resource-details')).toContainText('texts/en.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'texts/en.json')
     await expectForm(page)
 
     await createResource(page, 'text', 'vi')
-    await expect(page.getByTestId('studio-resource-details')).toContainText('texts/vi.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'texts/vi.json')
     await expectForm(page)
 
     const english = await texts('en')
@@ -389,7 +389,7 @@ test.describe('the author builds the asset management application with Studio on
     ]) {
       await createResource(page, 'role', name)
       // The editor of the previous role stays on screen until the new role replaces it, so wait for the file.
-      await expect(page.getByTestId('studio-resource-details')).toContainText(`roles/${name}.json`)
+      await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', `roles/${name}.json`)
       await expectForm(page)
       await writeLabel(page, 'studio-field-/label', text(key))
       await save(page)
@@ -1001,7 +1001,7 @@ test.describe('the author builds the asset management application with Studio on
       await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
       await createResource(page, 'scenario', name)
-      await expect(page.getByTestId('studio-resource-details')).toContainText(file)
+      await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', file)
       await expectForm(page)
 
       const scenario = await sample<SampleScenario>(file)
@@ -1049,7 +1049,7 @@ test.describe('the author builds the asset management application with Studio on
       await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
       await createResource(page, 'scenario', name)
-      await expect(page.getByTestId('studio-resource-details')).toContainText(file)
+      await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', file)
 
       // The scenario editor cannot add a child-collection value, so the sample is pasted into the JSON view.
       await openTab(page, 'JSON')

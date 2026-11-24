@@ -154,11 +154,11 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(starter.getByRole('link')).toHaveCount(0)
 
     await createResource(page, 'text', 'en')
-    await expect(page.getByTestId('studio-resource-details')).toContainText('texts/en.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'texts/en.json')
     await expectForm(page)
 
     await createResource(page, 'text', 'vi')
-    await expect(page.getByTestId('studio-resource-details')).toContainText('texts/vi.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'texts/vi.json')
     await expectForm(page)
 
     const english = await texts('en')
@@ -205,7 +205,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     ]) {
       await createResource(page, 'role', name)
       // The editor of the previous role stays on screen until the new role replaces it, so wait for the file.
-      await expect(page.getByTestId('studio-resource-details')).toContainText(`roles/${name}.json`)
+      await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', `roles/${name}.json`)
       await expectForm(page)
       await writeLabel(page, 'studio-field-/label', text(key))
       await save(page)

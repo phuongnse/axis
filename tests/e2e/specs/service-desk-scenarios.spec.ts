@@ -143,7 +143,7 @@ test.describe('the author writes the test scenarios in Studio', () => {
       await page.goto(`${server.url}/studio?app=ServiceDesk`)
 
       await createResource(page, 'scenario', name)
-      await expect(page.getByTestId('studio-resource-details')).toContainText(file)
+      await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', file)
       await expectForm(page)
 
       const scenario = await sample<SampleScenario>(file)

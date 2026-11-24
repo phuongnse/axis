@@ -76,13 +76,13 @@ test.describe('Studio creates a resource from a starter', () => {
 
     await createResource(page, 'entity', 'CostCentre')
     await expect(page).toHaveURL(/resource=/)
-    await expect(page.getByTestId('studio-resource-details')).toContainText('entities/cost-centre.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'entities/cost-centre.json')
     await expect(page.getByTestId('studio-editor')).toBeVisible()
 
     await createResource(page, 'page', 'Overview')
     await openFormTab(page)
     await expect(page).toHaveURL(/resource=/)
-    await expect(page.getByTestId('studio-resource-details')).toContainText('pages/overview.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'pages/overview.json')
     await expect(page.getByTestId('studio-editor')).toBeVisible()
   })
 
@@ -92,7 +92,7 @@ test.describe('Studio creates a resource from a starter', () => {
 
     await createResource(page, 'text', 'vi')
     await expect(page).toHaveURL(/resource=/)
-    await expect(page.getByTestId('studio-resource-details')).toContainText('texts/vi.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'texts/vi.json')
     await expect(page.getByTestId('studio-editor')).toBeVisible()
 
     const keys = async (locale: string) => {
@@ -117,7 +117,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await expect(entityName).toHaveValue('ProjectTask')
     await createResource(page, 'entity', 'Project')
     await expect(entityName).toHaveValue('Project')
-    await expect(page.getByTestId('studio-resource-details')).toContainText('entities/project.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'entities/project.json')
 
     await addField(page, 1, 'stage', 'enum')
     const values = page.getByTestId('studio-field-/fields/1/values').getByRole('combobox')
@@ -199,7 +199,7 @@ test.describe('Studio creates a resource from a starter', () => {
 
     await createResource(page, 'entity', 'Shipment')
     await expect(entityName).toHaveValue('Shipment')
-    await expect(page.getByTestId('studio-resource-details')).toContainText('entities/shipment.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'entities/shipment.json')
 
     await addField(page, 1, 'currencyCode', 'enum')
     await tag('studio-field-/fields/1/values', 'VND')
@@ -251,7 +251,7 @@ test.describe('Studio creates a resource from a starter', () => {
 
     await createResource(page, 'entity', 'Backlog')
     await expect(entityName).toHaveValue('Backlog')
-    await expect(page.getByTestId('studio-resource-details')).toContainText('entities/backlog.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'entities/backlog.json')
 
     await addField(page, 1, 'stage', 'enum')
     const values = page.getByTestId('studio-field-/fields/1/values').getByRole('combobox')
@@ -297,7 +297,7 @@ test.describe('Studio creates a resource from a starter', () => {
 
     await createResource(page, 'identityProvider', 'Partner')
     await openFormTab(page)
-    await expect(page.getByTestId('studio-resource-details')).toContainText('identity-providers/partner.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'identity-providers/partner.json')
     await pick(page, 'studio-field-/type', 'oidc')
     await page.getByRole('textbox', { name: 'Issuer', exact: true }).fill('PartnerIssuer')
     await page.getByRole('textbox', { name: 'Client ID', exact: true }).fill('PartnerClientId')
@@ -365,7 +365,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     await createResource(page, 'connector', 'WarehouseShipping')
     await openFormTab(page)
-    await expect(page.getByTestId('studio-resource-details')).toContainText('connectors/warehouse-shipping.json')
+    await expect(page.getByTestId('studio-resource-details')).toHaveAttribute('data-file', 'connectors/warehouse-shipping.json')
 
     await pick(page, 'studio-field-/baseUrl/binding', 'PurchasingSystemUrl')
     await pick(page, 'studio-field-/auth/type', 'oauth2')
