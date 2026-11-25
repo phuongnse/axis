@@ -1,5 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -14,7 +14,7 @@ import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { CellTenantPage } from './CellTenantPage'
 import { PlatformContext, type Platform } from './context'
-import { hasFieldError, isRequiredLabel } from '../test/antd'
+import { hasFieldError, isRequiredLabel, shownMenu } from '../test/antd'
 import { clickInDialog, pick } from '../test/tableFilter'
 
 const platform: Platform = {
@@ -244,6 +244,22 @@ function cellTexts(row: HTMLElement) {
 /** The tag of the tenant's status, on the page's heading. */
 function statusTag(text: string) {
   return within(screen.getByTestId('page-heading')).getByText(text).closest('[data-tone]')
+}
+
+/**
+ * Opens the More actions menu of the page's heading, as a person does, and returns the menu once it has the focus. The
+ * menu takes the focus a few frames after it opens, so a choice made before then would lose it to the menu again.
+ */
+async function openMore(user: UserEvent) {
+  await user.click(within(await screen.findByTestId('page-actions')).getByRole('button', { name: 'More actions' }))
+  const menu = await shownMenu('More actions')
+  await waitFor(() => expect(menu.contains(document.activeElement)).toBe(true))
+  return within(menu)
+}
+
+/** Chooses the entry `testId` in the More actions menu of the heading, for an action that folds into it. */
+async function chooseMore(user: UserEvent, testId: string) {
+  await user.click((await openMore(user)).getByTestId(testId))
 }
 
 describe('CellTenantPage', () => {
@@ -520,15 +536,32 @@ describe('CellTenantPage', () => {
     expect(statusTag(words)).toHaveAttribute('data-tone', tone)
   })
 
-  it('puts the actions on the right of the heading', async () => {
+  it('puts Export on the heading and folds the other actions into More actions, Suspend and Delete last', async () => {
     stubRoutes(ok(acme))
+    const user = userEvent.setup()
     renderPage('/tenants/acme')
 
     const actions = within(await screen.findByTestId('page-actions'))
-    expect(await actions.findByTestId('cell-tenant-suspend')).toBeInTheDocument()
+    expect(actions.getAllByRole('button')).toHaveLength(2)
     expect(actions.getByTestId('cell-tenant-export')).toBeInTheDocument()
-    expect(actions.getByTestId('cell-tenant-set-quotas')).toBeInTheDocument()
-    expect(actions.getByTestId('cell-tenant-add-host')).toBeInTheDocument()
+    const menu = await openMore(user)
+    expect(menu.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual([
+      'Set quotas…',
+      'Add a host…',
+      'Suspend…',
+      'Delete…',
+    ])
+    expect(menu.getAllByRole('separator')).toHaveLength(1)
+    expect(menu.getByTestId('cell-tenant-suspend')).toBeInTheDocument()
+  })
+
+  it('opens Suspend from the More actions menu, and its confirmation names the tenant', async () => {
+    stubRoutes(ok(acme))
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await chooseMore(user, 'cell-tenant-suspend')
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Suspend acme?')
   })
 
   it('shows the purge date of a deleting tenant next to its status', async () => {
@@ -642,31 +675,36 @@ describe('CellTenantPage', () => {
     expect(screen.queryByRole('separator')).not.toBeInTheDocument()
   })
 
-  it('offers Suspend and no Resume for an active tenant, and neither for a provisioning one', async () => {
+  it('offers Suspend in the More actions menu and no Resume for an active tenant', async () => {
     stubRoutes(ok(acme))
+    const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await screen.findByTestId('cell-tenant')
-    expect(screen.getByTestId('cell-tenant-suspend')).toBeInTheDocument()
-    expect(screen.queryByTestId('cell-tenant-resume')).not.toBeInTheDocument()
+    const menu = await openMore(user)
+    expect(menu.getByTestId('cell-tenant-suspend')).toBeInTheDocument()
+    expect(menu.queryByTestId('cell-tenant-resume')).not.toBeInTheDocument()
   })
 
-  it('offers both buttons for a read-only tenant and Resume alone for a suspended one', async () => {
+  it('offers Resume on the heading and Suspend in the More actions menu for a read-only tenant', async () => {
     stubRoutes(ok({ ...acme, status: 'readOnly' }))
+    const user = userEvent.setup()
     renderPage('/tenants/acme')
 
     await screen.findByTestId('cell-tenant')
-    expect(screen.getByTestId('cell-tenant-suspend')).toBeInTheDocument()
-    expect(screen.getByTestId('cell-tenant-resume')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-actions')).getByTestId('cell-tenant-resume')).toBeInTheDocument()
+    expect((await openMore(user)).getByTestId('cell-tenant-suspend')).toBeInTheDocument()
   })
 
-  it('offers no action for a provisioning tenant', async () => {
+  it('offers no Suspend or Resume for a provisioning tenant, and no More actions button', async () => {
     stubRoutes(ok({ ...acme, status: 'provisioning' }))
     renderPage('/tenants/acme')
 
     await screen.findByTestId('cell-tenant')
     expect(screen.queryByTestId('cell-tenant-suspend')).not.toBeInTheDocument()
     expect(screen.queryByTestId('cell-tenant-resume')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('page-actions')).queryByRole('button', { name: 'More actions' }),
+    ).not.toBeInTheDocument()
   })
 
   it('keeps the Idempotency-Key for a retry after a 5xx and sends a new one for the next action', async () => {
@@ -682,7 +720,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-suspend'))
+    await chooseMore(user, 'cell-tenant-suspend')
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Suspend acme?')
     await user.click(within(dialog).getByRole('button', { name: /Suspend$/ }))
@@ -695,7 +733,8 @@ describe('CellTenantPage', () => {
     await user.click(await within(dialog).findByRole('button', { name: /Suspend$/ }))
 
     await waitFor(() => expect(statusTag('Suspended')).toBeInTheDocument())
-    expect(screen.queryByTestId('cell-tenant-suspend')).not.toBeInTheDocument()
+    expect((await openMore(user)).queryByTestId('cell-tenant-suspend')).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
     await user.click(screen.getByTestId('cell-tenant-resume'))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Resume$/ }))
 
@@ -712,7 +751,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     const onRefused = renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-suspend'))
+    await chooseMore(user, 'cell-tenant-suspend')
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Suspend$/ }))
 
     await waitFor(() => expect(onRefused).toHaveBeenCalledWith('forbidden'))
@@ -729,7 +768,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    await chooseMore(user, 'cell-tenant-set-quotas')
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Set the quotas of acme')
     // Users is overridden, Applications is the default and Storage has no limit. Storage stays as it is.
@@ -761,7 +800,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    await chooseMore(user, 'cell-tenant-set-quotas')
     const dialog = await screen.findByRole('dialog')
     await user.click(
       within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByRole('radio', { name: /^No limit/ }),
@@ -777,7 +816,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    await chooseMore(user, 'cell-tenant-set-quotas')
     const dialog = await screen.findByRole('dialog')
     const save = within(dialog).getByRole('button', { name: 'Save' })
     expect(save).toBeDisabled()
@@ -796,7 +835,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    await chooseMore(user, 'cell-tenant-set-quotas')
     const dialog = await screen.findByRole('dialog')
 
     for (const label of ['Users', 'Applications', 'Storage (bytes)']) {
@@ -820,7 +859,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    await chooseMore(user, 'cell-tenant-set-quotas')
     const dialog = await screen.findByRole('dialog')
     const users = within(dialog).getByRole('spinbutton', { name: 'Users value' })
     await user.clear(users)
@@ -836,12 +875,12 @@ describe('CellTenantPage', () => {
     expect(writes).toHaveLength(0)
   })
 
-  it('offers Export for every status but provisioning', async () => {
+  it('offers Export for every status but provisioning, in the More actions menu of a suspended tenant', async () => {
     stubRoutes(ok({ ...acme, status: 'suspended' }))
+    const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await screen.findByTestId('cell-tenant')
-    expect(screen.getByTestId('cell-tenant-export')).toBeInTheDocument()
+    expect((await openMore(user)).getByTestId('cell-tenant-export')).toBeInTheDocument()
   })
 
   it('queues an export job with an Idempotency-Key after the confirmation names the tenant', async () => {
@@ -866,11 +905,14 @@ describe('CellTenantPage', () => {
 
   it('offers Download only with a succeeded export job', async () => {
     stubDownload([{ ...exportJob, state: 'failed' }, job])
+    const user = userEvent.setup()
     renderPage('/tenants/acme')
 
     await screen.findByTestId('cell-tenant')
     await screen.findByTestId('cell-jobs')
-    expect(screen.queryByTestId('cell-tenant-download')).not.toBeInTheDocument()
+    const menu = await openMore(user)
+    expect(menu.getByTestId('cell-tenant-set-quotas')).toBeInTheDocument()
+    expect(menu.queryByTestId('cell-tenant-download')).not.toBeInTheDocument()
   })
 
   it('sends the ZIP request only after the warning is accepted, and saves the file under the name of the server', async () => {
@@ -890,7 +932,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-download'))
+    await chooseMore(user, 'cell-tenant-download')
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Download the export of acme?')
     expect(dialog).toHaveTextContent('restricted data')
@@ -912,7 +954,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-download'))
+    await chooseMore(user, 'cell-tenant-download')
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
@@ -927,7 +969,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-download'))
+    await chooseMore(user, 'cell-tenant-download')
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: /Download$/ }))
 
@@ -946,38 +988,43 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     const onRefused = renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-download'))
+    await chooseMore(user, 'cell-tenant-download')
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Download$/ }))
 
     await waitFor(() => expect(onRefused).toHaveBeenCalledWith('forbidden'))
   })
 
-  it('offers Delete next to Suspend and Resume for a suspended tenant, and not for a provisioning one', async () => {
+  it('offers Resume on the heading and Delete last in the More actions menu for a suspended tenant', async () => {
     stubRoutes(ok({ ...acme, status: 'suspended' }))
+    const user = userEvent.setup()
     renderPage('/tenants/acme')
 
     await screen.findByTestId('cell-tenant')
-    expect(screen.getByTestId('cell-tenant-delete')).toBeInTheDocument()
-    expect(screen.getByTestId('cell-tenant-resume')).toBeInTheDocument()
-    expect(screen.queryByTestId('cell-tenant-cancel-deletion')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('page-actions')).getByTestId('cell-tenant-resume')).toBeInTheDocument()
+    const menu = await openMore(user)
+    expect(menu.getByTestId('cell-tenant-delete')).toBeInTheDocument()
+    expect(menu.queryByTestId('cell-tenant-cancel-deletion')).not.toBeInTheDocument()
   })
 
-  it('offers no Delete for a provisioning tenant', async () => {
+  it('offers no Delete for a provisioning tenant, and no More actions button', async () => {
     stubRoutes(ok({ ...acme, status: 'provisioning' }))
     renderPage('/tenants/acme')
 
     await screen.findByTestId('cell-tenant')
     expect(screen.queryByTestId('cell-tenant-delete')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('cell-tenant-cancel-deletion')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('page-actions')).queryByRole('button', { name: 'More actions' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('offers Set quotas and Add a host for every status', async () => {
+  it('offers Set quotas and Add a host as buttons on the heading of a provisioning tenant', async () => {
     stubRoutes(ok({ ...acme, status: 'provisioning' }))
     renderPage('/tenants/acme')
 
     await screen.findByTestId('cell-tenant')
-    expect(screen.getByTestId('cell-tenant-set-quotas')).toBeInTheDocument()
-    expect(screen.getByTestId('cell-tenant-add-host')).toBeInTheDocument()
+    const actions = within(screen.getByTestId('page-actions'))
+    expect(actions.getByRole('button', { name: 'Set quotas…' })).toBeInTheDocument()
+    expect(actions.getByRole('button', { name: 'Add a host…' })).toBeInTheDocument()
   })
 
   it('adds a host and shows its TXT and CNAME records', async () => {
@@ -985,7 +1032,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    await chooseMore(user, 'cell-tenant-add-host')
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Add a host to acme')
     const add = within(dialog).getByRole('button', { name: 'Add' })
@@ -1015,7 +1062,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    await chooseMore(user, 'cell-tenant-add-host')
     const dialog = await screen.findByRole('dialog')
     expect(tenantReads()).toBe(1)
     await user.type(within(dialog).getByRole('textbox', { name: 'Host' }), 'portal.acme.test')
@@ -1030,7 +1077,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    await chooseMore(user, 'cell-tenant-add-host')
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: 'Add' }))
 
@@ -1046,7 +1093,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    await chooseMore(user, 'cell-tenant-add-host')
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByRole('textbox', { name: 'Host' }), 'taken.example.com')
     await user.click(within(dialog).getByRole('button', { name: 'Add' }))
@@ -1066,7 +1113,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     const onRefused = renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    await chooseMore(user, 'cell-tenant-add-host')
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByRole('textbox', { name: 'Host' }), 'portal.acme.test')
     await user.click(within(dialog).getByRole('button', { name: 'Add' }))
@@ -1080,7 +1127,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    await chooseMore(user, 'cell-tenant-set-quotas')
     const dialog = await screen.findByRole('dialog')
     await user.click(
       within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByRole('radio', { name: /^No limit/ }),
@@ -1100,7 +1147,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-delete'))
+    await chooseMore(user, 'cell-tenant-delete')
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Delete acme?')
     const deleteButton = within(dialog).getByRole('button', { name: /Delete$/ })
@@ -1127,12 +1174,12 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-delete'))
+    await chooseMore(user, 'cell-tenant-delete')
     await user.type(within(await screen.findByRole('dialog')).getByLabelText('Type acme to confirm'), 'acme')
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
-    await user.click(screen.getByTestId('cell-tenant-delete'))
+    await chooseMore(user, 'cell-tenant-delete')
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByLabelText('Type acme to confirm')).toHaveValue('')
     expect(within(dialog).getByRole('button', { name: /Delete$/ })).toBeDisabled()
@@ -1147,7 +1194,7 @@ describe('CellTenantPage', () => {
     const user = userEvent.setup()
     renderPage('/tenants/acme')
 
-    await user.click(await screen.findByTestId('cell-tenant-delete'))
+    await chooseMore(user, 'cell-tenant-delete')
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Type acme to confirm'), 'acme')
     await user.click(within(dialog).getByRole('button', { name: /Delete$/ }))
@@ -1158,7 +1205,7 @@ describe('CellTenantPage', () => {
     expect(keys[0]).toBeTruthy()
   })
 
-  it('offers only Cancel deletion for a deleting tenant and posts the cancellation when it is confirmed', async () => {
+  it('offers Cancel deletion in the More actions menu of a deleting tenant and posts the cancellation when it is confirmed', async () => {
     const queued = { id: '12', kind: 'cancel-deletion', tenantId: 'acme', state: 'queued', createdAt: job.createdAt }
     const { keys, sent } = stubActions(
       { 'POST /api/cell/tenants/acme/deletion/cancel': [{ status: 202, body: queued }] },
@@ -1169,11 +1216,13 @@ describe('CellTenantPage', () => {
     renderPage('/tenants/acme')
 
     await screen.findByTestId('cell-tenant')
-    expect(screen.queryByTestId('cell-tenant-suspend')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('cell-tenant-resume')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('cell-tenant-delete')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('page-actions')).getByTestId('cell-tenant-export')).toBeInTheDocument()
+    const menu = await openMore(user)
+    expect(menu.queryByTestId('cell-tenant-suspend')).not.toBeInTheDocument()
+    expect(menu.queryByTestId('cell-tenant-resume')).not.toBeInTheDocument()
+    expect(menu.queryByTestId('cell-tenant-delete')).not.toBeInTheDocument()
 
-    await user.click(screen.getByTestId('cell-tenant-cancel-deletion'))
+    await user.click(menu.getByTestId('cell-tenant-cancel-deletion'))
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Cancel the deletion of acme?')
     // The corner button of the dialog is also named Close, so the dismiss button is the second one.

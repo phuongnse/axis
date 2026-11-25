@@ -132,7 +132,7 @@ choices.
   size token, and wider when an item needs the room.
 - **One threshold everywhere**. One or two actions show as buttons in a table's row or a list's item. From three
   on, or when the row runs out of room, they fold into one "…" menu.
-- **One threshold on a heading** _(planned, #5134)_. One or two actions show as buttons on a page's heading or a section's
+- **One threshold on a heading**. One or two actions show as buttons on a page's heading or a section's
   title row. From three on, the actions the heading marks as foldable fold into one "…" menu of two or more, as a row's
   actions do.
 - **A destructive entry comes last.** In a menu of actions, a destructive entry comes after the others, behind one
