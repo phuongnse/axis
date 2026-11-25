@@ -25,6 +25,7 @@ import { EmptyDash } from '../platform/EmptyValue'
 import { saveFile } from '../platform/exports'
 import { HostRequestDialog } from '../platform/HostRequestDialog'
 import { HostRequestTable } from '../platform/HostRequestTable'
+import { actionText, type AxisAction } from '../platform/menuActions'
 import { PageActions, PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
 import { recordPageSize } from '../platform/tableQuery'
@@ -104,9 +105,11 @@ const actionTexts = {
  * action, see docs/reference/cell-console.md#views. An id that is neither shows the not-found page. An `active` or `readOnly` tenant offers
  * Suspend and a `suspended` or `readOnly` one offers Resume. Any tenant but a `provisioning` one offers Export. An `active`,
  * `readOnly` or `suspended` tenant offers Delete, which stays off until the operator types the tenant id exactly, and a
- * `deleting` one offers Cancel deletion in place of Suspend, Resume and Delete. Each action is behind a confirmation. An
- * action queues a job with an `Idempotency-Key`, which stays for a retry after a network error or a 5xx and goes with a
- * final answer. The page then follows the job every 2 seconds until it ends and reloads the tenant and its jobs. With a
+ * `deleting` one offers Cancel deletion in place of Suspend, Resume and Delete. The first action that is not
+ * destructive is the heading's button, and the others fold into the More actions menu, with Suspend and Delete last.
+ * Each action is behind a confirmation. An action queues a job with an `Idempotency-Key`, which stays for a retry after
+ * a network error or a 5xx and goes with a final answer. The page then follows the job every 2 seconds until it ends
+ * and reloads the tenant and its jobs. With a
  * succeeded `export` job among the jobs, Download opens a warning that the ZIP is restricted data, and only accepting it
  * fetches the ZIP. Set quotas and Add a host open their own dialogs, show for every status and queue no job: the quota
  * table shows the quotas that the cell answered. Once Add a host is answered, the page loads the tenant again, so the
@@ -274,6 +277,73 @@ export function CellTenantPage() {
   const ready = jobs?.find((job) => job.kind === 'export' && job.state === 'succeeded')
   const canDelete = tenant?.status === 'active' || tenant?.status === 'readOnly' || tenant?.status === 'suspended'
   const canCancelDeletion = tenant?.status === 'deleting'
+  // The tenant's actions in the order of docs/reference/cell-console.md#actions. Suspend and Delete are destructive, so
+  // they go last in the More actions menu, see docs/reference/actions-and-controls.md#menus.
+  const shown: (AxisAction | false)[] = [
+    canSuspend && {
+      key: 'suspend',
+      labelKey: actionTexts.suspend.button,
+      destructive: true,
+      disabled: following !== null,
+      onClick: () => openConfirmation('suspend'),
+      attributes: { 'data-testid': 'cell-tenant-suspend' },
+    },
+    canResume && {
+      key: 'resume',
+      labelKey: actionTexts.resume.button,
+      disabled: following !== null,
+      onClick: () => openConfirmation('resume'),
+      attributes: { 'data-testid': 'cell-tenant-resume' },
+    },
+    canExport && {
+      key: 'export',
+      labelKey: actionTexts.export.button,
+      disabled: following !== null,
+      onClick: () => openConfirmation('export'),
+      attributes: { 'data-testid': 'cell-tenant-export' },
+    },
+    canDelete && {
+      key: 'delete',
+      labelKey: actionTexts.delete.button,
+      destructive: true,
+      disabled: following !== null,
+      onClick: () => openConfirmation('delete'),
+      attributes: { 'data-testid': 'cell-tenant-delete' },
+    },
+    canCancelDeletion && {
+      key: 'cancel-deletion',
+      labelKey: actionTexts['cancel-deletion'].button,
+      disabled: following !== null,
+      onClick: () => openConfirmation('cancel-deletion'),
+      attributes: { 'data-testid': 'cell-tenant-cancel-deletion' },
+    },
+    ready !== undefined && {
+      key: 'download',
+      labelKey: 'shell.cell.tenant.download',
+      disabled: following !== null,
+      onClick: () => {
+        setDownloadError(null)
+        setDownloading(true)
+      },
+      attributes: { 'data-testid': 'cell-tenant-download' },
+    },
+    {
+      key: 'set-quotas',
+      labelKey: 'shell.cell.tenant.setQuotas',
+      onClick: () => setOpenDialog('quotas'),
+      attributes: { 'data-testid': 'cell-tenant-set-quotas' },
+    },
+    {
+      key: 'add-host',
+      labelKey: 'shell.cell.tenant.addHost',
+      onClick: () => setOpenDialog('host'),
+      attributes: { 'data-testid': 'cell-tenant-add-host' },
+    },
+  ]
+  const shownActions = shown.filter((action): action is AxisAction => action !== false)
+  // The first action that is not destructive stays the heading's button. The others fold into the More actions menu.
+  const first = shownActions.find((action) => !action.destructive)
+  const fold = shownActions.filter((action) => action !== first)
 
   function openConfirmation(action: CellTenantAction) {
     setActionError(null)
@@ -339,78 +409,12 @@ export function CellTenantPage() {
         <AxisAlert data-testid="cell-tenant-error" kind="error" message={t('shell.cell.tenant.loadFailed')} />
       )}
       {tenant && (
-        <PageActions>
-          <Flex gap="small">
-            {canSuspend && (
-              <AxisButton
-                role="secondary"
-                data-testid="cell-tenant-suspend"
-                disabled={following !== null}
-                onClick={() => openConfirmation('suspend')}
-              >
-                {t(actionTexts.suspend.button)}
-              </AxisButton>
-            )}
-            {canResume && (
-              <AxisButton
-                role="secondary"
-                data-testid="cell-tenant-resume"
-                disabled={following !== null}
-                onClick={() => openConfirmation('resume')}
-              >
-                {t(actionTexts.resume.button)}
-              </AxisButton>
-            )}
-            {canExport && (
-              <AxisButton
-                role="secondary"
-                data-testid="cell-tenant-export"
-                disabled={following !== null}
-                onClick={() => openConfirmation('export')}
-              >
-                {t(actionTexts.export.button)}
-              </AxisButton>
-            )}
-            {canDelete && (
-              <AxisButton
-                role="secondary"
-                data-testid="cell-tenant-delete"
-                disabled={following !== null}
-                onClick={() => openConfirmation('delete')}
-              >
-                {t(actionTexts.delete.button)}
-              </AxisButton>
-            )}
-            {canCancelDeletion && (
-              <AxisButton
-                role="secondary"
-                data-testid="cell-tenant-cancel-deletion"
-                disabled={following !== null}
-                onClick={() => openConfirmation('cancel-deletion')}
-              >
-                {t(actionTexts['cancel-deletion'].button)}
-              </AxisButton>
-            )}
-            {ready && (
-              <AxisButton
-                role="secondary"
-                data-testid="cell-tenant-download"
-                disabled={following !== null}
-                onClick={() => {
-                  setDownloadError(null)
-                  setDownloading(true)
-                }}
-              >
-                {t('shell.cell.tenant.download')}
-              </AxisButton>
-            )}
-            <AxisButton role="secondary" data-testid="cell-tenant-set-quotas" onClick={() => setOpenDialog('quotas')}>
-              {t('shell.cell.tenant.setQuotas')}
+        <PageActions fold={fold}>
+          {first && (
+            <AxisButton role="secondary" disabled={first.disabled} onClick={first.onClick} {...first.attributes}>
+              {actionText(first, t)}
             </AxisButton>
-            <AxisButton role="secondary" data-testid="cell-tenant-add-host" onClick={() => setOpenDialog('host')}>
-              {t('shell.cell.tenant.addHost')}
-            </AxisButton>
-          </Flex>
+          )}
         </PageActions>
       )}
       <SectionParts>

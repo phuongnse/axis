@@ -7,6 +7,7 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { fieldLabel } from '../fields'
 import { submitCode, submitPassword } from '../keycloak'
 import { psql } from '../postgres'
+import { chooseMoreAction, openMoreActions } from '../shell'
 import { addRealmAccount, type RealmAccount } from '../tenant-realm'
 import { liveTotp, totpSecret } from '../totp'
 
@@ -124,7 +125,7 @@ test('the platform operator suspends a tenant, follows the job and resumes it', 
   await page.goto(`https://console.localhost/tenants/${tenant}`)
   await expect(page.getByTestId('page-heading')).toContainText('Active')
 
-  await page.getByTestId('cell-tenant-suspend').click()
+  await chooseMoreAction(page, 'cell-tenant-suspend')
   await expect(await waitForDialog(page)).toContainText(tenant)
   await expectNoViolations(page)
   await confirmDialog(page, 'Suspend')
@@ -145,7 +146,7 @@ test('the platform operator sets a quota of a tenant', async () => {
   await page.goto(`https://console.localhost/tenants/${tenant}`)
   await expect(page.getByTestId('page-heading')).toContainText('Active')
 
-  await page.getByTestId('cell-tenant-set-quotas').click()
+  await chooseMoreAction(page, 'cell-tenant-set-quotas')
   const dialog = await waitForDialog(page)
   await expect(dialog).toContainText(tenant)
   await dialog.getByRole('radiogroup', { name: 'Users', exact: true }).getByRole('radio', { name: /^A value/ }).check()
@@ -164,7 +165,7 @@ test('the platform operator adds a host to a tenant and sees the records to add'
   await page.goto(`https://console.localhost/tenants/${tenant}`)
   await expect(page.getByTestId('page-heading')).toContainText('Active')
 
-  await page.getByTestId('cell-tenant-add-host').click()
+  await chooseMoreAction(page, 'cell-tenant-add-host')
   const dialog = await waitForDialog(page)
   await expect(dialog).toContainText(tenant)
   await dialog.getByRole('textbox', { name: 'Host', exact: true }).fill(host)
@@ -191,7 +192,7 @@ test('the platform operator exports a tenant, follows the job and downloads the 
   await expect(newestJob).toContainText('export', { timeout: 60_000 })
   await expect(newestJob).toContainText('Succeeded', { timeout: 120_000 })
 
-  await page.getByTestId('cell-tenant-download').click()
+  await chooseMoreAction(page, 'cell-tenant-download')
   const warning = await waitForDialog(page)
   await expect(warning).toContainText('restricted data')
   await expectNoViolations(page)
@@ -215,7 +216,7 @@ test('cancelling the download warning downloads nothing', async () => {
   })
   page.on('download', () => downloads++)
 
-  await page.getByTestId('cell-tenant-download').click()
+  await chooseMoreAction(page, 'cell-tenant-download')
   const warning = await waitForDialog(page)
   await warning.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(warning).toBeHidden()
@@ -274,7 +275,7 @@ test('the platform operator deletes a tenant by typing its id and cancels the de
   await page.goto(`https://console.localhost/tenants/${tenant}`)
   await expect(page.getByTestId('page-heading')).toContainText('Active')
 
-  await page.getByTestId('cell-tenant-delete').click()
+  await chooseMoreAction(page, 'cell-tenant-delete')
   const dialog = await waitForDialog(page)
   await expect(dialog).toContainText(tenant)
   await expect(dialog.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled()
@@ -287,9 +288,11 @@ test('the platform operator deletes a tenant by typing its id and cancels the de
   await expect(jobs.getByRole('row').nth(1)).toContainText('delete', { timeout: 60_000 })
   await expect(jobs.getByRole('row').nth(1)).toContainText('Succeeded', { timeout: 60_000 })
   await expect(page.getByTestId('page-heading')).toContainText('Deleting', { timeout: 60_000 })
-  await expect(page.getByTestId('cell-tenant-suspend')).toHaveCount(0)
-
-  await page.getByTestId('cell-tenant-cancel-deletion').click()
+  // A deleting tenant has no Suspend, and its Cancel deletion waits in the More actions menu.
+  const more = await openMoreActions(page)
+  await expect(more.getByTestId('cell-tenant-suspend')).toHaveCount(0)
+  await more.getByTestId('cell-tenant-cancel-deletion').click()
+  await expect(more).toHaveCount(0)
   await confirmDialog(page, 'Cancel deletion')
   await expect(jobs.getByRole('row').nth(1)).toContainText('cancel-deletion', { timeout: 60_000 })
   await expect(jobs.getByRole('row').nth(1)).toContainText('Succeeded', { timeout: 60_000 })

@@ -136,9 +136,9 @@ tenant button of the Tenants view and the actions of the Tenant view.
     facts, and its jobs, read from
     [the deleted-tenant read](tenant-lifecycle.md#routes). The purge removed the rest, so that view shows no hosts,
     host verification, quotas, usage or action. Both dates show with the time, in the operator's locale.
-  - **Actions.** A Suspend, a Resume, an Export, a Delete and a Cancel deletion button, each with a confirmation
-    that names the tenant, a Download button once an export has succeeded, and a Set quotas and an Add a host
-    button, each with a dialog that names the tenant, see [actions](#actions).
+  - **Actions.** A Suspend, a Resume, an Export, a Delete and a Cancel deletion action, each with a confirmation
+    that names the tenant, a Download action once an export has succeeded, and a Set quotas and an Add a host
+    action, each with a dialog that names the tenant, see [actions](#actions).
 - **Application**. A row of the Tenants view and the Tenant view show the tenant's
   application, as the [tenant reads](tenant-lifecycle.md#routes) answer it.
 
@@ -148,10 +148,14 @@ Each action calls one route of the [provisioning API](tenant-lifecycle.md#provis
 operator's session. Suspend, Resume, Export, Delete, Cancel deletion, Create a tenant and Run again queue a job.
 Set quotas and Add a host apply at once.
 
+- **The heading.** The Tenant view's first shown action that is not destructive is a button on the heading. From
+  three actions on, the others fold into the More actions menu in their order, with Suspend and Delete last, behind a
+  divider. A `provisioning` tenant shows only Set quotas and Add a host, so both stay buttons and there is no menu.
+  See [one threshold on a heading](actions-and-controls.md#menus).
 - **Suspend and Resume.** The Tenant view shows Suspend for an `active` or a `readOnly` tenant and Resume for
   a `suspended` or a `readOnly` one, the statuses that [`tenant suspend`](tenant-status-commands.md#tenant-suspend)
   and [`tenant resume`](tenant-status-commands.md#tenant-resume) change. A `provisioning` or `deleting` tenant
-  shows neither. A button opens a confirmation that names the tenant and says what the action does, and
+  shows neither. Each opens a confirmation that names the tenant and says what the action does, and
   confirming it calls `POST /api/cell/tenants/{id}/suspend` or `/resume`.
 - **Export and Download.** The Tenant view shows Export for a tenant in any status but `provisioning`. Its
   confirmation names the tenant, and confirming it calls `POST /api/cell/tenants/{id}/exports` and follows the
@@ -202,7 +206,7 @@ Set quotas and Add a host apply at once.
 - **The job.** The queued job heads the tenant's jobs, or the shown page of the Jobs view after a run again. The view reads
   it at once and then every 2 seconds, and shows its state and steps. When the job succeeds or fails, the view
   loads the tenant and its jobs, or the page, again. The Suspend, Resume, Export, Delete, Cancel deletion and
-  Download buttons are off while the Tenant view follows a job.
+  Download actions are off while the Tenant view follows a job.
 
 ## What the console never shows
 

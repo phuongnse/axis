@@ -5,6 +5,7 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { fieldLabel } from '../fields'
 import { addAuthenticator, submitCode, submitPassword } from '../keycloak'
 import { psql } from '../postgres'
+import { chooseMoreAction } from '../shell'
 import { addRealmAccount, clearRequiredActions, giveRealmRole, setRealmPassword } from '../tenant-realm'
 import { liveTotp } from '../totp'
 
@@ -149,7 +150,7 @@ test('the operator lowers a quota under the use of a tenant, its save is refused
   }
 
   await operator.goto(`${consoleUrl}tenants/${full}`)
-  await operator.getByTestId('cell-tenant-set-quotas').click()
+  await chooseMoreAction(operator, 'cell-tenant-set-quotas')
   const dialog = await waitForDialog(operator)
   await expect(dialog).toContainText(full)
   await dialog.getByRole('radiogroup', { name: 'Storage (bytes)', exact: true }).getByRole('radio', { name: /^A value/ }).check()
@@ -188,14 +189,14 @@ test('the operator exports the tenant over its quota, downloads the ZIP after th
   await expect(jobs.getByRole('row').nth(1)).toContainText('export', { timeout: 60_000 })
   await expect(jobs.getByRole('row').nth(1)).toContainText('Succeeded', { timeout: 120_000 })
 
-  await page.getByTestId('cell-tenant-download').click()
+  await chooseMoreAction(page, 'cell-tenant-download')
   const warning = await waitForDialog(page)
   await expect(warning).toContainText('restricted data')
   const download = page.waitForEvent('download')
   await confirmDialog(page, 'Download')
   expect((await download).suggestedFilename()).toMatch(new RegExp(`^${full}-[0-9a-f-]{36}\\.zip$`))
 
-  await page.getByTestId('cell-tenant-delete').click()
+  await chooseMoreAction(page, 'cell-tenant-delete')
   const dialog = await waitForDialog(page)
   await dialog.getByTestId('cell-tenant-delete-id').fill(full)
   await confirmDialog(page, 'Delete')
