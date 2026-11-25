@@ -486,5 +486,7 @@ each entity field has `helpKey`, the text key of its `help`, or `null`. It adds 
     [frontend](frontend.md) say.
   - `opensForm` is `true` when the target page holds a form widget, so the SPA opens `/new` without
     `record`.
-  - A saved record shows a button for each `navigate` action after its `startProcess` buttons, with
-    values from the record as it was loaded, so unsaved edits are not used. A new record shows none.
+  - A saved record shows each `navigate` action on the page heading after its `startProcess` actions, in the
+    same order. From three actions on, those after the first are entries of the More actions menu, as
+    [start process actions](#start-process-actions) says. Its values come from the record as it was loaded, so
+    unsaved edits are not used. A new record shows none.
