@@ -66,8 +66,8 @@ wrong form show the not-found page, and the instance is not requested.
 - **Heading**. The heading is the process's title, through `processTitle`, which gives the process's name
   where its release gives no title. Its state is a `StatusTag` beside the title, and Process ("Quy trình") is the
   line under it, see [page header](shell.md#page-header). The commands sit on the heading's right, through
-  `PageActions`: Open in Studio ("Mở trong Studio"), a secondary button, then Cancel instance and Retry, see
-  [commands](#commands). Studio is another site, so Open in Studio is a named button, never a link in the data,
+  `PageActions`: Open in Studio ("Mở trong Studio"), a secondary button, then Cancel instance and Retry, which fold
+  into the More actions menu when all three show, see [commands](#commands). Studio is another site, so Open in Studio is a named button, never a link in the data,
   see [opening things](actions-and-controls.md#opening-things). It shows only when the detail's `studio` is not
   `null`, which is for a person who may author the application.
 
@@ -254,8 +254,9 @@ The instance page runs the operator's commands on the instance and its calls, ea
 - **Buttons.** The page has a Cancel instance and a Retry button for each of those commands that the
   instance detail's `commands` lists. With none listed, it has no button, and a command name the SPA
   does not know is left out.
-- **On the heading**. Cancel instance and Retry are secondary `AxisButton`s on the heading's right, after
-  Open in Studio, through `PageActions`.
+- **On the heading**. Cancel instance and Retry are `PageActions`' `fold` on the heading's right, after
+  Open in Studio. Each is a secondary button, until Open in Studio and both commands all show: then they are
+  entries of the More actions menu, see [menus](actions-and-controls.md#menus).
 - **Reason.** A button opens a dialog that asks for a reason. The reason is required, must not be
   blank and has at most 500 characters, and Send is blocked until it is valid.
 - **Answer.** On success, the dialog closes and the page reads the instance detail again, so it shows

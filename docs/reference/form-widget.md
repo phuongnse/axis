@@ -373,15 +373,18 @@ A `form` widget can declare `startProcess` actions, which save the record and st
 }
 ```
 
-- **Buttons.** On a saved record, each action is a button with its label, outlined as a page's own action, see
-  [buttons](actions-and-controls.md#buttons) and [on the page heading](#start-process-actions). For a signed-in user,
+- **Buttons.** On a saved record, each action has its label. The first is an outlined `main` button and a second is a
+  secondary button, since a screen keeps one main action, see [buttons](actions-and-controls.md#buttons) and
+  [on the page heading](#start-process-actions). From three actions on, the first stays a button and the others fold
+  into the More actions menu, see [menus](actions-and-controls.md#menus). For a signed-in user,
   page metadata lists only the actions whose process the user holds a `start` grant on. A new record shows no action buttons, so a
   failed start never leaves a record behind on a form that still says new.
-- **On the page heading.** Each action on a saved record is the page's own: an outlined `main`
-  button on the right of the page's heading, on its row, through `PageActions`, with the `navigate` buttons
-  after the `startProcess` ones. A form drawn with no page heading, such as in a widget's preview, puts them at
-  its top, on the right. On a designer's canvas the actions stay at the form's top, because the canvas's page heading is
-  not the form's.
+- **On the page heading.** Each action on a saved record is the page's own, on the right of the page's heading, on its
+  row, through `PageActions`, with the `navigate` actions after the `startProcess` ones. The actions after the first
+  are `PageActions`' `fold`, so from three on they are menu entries that do what their buttons do. A form drawn with
+  no page heading, such as in a widget's preview, puts them at its top, on the right. On a designer's canvas the
+  actions stay at the form's top, because the canvas's page heading is not the form's, and every action stays a
+  button that never folds, so the author can select each one.
 - **Compile checks.** The process must name the form's entity as its subject. An unknown process is
   `AXC0087`, and a process over another entity is `AXC0088`, both at
   `/widgets/{i}/actions/{j}/process`. `actions` on another widget type is `AXC0060`. The label joins
@@ -483,5 +486,7 @@ each entity field has `helpKey`, the text key of its `help`, or `null`. It adds 
     [frontend](frontend.md) say.
   - `opensForm` is `true` when the target page holds a form widget, so the SPA opens `/new` without
     `record`.
-  - A saved record shows a button for each `navigate` action after its `startProcess` buttons, with
-    values from the record as it was loaded, so unsaved edits are not used. A new record shows none.
+  - A saved record shows each `navigate` action on the page heading after its `startProcess` actions, in the
+    same order. From three actions on, those after the first are entries of the More actions menu, as
+    [start process actions](#start-process-actions) says. Its values come from the record as it was loaded, so
+    unsaved edits are not used. A new record shows none.

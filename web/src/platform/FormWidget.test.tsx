@@ -361,6 +361,7 @@ const texts = {
   'shell.studio.cancel': 'Cancel',
   'shell.studio.saveBar.unsaved': 'Unsaved changes',
   'shell.studio.saveBar.noUnsaved': 'No unsaved changes',
+  'shell.actionRow.more': 'More actions',
   'shell.form.next': 'Next',
   'shell.form.back': 'Back',
   'shell.form.reload': 'Reload',
@@ -2737,7 +2738,7 @@ describe('FormWidget', () => {
       visibleWhen: null,
     }
 
-    it('draws the start and navigate actions as outlined buttons on the page heading', async () => {
+    it('draws the first action as the main button and a second as a secondary button on the page heading', async () => {
       stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
       renderForm(
         noteId,
@@ -2754,9 +2755,72 @@ describe('FormWidget', () => {
       const action = await within(heading).findByRole('button', { name: 'Close note' })
       const open = within(heading).getByRole('button', { name: 'note.open' })
       expect(action).toHaveClass('ant-btn-variant-outlined')
+      expect(action).toHaveStyle({ borderColor: designTokensFor('light').colour.primaryText })
       expect(open).toHaveClass('ant-btn-variant-outlined')
+      expect(open).not.toHaveStyle({ borderColor: designTokensFor('light').colour.primaryText })
+      expect(within(heading).queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    })
+
+    const secondStart = {
+      type: 'startProcess' as const,
+      process: 'NoteArchive',
+      labelKey: 'noteArchive.action',
+      instancesPath: '/api/apps/E2eApp/processes/NoteArchive/instances',
+      visibleWhen: null,
+    }
+    const threeActions = { ...actionWidget, actions: [...actionWidget.actions, secondStart, openAction] }
+
+    it('keeps the first action as a button and folds the others into the More actions menu from three on', async () => {
+      const requests = stubFetch(
+        { status: 200, body: noteJson('Buy paper', 1) },
+        { status: 201, body: instanceJson },
+        { status: 200, body: noteJson('Buy paper', 2) },
+      )
+      renderForm(noteId, threeActions, undefined, undefined, null, undefined, false, true)
+
+      const heading = await screen.findByTestId('page-actions')
+      expect(await within(heading).findByRole('button', { name: 'Close note' })).toBeInTheDocument()
+      expect(within(heading).queryByRole('button', { name: 'noteArchive.action' })).not.toBeInTheDocument()
+      expect(within(heading).queryByRole('button', { name: 'note.open' })).not.toBeInTheDocument()
+
+      await userEvent.click(within(heading).getByRole('button', { name: 'More actions' }))
+      const entries = await screen.findAllByRole('menuitem')
+      expect(entries.map((entry) => entry.textContent)).toEqual(['noteArchive.action', 'note.open'])
+
+      await userEvent.click(entries[0])
+
+      expect(await screen.findByTestId('form-started')).toBeInTheDocument()
+      expect(requests().map(({ url, method }) => ({ url, method }))).toContainEqual({
+        url: '/api/apps/E2eApp/processes/NoteArchive/instances',
+        method: 'POST',
+      })
+    })
+
+    it('opens the target page from the More actions menu', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, threeActions, undefined, undefined, null, undefined, false, true)
+
+      await userEvent.click(
+        await within(await screen.findByTestId('page-actions')).findByRole('button', { name: 'More actions' }),
+      )
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'note.open' }))
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notes?note=${noteId}`))
+    })
+
+    it('draws every action as a selectable button on a designer canvas, and never folds them', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId, threeActions, undefined, undefined, null, undefined, true, true)
+
+      const first = await screen.findByRole('button', { name: 'Close note' })
+      const second = screen.getByRole('button', { name: 'noteArchive.action' })
+      const third = screen.getByRole('button', { name: 'note.open' })
+      expect(first).toHaveAttribute('data-action', 'actions/0')
+      expect(second).toHaveAttribute('data-action', 'actions/1')
+      expect(third).toHaveAttribute('data-action', 'actions/2')
+      expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
     })
 
     it('draws the actions at the top of the form on the right when there is no page heading', async () => {

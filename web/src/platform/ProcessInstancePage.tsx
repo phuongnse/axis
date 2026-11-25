@@ -1,6 +1,6 @@
 import { Flex, Tabs } from 'antd'
 import { AxisAlert } from './AxisAlert'
-import { AxisButton } from './AxisButton'
+import type { AxisAction } from './menuActions'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { CopyableId } from './CopyableId'
@@ -359,17 +359,7 @@ export function InstanceDetailView({
   }
   return (
     <div data-testid="inspector-instance">
-      <PageActions>
-        <Flex gap="small" align="center">
-          {instance.studio && (
-            <OpenInStudioButton
-              address={studioResourceAddress(instance.studio.app, instance.studio.resource)}
-              data-testid="inspector-open-studio"
-            />
-          )}
-          <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
-        </Flex>
-      </PageActions>
+      <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
       {instance.state === 'failed' && (
         <AxisAlert data-testid="inspector-failure" kind="error" message={reason ? `${stopped} ${reason}` : stopped} />
       )}
@@ -468,23 +458,32 @@ interface InstanceCommandsProps {
   onChanged: () => void
 }
 
-/** One secondary button for each command the instance detail allows. A command this build does not know is left out. */
+/**
+ * The instance's actions on the page heading: Open in Studio as a button, and each command the instance detail allows,
+ * which fold into the More actions menu when all three show, see
+ * docs/reference/process-inspector-widget.md#instance-page. A command this build does not know is left out.
+ */
 function InstanceCommands({ instance, instancesPath, onChanged }: InstanceCommandsProps) {
   const t = useText()
   const [open, setOpen] = useState<InstanceCommand>()
-  const allowed = instanceCommands.filter((command) => instance.commands.includes(command))
+  const commands: AxisAction[] = instanceCommands
+    .filter((command) => instance.commands.includes(command))
+    .map((command) => ({
+      key: command,
+      labelKey: `shell.inspector.commands.${command}`,
+      onClick: () => setOpen(command),
+      attributes: { 'data-testid': `inspector-command-${command}` },
+    }))
   return (
     <>
-      {allowed.map((command) => (
-        <AxisButton
-          key={command}
-          role="secondary"
-          data-testid={`inspector-command-${command}`}
-          onClick={() => setOpen(command)}
-        >
-          {t(`shell.inspector.commands.${command}`)}
-        </AxisButton>
-      ))}
+      <PageActions fold={commands}>
+        {instance.studio && (
+          <OpenInStudioButton
+            address={studioResourceAddress(instance.studio.app, instance.studio.resource)}
+            data-testid="inspector-open-studio"
+          />
+        )}
+      </PageActions>
       {open && (
         <ReasonDialog
           title={t(`shell.inspector.commands.${open}`)}
