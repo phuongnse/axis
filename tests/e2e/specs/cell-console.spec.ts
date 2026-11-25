@@ -291,7 +291,7 @@ test('the platform operator deletes a tenant by typing its id and cancels the de
   // A deleting tenant has no Suspend, and its Cancel deletion waits in the More actions menu.
   const more = await openMoreActions(page)
   await expect(more.getByTestId('cell-tenant-suspend')).toHaveCount(0)
-  await more.getByTestId('cell-tenant-cancel-deletion').press('Enter')
+  await more.getByTestId('cell-tenant-cancel-deletion').click()
   await expect(more).toHaveCount(0)
   await confirmDialog(page, 'Cancel deletion')
   await expect(jobs.getByRole('row').nth(1)).toContainText('cancel-deletion', { timeout: 60_000 })

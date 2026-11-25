@@ -39,21 +39,23 @@ export async function expectChosen(page: Page, item: string, button = 'Language 
 
 /**
  * Opens the More actions menu of the page heading, which holds the actions that fold into it, see
- * docs/reference/actions-and-controls.md#menus. It waits until the menu is shown, and returns it.
+ * docs/reference/actions-and-controls.md#menus. It waits until the menu is shown and has the focus, and returns it. The
+ * menu takes the focus a few frames after it opens, so an entry chosen before then can lose it to the menu.
  */
 export async function openMoreActions(page: Page): Promise<Locator> {
   await page.getByTestId('page-actions').getByRole('button', { name: 'More actions', exact: true }).click()
   const menu = page.getByRole('menu', { name: 'More actions', exact: true })
   await expect(menu).toBeVisible()
+  await expect.poll(() => menu.evaluate((element) => element.contains(document.activeElement))).toBe(true)
   return menu
 }
 
 /**
- * Chooses the folded action `testId` in the More actions menu of the page heading. It presses Enter on the entry, as
- * `entityFieldAction` does, and waits until the menu has closed. An action that stays a button is clicked directly.
+ * Chooses the folded action `testId` in the More actions menu of the page heading. It clicks the entry once the menu has
+ * the focus, and waits until the menu has closed. An action that stays a button is clicked directly.
  */
 export async function chooseMoreAction(page: Page, testId: string) {
   const menu = await openMoreActions(page)
-  await menu.getByTestId(testId).press('Enter')
+  await menu.getByTestId(testId).click()
   await expect(menu).toHaveCount(0)
 }
